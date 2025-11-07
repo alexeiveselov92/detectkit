@@ -231,6 +231,7 @@ class MetricConfig(BaseModel):
 
     Attributes:
         name: Metric name (unique identifier)
+        tags: Optional list of tags for metric selection (e.g., ["critical", "api"])
         profile: Profile name to use (overrides default_profile from project config)
         query: Inline SQL query (mutually exclusive with query_file)
         query_file: Path to SQL file (mutually exclusive with query)
@@ -246,6 +247,7 @@ class MetricConfig(BaseModel):
     Example YAML:
         ```yaml
         name: cpu_usage
+        tags: ["critical", "infrastructure", "10min"]
         profile: clickhouse_prod
         query_file: sql/cpu_usage.sql
         query_columns:
@@ -275,6 +277,10 @@ class MetricConfig(BaseModel):
     """
 
     name: str = Field(..., description="Metric name")
+    tags: Optional[List[str]] = Field(
+        default=None,
+        description="Optional tags for metric selection (e.g., ['critical', 'api', '10min'])",
+    )
     profile: Optional[str] = Field(
         default=None, description="Profile name to use (overrides default_profile)"
     )
@@ -333,6 +339,32 @@ class MetricConfig(BaseModel):
                 "Metric name can only contain alphanumeric characters, "
                 "underscores, and dashes"
             )
+        return v
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        """Validate tags field."""
+        if v is None:
+            return v
+
+        if not v:
+            raise ValueError("tags list cannot be empty (use null instead)")
+
+        # Check for duplicate tags
+        if len(v) != len(set(v)):
+            raise ValueError("Duplicate tags not allowed")
+
+        # Validate each tag format (alphanumeric + underscore + dash)
+        for tag in v:
+            if not tag:
+                raise ValueError("Empty tag not allowed")
+            if not all(c.isalnum() or c in ("_", "-") for c in tag):
+                raise ValueError(
+                    f"Invalid tag '{tag}': only alphanumeric characters, "
+                    f"underscores, and dashes allowed"
+                )
+
         return v
 
     @field_validator("loading_batch_size")

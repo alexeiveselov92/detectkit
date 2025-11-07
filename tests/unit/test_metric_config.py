@@ -277,6 +277,92 @@ class TestMetricConfig:
         with pytest.raises(FileNotFoundError):
             config.get_query_text()
 
+    def test_tags_field_optional(self):
+        """Test that tags field is optional."""
+        config = MetricConfig(
+            name="cpu_usage",
+            query="SELECT 1",
+            interval="10min",
+        )
+        assert config.tags is None
+
+    def test_tags_field_valid(self):
+        """Test valid tags."""
+        config = MetricConfig(
+            name="cpu_usage",
+            query="SELECT 1",
+            interval="10min",
+            tags=["critical", "infrastructure", "10min"],
+        )
+        assert config.tags == ["critical", "infrastructure", "10min"]
+
+    def test_tags_alphanumeric_underscore_dash(self):
+        """Test tags with alphanumeric, underscore, and dash characters."""
+        valid_tags = ["critical", "api_v2", "10-min", "team-A", "env_prod"]
+        config = MetricConfig(
+            name="cpu_usage",
+            query="SELECT 1",
+            interval="10min",
+            tags=valid_tags,
+        )
+        assert config.tags == valid_tags
+
+    def test_tags_empty_list_error(self):
+        """Test that empty tags list raises error."""
+        with pytest.raises(ValueError, match="cannot be empty"):
+            MetricConfig(
+                name="cpu_usage",
+                query="SELECT 1",
+                interval="10min",
+                tags=[],
+            )
+
+    def test_tags_duplicate_error(self):
+        """Test that duplicate tags raise error."""
+        with pytest.raises(ValueError, match="Duplicate tags"):
+            MetricConfig(
+                name="cpu_usage",
+                query="SELECT 1",
+                interval="10min",
+                tags=["critical", "api", "critical"],
+            )
+
+    def test_tags_empty_string_error(self):
+        """Test that empty string tag raises error."""
+        with pytest.raises(ValueError, match="Empty tag"):
+            MetricConfig(
+                name="cpu_usage",
+                query="SELECT 1",
+                interval="10min",
+                tags=["critical", ""],
+            )
+
+    def test_tags_invalid_characters_error(self):
+        """Test that invalid characters in tags raise error."""
+        with pytest.raises(ValueError, match="Invalid tag"):
+            MetricConfig(
+                name="cpu_usage",
+                query="SELECT 1",
+                interval="10min",
+                tags=["critical!", "api"],
+            )
+
+        with pytest.raises(ValueError, match="Invalid tag"):
+            MetricConfig(
+                name="cpu_usage",
+                query="SELECT 1",
+                interval="10min",
+                tags=["critical api"],  # Space not allowed
+            )
+
+        with pytest.raises(ValueError, match="Invalid tag"):
+            MetricConfig(
+                name="cpu_usage",
+                query="SELECT 1",
+                interval="10min",
+                tags=["critical@prod"],  # @ not allowed
+            )
+
     def test_metric_with_detectors(self):
         """Test metric with detector configurations."""
         config = MetricConfig(

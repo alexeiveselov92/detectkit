@@ -101,22 +101,51 @@ dtk run --select <selector> [OPTIONS]
 
 ##### `--select`, `-s` (required)
 
-Selector for metrics to run.
+Selector for metrics to run. Three selector types are supported:
 
-**Metric name**:
+**1. Metric name** (searches only root `metrics/` directory):
 ```bash
-dtk run --select cpu_usage
+dtk run --select cpu_usage          # Finds metrics/cpu_usage.yml
+dtk run --select api_latency        # Finds metrics/api_latency.yml
 ```
 
-**Path pattern** (glob):
+Note: When using metric name (without path separators), **do not** include `.yml` extension. The extension is added automatically.
+
+**2. Path pattern** (glob - supports subdirectories):
 ```bash
-dtk run --select "metrics/critical/*.yml"
+# Select specific file with full path
+dtk run --select "metrics/critical/cpu.yml"
+
+# Select all metrics in a folder
+dtk run --select "metrics/critical/*"
+
+# Select all metrics recursively
+dtk run --select "metrics/**/*.yml"
+
+# Pattern matching
+dtk run --select "api_*"            # All metrics starting with "api_"
 ```
 
-**Tag** (not implemented yet):
+**3. Tag selector** (searches recursively):
 ```bash
+# Select all metrics with "critical" tag
 dtk run --select tag:critical
+
+# Select metrics tagged as "api"
+dtk run --select tag:api
+
+# Select metrics tagged as "10min"
+dtk run --select tag:10min
 ```
+
+Tags must be configured in metric YAML files:
+```yaml
+name: api_latency
+tags: ["critical", "api", "10min"]
+# ... rest of config
+```
+
+**Uniqueness validation**: All selected metrics are validated to ensure no duplicate metric names exist. If duplicates are found, an error is raised listing the conflicting files.
 
 ##### `--exclude`, `-e` (optional)
 
@@ -231,6 +260,86 @@ dtk run --select cpu_usage --profile staging
 **Use cases**:
 - Testing with different database
 - Running against multiple environments
+
+#### Metric Selection Rules
+
+Understanding how metric selection works is important to avoid confusion:
+
+##### File Name vs Metric Name
+
+**Two different identifiers**:
+1. **File name** (e.g., `metrics/cpu.yml`) - where config is stored
+2. **Metric name** (e.g., `name: cpu_usage` in YAML) - identifier used in database
+
+**Important**: detectkit uses **metric name** (from config) for all operations:
+- Database table rows are keyed by `metric_name`
+- Task locking uses `metric_name`
+- Display shows `metric_name` (not file name)
+
+**Best practice**: Keep file names and metric names consistent:
+```yaml
+# File: metrics/cpu_usage.yml
+name: cpu_usage    # ✅ Matches file name (recommended)
+```
+
+```yaml
+# File: metrics/cpu.yml
+name: server_cpu_usage    # ⚠️ Confusing - file name doesn't match
+```
+
+##### Uniqueness Requirements
+
+**Metric names MUST be unique** across the entire project.
+
+**Why uniqueness matters**:
+- Database tables use `metric_name` as PRIMARY KEY component
+- Duplicate names cause data to mix from different sources
+- Task locking conflicts prevent metrics from running
+- Anomaly detection becomes invalid (mixed data)
+
+**Example of invalid configuration**:
+```yaml
+# metrics/api/cpu.yml
+name: cpu_usage          # ❌ Duplicate name!
+query: "SELECT * FROM api_metrics"
+
+# metrics/system/cpu.yml
+name: cpu_usage          # ❌ Same name causes data corruption!
+query: "SELECT * FROM system_metrics"
+```
+
+**Validation**: detectkit automatically validates uniqueness when selecting metrics. If duplicates are found:
+```
+Error: Duplicate metric name 'cpu_usage' found:
+  - metrics/api/cpu.yml
+  - metrics/system/cpu.yml
+
+Metric names must be unique across the project.
+Please rename one of the metrics to avoid data corruption.
+```
+
+**Solution - use unique names**:
+```yaml
+# metrics/api/cpu.yml
+name: api_cpu_usage      # ✅ Unique
+
+# metrics/system/cpu.yml
+name: system_cpu_usage   # ✅ Unique
+```
+
+##### Selector Behavior Summary
+
+| Selector Type | Example | Searches | Extension |
+|--------------|---------|----------|-----------|
+| Metric name | `cpu_usage` | Root `metrics/` only | Auto-added |
+| Path with `/` | `metrics/api/cpu.yml` | Glob pattern | Keep as-is |
+| Pattern with `*` | `api_*` | Glob pattern | Keep as-is |
+| Tag | `tag:critical` | Recursive search | N/A |
+
+**Common mistakes**:
+- ❌ `dtk run --select cpu_usage.yml` → Won't work (searches for `metrics/cpu_usage.yml.yml`)
+- ✅ `dtk run --select cpu_usage` → Correct (searches for `metrics/cpu_usage.yml`)
+- ✅ `dtk run --select "metrics/cpu_usage.yml"` → Also works (explicit path)
 
 #### Examples
 

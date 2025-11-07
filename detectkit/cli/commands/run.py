@@ -12,6 +12,7 @@ import click
 
 from detectkit.config.metric_config import MetricConfig
 from detectkit.config.profile import ProfilesConfig
+from detectkit.config.validator import validate_metric_uniqueness
 from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.orchestration.task_manager import PipelineStep, TaskManager
 
@@ -65,16 +66,37 @@ def run_command(
     # project_config = load_project_config(project_root)
 
     # Select metrics based on selector
-    metrics = select_metrics(select, project_root)
+    # Returns list of (path, config) tuples with uniqueness validation
+    try:
+        metrics = select_metrics(select, project_root)
+    except ValueError as e:
+        click.echo(
+            click.style(
+                f"Error: {e}",
+                fg="red",
+                bold=True,
+            )
+        )
+        return
 
     # Exclude metrics if specified
     if exclude:
-        excluded_metrics = select_metrics(exclude, project_root)
-        excluded_names = {m.name for m in excluded_metrics}
-        metrics = [m for m in metrics if m.name not in excluded_names]
+        try:
+            excluded_metrics = select_metrics(exclude, project_root)
+            excluded_names = {config.name for _, config in excluded_metrics}
+            metrics = [(path, config) for path, config in metrics if config.name not in excluded_names]
 
-        if excluded_metrics:
-            click.echo(f"Excluded {len(excluded_metrics)} metric(s) matching: {exclude}")
+            if excluded_metrics:
+                click.echo(f"Excluded {len(excluded_metrics)} metric(s) matching: {exclude}")
+        except ValueError as e:
+            click.echo(
+                click.style(
+                    f"Error in exclusion selector: {e}",
+                    fg="red",
+                    bold=True,
+                )
+            )
+            return
 
     if not metrics:
         click.echo(
@@ -150,9 +172,10 @@ def run_command(
     )
 
     # Process each metric
-    for metric_path in metrics:
+    for metric_path, config in metrics:
         process_metric(
             metric_path=metric_path,
+            config=config,
             project_root=project_root,
             task_manager=task_manager,
             steps=step_list,
@@ -254,9 +277,9 @@ def find_project_root() -> Optional[Path]:
     return None
 
 
-def select_metrics(selector: str, project_root: Path) -> List[Path]:
+def select_metrics(selector: str, project_root: Path) -> List[tuple[Path, MetricConfig]]:
     """
-    Select metrics based on selector.
+    Select metrics based on selector and validate uniqueness.
 
     Selector types:
     - Metric name: "cpu_usage"
@@ -268,34 +291,44 @@ def select_metrics(selector: str, project_root: Path) -> List[Path]:
         project_root: Project root path
 
     Returns:
-        List of metric file paths
+        List of (path, config) tuples for selected metrics
+
+    Raises:
+        ValueError: If duplicate metric names found or configs invalid
     """
     metrics_dir = project_root / "metrics"
 
     if not metrics_dir.exists():
         return []
 
+    # Collect metric paths based on selector
+    metric_paths: List[Path] = []
+
     # Tag selector
     if selector.startswith("tag:"):
         tag = selector[4:]
-        return find_metrics_by_tag(metrics_dir, tag)
-
+        metric_paths = find_metrics_by_tag(metrics_dir, tag)
     # Path pattern selector
-    if "*" in selector or "/" in selector:
+    elif "*" in selector or "/" in selector:
         pattern = selector if selector.startswith("metrics/") else f"metrics/{selector}"
-        return list(project_root.glob(pattern))
+        metric_paths = list(project_root.glob(pattern))
+    # Metric name selector (only searches root metrics/ directory)
+    else:
+        metric_file = metrics_dir / f"{selector}.yml"
+        if metric_file.exists():
+            metric_paths = [metric_file]
+        else:
+            # Try with .yaml extension
+            metric_file = metrics_dir / f"{selector}.yaml"
+            if metric_file.exists():
+                metric_paths = [metric_file]
 
-    # Metric name selector
-    metric_file = metrics_dir / f"{selector}.yml"
-    if metric_file.exists():
-        return [metric_file]
+    if not metric_paths:
+        return []
 
-    # Try with .yaml extension
-    metric_file = metrics_dir / f"{selector}.yaml"
-    if metric_file.exists():
-        return [metric_file]
-
-    return []
+    # Validate uniqueness and load configs
+    # This will raise ValueError if duplicate metric names found
+    return validate_metric_uniqueness(metric_paths)
 
 
 def find_metrics_by_tag(metrics_dir: Path, tag: str) -> List[Path]:
@@ -330,6 +363,7 @@ def find_metrics_by_tag(metrics_dir: Path, tag: str) -> List[Path]:
 
 def process_metric(
     metric_path: Path,
+    config: MetricConfig,
     project_root: Path,
     task_manager: TaskManager,
     steps: List[PipelineStep],
@@ -343,6 +377,7 @@ def process_metric(
 
     Args:
         metric_path: Path to metric YAML file
+        config: Loaded and validated metric configuration
         project_root: Project root directory
         task_manager: Task manager instance
         steps: Pipeline steps to execute
@@ -351,10 +386,11 @@ def process_metric(
         full_refresh: Full refresh flag
         force: Force flag
     """
-    metric_name = metric_path.stem
+    # Use config.name (not metric_path.stem) for consistency
+    metric_name = config.name
 
-    click.echo(click.style(f"Processing: {metric_name}", fg="cyan", bold=True))
-    click.echo(f"  File: {metric_path}")
+    click.echo(click.style(f"Processing metric: {metric_name}", fg="cyan", bold=True))
+    click.echo(f"  Config file: {metric_path.relative_to(project_root)}")
     click.echo(f"  Steps: {', '.join(s.value for s in steps)}")
 
     if from_date:
@@ -367,19 +403,6 @@ def process_metric(
         click.echo(click.style("  Force: YES (ignoring locks)", fg="yellow"))
 
     click.echo()
-
-    # Load metric configuration
-    try:
-        config = MetricConfig.from_yaml_file(metric_path)
-    except Exception as e:
-        click.echo(
-            click.style(
-                f"  ✗ Error loading metric config: {e}",
-                fg="red",
-            )
-        )
-        click.echo()
-        return
 
     # Run pipeline
     try:

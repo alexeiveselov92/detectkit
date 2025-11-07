@@ -300,7 +300,7 @@ upper_bound: null    # Error: at least one bound required
 | Historical data | ❌ Not needed | ✅ Required | ✅ Required | ✅ Required |
 | Warm-up period | ✅ None | ⚠️ min_samples | ⚠️ min_samples | ⚠️ min_samples |
 | Adaptivity | ❌ Static | ✅ Adapts | ✅ Adapts | ✅ Adapts |
-| Seasonality | ❌ No | ✅ Excellent | ❌ Not yet | ❌ Not yet |
+| Seasonality | ❌ No | ✅ Excellent | ✅ Yes | ✅ Yes |
 | Domain knowledge | ✅ Required | ❌ Not needed | ❌ Not needed | ❌ Not needed |
 | Setup effort | ⚠️ Manual tuning | ✅ Auto | ✅ Auto | ✅ Auto |
 | Performance | ✅ Fastest | ✅ Fast | ✅ Fast | ✅ Fast |

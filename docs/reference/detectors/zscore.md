@@ -282,7 +282,7 @@ With `window_size < min_samples`:
 |---------|---------|-----|-----|--------|
 | Robust to outliers | ❌ No | ✅ Very | ✅ Very | N/A |
 | Normal distribution | ✅ Required | ❌ Not required | ❌ Not required | N/A |
-| Seasonality support | ❌ Not yet | ✅ Excellent | ❌ Not yet | ❌ No |
+| Seasonality support | ✅ Yes | ✅ Excellent | ✅ Yes | ❌ No |
 | Sensitivity | ✅ High | ⚠️ Medium | ⚠️ Medium | ✅ Exact |
 | Performance | ✅ Very Fast | ✅ Fast | ✅ Fast | ✅ Very Fast |
 | Mathematical basis | ✅ Strong | ✅ Good | ✅ Good | ❌ None |

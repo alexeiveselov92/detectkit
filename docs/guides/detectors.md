@@ -9,8 +9,8 @@ detectkit provides several detector types for anomaly detection:
 | Detector | Best For | Robustness | Seasonality | Speed |
 |----------|----------|------------|-------------|-------|
 | [MAD](../reference/detectors/mad.md) | General-purpose, seasonal data | ✅ High | ✅ Yes | Fast |
-| [Z-Score](../reference/detectors/zscore.md) | Normal distributions, clean data | ❌ Low | ❌ No | Very Fast |
-| [IQR](../reference/detectors/iqr.md) | Skewed distributions, outliers | ✅ High | ❌ No | Fast |
+| [Z-Score](../reference/detectors/zscore.md) | Normal distributions, clean data | ❌ Low | ✅ Yes | Very Fast |
+| [IQR](../reference/detectors/iqr.md) | Skewed distributions, outliers | ✅ High | ✅ Yes | Fast |
 | [Manual Bounds](../reference/detectors/manual_bounds.md) | Known thresholds, SLAs | N/A | ❌ No | Fastest |
 
 ## Decision Tree

@@ -6,9 +6,11 @@
 
 ## Status
 
-🚧 **In Active Development** - Version 0.1.0
+✅ **Production Ready** - Version 0.1.0
 
-This is a complete rewrite of the original detectk library with modern architecture and best practices (2025).
+Published to PyPI: https://pypi.org/project/detectkit/
+
+Complete rewrite with modern architecture and full documentation (2025).
 
 ## Features
 
@@ -130,14 +132,18 @@ pytest tests/ --cov=detectkit --cov-report=html
 - ⚠️ Advanced detectors (Prophet, TimesFM) - optional extras
 - ⚠️ Additional alert channels (Telegram, Email) - optional
 
-See [TODO.md](TODO.md) for detailed development roadmap.
-
 ## Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture and design
-- [TECHNICAL_SPEC.md](TECHNICAL_SPEC.md) - Complete technical specification (Russian)
-- [TODO.md](TODO.md) - Development roadmap
-- [CLAUDE.md](CLAUDE.md) - Development context for AI assistants
+📚 **Complete documentation available in [docs/](docs/)**
+
+- [Getting Started](docs/getting-started/quickstart.md) - 5-minute quickstart
+- [Configuration Guide](docs/guides/configuration.md) - All configuration options
+- [Detectors Guide](docs/guides/detectors.md) - Choosing the right detector
+- [Alerting Guide](docs/guides/alerting.md) - Setting up alerts
+- [CLI Reference](docs/reference/cli.md) - Command-line documentation
+- [Examples](docs/examples/) - Real-world monitoring scenarios
+
+
 
 ## Requirements
 

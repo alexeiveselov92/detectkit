@@ -345,7 +345,7 @@ Q3 = np.percentile(data, 75)
 |---------|-----|-----|---------|--------|
 | Robust to outliers | ✅ Very | ✅ Very | ❌ No | N/A |
 | Distribution-free | ✅ Yes | ✅ Yes | ❌ No | N/A |
-| Seasonality support | ❌ Not yet | ✅ Excellent | ❌ Not yet | ❌ No |
+| Seasonality support | ✅ Yes | ✅ Excellent | ✅ Yes | ❌ No |
 | Skewed data | ✅ Excellent | ✅ Good | ❌ Poor | N/A |
 | Sensitivity | ⚠️ Medium | ⚠️ Medium | ✅ High | ✅ Exact |
 | Performance | ✅ Fast | ✅ Fast | ✅ Very Fast | ✅ Very Fast |

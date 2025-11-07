@@ -323,8 +323,8 @@ alerting:
 | Detector | Best For | Robustness | Seasonality | Speed |
 |----------|----------|------------|-------------|-------|
 | [MAD](reference/detectors/mad.md) | General-purpose, seasonal data | ✅ High | ✅ Yes | Fast |
-| [Z-Score](reference/detectors/zscore.md) | Normal distributions | ❌ Low | ❌ No | Very Fast |
-| [IQR](reference/detectors/iqr.md) | Skewed distributions | ✅ High | ❌ No | Fast |
+| [Z-Score](reference/detectors/zscore.md) | Normal distributions | ❌ Low | ✅ Yes | Very Fast |
+| [IQR](reference/detectors/iqr.md) | Skewed distributions | ✅ High | ✅ Yes | Fast |
 | [Manual Bounds](reference/detectors/manual_bounds.md) | Known thresholds | N/A | ❌ No | Fastest |
 
 [Choosing a Detector →](guides/detectors.md)

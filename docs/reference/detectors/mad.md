@@ -292,7 +292,7 @@ Each detection result includes metadata:
 |---------|-----|---------|-----|--------|
 | Robust to outliers | ✅ Very | ❌ No | ✅ Very | N/A |
 | Normal distribution | ❌ Not required | ✅ Required | ❌ Not required | N/A |
-| Seasonality support | ✅ Excellent | ✅ Good | ✅ Good | ❌ No |
+| Seasonality support | ✅ Excellent | ✅ Yes | ✅ Yes | ❌ No |
 | Sensitivity tuning | ✅ Threshold | ✅ Threshold | ✅ Threshold | ✅ Bounds |
 | Performance | ✅ Fast | ✅ Fast | ✅ Fast | ✅ Very Fast |
 

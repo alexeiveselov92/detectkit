@@ -134,15 +134,14 @@ pytest tests/ --cov=detectkit --cov-report=html
 
 ## Documentation
 
-📚 **Complete documentation available in [docs/](docs/)**
+📚 **Complete documentation available at: https://github.com/alexeiveselov92/detectkit/tree/main/docs**
 
-- [Getting Started](docs/getting-started/quickstart.md) - 5-minute quickstart
-- [Configuration Guide](docs/guides/configuration.md) - All configuration options
-- [Detectors Guide](docs/guides/detectors.md) - Choosing the right detector
-- [Alerting Guide](docs/guides/alerting.md) - Setting up alerts
-- [CLI Reference](docs/reference/cli.md) - Command-line documentation
-- [Examples](docs/examples/) - Real-world monitoring scenarios
-
+- [Getting Started](https://github.com/alexeiveselov92/detectkit/blob/main/docs/getting-started/quickstart.md) - 5-minute quickstart
+- [Configuration Guide](https://github.com/alexeiveselov92/detectkit/blob/main/docs/guides/configuration.md) - All configuration options
+- [Detectors Guide](https://github.com/alexeiveselov92/detectkit/blob/main/docs/guides/detectors.md) - Choosing the right detector
+- [Alerting Guide](https://github.com/alexeiveselov92/detectkit/blob/main/docs/guides/alerting.md) - Setting up alerts
+- [CLI Reference](https://github.com/alexeiveselov92/detectkit/blob/main/docs/reference/cli.md) - Command-line documentation
+- [Examples](https://github.com/alexeiveselov92/detectkit/tree/main/docs/examples) - Real-world monitoring scenarios
 
 
 ## Requirements

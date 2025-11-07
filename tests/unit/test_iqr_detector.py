@@ -191,15 +191,18 @@ class TestIQRDetectorDetect:
         result = results[-1]
         metadata = result.detection_metadata
 
-        # Verify Q1, Q3, IQR
-        assert "q1" in metadata
-        assert "q3" in metadata
-        assert "iqr" in metadata
+        # Verify Q1, Q3, IQR (now with global_ prefix)
+        assert "global_q1" in metadata
+        assert "global_q3" in metadata
+        assert "global_iqr" in metadata
+        assert "adjusted_q1" in metadata
+        assert "adjusted_q3" in metadata
+        assert "adjusted_iqr" in metadata
 
         # Q1 should be around 3.25, Q3 around 7.75
-        assert 3.0 < metadata["q1"] < 4.0
-        assert 7.5 < metadata["q3"] < 8.0
-        assert 4.0 < metadata["iqr"] < 5.0
+        assert 3.0 < metadata["global_q1"] < 4.0
+        assert 7.5 < metadata["global_q3"] < 8.0
+        assert 4.0 < metadata["global_iqr"] < 5.0
 
     def test_detect_skewed_distribution(self):
         """Test IQR with skewed distribution (where it performs well)."""
@@ -242,9 +245,12 @@ class TestIQRDetectorDetect:
 
         # Check metadata structure
         result = results[-1]
-        assert "q1" in result.detection_metadata
-        assert "q3" in result.detection_metadata
-        assert "iqr" in result.detection_metadata
+        assert "global_q1" in result.detection_metadata
+        assert "global_q3" in result.detection_metadata
+        assert "global_iqr" in result.detection_metadata
+        assert "adjusted_q1" in result.detection_metadata
+        assert "adjusted_q3" in result.detection_metadata
+        assert "adjusted_iqr" in result.detection_metadata
         assert "window_size" in result.detection_metadata
 
     def test_detect_severity(self):

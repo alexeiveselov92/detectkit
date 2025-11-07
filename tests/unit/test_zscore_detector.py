@@ -207,8 +207,10 @@ class TestZScoreDetectorDetect:
 
         # Check metadata structure
         result = results[-1]
-        assert "mean" in result.detection_metadata
-        assert "std" in result.detection_metadata
+        assert "global_mean" in result.detection_metadata
+        assert "global_std" in result.detection_metadata
+        assert "adjusted_mean" in result.detection_metadata
+        assert "adjusted_std" in result.detection_metadata
         assert "window_size" in result.detection_metadata
 
     def test_detect_severity_zscore(self):

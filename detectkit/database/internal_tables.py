@@ -9,7 +9,7 @@ methods underneath. It does NOT duplicate logic - just provides semantic wrapper
 """
 
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -419,6 +419,131 @@ class InternalTablesManager:
 
         # ClickHouse ALTER TABLE DELETE is async, return 0
         return 0
+
+    def get_recent_detections(
+        self,
+        metric_name: str,
+        last_point: datetime,
+        num_points: int,
+    ) -> List[Dict]:
+        """
+        Get recent detection results grouped by timestamp.
+
+        This method is fully database-agnostic - uses simple SELECT
+        and groups data in Python (no GROUP BY, no database-specific functions).
+
+        Args:
+            metric_name: Metric identifier
+            last_point: Last complete timestamp to query up to
+            num_points: Number of recent timestamps to retrieve
+
+        Returns:
+            List of dicts, each containing:
+                - timestamp: Detection timestamp
+                - detector_ids: List of detector IDs for this timestamp
+                - detector_names: List of detector names
+                - detector_params_list: List of detector params (JSON strings)
+                - is_anomaly_flags: List of is_anomaly bools
+                - confidence_lowers: List of lower confidence bounds
+                - confidence_uppers: List of upper confidence bounds
+                - value: Metric value (same for all detectors at this timestamp)
+
+        Example:
+            >>> detections = internal.get_recent_detections(
+            ...     "cpu_usage",
+            ...     datetime(2024, 1, 1, 12, 0, 0),
+            ...     5
+            ... )
+            >>> for det in detections:
+            ...     print(f"{det['timestamp']}: {len(det['detector_ids'])} detectors")
+        """
+        full_table_name = self._manager.get_full_table_name(
+            TABLE_DETECTIONS, use_internal=True
+        )
+
+        # Step 1: Get distinct timestamps (database-agnostic)
+        # Find last N timestamps with detections
+        timestamps_query = f"""
+        SELECT DISTINCT timestamp
+        FROM {full_table_name}
+        WHERE metric_name = %(metric_name)s
+          AND timestamp <= %(last_point)s
+        ORDER BY timestamp DESC
+        LIMIT %(num_points)s
+        """
+
+        timestamp_results = self._manager.execute_query(
+            timestamps_query,
+            params={
+                "metric_name": metric_name,
+                "last_point": last_point,
+                "num_points": num_points,
+            },
+        )
+
+        if not timestamp_results:
+            return []
+
+        # Extract timestamps
+        timestamps = [row["timestamp"] for row in timestamp_results]
+
+        # Step 2: Get all detections for these timestamps (simple SELECT)
+        # Build IN clause with timestamps
+        timestamps_str = ", ".join([
+            f"'{ts.strftime('%Y-%m-%d %H:%M:%S')}'" for ts in timestamps
+        ])
+
+        detections_query = f"""
+        SELECT
+            timestamp,
+            detector_id,
+            detector_name,
+            detector_params,
+            is_anomaly,
+            confidence_lower,
+            confidence_upper,
+            value
+        FROM {full_table_name}
+        WHERE metric_name = %(metric_name)s
+          AND timestamp IN ({timestamps_str})
+        ORDER BY timestamp DESC, detector_id
+        """
+
+        detection_results = self._manager.execute_query(
+            detections_query,
+            params={"metric_name": metric_name},
+        )
+
+        if not detection_results:
+            return []
+
+        # Step 3: Group by timestamp in Python (no pandas, pure Python)
+        grouped = {}
+        for row in detection_results:
+            ts = row["timestamp"]
+            if ts not in grouped:
+                grouped[ts] = {
+                    "timestamp": ts,
+                    "detector_ids": [],
+                    "detector_names": [],
+                    "detector_params_list": [],
+                    "is_anomaly_flags": [],
+                    "confidence_lowers": [],
+                    "confidence_uppers": [],
+                    "value": row["value"],  # Same for all detectors at this timestamp
+                }
+
+            grouped[ts]["detector_ids"].append(row["detector_id"])
+            grouped[ts]["detector_names"].append(row["detector_name"])
+            grouped[ts]["detector_params_list"].append(row["detector_params"])
+            grouped[ts]["is_anomaly_flags"].append(row["is_anomaly"])
+            grouped[ts]["confidence_lowers"].append(row["confidence_lower"])
+            grouped[ts]["confidence_uppers"].append(row["confidence_upper"])
+
+        # Step 4: Convert to list, sorted by timestamp (desc)
+        result = [grouped[ts] for ts in sorted(grouped.keys(), reverse=True)]
+
+        return result
 
     def acquire_lock(
         self,

@@ -548,37 +548,11 @@ class TaskManager:
         Returns:
             List of DetectionRecord objects
         """
-        # Get full table name for _dtk_detections
-        from detectkit.database.tables import TABLE_DETECTIONS
-        full_table_name = self.db_manager.get_full_table_name(
-            TABLE_DETECTIONS, use_internal=True
-        )
-
-        # Query _dtk_detections for recent points
-        # GROUP BY timestamp to combine results from multiple detectors
-        query = f"""
-        SELECT
-            timestamp,
-            groupArray(detector_id) as detector_ids,
-            groupArray(is_anomaly) as is_anomaly_flags,
-            groupArray(confidence_lower) as confidence_lowers,
-            groupArray(confidence_upper) as confidence_uppers,
-            any(value) as value
-        FROM {full_table_name}
-        WHERE metric_name = %(metric_name)s
-          AND timestamp <= %(last_point)s
-        GROUP BY timestamp
-        ORDER BY timestamp DESC
-        LIMIT %(num_points)s
-        """
-
-        results = self.db_manager.execute_query(
-            query,
-            params={
-                "metric_name": metric_name,
-                "last_point": last_point,
-                "num_points": num_points,
-            },
+        # Use internal tables manager method (database-agnostic)
+        results = self.internal.get_recent_detections(
+            metric_name=metric_name,
+            last_point=last_point,
+            num_points=num_points,
         )
 
         if not results:
@@ -590,10 +564,10 @@ class TaskManager:
             # Check if any detector flagged this point as anomaly
             is_anomaly = any(row["is_anomaly_flags"])
 
-            # Get detector IDs that flagged anomaly
-            anomaly_detectors = [
-                d_id
-                for d_id, flag in zip(row["detector_ids"], row["is_anomaly_flags"])
+            # Get detector data for anomalous detections
+            anomaly_indices = [
+                i
+                for i, flag in enumerate(row["is_anomaly_flags"])
                 if flag
             ]
 
@@ -602,12 +576,18 @@ class TaskManager:
             severity = 0.0
             confidence_lower = None
             confidence_upper = None
+            detector_name = "unknown"
+            detector_id = "unknown"
+            detector_params = "{}"
 
-            if is_anomaly and anomaly_detectors:
-                # Get confidence bounds from first detector (they should be similar)
-                first_detector_idx = row["detector_ids"].index(anomaly_detectors[0])
-                confidence_lower = row["confidence_lowers"][first_detector_idx]
-                confidence_upper = row["confidence_uppers"][first_detector_idx]
+            if is_anomaly and anomaly_indices:
+                # Get data from first anomalous detector
+                first_idx = anomaly_indices[0]
+                detector_name = row["detector_names"][first_idx]
+                detector_id = row["detector_ids"][first_idx]
+                detector_params = row["detector_params_list"][first_idx]
+                confidence_lower = row["confidence_lowers"][first_idx]
+                confidence_upper = row["confidence_uppers"][first_idx]
 
                 # Determine direction
                 value = row["value"]
@@ -621,8 +601,9 @@ class TaskManager:
             records.append(
                 DetectionRecord(
                     timestamp=row["timestamp"],
-                    detector_name=anomaly_detectors[0] if anomaly_detectors else "unknown",
-                    detector_id=anomaly_detectors[0] if anomaly_detectors else "unknown",
+                    detector_name=detector_name,
+                    detector_id=detector_id,
+                    detector_params=detector_params,
                     value=row["value"],
                     is_anomaly=is_anomaly,
                     confidence_lower=confidence_lower,

@@ -35,6 +35,7 @@ class DetectionRecord:
     timestamp: np.datetime64
     detector_name: str
     detector_id: str
+    detector_params: str  # JSON string with detector parameters
     value: float
     is_anomaly: bool
     confidence_lower: Optional[float]
@@ -242,9 +243,9 @@ class AlertOrchestrator:
             detector_names = [d.detector_name for d in anomalies]
             detector_name = f"{len(anomalies)} detectors"
             detector_params_list = [
-                f"{d.detector_name}({d.detector_id[:8]})" for d in anomalies
+                f"{d.detector_name}: {d.detector_params}" for d in anomalies
             ]
-            detector_params = ", ".join(detector_params_list)
+            detector_params = "; ".join(detector_params_list)
 
             # Combine metadata
             combined_metadata = {
@@ -256,7 +257,7 @@ class AlertOrchestrator:
         else:
             max_severity = primary.severity
             detector_name = primary.detector_name
-            detector_params = f"{primary.detector_id[:16]}"
+            detector_params = primary.detector_params
             combined_metadata = primary.detection_metadata
 
         # Convert numpy timestamp for AlertData

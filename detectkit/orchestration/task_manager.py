@@ -385,9 +385,9 @@ class TaskManager:
             if not actual_from or actual_from >= actual_to:
                 continue
 
-            # Get batch_size and window_size
+            # Get batch_size and context_size
             batch_size = detector_config.get_batch_size() or 1000  # Default batch size
-            window_size = detector_config.params.get('window_size', 0)
+            context_size = detector.get_context_size()  # Historical points needed
 
             # Calculate total points to detect
             total_seconds = (actual_to - actual_from).total_seconds()
@@ -403,14 +403,15 @@ class TaskManager:
                 if batch_to > actual_to:
                     batch_to = actual_to
 
-                # Calculate window start (need historical data for window)
-                window_seconds = window_size * interval.seconds
-                window_from = current_from - timedelta(seconds=window_seconds)
+                # Calculate context start (need historical data for context)
+                # context_size includes window_size + any extra needed for preprocessing
+                context_seconds = context_size * interval.seconds
+                context_from = current_from - timedelta(seconds=context_seconds)
 
-                # Load data with window
+                # Load data with context (historical window)
                 data = self.internal.load_datapoints(
                     metric_name=config.name,
-                    from_timestamp=window_from,
+                    from_timestamp=context_from,
                     to_timestamp=batch_to,
                 )
 
@@ -440,6 +441,7 @@ class TaskManager:
                         "confidence_lower": np.array([r.confidence_lower for r in batch_results], dtype=np.float64),
                         "confidence_upper": np.array([r.confidence_upper for r in batch_results], dtype=np.float64),
                         "value": np.array([r.value for r in batch_results], dtype=np.float64),
+                        "processed_value": np.array([r.processed_value for r in batch_results], dtype=np.float64),
                         "detection_metadata": np.array([
                             json.dumps(r.detection_metadata) if r.detection_metadata else "{}"
                             for r in batch_results

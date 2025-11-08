@@ -356,6 +356,9 @@ class TaskManager:
                 metric_name=config.name,
                 detector_id=detector_id
             )
+            # Normalize last_detection_ts to naive if needed
+            if last_detection_ts and last_detection_ts.tzinfo is not None:
+                last_detection_ts = last_detection_ts.replace(tzinfo=None)
 
             # Determine actual from_date
             actual_from = normalized_from_date
@@ -374,12 +377,13 @@ class TaskManager:
                 # Always normalize to naive datetime
                 start_time = start_time.replace(tzinfo=None)
                 if actual_from:
-                    # Ensure actual_from is also naive
-                    if actual_from.tzinfo is not None:
-                        actual_from = actual_from.replace(tzinfo=None)
                     actual_from = max(actual_from, start_time)
                 else:
                     actual_from = start_time
+
+            # Ensure actual_from is naive (for comparison with actual_to)
+            if actual_from and actual_from.tzinfo is not None:
+                actual_from = actual_from.replace(tzinfo=None)
 
             # Skip if nothing to detect
             if not actual_from or actual_from >= actual_to:
@@ -451,6 +455,7 @@ class TaskManager:
                     self.internal.save_detections(
                         metric_name=config.name,
                         detector_id=detector_id,
+                        detector_name=detector.__class__.__name__,
                         data=detection_data,
                         detector_params=detector.get_detector_params(),
                     )

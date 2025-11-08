@@ -348,8 +348,8 @@ class IQRDetector(BaseDetector):
                     )
 
                     # Apply mask to window (only valid values + seasonality match)
-                    combined_mask = valid_mask.copy()
-                    combined_mask[valid_mask] &= season_mask
+                    # Both valid_mask and season_mask are same size as window_processed
+                    combined_mask = valid_mask & season_mask
 
                     group_values = window_processed[combined_mask]
 

@@ -159,6 +159,7 @@ class BaseAlertChannel(ABC):
                 confidence_upper=alert_data.confidence_upper,
                 confidence_interval=confidence_str,
                 detector_name=alert_data.detector_name,
+                detector_params=alert_data.detector_params,
                 direction=alert_data.direction,
                 severity=alert_data.severity,
                 consecutive_count=alert_data.consecutive_count,
@@ -182,6 +183,7 @@ class BaseAlertChannel(ABC):
             "Value: {value}\n"
             "Confidence interval: {confidence_interval}\n"
             "Detector: {detector_name}\n"
+            "Parameters: {detector_params}\n"
             "Direction: {direction}\n"
             "Severity: {severity:.2f}"
         )

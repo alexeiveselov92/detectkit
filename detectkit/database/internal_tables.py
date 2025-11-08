@@ -518,12 +518,24 @@ class InternalTablesManager:
             return []
 
         # Step 3: Group by timestamp in Python (no pandas, pure Python)
+        # Use timestamp string as key to avoid datetime comparison issues
         grouped = {}
         for row in detection_results:
             ts = row["timestamp"]
-            if ts not in grouped:
-                grouped[ts] = {
-                    "timestamp": ts,
+            # Convert timestamp to string key for grouping
+            if isinstance(ts, str):
+                ts_key = ts
+                ts_value = ts
+            else:
+                # datetime object - normalize and convert to string
+                if hasattr(ts, 'tzinfo') and ts.tzinfo is not None:
+                    ts = ts.replace(tzinfo=None)
+                ts_key = ts.isoformat()
+                ts_value = ts
+
+            if ts_key not in grouped:
+                grouped[ts_key] = {
+                    "timestamp": ts_value,
                     "detector_ids": [],
                     "detector_names": [],
                     "detector_params_list": [],
@@ -533,15 +545,15 @@ class InternalTablesManager:
                     "value": row["value"],  # Same for all detectors at this timestamp
                 }
 
-            grouped[ts]["detector_ids"].append(row["detector_id"])
-            grouped[ts]["detector_names"].append(row["detector_name"])
-            grouped[ts]["detector_params_list"].append(row["detector_params"])
-            grouped[ts]["is_anomaly_flags"].append(row["is_anomaly"])
-            grouped[ts]["confidence_lowers"].append(row["confidence_lower"])
-            grouped[ts]["confidence_uppers"].append(row["confidence_upper"])
+            grouped[ts_key]["detector_ids"].append(row["detector_id"])
+            grouped[ts_key]["detector_names"].append(row["detector_name"])
+            grouped[ts_key]["detector_params_list"].append(row["detector_params"])
+            grouped[ts_key]["is_anomaly_flags"].append(row["is_anomaly"])
+            grouped[ts_key]["confidence_lowers"].append(row["confidence_lower"])
+            grouped[ts_key]["confidence_uppers"].append(row["confidence_upper"])
 
-        # Step 4: Convert to list, sorted by timestamp (desc)
-        result = [grouped[ts] for ts in sorted(grouped.keys(), reverse=True)]
+        # Step 4: Convert to list, sorted by timestamp key (desc)
+        result = [grouped[ts_key] for ts_key in sorted(grouped.keys(), reverse=True)]
 
         return result
 

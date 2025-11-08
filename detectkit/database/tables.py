@@ -52,7 +52,8 @@ def get_detections_table_model() -> TableModel:
         - is_anomaly: Whether point is anomalous
         - confidence_lower: Lower confidence bound
         - confidence_upper: Upper confidence bound
-        - value: Actual metric value
+        - value: Actual metric value (ALWAYS original value)
+        - processed_value: Value analyzed by detector (may be smoothed/transformed)
         - detector_params: JSON with sorted detector parameters
         - detection_metadata: JSON with missing_ratio, severity, direction, etc.
         - created_at: When detection was performed (UTC, millisecond precision)
@@ -68,6 +69,7 @@ def get_detections_table_model() -> TableModel:
             ColumnDefinition("confidence_lower", "Nullable(Float64)", nullable=True),
             ColumnDefinition("confidence_upper", "Nullable(Float64)", nullable=True),
             ColumnDefinition("value", "Nullable(Float64)", nullable=True),
+            ColumnDefinition("processed_value", "Nullable(Float64)", nullable=True),
             ColumnDefinition("detector_params", "String"),
             ColumnDefinition("detection_metadata", "String"),
             ColumnDefinition("created_at", "DateTime64(3, 'UTC')"),

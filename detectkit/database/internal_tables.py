@@ -157,6 +157,7 @@ class InternalTablesManager:
                 - confidence_lower: np.array of float64 (nullable)
                 - confidence_upper: np.array of float64 (nullable)
                 - value: np.array of float64 (nullable)
+                - processed_value: np.array of float64 (nullable)
                 - detection_metadata: np.array of JSON strings
             detector_params: JSON string with sorted detector parameters
 
@@ -170,6 +171,7 @@ class InternalTablesManager:
             ...     "confidence_lower": np.array([0.4, 0.5]),
             ...     "confidence_upper": np.array([0.6, 0.7]),
             ...     "value": np.array([0.5, 0.9]),
+            ...     "processed_value": np.array([0.5, 0.9]),
             ...     "detection_metadata": np.array(['{"severity": 0.0}', '{"severity": 0.8}']),
             ... }
             >>> rows = internal.save_detections(
@@ -187,6 +189,7 @@ class InternalTablesManager:
             "confidence_lower": data["confidence_lower"],
             "confidence_upper": data["confidence_upper"],
             "value": data["value"],
+            "processed_value": data["processed_value"],
             "detector_params": np.full(num_rows, detector_params, dtype=object),
             "detection_metadata": data["detection_metadata"],
             "created_at": np.full(

@@ -123,3 +123,74 @@ def weighted_mad(
 
     deviations = np.abs(data - center)
     return weighted_median(deviations, weights)
+
+
+def weighted_mean(data: np.ndarray, weights: np.ndarray) -> float:
+    """
+    Compute weighted mean.
+
+    Args:
+        data: Array of values
+        weights: Array of weights (must sum to 1.0)
+
+    Returns:
+        Weighted mean value
+
+    Example:
+        >>> data = np.array([1, 2, 3, 4, 5])
+        >>> weights = np.array([0.1, 0.2, 0.4, 0.2, 0.1])
+        >>> weighted_mean(data, weights)
+        3.0
+    """
+    if len(data) != len(weights):
+        raise ValueError(f"data and weights must have same length: {len(data)} vs {len(weights)}")
+
+    if not np.isclose(weights.sum(), 1.0):
+        raise ValueError(f"weights must sum to 1.0, got {weights.sum()}")
+
+    return np.sum(data * weights)
+
+
+def weighted_std(
+    data: np.ndarray,
+    weights: np.ndarray,
+    center: Optional[float] = None,
+    ddof: int = 0
+) -> float:
+    """
+    Compute weighted standard deviation.
+
+    Args:
+        data: Array of values
+        weights: Array of weights (must sum to 1.0)
+        center: Center value (if None, uses weighted mean)
+        ddof: Delta degrees of freedom (0 = population, 1 = sample)
+
+    Returns:
+        Weighted standard deviation
+
+    Example:
+        >>> data = np.array([1, 2, 3, 4, 5])
+        >>> weights = np.array([0.1, 0.2, 0.4, 0.2, 0.1])
+        >>> weighted_std(data, weights)
+        1.095445...
+    """
+    if len(data) != len(weights):
+        raise ValueError(f"data and weights must have same length: {len(data)} vs {len(weights)}")
+
+    if not np.isclose(weights.sum(), 1.0):
+        raise ValueError(f"weights must sum to 1.0, got {weights.sum()}")
+
+    if center is None:
+        center = weighted_mean(data, weights)
+
+    # Weighted variance
+    variance = np.sum(weights * (data - center) ** 2)
+
+    # Apply Bessel's correction if ddof=1
+    if ddof == 1:
+        # For weighted data: variance / (1 - sum(weights^2))
+        sum_weights_sq = np.sum(weights ** 2)
+        variance = variance / (1 - sum_weights_sq)
+
+    return np.sqrt(variance)

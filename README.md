@@ -6,7 +6,7 @@
 
 ## Status
 
-✅ **Production Ready** - Version 0.1.0
+✅ **Production Ready** - Version 0.1.2
 
 Published to PyPI: https://pypi.org/project/detectkit/
 

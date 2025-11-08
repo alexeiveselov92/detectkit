@@ -142,6 +142,7 @@ class InternalTablesManager:
         self,
         metric_name: str,
         detector_id: str,
+        detector_name: str,
         data: Dict[str, np.ndarray],
         detector_params: str,
     ) -> int:
@@ -151,6 +152,7 @@ class InternalTablesManager:
         Args:
             metric_name: Metric identifier
             detector_id: Detector identifier (hash)
+            detector_name: Detector class name (e.g., "MADDetector")
             data: Dictionary with keys:
                 - timestamp: np.array of datetime64
                 - is_anomaly: np.array of bool
@@ -175,7 +177,7 @@ class InternalTablesManager:
             ...     "detection_metadata": np.array(['{"severity": 0.0}', '{"severity": 0.8}']),
             ... }
             >>> rows = internal.save_detections(
-            ...     "cpu_usage", "mad_abc123", data, '{"threshold": 3.0}'
+            ...     "cpu_usage", "mad_abc123", "MADDetector", data, '{"threshold": 3.0}'
             ... )
         """
         num_rows = len(data["timestamp"])
@@ -184,6 +186,7 @@ class InternalTablesManager:
         insert_data = {
             "metric_name": np.full(num_rows, metric_name, dtype=object),
             "detector_id": np.full(num_rows, detector_id, dtype=object),
+            "detector_name": np.full(num_rows, detector_name, dtype=object),
             "timestamp": data["timestamp"],
             "is_anomaly": data["is_anomaly"],
             "confidence_lower": data["confidence_lower"],

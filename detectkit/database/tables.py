@@ -48,6 +48,7 @@ def get_detections_table_model() -> TableModel:
     Schema:
         - metric_name: Metric identifier
         - detector_id: Detector identifier (hash of class + params)
+        - detector_name: Detector class name (e.g., "MADDetector", "ZScoreDetector")
         - timestamp: Detection timestamp (UTC, millisecond precision)
         - is_anomaly: Whether point is anomalous
         - confidence_lower: Lower confidence bound
@@ -64,6 +65,7 @@ def get_detections_table_model() -> TableModel:
         columns=[
             ColumnDefinition("metric_name", "String"),
             ColumnDefinition("detector_id", "String"),
+            ColumnDefinition("detector_name", "String"),
             ColumnDefinition("timestamp", "DateTime64(3, 'UTC')"),
             ColumnDefinition("is_anomaly", "Bool"),
             ColumnDefinition("confidence_lower", "Nullable(Float64)", nullable=True),

@@ -64,6 +64,12 @@ class MADDetector(BaseDetector):
         min_samples: int = 30,
         seasonality_components: Optional[List[Union[str, List[str]]]] = None,
         min_samples_per_group: int = 10,
+        input_type: str = "values",
+        smoothing: Optional[str] = None,
+        smoothing_alpha: float = 0.3,
+        smoothing_window: int = 10,
+        window_weights: Optional[str] = None,
+        weight_decay: float = 0.95,
     ):
         """
         Initialize MAD detector with parameters.
@@ -78,6 +84,12 @@ class MADDetector(BaseDetector):
                 - [["day_of_week", "hour"]] - combined group
                 - ["day", ["hour", "minute"]] - separate + combined
             min_samples_per_group: Minimum samples per seasonality group
+            input_type: Input transformation type (values, changes, absolute_changes, log_changes)
+            smoothing: Smoothing method (None, ema, sma)
+            smoothing_alpha: EMA smoothing factor (0 < alpha <= 1)
+            smoothing_window: SMA window size
+            window_weights: Weighting method (None, exponential, linear)
+            weight_decay: Decay factor for exponential weights (0 < decay < 1)
         """
         super().__init__(
             threshold=threshold,
@@ -85,6 +97,12 @@ class MADDetector(BaseDetector):
             min_samples=min_samples,
             seasonality_components=seasonality_components,
             min_samples_per_group=min_samples_per_group,
+            input_type=input_type,
+            smoothing=smoothing,
+            smoothing_alpha=smoothing_alpha,
+            smoothing_window=smoothing_window,
+            window_weights=window_weights,
+            weight_decay=weight_decay,
         )
 
     def _validate_params(self):
@@ -198,9 +216,11 @@ class MADDetector(BaseDetector):
         Perform MAD-based anomaly detection with seasonality support.
 
         Algorithm (TECHNICAL_SPEC.md section 8):
-        1. Parse seasonality data
-        2. For each point:
+        1. Apply preprocessing (input_type transformation and smoothing)
+        2. Parse seasonality data
+        3. For each point:
            - Compute global statistics (entire window)
+           - Apply weighting if specified
            - For each seasonality group:
              * Create mask matching current point's seasonality
              * Compute group statistics
@@ -219,7 +239,7 @@ class MADDetector(BaseDetector):
             List of DetectionResult for each point
         """
         timestamps = data["timestamp"]
-        values = data["value"]
+        values = data["value"]  # ORIGINAL values (always kept)
         seasonality_data = data.get("seasonality_data", np.array([]))
         seasonality_columns = data.get("seasonality_columns", [])
 
@@ -228,6 +248,11 @@ class MADDetector(BaseDetector):
         min_samples = self.params["min_samples"]
         seasonality_components = self.params.get("seasonality_components")
         min_samples_per_group = self.params.get("min_samples_per_group", 10)
+
+        # STEP 0: Preprocessing (smoothing + input_type transformation)
+        # Order matters: smoothing first, then input_type
+        smoothed_values = self._apply_smoothing(values)
+        processed_values = self._preprocess_input(smoothed_values)
 
         # Parse seasonality data once
         seasonality_dict = {}
@@ -240,15 +265,17 @@ class MADDetector(BaseDetector):
         n_points = len(timestamps)
 
         for i in range(n_points):
-            current_val = values[i]
+            current_val = values[i]  # ORIGINAL value
+            current_processed = processed_values[i]  # PROCESSED value
             current_ts = timestamps[i]
 
-            # Skip NaN values
-            if np.isnan(current_val):
+            # Skip NaN values (in processed)
+            if np.isnan(current_processed):
                 results.append(
                     DetectionResult(
                         timestamp=current_ts,
                         value=current_val,
+                        processed_value=current_processed,
                         is_anomaly=False,
                         detection_metadata={"reason": "missing_data"},
                     )
@@ -257,11 +284,11 @@ class MADDetector(BaseDetector):
 
             # Get historical window (not including current point)
             window_start = max(0, i - window_size)
-            window_values = values[window_start:i]
+            window_processed = processed_values[window_start:i]
 
             # Filter out NaN values from window
-            valid_mask = ~np.isnan(window_values)
-            window_valid = window_values[valid_mask]
+            valid_mask = ~np.isnan(window_processed)
+            window_valid = window_processed[valid_mask]
 
             # Check if we have enough samples
             if len(window_valid) < min_samples:
@@ -269,6 +296,7 @@ class MADDetector(BaseDetector):
                     DetectionResult(
                         timestamp=current_ts,
                         value=current_val,
+                        processed_value=current_processed,
                         is_anomaly=False,
                         detection_metadata={
                             "reason": "insufficient_data",
@@ -279,10 +307,15 @@ class MADDetector(BaseDetector):
                 )
                 continue
 
+            # Compute weights for window (if specified)
+            weights = self._compute_weights(len(window_valid))
+
             # STEP 1: Compute GLOBAL statistics (entire window)
-            global_median = np.median(window_valid)
-            global_abs_deviations = np.abs(window_valid - global_median)
-            global_mad = np.median(global_abs_deviations)
+            # Use weighted statistics if weights are not uniform
+            from detectkit.utils import weighted_median, weighted_mad
+
+            global_median = weighted_median(window_valid, weights)
+            global_mad = weighted_mad(window_valid, weights, center=global_median)
 
             # Initialize adjusted statistics with global values
             adjusted_median = global_median
@@ -306,7 +339,7 @@ class MADDetector(BaseDetector):
                     combined_mask = valid_mask.copy()
                     combined_mask[valid_mask] &= season_mask
 
-                    group_values = window_values[combined_mask]
+                    group_values = window_processed[combined_mask]
 
                     # Check if enough samples in group
                     if len(group_values) < min_samples_per_group:
@@ -320,10 +353,10 @@ class MADDetector(BaseDetector):
                         })
                         continue
 
-                    # Compute group statistics
-                    group_median = np.median(group_values)
-                    group_abs_dev = np.abs(group_values - group_median)
-                    group_mad = np.median(group_abs_dev)
+                    # Compute group statistics with weights
+                    group_weights = self._compute_weights(len(group_values))
+                    group_median = weighted_median(group_values, group_weights)
+                    group_mad = weighted_mad(group_values, group_weights, center=group_median)
 
                     # Calculate multipliers
                     if global_median != 0:
@@ -356,8 +389,8 @@ class MADDetector(BaseDetector):
                 confidence_lower = adjusted_median - threshold * adjusted_mad
                 confidence_upper = adjusted_median + threshold * adjusted_mad
 
-            # STEP 4: Check if current value is anomalous
-            is_anomaly = (current_val < confidence_lower) or (current_val > confidence_upper)
+            # STEP 4: Check if current PROCESSED value is anomalous
+            is_anomaly = (current_processed < confidence_lower) or (current_processed > confidence_upper)
 
             # Build metadata
             metadata = {
@@ -368,16 +401,25 @@ class MADDetector(BaseDetector):
                 "window_size": int(len(window_valid)),
             }
 
+            # Add preprocessing info if used
+            if self.params.get("smoothing") or self.params.get("input_type") != "values":
+                metadata["preprocessing"] = {
+                    "input_type": self.params.get("input_type", "values"),
+                    "smoothing": self.params.get("smoothing"),
+                }
+                if self.params.get("smoothing"):
+                    metadata["preprocessing"]["smoothed_value"] = float(smoothed_values[i])
+
             if seasonality_components and multipliers_applied:
                 metadata["seasonality_groups"] = multipliers_applied
 
             if is_anomaly:
-                if current_val < confidence_lower:
+                if current_processed < confidence_lower:
                     direction = "below"
-                    distance = confidence_lower - current_val
+                    distance = confidence_lower - current_processed
                 else:
                     direction = "above"
-                    distance = current_val - confidence_upper
+                    distance = current_processed - confidence_upper
 
                 # Severity: how many adjusted MAD units away
                 severity = distance / adjusted_mad if adjusted_mad > 0 else float("inf")
@@ -391,7 +433,8 @@ class MADDetector(BaseDetector):
             results.append(
                 DetectionResult(
                     timestamp=current_ts,
-                    value=current_val,
+                    value=current_val,  # ORIGINAL value
+                    processed_value=current_processed,  # PROCESSED value
                     is_anomaly=is_anomaly,
                     confidence_lower=float(confidence_lower),
                     confidence_upper=float(confidence_upper),
@@ -413,9 +456,21 @@ class MADDetector(BaseDetector):
             "window_size": 100,
             "min_samples": 30,
             "min_samples_per_group": 10,
+            "input_type": "values",
+            "smoothing": None,
+            "smoothing_alpha": 0.3,
+            "smoothing_window": 10,
+            "window_weights": None,
+            "weight_decay": 0.95,
         }
         # Execution parameters that don't affect detector ID
-        execution_params = {"seasonality_components", "min_samples_per_group"}
+        execution_params = {
+            "seasonality_components",
+            "min_samples_per_group",
+            "smoothing_alpha",  # Only affects smoothing, not algorithm
+            "smoothing_window",  # Only affects smoothing, not algorithm
+            "weight_decay",  # Only affects weighting, not algorithm
+        }
 
         return {
             k: v for k, v in self.params.items()

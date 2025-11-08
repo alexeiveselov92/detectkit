@@ -49,11 +49,20 @@ class ManualBoundsDetector(BaseDetector):
         self,
         lower_bound: Optional[float] = None,
         upper_bound: Optional[float] = None,
+        input_type: str = "values",
     ):
-        """Initialize Manual Bounds detector with thresholds."""
+        """
+        Initialize Manual Bounds detector with thresholds.
+
+        Args:
+            lower_bound: Minimum acceptable value (None = no lower limit)
+            upper_bound: Maximum acceptable value (None = no upper limit)
+            input_type: Input transformation type (values, changes, absolute_changes, log_changes)
+        """
         super().__init__(
             lower_bound=lower_bound,
             upper_bound=upper_bound,
+            input_type=input_type,
         )
 
     def _validate_params(self):
@@ -93,46 +102,59 @@ class ManualBoundsDetector(BaseDetector):
             - No minimum samples requirement
         """
         timestamps = data["timestamp"]
-        values = data["value"]
+        values = data["value"]  # ORIGINAL values (always kept)
         lower_bound = self.params.get("lower_bound")
         upper_bound = self.params.get("upper_bound")
+
+        # STEP 0: Preprocessing (input_type transformation only, no smoothing)
+        # Note: ManualBounds doesn't use smoothing or weights (no historical window)
+        processed_values = self._preprocess_input(values)
 
         results = []
         n_points = len(timestamps)
 
         for i in range(n_points):
-            current_val = values[i]
+            current_val = values[i]  # ORIGINAL value
+            current_processed = processed_values[i]  # PROCESSED value
             current_ts = timestamps[i]
 
-            # Skip NaN values
-            if np.isnan(current_val):
+            # Skip NaN values (in processed)
+            if np.isnan(current_processed):
                 results.append(
                     DetectionResult(
                         timestamp=current_ts,
                         value=current_val,
+                        processed_value=current_processed,
                         is_anomaly=False,
                         detection_metadata={"reason": "missing_data"},
                     )
                 )
                 continue
 
-            # Check bounds
+            # Check bounds on PROCESSED value
             is_anomaly = False
             direction = None
             distance = 0.0
 
-            if lower_bound is not None and current_val < lower_bound:
+            if lower_bound is not None and current_processed < lower_bound:
                 is_anomaly = True
                 direction = "below"
-                distance = lower_bound - current_val
+                distance = lower_bound - current_processed
 
-            if upper_bound is not None and current_val > upper_bound:
+            if upper_bound is not None and current_processed > upper_bound:
                 is_anomaly = True
                 direction = "above"
-                distance = current_val - upper_bound
+                distance = current_processed - upper_bound
 
             # Prepare metadata
             metadata = {}
+
+            # Add preprocessing info if used
+            if self.params.get("input_type") != "values":
+                metadata["preprocessing"] = {
+                    "input_type": self.params.get("input_type", "values"),
+                }
+
             if is_anomaly:
                 metadata["direction"] = direction
                 metadata["distance"] = float(distance)
@@ -158,7 +180,8 @@ class ManualBoundsDetector(BaseDetector):
             results.append(
                 DetectionResult(
                     timestamp=current_ts,
-                    value=current_val,
+                    value=current_val,  # ORIGINAL value
+                    processed_value=current_processed,  # PROCESSED value
                     is_anomaly=is_anomaly,
                     confidence_lower=lower_bound,
                     confidence_upper=upper_bound,
@@ -169,9 +192,15 @@ class ManualBoundsDetector(BaseDetector):
         return results
 
     def _get_non_default_params(self) -> Dict[str, Any]:
-        """Get parameters that differ from defaults."""
-        # No defaults - all params are non-default
+        """
+        Get parameters that differ from defaults.
+
+        Returns all specified bounds plus input_type if not default.
+        """
+        defaults = {
+            "input_type": "values",
+        }
         return {
             k: v for k, v in self.params.items()
-            if v is not None
+            if v is not None and v != defaults.get(k)
         }

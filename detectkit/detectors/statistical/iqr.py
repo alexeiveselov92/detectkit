@@ -85,14 +85,41 @@ class IQRDetector(BaseDetector):
         min_samples: int = 30,
         seasonality_components: Optional[List[Union[str, List[str]]]] = None,
         min_samples_per_group: int = 4,
+        input_type: str = "values",
+        smoothing: Optional[str] = None,
+        smoothing_alpha: float = 0.3,
+        smoothing_window: int = 10,
+        window_weights: Optional[str] = None,
+        weight_decay: float = 0.95,
     ):
-        """Initialize IQR detector with parameters."""
+        """
+        Initialize IQR detector with parameters.
+
+        Args:
+            threshold: IQR multiplier for bounds
+            window_size: Historical window size in points
+            min_samples: Minimum total samples required
+            seasonality_components: Optional list of seasonality groups
+            min_samples_per_group: Minimum samples per seasonality group
+            input_type: Input transformation type (values, changes, absolute_changes, log_changes)
+            smoothing: Smoothing method (None, ema, sma)
+            smoothing_alpha: EMA smoothing factor (0 < alpha <= 1)
+            smoothing_window: SMA window size
+            window_weights: Weighting method (None, exponential, linear)
+            weight_decay: Decay factor for exponential weights (0 < decay < 1)
+        """
         super().__init__(
             threshold=threshold,
             window_size=window_size,
             min_samples=min_samples,
             seasonality_components=seasonality_components,
             min_samples_per_group=min_samples_per_group,
+            input_type=input_type,
+            smoothing=smoothing,
+            smoothing_alpha=smoothing_alpha,
+            smoothing_window=smoothing_window,
+            window_weights=window_weights,
+            weight_decay=weight_decay,
         )
 
     def _validate_params(self):
@@ -218,7 +245,7 @@ class IQRDetector(BaseDetector):
             - Seasonality grouping creates adaptive confidence intervals
         """
         timestamps = data["timestamp"]
-        values = data["value"]
+        values = data["value"]  # ORIGINAL values (always kept)
         threshold = self.params["threshold"]
         window_size = self.params["window_size"]
         min_samples = self.params["min_samples"]
@@ -226,6 +253,10 @@ class IQRDetector(BaseDetector):
         # Seasonality parameters
         seasonality_components = self.params.get("seasonality_components")
         min_samples_per_group = self.params.get("min_samples_per_group", 4)
+
+        # STEP 0: Preprocessing (smoothing + input_type transformation)
+        smoothed_values = self._apply_smoothing(values)
+        processed_values = self._preprocess_input(smoothed_values)
 
         # Parse seasonality data if available
         seasonality_dict = {}
@@ -245,15 +276,17 @@ class IQRDetector(BaseDetector):
         n_points = len(timestamps)
 
         for i in range(n_points):
-            current_val = values[i]
+            current_val = values[i]  # ORIGINAL value
+            current_processed = processed_values[i]  # PROCESSED value
             current_ts = timestamps[i]
 
-            # Skip NaN values
-            if np.isnan(current_val):
+            # Skip NaN values (in processed)
+            if np.isnan(current_processed):
                 results.append(
                     DetectionResult(
                         timestamp=current_ts,
                         value=current_val,
+                        processed_value=current_processed,
                         is_anomaly=False,
                         detection_metadata={"reason": "missing_data"},
                     )
@@ -262,10 +295,11 @@ class IQRDetector(BaseDetector):
 
             # Get historical window (not including current point)
             window_start = max(0, i - window_size)
-            window_values = values[window_start:i]
+            window_processed = processed_values[window_start:i]
 
             # Filter out NaN values from window
-            window_valid = window_values[~np.isnan(window_values)]
+            valid_mask = ~np.isnan(window_processed)
+            window_valid = window_processed[valid_mask]
 
             # Check if we have enough samples
             if len(window_valid) < min_samples:
@@ -273,6 +307,7 @@ class IQRDetector(BaseDetector):
                     DetectionResult(
                         timestamp=current_ts,
                         value=current_val,
+                        processed_value=current_processed,
                         is_anomaly=False,
                         detection_metadata={
                             "reason": "insufficient_data",
@@ -283,9 +318,15 @@ class IQRDetector(BaseDetector):
                 )
                 continue
 
+            # Compute weights for window (if specified)
+            weights = self._compute_weights(len(window_valid))
+
             # STEP 1: Compute GLOBAL statistics (entire window)
-            global_q1 = np.percentile(window_valid, 25)
-            global_q3 = np.percentile(window_valid, 75)
+            # Use weighted statistics if weights are not uniform
+            from detectkit.utils import weighted_percentile
+
+            global_q1 = weighted_percentile(window_valid, weights, 25)
+            global_q3 = weighted_percentile(window_valid, weights, 75)
             global_iqr = global_q3 - global_q1
 
             # Initialize adjusted statistics
@@ -294,6 +335,8 @@ class IQRDetector(BaseDetector):
             adjusted_iqr = global_iqr
 
             # STEP 2: Apply seasonality adjustments
+            multipliers_applied = []
+
             if seasonality_components and seasonality_dict:
                 for group in seasonality_components:
                     # Convert single string to list
@@ -304,22 +347,29 @@ class IQRDetector(BaseDetector):
                         seasonality_dict, window_start, i, group_cols
                     )
 
-                    # Filter window by seasonality mask
-                    season_indices = np.where(season_mask)[0]
-                    if len(season_indices) < min_samples_per_group:
-                        # Not enough samples in this group - skip adjustment
+                    # Apply mask to window (only valid values + seasonality match)
+                    combined_mask = valid_mask.copy()
+                    combined_mask[valid_mask] &= season_mask
+
+                    group_values = window_processed[combined_mask]
+
+                    # Check if enough samples in group
+                    if len(group_values) < min_samples_per_group:
+                        # Insufficient data - skip this group (multiplier = 1.0)
+                        multipliers_applied.append({
+                            "group": group_cols,
+                            "q1_multiplier": 1.0,
+                            "q3_multiplier": 1.0,
+                            "iqr_multiplier": 1.0,
+                            "reason": "insufficient_group_data",
+                            "group_size": int(len(group_values)),
+                        })
                         continue
 
-                    # Get values for this seasonality group
-                    group_window = window_values[season_indices]
-                    group_valid = group_window[~np.isnan(group_window)]
-
-                    if len(group_valid) < min_samples_per_group:
-                        continue
-
-                    # Compute group statistics
-                    group_q1 = np.percentile(group_valid, 25)
-                    group_q3 = np.percentile(group_valid, 75)
+                    # Compute group statistics with weights
+                    group_weights = self._compute_weights(len(group_values))
+                    group_q1 = weighted_percentile(group_values, group_weights, 25)
+                    group_q3 = weighted_percentile(group_values, group_weights, 75)
                     group_iqr = group_q3 - group_q1
 
                     # Calculate multipliers (avoid division by zero)
@@ -343,6 +393,14 @@ class IQRDetector(BaseDetector):
                     adjusted_q3 *= q3_multiplier
                     adjusted_iqr *= iqr_multiplier
 
+                    multipliers_applied.append({
+                        "group": group_cols,
+                        "q1_multiplier": float(q1_multiplier),
+                        "q3_multiplier": float(q3_multiplier),
+                        "iqr_multiplier": float(iqr_multiplier),
+                        "group_size": int(len(group_values)),
+                    })
+
             # STEP 3: Build confidence interval with adjusted statistics
             if adjusted_iqr == 0:
                 # No spread - use small epsilon
@@ -352,9 +410,9 @@ class IQRDetector(BaseDetector):
                 confidence_lower = adjusted_q1 - threshold * adjusted_iqr
                 confidence_upper = adjusted_q3 + threshold * adjusted_iqr
 
-            # STEP 4: Check if current value is anomalous
-            is_anomaly = (current_val < confidence_lower) or (
-                current_val > confidence_upper
+            # STEP 4: Check if current PROCESSED value is anomalous
+            is_anomaly = (current_processed < confidence_lower) or (
+                current_processed > confidence_upper
             )
 
             # STEP 5: Compute metadata
@@ -368,13 +426,25 @@ class IQRDetector(BaseDetector):
                 "window_size": int(len(window_valid)),
             }
 
+            # Add preprocessing info if used
+            if self.params.get("smoothing") or self.params.get("input_type") != "values":
+                metadata["preprocessing"] = {
+                    "input_type": self.params.get("input_type", "values"),
+                    "smoothing": self.params.get("smoothing"),
+                }
+                if self.params.get("smoothing"):
+                    metadata["preprocessing"]["smoothed_value"] = float(smoothed_values[i])
+
+            if seasonality_components and multipliers_applied:
+                metadata["seasonality_groups"] = multipliers_applied
+
             if is_anomaly:
-                if current_val < confidence_lower:
+                if current_processed < confidence_lower:
                     direction = "below"
-                    distance = confidence_lower - current_val
+                    distance = confidence_lower - current_processed
                 else:
                     direction = "above"
-                    distance = current_val - confidence_upper
+                    distance = current_processed - confidence_upper
 
                 # Severity: how many adjusted IQR units away
                 if adjusted_iqr > 0:
@@ -393,7 +463,8 @@ class IQRDetector(BaseDetector):
             results.append(
                 DetectionResult(
                     timestamp=current_ts,
-                    value=current_val,
+                    value=current_val,  # ORIGINAL value
+                    processed_value=current_processed,  # PROCESSED value
                     is_anomaly=is_anomaly,
                     confidence_lower=float(confidence_lower),
                     confidence_upper=float(confidence_upper),
@@ -404,15 +475,34 @@ class IQRDetector(BaseDetector):
         return results
 
     def _get_non_default_params(self) -> Dict[str, Any]:
-        """Get parameters that differ from defaults."""
+        """
+        Get parameters that differ from defaults.
+
+        Excludes execution parameters (seasonality_components, min_samples_per_group)
+        from detector ID hash.
+        """
         defaults = {
             "threshold": 1.5,
             "window_size": 100,
             "min_samples": 30,
             "min_samples_per_group": 4,
+            "input_type": "values",
+            "smoothing": None,
+            "smoothing_alpha": 0.3,
+            "smoothing_window": 10,
+            "window_weights": None,
+            "weight_decay": 0.95,
         }
+        # Execution parameters that don't affect detector ID
+        execution_params = {
+            "seasonality_components",
+            "min_samples_per_group",
+            "smoothing_alpha",  # Only affects smoothing, not algorithm
+            "smoothing_window",  # Only affects smoothing, not algorithm
+            "weight_decay",  # Only affects weighting, not algorithm
+        }
+
         return {
-            k: v
-            for k, v in self.params.items()
-            if k not in {"seasonality_components"} and v != defaults.get(k)
+            k: v for k, v in self.params.items()
+            if v != defaults.get(k) and k not in execution_params
         }

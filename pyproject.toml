@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "detectkit"
-version = "0.2.1"
+version = "0.2.2"
 description = "Metric monitoring with automatic anomaly detection"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -33,6 +33,7 @@ dependencies = [
     "click>=8.0",
     "jinja2>=3.0",
     "orjson>=3.0",
+    "requests>=2.25.0",
 ]
 
 [project.optional-dependencies]
@@ -125,6 +126,7 @@ strict_equality = true
 module = [
     "clickhouse_driver.*",
     "orjson.*",
+    "requests.*",
 ]
 ignore_missing_imports = true
 

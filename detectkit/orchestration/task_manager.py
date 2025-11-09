@@ -12,6 +12,7 @@ from enum import Enum
 from typing import Dict, List, Optional
 import json
 
+import click
 import numpy as np
 
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
@@ -165,12 +166,16 @@ class TaskManager:
 
                 # Step 2: Detect anomalies
                 if PipelineStep.DETECT in steps:
+                    click.echo()
+                    click.echo(click.style("  ┌─ DETECT", fg="cyan", bold=True))
                     detect_result = self._run_detect_step(config, from_date, to_date, full_refresh)
                     result["anomalies_detected"] = detect_result["anomalies_count"]
                     result["steps_completed"].append(PipelineStep.DETECT)
 
                 # Step 3: Send alerts
                 if PipelineStep.ALERT in steps:
+                    click.echo()
+                    click.echo(click.style("  ┌─ ALERT", fg="cyan", bold=True))
                     alert_result = self._run_alert_step(config)
                     result["alerts_sent"] = alert_result["alerts_sent"]
                     result["steps_completed"].append(PipelineStep.ALERT)
@@ -221,6 +226,7 @@ class TaskManager:
 
         # Determine date range
         if full_refresh:
+            click.echo("  │ Deleting existing datapoints...")
             # Delete existing data for this metric
             self.internal.delete_datapoints(
                 metric_name=config.name,
@@ -239,12 +245,14 @@ class TaskManager:
                 # Start from next interval after last timestamp
                 interval = config.get_interval()
                 actual_from = last_ts + timedelta(seconds=interval.seconds)
+                click.echo(f"  │ Resuming from last saved: {last_ts.strftime('%Y-%m-%d %H:%M:%S')}")
             else:
                 # No data yet - use loading_start_time from config
                 if config.loading_start_time:
                     actual_from = datetime.strptime(
                         config.loading_start_time, "%Y-%m-%d %H:%M:%S"
                     ).replace(tzinfo=timezone.utc)
+                    click.echo(f"  │ Starting fresh from: {config.loading_start_time}")
                 else:
                     raise ValueError(
                         "No existing data and no loading_start_time configured. "
@@ -260,16 +268,26 @@ class TaskManager:
         total_points = int(total_seconds / interval.seconds)
         batch_size = config.loading_batch_size
 
+        click.echo(f"  │ Loading from {actual_from.strftime('%Y-%m-%d %H:%M:%S')} to {actual_to.strftime('%Y-%m-%d %H:%M:%S')}")
+        click.echo(f"  │ Total points: ~{total_points:,} | Batch size: {batch_size:,}")
+
         # If total points <= batch_size, load in one go
         if total_points <= batch_size:
+            click.echo("  │ Loading in single batch...")
             rows_inserted = loader.load_and_save(from_date=actual_from, to_date=actual_to)
+            click.echo(click.style(f"  └─ Loaded {rows_inserted:,} datapoints", fg="green"))
             return {"points_loaded": rows_inserted}
 
         # Load in batches
         total_loaded = 0
         current_from = actual_from
+        num_batches = int(total_points / batch_size) + 1
+        batch_num = 0
+
+        click.echo(f"  │ Loading in {num_batches} batches...")
 
         while current_from < actual_to:
+            batch_num += 1
             # Calculate batch end time
             batch_seconds = batch_size * interval.seconds
             batch_to = current_from + timedelta(seconds=batch_seconds)
@@ -280,9 +298,12 @@ class TaskManager:
             rows = loader.load_and_save(from_date=current_from, to_date=batch_to)
             total_loaded += rows
 
+            click.echo(f"  │   Batch {batch_num}/{num_batches}: +{rows:,} points (total: {total_loaded:,})")
+
             # Move to next batch
             current_from = batch_to
 
+        click.echo(click.style(f"  └─ Loaded {total_loaded:,} datapoints", fg="green"))
         return {"points_loaded": total_loaded}
 
     def _run_detect_step(
@@ -308,10 +329,12 @@ class TaskManager:
 
         # Skip if no detectors configured
         if not config.detectors:
+            click.echo("  │ No detectors configured, skipping detection")
             return {"anomalies_count": 0}
 
         # Get interval
         interval = config.get_interval()
+        click.echo(f"  │ Running {len(config.detectors)} detector(s)...")
 
         # Determine to_date if not specified
         actual_to = to_date or datetime.now(timezone.utc)
@@ -325,7 +348,10 @@ class TaskManager:
             normalized_from_date = normalized_from_date.replace(tzinfo=None)
 
         # Run each detector
-        for detector_config in config.detectors:
+        for idx, detector_config in enumerate(config.detectors, 1):
+            click.echo(f"  │")
+            click.echo(f"  │ [{idx}/{len(config.detectors)}] Detector: {detector_config.type}")
+
             # Create detector to get detector_id
             # Combine algorithm params with execution params (seasonality_components)
             detector_params = detector_config.get_algorithm_params()
@@ -344,6 +370,7 @@ class TaskManager:
 
             # Delete existing detections if full_refresh
             if full_refresh:
+                click.echo("  │   Deleting existing detections...")
                 self.internal.delete_detections(
                     metric_name=config.name,
                     detector_id=detector_id,
@@ -387,6 +414,7 @@ class TaskManager:
 
             # Skip if nothing to detect
             if not actual_from or actual_from >= actual_to:
+                click.echo("  │   Nothing to detect (already up to date)")
                 continue
 
             # Get batch_size and context_size
@@ -397,10 +425,17 @@ class TaskManager:
             total_seconds = (actual_to - actual_from).total_seconds()
             total_points = int(total_seconds / interval.seconds)
 
+            click.echo(f"  │   Detecting from {actual_from.strftime('%Y-%m-%d %H:%M:%S')} to {actual_to.strftime('%Y-%m-%d %H:%M:%S')}")
+            click.echo(f"  │   Total points: ~{total_points:,} | Batch size: {batch_size:,}")
+
             # BATCHING: Process in batches
             current_from = actual_from
+            detector_anomalies = 0
+            num_batches = int(total_points / batch_size) + 1 if total_points > batch_size else 1
+            batch_num = 0
 
             while current_from < actual_to:
+                batch_num += 1
                 # Calculate batch end
                 batch_seconds = batch_size * interval.seconds
                 batch_to = current_from + timedelta(seconds=batch_seconds)
@@ -461,11 +496,19 @@ class TaskManager:
                     )
 
                     # Count anomalies
-                    anomalies_count += sum(1 for r in batch_results if r.is_anomaly)
+                    batch_anomalies = sum(1 for r in batch_results if r.is_anomaly)
+                    detector_anomalies += batch_anomalies
+                    anomalies_count += batch_anomalies
+
+                    if num_batches > 1:
+                        click.echo(f"  │     Batch {batch_num}/{num_batches}: {len(batch_results):,} points, {batch_anomalies} anomalies")
 
                 # Move to next batch
                 current_from = batch_to
 
+            click.echo(click.style(f"  │   └─ Detected {detector_anomalies:,} anomalies", fg="yellow" if detector_anomalies > 0 else "green"))
+
+        click.echo(click.style(f"  └─ Total anomalies: {anomalies_count:,}", fg="yellow" if anomalies_count > 0 else "green"))
         return {"anomalies_count": anomalies_count}
 
     def _run_alert_step(self, config: MetricConfig) -> Dict[str, int]:
@@ -482,10 +525,14 @@ class TaskManager:
 
         # Check if alerting is configured
         if not config.alerting or not config.alerting.enabled:
+            click.echo("  │ Alerting not enabled")
             return {"alerts_sent": 0}
 
         if not config.alerting.channels:
+            click.echo("  │ No alert channels configured")
             return {"alerts_sent": 0}
+
+        click.echo(f"  │ Checking alert conditions...")
 
         # Get alerting config
         alerting_config = config.alerting
@@ -515,12 +562,15 @@ class TaskManager:
         )
 
         if not recent_detections:
+            click.echo("  │ No recent detections found")
             return {"alerts_sent": 0}
 
         # Check if alert should be sent
         should_alert, alert_data = orchestrator.should_alert(recent_detections)
 
         if should_alert:
+            click.echo(click.style(f"  │ ⚠ Alert triggered! Sending to {len(alerting_config.channels)} channel(s)...", fg="yellow", bold=True))
+
             # Create alert channels from config
             channels = self._create_alert_channels(alerting_config.channels)
 
@@ -528,6 +578,16 @@ class TaskManager:
                 # Send alerts
                 results = orchestrator.send_alerts(alert_data, channels)
                 alerts_sent = sum(1 for success in results.values() if success)
+
+                for channel_name, success in results.items():
+                    status = click.style("✓", fg="green") if success else click.style("✗", fg="red")
+                    click.echo(f"  │   {status} {channel_name}")
+
+                click.echo(click.style(f"  └─ Sent {alerts_sent}/{len(channels)} alerts", fg="green" if alerts_sent > 0 else "yellow"))
+            else:
+                click.echo(click.style("  └─ No valid alert channels available", fg="yellow"))
+        else:
+            click.echo("  └─ No alert needed (conditions not met)")
 
         return {"alerts_sent": alerts_sent}
 

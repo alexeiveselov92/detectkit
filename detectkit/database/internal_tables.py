@@ -125,7 +125,7 @@ class InternalTablesManager:
                 num_rows, ",".join(seasonality_columns), dtype=object
             ),
             "created_at": np.full(
-                num_rows, datetime.now(timezone.utc), dtype="datetime64[ms]"
+                num_rows, datetime.now(timezone.utc).replace(tzinfo=None), dtype="datetime64[ms]"
             ),
         }
 
@@ -196,7 +196,7 @@ class InternalTablesManager:
             "detector_params": np.full(num_rows, detector_params, dtype=object),
             "detection_metadata": data["detection_metadata"],
             "created_at": np.full(
-                num_rows, datetime.now(timezone.utc), dtype="datetime64[ms]"
+                num_rows, datetime.now(timezone.utc).replace(tzinfo=None), dtype="datetime64[ms]"
             ),
         }
 

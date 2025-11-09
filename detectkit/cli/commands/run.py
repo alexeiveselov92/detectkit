@@ -282,9 +282,13 @@ def select_metrics(selector: str, project_root: Path) -> List[tuple[Path, Metric
     Select metrics based on selector and validate uniqueness.
 
     Selector types:
-    - Metric name: "cpu_usage"
-    - Path pattern: "metrics/critical/*.yml"
+    - Metric name: "cpu_usage" (searches by 'name' field recursively in subdirectories)
+    - Path pattern: "metrics/critical/*.yml" or "league/cpu_usage"
     - Tag: "tag:critical"
+
+    For name selector:
+    1. First tries filename-based search in root metrics/ directory
+    2. If not found, searches recursively by 'name' field in all subdirectories
 
     Args:
         selector: Selector string
@@ -312,8 +316,9 @@ def select_metrics(selector: str, project_root: Path) -> List[tuple[Path, Metric
     elif "*" in selector or "/" in selector:
         pattern = selector if selector.startswith("metrics/") else f"metrics/{selector}"
         metric_paths = list(project_root.glob(pattern))
-    # Metric name selector (only searches root metrics/ directory)
+    # Metric name selector
     else:
+        # First try filename-based search in root (backward compatibility)
         metric_file = metrics_dir / f"{selector}.yml"
         if metric_file.exists():
             metric_paths = [metric_file]
@@ -322,6 +327,11 @@ def select_metrics(selector: str, project_root: Path) -> List[tuple[Path, Metric
             metric_file = metrics_dir / f"{selector}.yaml"
             if metric_file.exists():
                 metric_paths = [metric_file]
+            else:
+                # Fall back to recursive search by 'name' field
+                found_metric = find_metric_by_name(metrics_dir, selector)
+                if found_metric:
+                    metric_paths = [found_metric]
 
     if not metric_paths:
         return []
@@ -359,6 +369,35 @@ def find_metrics_by_tag(metrics_dir: Path, tag: str) -> List[Path]:
             continue
 
     return matching_metrics
+
+
+def find_metric_by_name(metrics_dir: Path, name: str) -> Optional[Path]:
+    """
+    Find metric by name field (searches recursively in subdirectories).
+
+    Args:
+        metrics_dir: Metrics directory path
+        name: Metric name to search for (from 'name' field in YAML)
+
+    Returns:
+        Path to metric file if found, None otherwise
+    """
+    import yaml
+
+    # Search both .yml and .yaml extensions
+    for pattern in ["**/*.yml", "**/*.yaml"]:
+        for metric_file in metrics_dir.glob(pattern):
+            try:
+                with open(metric_file) as f:
+                    config = yaml.safe_load(f)
+
+                if config and config.get("name") == name:
+                    return metric_file
+            except Exception:
+                # Skip files that can't be parsed
+                continue
+
+    return None
 
 
 def process_metric(

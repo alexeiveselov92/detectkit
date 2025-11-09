@@ -445,6 +445,11 @@ def process_metric(
 
     # Run pipeline
     try:
+        # Log step headers
+        if PipelineStep.LOAD in steps:
+            click.echo()
+            click.echo(click.style("  ┌─ LOAD", fg="cyan", bold=True))
+
         result = task_manager.run_metric(
             config=config,
             steps=steps,
@@ -454,18 +459,10 @@ def process_metric(
             force=force,
         )
 
-        # Display results
+        # Display results - task_manager already printed details
+        click.echo()
         if result["status"] == "success":
-            click.echo(click.style("  ✓ Success!", fg="green", bold=True))
-
-            if PipelineStep.LOAD in steps:
-                click.echo(f"    Loaded: {result['datapoints_loaded']} datapoints")
-
-            if PipelineStep.DETECT in steps:
-                click.echo(f"    Detected: {result['anomalies_detected']} anomalies")
-
-            if PipelineStep.ALERT in steps:
-                click.echo(f"    Sent: {result['alerts_sent']} alerts")
+            click.echo(click.style("✓ Pipeline completed successfully", fg="green", bold=True))
         else:
             click.echo(
                 click.style(

@@ -330,8 +330,8 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         """
         from detectkit.database.tables import TABLE_TASKS
 
-        # Get current UTC time
-        now = datetime.now(timezone.utc)
+        # Get current UTC time (convert to naive UTC for numpy compatibility)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         # First, delete existing record (if any)
         delete_query = f"""
@@ -350,6 +350,14 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
             }
         )
 
+        # Convert last_processed_timestamp to naive UTC if needed
+        last_ts_naive = None
+        if last_processed_timestamp:
+            if last_processed_timestamp.tzinfo is not None:
+                last_ts_naive = last_processed_timestamp.replace(tzinfo=None)
+            else:
+                last_ts_naive = last_processed_timestamp
+
         # Then insert new record
         insert_data = {
             "metric_name": np.array([metric_name]),
@@ -358,7 +366,7 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
             "status": np.array([status]),
             "started_at": np.array([now], dtype="datetime64[ms]"),
             "updated_at": np.array([now], dtype="datetime64[ms]"),
-            "last_processed_timestamp": np.array([last_processed_timestamp], dtype="datetime64[ms]") if last_processed_timestamp else np.array([None]),
+            "last_processed_timestamp": np.array([last_ts_naive], dtype="datetime64[ms]") if last_ts_naive else np.array([None]),
             "error_message": np.array([error_message]),
             "timeout_seconds": np.array([timeout_seconds], dtype=np.int32),
         }

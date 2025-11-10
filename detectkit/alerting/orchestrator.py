@@ -73,6 +73,8 @@ class AlertOrchestrator:
         interval: Interval,
         conditions: Optional[AlertConditions] = None,
         timezone_display: str = "UTC",
+        internal=None,  # InternalTablesManager (optional, for cooldown tracking)
+        alert_config=None,  # AlertConfig (optional, for cooldown settings)
     ):
         """
         Initialize alert orchestrator.
@@ -82,11 +84,15 @@ class AlertOrchestrator:
             interval: Metric interval
             conditions: Alert conditions (defaults to AlertConditions())
             timezone_display: Timezone for alert display (default: UTC)
+            internal: InternalTablesManager instance (optional, for cooldown tracking)
+            alert_config: AlertConfig instance (optional, for cooldown settings)
         """
         self.metric_name = metric_name
         self.interval = interval
         self.conditions = conditions or AlertConditions()
         self.timezone_display = timezone_display
+        self.internal = internal
+        self.alert_config = alert_config
 
     def should_alert(
         self,
@@ -106,9 +112,14 @@ class AlertOrchestrator:
         Logic:
             1. Check if enough detectors triggered (min_detectors)
             2. Check consecutive anomalies with direction matching
-            3. Return decision and formatted AlertData
+            3. Check alert cooldown (if configured)
+            4. Return decision and formatted AlertData
         """
         if not recent_detections:
+            return False, None
+
+        # NEW: Check cooldown FIRST (before expensive checks)
+        if self._is_in_cooldown():
             return False, None
 
         # Group detections by timestamp
@@ -316,6 +327,15 @@ class AlertOrchestrator:
                 print(f"Error sending alert via {channel_name}: {e}")
                 results[channel_name] = False
 
+        # NEW: Update alert timestamp after sending (for cooldown tracking)
+        if any(results.values()) and self.internal:
+            # At least one channel succeeded - update timestamp
+            self.internal.update_alert_timestamp(
+                metric_name=self.metric_name,
+                timestamp=datetime.utcnow(),
+                increment_count=True
+            )
+
         return results
 
     def get_last_complete_point(self, now: Optional[datetime] = None) -> datetime:
@@ -356,6 +376,150 @@ class AlertOrchestrator:
         last_complete_seconds = floored_seconds - interval_seconds
 
         return datetime.fromtimestamp(last_complete_seconds, tz=timezone.utc)
+
+    def _is_in_cooldown(self) -> bool:
+        """
+        Check if alert is currently in cooldown period.
+
+        Returns:
+            True if in cooldown (should NOT send alert), False otherwise
+
+        Logic:
+            1. If alert_cooldown not configured → return False (no cooldown)
+            2. Get last_alert_sent timestamp from database
+            3. If never sent → return False (no cooldown)
+            4. Calculate elapsed time since last alert
+            5. If cooldown_reset_on_recovery=True:
+               - Check if recovery happened since last alert
+               - If yes → return False (cooldown reset)
+            6. If elapsed < cooldown_interval → return True (in cooldown)
+            7. Otherwise → return False (cooldown expired)
+        """
+        # No cooldown configured
+        if not self.alert_config or not self.alert_config.alert_cooldown:
+            return False
+
+        # No internal manager (can't check cooldown)
+        if not self.internal:
+            return False
+
+        # Get last alert timestamp
+        last_sent = self.internal.get_last_alert_timestamp(self.metric_name)
+
+        if not last_sent:
+            return False  # Never sent alert before
+
+        # Parse cooldown interval
+        from detectkit.core.interval import Interval
+        cooldown_interval = Interval(self.alert_config.alert_cooldown)
+        cooldown_seconds = cooldown_interval.seconds
+
+        # Calculate elapsed time
+        now = datetime.utcnow()
+        elapsed = (now - last_sent).total_seconds()
+
+        # Check recovery reset (if enabled)
+        if self.alert_config.cooldown_reset_on_recovery:
+            # Check if recovery happened since last alert
+            has_recovery = self._check_recovery_since_last_alert(last_sent)
+
+            if has_recovery:
+                return False  # Cooldown reset by recovery
+
+        # Check if still in cooldown
+        return elapsed < cooldown_seconds
+
+    def _check_recovery_since_last_alert(
+        self,
+        last_alert_timestamp: datetime
+    ) -> bool:
+        """
+        Check if recovery happened since last alert was sent.
+
+        Recovery means: consecutive anomalies count dropped below threshold,
+        indicating the metric returned to normal state.
+
+        Args:
+            last_alert_timestamp: Timestamp when last alert was sent
+
+        Returns:
+            True if recovery detected, False otherwise
+
+        Logic:
+            1. Load detections created after last_alert_timestamp
+            2. Count consecutive anomalies using same logic as should_alert()
+            3. If consecutive < required → recovery happened
+            4. If consecutive >= required → still in anomaly state
+        """
+        if not self.internal:
+            return False
+
+        # Get last complete point
+        last_point = self.get_last_complete_point()
+
+        # Load detections created AFTER last alert
+        # We need enough points to check consecutive anomalies
+        num_points = self.conditions.consecutive_anomalies + 5  # +5 for margin
+
+        recent_detections = self.internal.get_recent_detections(
+            metric_name=self.metric_name,
+            last_point=last_point,
+            num_points=num_points,
+            created_after=last_alert_timestamp  # Only detections AFTER last alert
+        )
+
+        if not recent_detections:
+            # No new detections → assume recovery
+            return True
+
+        # Convert to DetectionRecord format
+        detection_records = []
+        for det in recent_detections:
+            # Group has multiple detectors per timestamp
+            for i in range(len(det["detector_ids"])):
+                # Parse detection metadata
+                try:
+                    import json
+                    metadata = json.loads(det["detector_params_list"][i])
+                except:
+                    metadata = {}
+
+                # Determine direction
+                value = det["value"]
+                conf_lower = det["confidence_lowers"][i]
+                conf_upper = det["confidence_uppers"][i]
+
+                if value < conf_lower:
+                    direction = "down"
+                elif value > conf_upper:
+                    direction = "up"
+                else:
+                    direction = "none"
+
+                record = DetectionRecord(
+                    timestamp=np.datetime64(det["timestamp"]),
+                    detector_name=det["detector_names"][i],
+                    detector_id=det["detector_ids"][i],
+                    detector_params=det["detector_params_list"][i],
+                    value=value,
+                    is_anomaly=det["is_anomaly_flags"][i],
+                    confidence_lower=conf_lower,
+                    confidence_upper=conf_upper,
+                    direction=direction,
+                    severity=0.0,  # Not used for recovery check
+                    detection_metadata=metadata
+                )
+                detection_records.append(record)
+
+        # Count consecutive anomalies (same logic as should_alert)
+        consecutive = self._count_consecutive_anomalies(
+            detections=detection_records,
+            min_detectors=self.conditions.min_detectors,
+            direction=self.conditions.direction
+        )
+
+        # Recovery = consecutive dropped below threshold
+        return consecutive < self.conditions.consecutive_anomalies
 
     def __repr__(self) -> str:
         """String representation."""

@@ -577,6 +577,8 @@ class TaskManager:
                 consecutive_anomalies=alerting_config.consecutive_anomalies,
             ),
             timezone_display="UTC",
+            internal=self.internal,  # For cooldown tracking
+            alert_config=alerting_config,  # For cooldown settings
         )
 
         # Get last complete point

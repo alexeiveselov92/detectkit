@@ -841,3 +841,125 @@ class InternalTablesManager:
             key_columns={"metric_name": metric_config.name},
             data=data
         )
+
+    def get_last_alert_timestamp(
+        self,
+        metric_name: str
+    ) -> Optional[datetime]:
+        """
+        Get timestamp of last sent alert for a metric.
+
+        Used for alert cooldown tracking - prevents sending alerts
+        too frequently for the same metric.
+
+        Args:
+            metric_name: Metric identifier
+
+        Returns:
+            Timestamp of last sent alert, or None if never sent
+
+        Example:
+            >>> last_sent = internal.get_last_alert_timestamp("cpu_usage")
+            >>> if last_sent:
+            ...     elapsed = (datetime.utcnow() - last_sent).total_seconds()
+            ...     print(f"Last alert sent {elapsed}s ago")
+        """
+        full_table_name = self._manager.get_full_table_name(
+            TABLE_TASKS, use_internal=True
+        )
+
+        # Query for pipeline task (detector_id="pipeline", process_type="pipeline")
+        query = f"""
+        SELECT last_alert_sent
+        FROM {full_table_name}
+        WHERE metric_name = %(metric_name)s
+          AND detector_id = 'pipeline'
+          AND process_type = 'pipeline'
+        LIMIT 1
+        """
+
+        results = self._manager.execute_query(
+            query,
+            params={"metric_name": metric_name}
+        )
+
+        if not results or not results[0]["last_alert_sent"]:
+            return None
+
+        last_sent = results[0]["last_alert_sent"]
+
+        # Normalize to naive datetime if needed
+        if hasattr(last_sent, 'tzinfo') and last_sent.tzinfo is not None:
+            last_sent = last_sent.replace(tzinfo=None)
+
+        return last_sent
+
+    def update_alert_timestamp(
+        self,
+        metric_name: str,
+        timestamp: datetime,
+        increment_count: bool = True
+    ) -> int:
+        """
+        Update last_alert_sent timestamp and optionally increment alert_count.
+
+        Called after successfully sending an alert to track cooldown state.
+
+        Args:
+            metric_name: Metric identifier
+            timestamp: Timestamp when alert was sent (typically datetime.utcnow())
+            increment_count: Whether to increment alert_count (default: True)
+
+        Returns:
+            Number of rows updated (typically 1)
+
+        Example:
+            >>> # After sending alert
+            >>> internal.update_alert_timestamp(
+            ...     "cpu_usage",
+            ...     datetime.utcnow(),
+            ...     increment_count=True
+            ... )
+        """
+        full_table_name = self._manager.get_full_table_name(
+            TABLE_TASKS, use_internal=True
+        )
+
+        # Normalize timestamp to naive if needed
+        if hasattr(timestamp, 'tzinfo') and timestamp.tzinfo is not None:
+            timestamp = timestamp.replace(tzinfo=None)
+
+        if increment_count:
+            # Update with alert_count increment
+            update_query = f"""
+            ALTER TABLE {full_table_name}
+            UPDATE
+                last_alert_sent = %(timestamp)s,
+                alert_count = alert_count + 1,
+                updated_at = %(timestamp)s
+            WHERE metric_name = %(metric_name)s
+              AND detector_id = 'pipeline'
+              AND process_type = 'pipeline'
+            """
+        else:
+            # Update without alert_count increment
+            update_query = f"""
+            ALTER TABLE {full_table_name}
+            UPDATE
+                last_alert_sent = %(timestamp)s,
+                updated_at = %(timestamp)s
+            WHERE metric_name = %(metric_name)s
+              AND detector_id = 'pipeline'
+              AND process_type = 'pipeline'
+            """
+
+        self._manager.execute_query(
+            update_query,
+            params={
+                "metric_name": metric_name,
+                "timestamp": timestamp
+            }
+        )
+
+        # ClickHouse ALTER TABLE UPDATE is async, return 1 (optimistic)
+        return 1

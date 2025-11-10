@@ -1,0 +1,130 @@
+# Example: Revenue Monitoring with Detector Preprocessing
+#
+# This example demonstrates advanced detector preprocessing features (v0.2.0+).
+#
+# Scenario:
+# - Daily revenue varies widely (weekdays: $10K, weekends: $30K)
+# - Absolute values don't indicate problems
+# - CHANGES in revenue are what matter (sudden 50% drop = problem)
+#
+# Features demonstrated:
+# - input_type: "pct_change" - Detect on percentage changes, not absolute values
+# - smoothing_window: Reduce noise from daily fluctuations
+# - recent_weight: Adapt faster to new baseline levels
+#
+# Without preprocessing:
+# - Monday $10K, Tuesday $25K → No alert (both are normal)
+# - But this is a 150% jump that might indicate data issue!
+#
+# With preprocessing:
+# - Detects abnormal CHANGES regardless of absolute level
+# - Smoothing prevents single-day noise from triggering
+# - Weighting adapts to seasonal baseline shifts
+
+name: daily_revenue_growth
+description: Daily revenue with percentage change detection and smoothing
+interval: "1day"
+
+# Load daily revenue from database
+query: |
+  SELECT
+    DATE(timestamp) as timestamp,
+    SUM(amount) as value
+  FROM sales
+  WHERE timestamp >= %(from_date)s
+    AND timestamp < %(to_date)s
+  GROUP BY DATE(timestamp)
+  ORDER BY timestamp
+
+# Loading configuration
+loading:
+  start_time: "2024-01-01"
+  batch_size: 90  # 90 days per batch
+
+# Advanced detector with preprocessing
+detectors:
+  - type: mad
+    params:
+      # PREPROCESSING: Detect on percentage changes
+      input_type: "pct_change"  # Convert to % change between days
+      # Example: $10K → $15K becomes +50% change
+      #          $30K → $33K becomes +10% change
+
+      # SMOOTHING: Reduce noise from daily fluctuations
+      smoothing_window: 7  # 7-day moving average
+      # Prevents single-day spikes from triggering alerts
+
+      # WEIGHTING: Adapt to seasonal baseline changes
+      recent_weight: 0.6  # Weight recent 20% of data at 60%
+      # Faster adaptation when baseline shifts (e.g., holiday season)
+
+      # Standard MAD parameters
+      threshold: 3.5
+      window_size: 90  # 90 days of history
+      min_samples: 30  # Need at least 30 days
+
+# Alert configuration
+alerting:
+  enabled: true
+  timezone: "UTC"
+
+  channels:
+    - slack_finance
+    - email_executives
+
+  # Anomaly filtering
+  min_detectors: 1
+  direction: "any"  # Alert on unusual growth OR drop
+  consecutive_anomalies: 2  # 2 consecutive days (reduces false positives)
+
+  # Alert cooldown
+  alert_cooldown: "1day"  # Max 1 alert per day
+  cooldown_reset_on_recovery: true
+
+  # Special alerts
+  no_data_alert: true  # Alert if revenue data is missing!
+
+# Example detection scenarios:
+#
+# Scenario 1: Absolute values vary, but changes are normal
+# Mon: $10,000 → Tue: $10,500 (+5%) → Normal
+# Tue: $10,500 → Wed: $11,000 (+4.8%) → Normal
+# Wed: $11,000 → Thu: $11,500 (+4.5%) → Normal
+# Result: No alerts (consistent growth)
+#
+# Scenario 2: Abnormal percentage change
+# Thu: $11,500 → Fri: $20,000 (+74%) → ANOMALY!
+# Fri: $20,000 → Sat: $21,000 (+5%) → Normal again
+# Result: Alert sent (unusual spike in growth)
+#
+# Scenario 3: Gradual baseline shift (seasonal)
+# Week 1 avg: $12K/day
+# Week 2 avg: $13K/day
+# Week 3 avg: $14K/day (holiday season starting)
+# Week 4 avg: $15K/day
+# Result: No alerts - recent_weight helps adapt to new baseline
+#
+# Scenario 4: Sudden drop
+# Mon: $15,000 → Tue: $8,000 (-47%) → ANOMALY!
+# Tue: $8,000 → Wed: $8,200 (+2.5%) → Still anomaly (-45% from Mon)
+# Result: Alert sent after 2 consecutive days (data pipeline issue?)
+
+# How preprocessing helps:
+#
+# 1. input_type: "pct_change"
+#    - Without: $10K and $30K both seem normal (wide range)
+#    - With: Detects when TODAY is abnormally different from YESTERDAY
+#
+# 2. smoothing_window: 7
+#    - Without: Single bad day triggers alert
+#    - With: Trend matters more than single data point
+#
+# 3. recent_weight: 0.6
+#    - Without: Holiday season growth looks like anomaly
+#    - With: Adapts baseline faster to new "normal"
+
+# Tags for filtering
+tags:
+  - finance
+  - critical
+  - revenue

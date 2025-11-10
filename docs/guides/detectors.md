@@ -544,6 +544,277 @@ detectors:
         - "hour_of_day"  # Must match above
 ```
 
+## Advanced Detector Features (v0.2.0+)
+
+**New in v0.2.0** - All statistical detectors support preprocessing, smoothing, and value weighting.
+
+### Input Preprocessing
+
+Transform input values before detection to detect on changes rather than absolute values.
+
+#### Available Transformations
+
+**`input_type: "raw"`** (default) - Use values as-is:
+```yaml
+detectors:
+  - type: mad
+    params:
+      input_type: "raw"  # Default
+      threshold: 3.5
+```
+
+**`input_type: "diff"`** - Detect on differences between consecutive points:
+```yaml
+detectors:
+  - type: mad
+    params:
+      input_type: "diff"
+      threshold: 3.0
+```
+
+**Example:**
+```
+Original values: [100, 102, 105, 150, 152]
+After diff:      [2,   3,   45,  2]
+                           ↑ Anomaly detected (spike in change)
+```
+
+**`input_type: "pct_change"`** - Detect on percentage changes:
+```yaml
+detectors:
+  - type: mad
+    params:
+      input_type: "pct_change"
+      threshold: 3.0
+```
+
+**Example:**
+```
+Original values: [100, 102, 105, 200, 202]
+After pct_change: [2%,  2.9%, 90%, 1%]
+                          ↑ Anomaly detected (90% jump)
+```
+
+#### When to Use Each Type
+
+**Use `"raw"`** (default):
+- Absolute values matter (CPU %, memory usage, latency)
+- Thresholds are meaningful (>500ms is bad regardless of trend)
+- Baseline is stable
+
+**Use `"diff"`**:
+- Changes matter more than absolute values
+- Sudden jumps/drops are anomalies
+- Examples: Error counts increasing rapidly, queue depth changes
+
+**Use `"pct_change"`**:
+- Relative changes matter (revenue, traffic, conversions)
+- Different baselines (10 vs 10,000 - both can have 50% spike)
+- Growth rates, ratios, percentages
+
+#### Complete Example
+
+**Scenario**: Detect abnormal revenue growth
+
+```yaml
+name: daily_revenue_growth
+description: Daily revenue percentage change monitoring
+interval: "1day"
+
+query: |
+  SELECT
+    date AS timestamp,
+    SUM(amount) AS value
+  FROM sales
+  WHERE date >= %(from_date)s
+    AND date < %(to_date)s
+  GROUP BY date
+  ORDER BY date
+
+detectors:
+  - type: mad
+    params:
+      input_type: "pct_change"  # Detect on % growth
+      threshold: 3.5
+      window_size: 90           # 90 days baseline
+
+alerting:
+  enabled: true
+  channels:
+    - slack_finance
+  consecutive_anomalies: 2
+```
+
+**What it detects:**
+```
+Day 1: $10,000 revenue
+Day 2: $10,200 revenue → +2% growth (normal)
+Day 3: $10,300 revenue → +1% growth (normal)
+Day 4: $18,000 revenue → +75% growth → ANOMALY DETECTED
+```
+
+### Value Smoothing
+
+Reduce noise with moving average before detection.
+
+```yaml
+detectors:
+  - type: mad
+    params:
+      smoothing_window: 5  # 5-point moving average
+      threshold: 3.0
+```
+
+**How it works:**
+
+```
+Original values: [10, 12, 50, 11, 9, 10, 11]  # 50 is noise spike
+After smoothing:  [10, 12, 18.4, 18.4, 18, 10, 11]
+                              ↑ Spike smoothed out
+```
+
+**When to use:**
+- Noisy metrics with high-frequency fluctuations
+- Single-point spikes that aren't real issues
+- Reduce false positives from measurement errors
+
+**Typical values:**
+- `smoothing_window: 3` - Light smoothing
+- `smoothing_window: 5` - Standard smoothing
+- `smoothing_window: 7-10` - Heavy smoothing
+
+**Trade-off**: Reduces noise but also reduces sensitivity to short-lived anomalies.
+
+### Recent Value Weighting
+
+Weight recent values more heavily in calculations.
+
+```yaml
+detectors:
+  - type: mad
+    params:
+      recent_weight: 0.7  # 70% weight to recent 20% of window
+      window_size: 100
+```
+
+**How it works:**
+
+Without weighting (default `recent_weight: 0.0`):
+```
+All 100 points contribute equally to median/std calculation
+```
+
+With weighting (`recent_weight: 0.7`):
+```
+Oldest 80 points:  30% of total weight
+Recent 20 points:  70% of total weight
+→ Recent data influences threshold more
+```
+
+**When to use:**
+- Metrics with trends or changing baselines
+- Faster adaptation to new "normal" levels
+- Seasonal metrics that shift over time
+
+**When NOT to use:**
+- Stable baselines (wastes computation)
+- Want to detect return to old baseline as anomaly
+
+**Typical values:**
+- `recent_weight: 0.0` - No weighting (default)
+- `recent_weight: 0.5` - Moderate weighting
+- `recent_weight: 0.7` - Aggressive weighting
+
+### Combining Features
+
+All features can be combined:
+
+```yaml
+name: api_error_rate_changes
+description: API error rate with change detection and smoothing
+interval: "5min"
+
+query: |
+  SELECT
+    timestamp,
+    error_count / total_requests * 100 AS value
+  FROM api_metrics
+  WHERE timestamp >= %(from_date)s
+    AND timestamp < %(to_date)s
+  ORDER BY timestamp
+
+detectors:
+  - type: mad
+    params:
+      # Detect on percentage changes (not absolute error rate)
+      input_type: "pct_change"
+
+      # Smooth out noise from low-traffic periods
+      smoothing_window: 3
+
+      # Weight recent data more (baseline shifts over time)
+      recent_weight: 0.6
+
+      # Standard MAD parameters
+      threshold: 3.5
+      window_size: 288  # 24 hours
+
+alerting:
+  enabled: true
+  channels:
+    - pagerduty_oncall
+  consecutive_anomalies: 2
+  alert_cooldown: "15min"
+  cooldown_reset_on_recovery: true
+```
+
+**This configuration:**
+1. Converts error rate to percentage changes (10% → 15% is 50% increase)
+2. Applies 3-point smoothing to reduce noise
+3. Weights recent 20% of window at 60% (adapts to new baselines faster)
+4. Uses MAD detector with 3.5 threshold
+5. Alerts only after 2 consecutive anomalies
+6. Prevents spam with 15-minute cooldown
+
+### Feature Compatibility
+
+All preprocessing features work with all statistical detectors:
+
+| Feature | MAD | Z-Score | IQR | Manual Bounds |
+|---------|-----|---------|-----|---------------|
+| `input_type` | ✅ | ✅ | ✅ | ✅ |
+| `smoothing_window` | ✅ | ✅ | ✅ | ✅ |
+| `recent_weight` | ✅ | ✅ | ✅ | ❌ (N/A) |
+
+**Note**: Manual Bounds detector doesn't use `recent_weight` because it uses fixed thresholds, not calculated statistics.
+
+### Performance Considerations
+
+- **`input_type: "diff"` or `"pct_change"`**: Minimal overhead (~5%)
+- **`smoothing_window`**: Adds ~10-20% overhead (rolling window calculation)
+- **`recent_weight`**: Adds ~15-25% overhead (weighted statistics)
+
+All preprocessing is vectorized using numpy, so overhead is minimal even for large datasets.
+
+### Debugging Preprocessed Detections
+
+Detection metadata includes preprocessing information:
+
+```python
+{
+  "preprocessing": {
+    "input_type": "pct_change",
+    "smoothing": "ma3",  # 3-point moving average
+    "recent_weight": 0.7
+  },
+  "global_median": 2.5,  # Statistics on preprocessed values
+  "adjusted_median": 2.3,
+  ...
+}
+```
+
+This helps understand what the detector "saw" after preprocessing.
+
 ## See Also
 
 - [MAD Detector Reference](../reference/detectors/mad.md)

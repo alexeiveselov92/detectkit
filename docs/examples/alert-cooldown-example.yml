@@ -1,0 +1,86 @@
+# Example: API Latency Monitoring with Alert Cooldown
+#
+# This example demonstrates alert cooldown to prevent spam from persistent anomalies.
+#
+# Scenario:
+# - API latency monitored every 5 minutes
+# - During incidents, latency can stay high for hours
+# - Without cooldown: 12 duplicate alerts per hour
+# - With cooldown: 1 alert every 30 minutes max
+#
+# Features demonstrated:
+# - alert_cooldown: Minimum time between alerts
+# - cooldown_reset_on_recovery: Reset timer when metric recovers
+# - consecutive_anomalies: Wait for sustained anomaly before alerting
+
+name: api_latency_p95
+description: API latency 95th percentile with cooldown to prevent alert spam
+interval: "5min"
+
+# Load latency data from database
+query: |
+  SELECT
+    timestamp,
+    quantile(0.95)(response_time_ms) as value
+  FROM api_requests
+  WHERE timestamp >= %(from_date)s
+    AND timestamp < %(to_date)s
+  GROUP BY timestamp
+  ORDER BY timestamp
+
+# Loading configuration
+loading:
+  start_time: "2025-01-01"
+  batch_size: 2880  # 10 days of 5-min intervals
+
+# Anomaly detection
+detectors:
+  - type: mad
+    params:
+      threshold: 3.5
+      window_size: 288  # 24 hours of data
+      min_samples: 100  # Need at least 100 points
+
+# Alert configuration with cooldown
+alerting:
+  enabled: true
+  timezone: "UTC"
+
+  # Alert channels (defined in profiles.yml)
+  channels:
+    - mattermost_ops
+    - pagerduty_oncall
+
+  # Anomaly filtering
+  min_detectors: 1
+  direction: "any"  # Alert on spikes or drops
+  consecutive_anomalies: 3  # Must persist for 3 intervals (15 minutes)
+
+  # Alert cooldown (v0.3.0) - KEY FEATURE
+  alert_cooldown: "30min"  # Minimum 30 minutes between alerts
+  cooldown_reset_on_recovery: true  # Reset timer when latency recovers
+
+  # Special alerts
+  no_data_alert: false
+
+# Example timeline with cooldown:
+#
+# 10:00 - Latency spike detected (1st anomaly)
+# 10:05 - Still high (2nd anomaly)
+# 10:10 - Still high (3rd anomaly) → ALERT SENT ✓ (threshold met)
+# 10:15 - Still high → Skipped (cooldown)
+# 10:20 - Still high → Skipped (cooldown)
+# ...
+# 10:40 - Still high → Skipped (cooldown - only 30min passed)
+# 10:45 - Latency RECOVERS to normal → Cooldown timer RESETS
+# 11:00 - NEW spike (1st anomaly)
+# 11:05 - Still high (2nd anomaly)
+# 11:10 - Still high (3rd anomaly) → ALERT SENT ✓ (new issue after recovery)
+#
+# Result: Only 2 alerts instead of ~12 without cooldown
+
+# Tags for filtering
+tags:
+  - production
+  - api
+  - critical

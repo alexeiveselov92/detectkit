@@ -510,6 +510,10 @@ alerting:
   direction: "same"              # "same", "any", "up", "down" (default: "same")
   consecutive_anomalies: 3       # Consecutive anomalies to trigger (default: 3)
 
+  # Alert cooldown (v0.3.0) - Prevent spam from persistent anomalies
+  alert_cooldown: "30min"        # Minimum time between alerts (default: null)
+  cooldown_reset_on_recovery: true  # Reset cooldown when metric recovers (default: true)
+
   # Special alerts
   no_data_alert: false           # Alert on missing data (default: false)
 

@@ -116,7 +116,8 @@ alerting:
   enabled: true
   channels:
     - mattermost_ops
-  consecutive_threshold: 3
+  consecutive_anomalies: 3  # Fixed: was consecutive_threshold
+  alert_cooldown: "30min"   # v0.3.0: Prevent alert spam
 ```
 
 ## Step 4: Configure Alert Channel

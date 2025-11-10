@@ -99,6 +99,7 @@ alerting:
   channels:
     - mattermost_alerts
   consecutive_anomalies: 3
+  alert_cooldown: "30min"  # v0.3.0: Prevent alert spam
 ```
 
 ### 4. Run Pipeline

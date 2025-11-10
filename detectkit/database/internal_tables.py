@@ -433,6 +433,7 @@ class InternalTablesManager:
         metric_name: str,
         last_point: datetime,
         num_points: int,
+        created_after: Optional[datetime] = None,
     ) -> List[Dict]:
         """
         Get recent detection results grouped by timestamp.
@@ -444,6 +445,8 @@ class InternalTablesManager:
             metric_name: Metric identifier
             last_point: Last complete timestamp to query up to
             num_points: Number of recent timestamps to retrieve
+            created_after: Optional filter to only include detections created after this time
+                          (useful to filter out old detections from previous runs)
 
         Returns:
             List of dicts, each containing:
@@ -471,22 +474,30 @@ class InternalTablesManager:
 
         # Step 1: Get distinct timestamps (database-agnostic)
         # Find last N timestamps with detections
+        created_filter = ""
+        params = {
+            "metric_name": metric_name,
+            "last_point": last_point,
+            "num_points": num_points,
+        }
+
+        if created_after is not None:
+            created_filter = "AND created_at > %(created_after)s"
+            params["created_after"] = created_after
+
         timestamps_query = f"""
         SELECT DISTINCT timestamp
         FROM {full_table_name}
         WHERE metric_name = %(metric_name)s
           AND timestamp <= %(last_point)s
+          {created_filter}
         ORDER BY timestamp DESC
         LIMIT %(num_points)s
         """
 
         timestamp_results = self._manager.execute_query(
             timestamps_query,
-            params={
-                "metric_name": metric_name,
-                "last_point": last_point,
-                "num_points": num_points,
-            },
+            params=params,
         )
 
         if not timestamp_results:

@@ -191,11 +191,18 @@ class TaskManager:
 
                 # Step 3: Send alerts
                 if PipelineStep.ALERT in steps:
-                    click.echo()
-                    click.echo(click.style("  ┌─ ALERT", fg="cyan", bold=True))
-                    alert_result = self._run_alert_step(config)
-                    result["alerts_sent"] = alert_result["alerts_sent"]
-                    result["steps_completed"].append(PipelineStep.ALERT)
+                    # Skip alert if no anomalies detected in current run
+                    if result.get("anomalies_detected", 0) == 0:
+                        click.echo()
+                        click.echo(click.style("  ┌─ ALERT", fg="cyan", bold=True))
+                        click.echo("  │   No anomalies detected in current run, skipping alerts")
+                        result["alerts_sent"] = 0
+                    else:
+                        click.echo()
+                        click.echo(click.style("  ┌─ ALERT", fg="cyan", bold=True))
+                        alert_result = self._run_alert_step(config)
+                        result["alerts_sent"] = alert_result["alerts_sent"]
+                        result["steps_completed"].append(PipelineStep.ALERT)
 
             finally:
                 # Always release lock
@@ -441,6 +448,11 @@ class TaskManager:
             # Calculate total points to detect
             total_seconds = (actual_to - actual_from).total_seconds()
             total_points = int(total_seconds / interval.seconds)
+
+            # Skip if incomplete interval (less than 1 full interval)
+            if total_points < 1:
+                click.echo("  │   Waiting for at least one complete interval")
+                continue
 
             click.echo(f"  │   Detecting from {actual_from.strftime('%Y-%m-%d %H:%M:%S')} to {actual_to.strftime('%Y-%m-%d %H:%M:%S')}")
             click.echo(f"  │   Total points: ~{total_points:,} | Batch size: {batch_size:,}")

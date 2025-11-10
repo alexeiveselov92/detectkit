@@ -179,6 +179,7 @@ class TestSaveDetections:
             "confidence_lower": np.array([0.4], dtype=np.float64),
             "confidence_upper": np.array([0.6], dtype=np.float64),
             "value": np.array([0.9], dtype=np.float64),
+            "processed_value": np.array([0.9], dtype=np.float64),
             "detection_metadata": np.array(
                 ['{"severity": 0.8, "direction": "above"}'], dtype=object
             ),
@@ -189,6 +190,7 @@ class TestSaveDetections:
         rows = internal_manager.save_detections(
             metric_name="cpu_usage",
             detector_id="mad_abc123",
+            detector_name="MADDetector",
             data=data,
             detector_params='{"threshold": 3.0}',
         )

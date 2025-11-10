@@ -132,6 +132,8 @@ class TestTasksTable:
             "last_processed_timestamp",  # This was missing before
             "error_message",
             "timeout_seconds",  # This was missing before
+            "last_alert_sent",  # For alert cooldown tracking
+            "alert_count",  # For alert statistics
         ]
         assert column_names == expected_columns
 

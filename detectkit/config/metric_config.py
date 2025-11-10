@@ -141,6 +141,8 @@ class AlertConfig(BaseModel):
         no_data_alert: Whether to alert when data is missing
         template_single: Custom template for single anomaly alert
         template_consecutive: Custom template for consecutive anomalies alert
+        alert_cooldown: Minimum interval between alerts (e.g., "30min", 1800 seconds)
+        cooldown_reset_on_recovery: Whether to reset cooldown when anomaly recovers
     """
 
     enabled: bool = Field(default=True, description="Enable alerting")
@@ -167,6 +169,17 @@ class AlertConfig(BaseModel):
     )
     template_consecutive: Optional[str] = Field(
         default=None, description="Custom template for consecutive anomalies"
+    )
+    alert_cooldown: Optional[Union[str, int]] = Field(
+        default=None,
+        description="Minimum interval between alerts (e.g., '30min', 1800). "
+                    "If None, no cooldown is applied (alerts sent every time conditions are met)."
+    )
+    cooldown_reset_on_recovery: bool = Field(
+        default=True,
+        description="Reset cooldown timer when anomaly recovers to normal. "
+                    "Only applies if alert_cooldown is set. "
+                    "True = cooldown resets on recovery, False = strict cooldown independent of recovery."
     )
 
     @field_validator("consecutive_anomalies")

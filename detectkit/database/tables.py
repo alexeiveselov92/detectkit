@@ -97,12 +97,15 @@ def get_tasks_table_model() -> TableModel:
         - last_processed_timestamp: Last successfully processed timestamp
         - error_message: Error message if failed (nullable)
         - timeout_seconds: Task timeout in seconds
+        - last_alert_sent: Timestamp of last sent alert (nullable, for cooldown tracking)
+        - alert_count: Number of alerts sent for this metric (for statistics)
 
     Primary Key: (metric_name, detector_id, process_type)
 
-    This table serves dual purpose:
+    This table serves multiple purposes:
     1. Locking: Only one process can run for a given (metric, detector, type)
     2. Resume: Stores last_processed_timestamp to resume from interruptions
+    3. Alert cooldown: Tracks last_alert_sent timestamp to prevent alert spam
     """
     return TableModel(
         columns=[
@@ -119,6 +122,12 @@ def get_tasks_table_model() -> TableModel:
             ),
             ColumnDefinition("error_message", "Nullable(String)", nullable=True),
             ColumnDefinition("timeout_seconds", "Int32"),
+            ColumnDefinition(
+                "last_alert_sent",
+                "Nullable(DateTime64(3, 'UTC'))",
+                nullable=True
+            ),
+            ColumnDefinition("alert_count", "UInt32", default="0"),
         ],
         primary_key=["metric_name", "detector_id", "process_type"],
         engine="MergeTree",

@@ -390,6 +390,42 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
             conflict_strategy="ignore"
         )
 
+    def upsert_record(
+        self,
+        table_name: str,
+        key_columns: Dict[str, Any],
+        data: Dict[str, np.ndarray]
+    ) -> int:
+        """
+        Upsert record in ClickHouse using DELETE + INSERT pattern.
+
+        ClickHouse doesn't have native UPSERT, so we explicitly delete
+        the old record (if exists) and then insert the new one.
+
+        Args:
+            table_name: Fully qualified table name
+            key_columns: Dict of column names to values for WHERE clause
+            data: Dict of column names to numpy arrays for INSERT
+
+        Returns:
+            Number of rows inserted (typically 1)
+        """
+        # Step 1: DELETE existing record (if any)
+        where_parts = [f"{col} = %({col})s" for col in key_columns.keys()]
+        delete_query = f"""
+        ALTER TABLE {table_name}
+        DELETE WHERE {' AND '.join(where_parts)}
+        """
+
+        self._client.execute(delete_query, key_columns)
+
+        # Step 2: INSERT new record
+        return self.insert_batch(
+            table_name,
+            data,
+            conflict_strategy="ignore"
+        )
+
     @property
     def internal_location(self) -> str:
         """Get internal database name."""

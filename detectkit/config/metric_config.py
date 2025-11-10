@@ -231,6 +231,7 @@ class MetricConfig(BaseModel):
 
     Attributes:
         name: Metric name (unique identifier)
+        description: Optional metric description (supports multi-line text)
         tags: Optional list of tags for metric selection (e.g., ["critical", "api"])
         profile: Profile name to use (overrides default_profile from project config)
         query: Inline SQL query (mutually exclusive with query_file)
@@ -247,6 +248,9 @@ class MetricConfig(BaseModel):
     Example YAML:
         ```yaml
         name: cpu_usage
+        description: |
+          CPU usage monitoring metric.
+          Tracks system load over time.
         tags: ["critical", "infrastructure", "10min"]
         profile: clickhouse_prod
         query_file: sql/cpu_usage.sql
@@ -277,6 +281,10 @@ class MetricConfig(BaseModel):
     """
 
     name: str = Field(..., description="Metric name")
+    description: Optional[str] = Field(
+        default=None,
+        description="Optional metric description (supports multi-line text)"
+    )
     tags: Optional[List[str]] = Field(
         default=None,
         description="Optional tags for metric selection (e.g., ['critical', 'api', '10min'])",

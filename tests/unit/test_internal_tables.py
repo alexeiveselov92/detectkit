@@ -10,9 +10,11 @@ from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.database.tables import (
     TABLE_DATAPOINTS,
     TABLE_DETECTIONS,
+    TABLE_METRICS,
     TABLE_TASKS,
     get_datapoints_table_model,
     get_detections_table_model,
+    get_metrics_table_model,
     get_tasks_table_model,
 )
 
@@ -44,7 +46,7 @@ class TestEnsureTables:
         internal_manager.ensure_tables()
 
         # Verify create_table was called for each internal table
-        assert mock_manager.create_table.call_count == 3
+        assert mock_manager.create_table.call_count == 4
 
         # Verify correct table names
         created_tables = [
@@ -53,6 +55,7 @@ class TestEnsureTables:
         assert f"detectk_internal.{TABLE_DATAPOINTS}" in created_tables
         assert f"detectk_internal.{TABLE_DETECTIONS}" in created_tables
         assert f"detectk_internal.{TABLE_TASKS}" in created_tables
+        assert f"detectk_internal.{TABLE_METRICS}" in created_tables
 
     def test_skips_existing_tables(self, internal_manager, mock_manager):
         """Test that existing tables are not recreated."""
@@ -76,8 +79,8 @@ class TestEnsureTables:
         # Call ensure_tables
         internal_manager.ensure_tables()
 
-        # Verify create_table called only for missing tables (detections, tasks)
-        assert mock_manager.create_table.call_count == 2
+        # Verify create_table called only for missing tables (detections, tasks, metrics)
+        assert mock_manager.create_table.call_count == 3
 
         created_tables = [
             call[0][0] for call in mock_manager.create_table.call_args_list
@@ -85,6 +88,7 @@ class TestEnsureTables:
         assert f"detectk_internal.{TABLE_DATAPOINTS}" not in created_tables
         assert f"detectk_internal.{TABLE_DETECTIONS}" in created_tables
         assert f"detectk_internal.{TABLE_TASKS}" in created_tables
+        assert f"detectk_internal.{TABLE_METRICS}" in created_tables
 
 
 class TestSaveDatapoints:
@@ -340,3 +344,119 @@ class TestTaskLocking:
             status="running",
             last_processed_timestamp=last_ts,
         )
+
+
+class TestUpsertMetricConfig:
+    """Test upsert_metric_config() method."""
+
+    def test_upserts_metric_config_with_all_fields(self, internal_manager, mock_manager):
+        """Test upserting metric config with all fields populated."""
+        # Create mock MetricConfig
+        mock_config = MagicMock()
+        mock_config.name = "cpu_usage"
+        mock_config.interval = "10min"
+        mock_config.loading_batch_size = 10000
+        mock_config.loading_start_time = "2024-01-01 00:00:00"
+        mock_config.tags = ["critical", "infrastructure"]
+        mock_config.enabled = True
+
+        # Mock alerting config
+        mock_alert = MagicMock()
+        mock_alert.enabled = True
+        mock_alert.timezone = "Europe/Moscow"
+        mock_alert.direction = "both"
+        mock_alert.consecutive_anomalies = 3
+        mock_alert.no_data_alert = True
+        mock_alert.min_detectors = 2
+        mock_config.alerting = mock_alert
+
+        # Mock upsert_record to return 1 (success)
+        mock_manager.upsert_record.return_value = 1
+
+        # Call upsert_metric_config
+        result = internal_manager.upsert_metric_config(
+            metric_config=mock_config,
+            file_path="metrics/cpu_usage.yml",
+            table_name_override="_dtk_metrics"
+        )
+
+        # Verify upsert_record was called
+        assert mock_manager.upsert_record.called
+        assert result == 1
+
+        # Verify table name
+        call_args = mock_manager.upsert_record.call_args
+        assert call_args[1]["table_name"] == "detectk_internal._dtk_metrics"
+
+        # Verify key_columns
+        assert call_args[1]["key_columns"] == {"metric_name": "cpu_usage"}
+
+        # Verify data dict structure
+        data = call_args[1]["data"]
+        assert data["metric_name"][0] == "cpu_usage"
+        assert data["path"][0] == "metrics/cpu_usage.yml"
+        assert data["interval"][0] == "10min"
+        assert data["loading_batch_size"][0] == 10000
+        assert data["is_alert_enabled"][0] == 1
+        assert data["timezone"][0] == "Europe/Moscow"
+        assert data["direction"][0] == "both"
+        assert data["consecutive_anomalies"][0] == 3
+        assert data["no_data_alert"][0] == 1
+        assert data["min_detectors"][0] == 2
+        assert data["enabled"][0] == 1
+
+    def test_upserts_metric_config_without_alerting(self, internal_manager, mock_manager):
+        """Test upserting metric config without alerting configuration."""
+        # Create mock MetricConfig without alerting
+        mock_config = MagicMock()
+        mock_config.name = "api_requests"
+        mock_config.interval = "1h"
+        mock_config.loading_batch_size = 5000
+        mock_config.loading_start_time = None
+        mock_config.tags = None
+        mock_config.enabled = True
+        mock_config.alerting = None  # No alerting
+
+        mock_manager.upsert_record.return_value = 1
+
+        # Call upsert_metric_config
+        result = internal_manager.upsert_metric_config(
+            metric_config=mock_config,
+            file_path="metrics/api_requests.yml"
+        )
+
+        # Verify upsert_record was called
+        assert mock_manager.upsert_record.called
+        assert result == 1
+
+        # Verify data has default alert values
+        data = mock_manager.upsert_record.call_args[1]["data"]
+        assert data["is_alert_enabled"][0] == 0
+        assert data["timezone"][0] is None
+        assert data["direction"][0] is None
+        assert data["consecutive_anomalies"][0] == 3
+        assert data["no_data_alert"][0] == 0
+        assert data["min_detectors"][0] == 1
+
+    def test_uses_default_table_name_when_no_override(self, internal_manager, mock_manager):
+        """Test that default table name is used when no override provided."""
+        mock_config = MagicMock()
+        mock_config.name = "test_metric"
+        mock_config.interval = "5min"
+        mock_config.loading_batch_size = 1000
+        mock_config.loading_start_time = None
+        mock_config.tags = []
+        mock_config.enabled = True
+        mock_config.alerting = None
+
+        mock_manager.upsert_record.return_value = 1
+
+        # Call without table_name_override
+        internal_manager.upsert_metric_config(
+            metric_config=mock_config,
+            file_path="metrics/test.yml"
+        )
+
+        # Verify default table name was used
+        call_args = mock_manager.upsert_record.call_args
+        assert call_args[1]["table_name"] == f"detectk_internal.{TABLE_METRICS}"

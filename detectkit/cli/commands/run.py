@@ -12,6 +12,7 @@ import click
 
 from detectkit.config.metric_config import MetricConfig
 from detectkit.config.profile import ProfilesConfig
+from detectkit.config.project_config import ProjectConfig
 from detectkit.config.validator import validate_metric_uniqueness
 from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.orchestration.task_manager import PipelineStep, TaskManager
@@ -63,7 +64,18 @@ def run_command(
     click.echo(f"Project root: {project_root}")
 
     # Load project config
-    # project_config = load_project_config(project_root)
+    project_config_path = project_root / "detectkit_project.yml"
+    try:
+        project_config = ProjectConfig.from_yaml_file(project_config_path)
+    except Exception as e:
+        click.echo(
+            click.style(
+                f"Error loading detectkit_project.yml: {e}",
+                fg="red",
+                bold=True,
+            )
+        )
+        return
 
     # Select metrics based on selector
     # Returns list of (path, config) tuples with uniqueness validation
@@ -169,6 +181,7 @@ def run_command(
         internal_manager=internal_manager,
         db_manager=db_manager,
         profiles_config=profiles_config,
+        project_config=project_config,
     )
 
     # Process each metric
@@ -457,6 +470,7 @@ def process_metric(
             to_date=to_date,
             full_refresh=full_refresh,
             force=force,
+            metric_file_path=str(metric_path),
         )
 
         # Display results - task_manager already printed details

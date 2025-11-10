@@ -73,6 +73,7 @@ class TaskManager:
         internal_manager: InternalTablesManager,
         db_manager,  # BaseDatabaseManager
         profiles_config=None,  # ProfilesConfig (optional for backward compatibility)
+        project_config=None,  # ProjectConfig (for table name overrides)
     ):
         """
         Initialize task manager.
@@ -81,10 +82,12 @@ class TaskManager:
             internal_manager: Manager for internal detectk tables
             db_manager: Database manager for metric data
             profiles_config: Profiles configuration (for alert channels)
+            project_config: Project configuration (for table name overrides)
         """
         self.internal = internal_manager
         self.db_manager = db_manager
         self.profiles_config = profiles_config
+        self.project_config = project_config
 
     def run_metric(
         self,
@@ -94,6 +97,7 @@ class TaskManager:
         to_date: Optional[datetime] = None,
         full_refresh: bool = False,
         force: bool = False,
+        metric_file_path: Optional[str] = None,
     ) -> Dict[str, any]:
         """
         Run metric processing pipeline.
@@ -105,6 +109,7 @@ class TaskManager:
             to_date: End date for data loading (optional)
             full_refresh: Delete all existing data and reload from scratch
             force: Ignore task locks
+            metric_file_path: Path to metric .yml file (for _dtk_metrics table)
 
         Returns:
             Dict with execution results:
@@ -139,7 +144,19 @@ class TaskManager:
         }
 
         try:
-            # Step 0: Acquire lock
+            # Step 0a: Save metric configuration to _dtk_metrics (informational)
+            if metric_file_path:
+                metrics_table_name = None
+                if self.project_config and hasattr(self.project_config, 'tables'):
+                    metrics_table_name = self.project_config.tables.metrics
+
+                self.internal.upsert_metric_config(
+                    metric_config=config,
+                    file_path=metric_file_path,
+                    table_name_override=metrics_table_name
+                )
+
+            # Step 0b: Acquire lock
             if not force:
                 # Default timeout: 1 hour (can be overridden via ProjectConfig in future)
                 timeout_seconds = 3600

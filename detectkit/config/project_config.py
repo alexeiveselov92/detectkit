@@ -33,6 +33,7 @@ class ProjectTablesConfig(BaseModel):
         datapoints: Default datapoints table name
         detections: Default detections table name
         tasks: Default tasks table name
+        metrics: Default metrics configuration table name
     """
 
     datapoints: str = Field(
@@ -42,6 +43,7 @@ class ProjectTablesConfig(BaseModel):
         default="_dtk_detections", description="Default detections table"
     )
     tasks: str = Field(default="_dtk_tasks", description="Default tasks table")
+    metrics: str = Field(default="_dtk_metrics", description="Default metrics config table")
 
 
 class ProjectTimeoutsConfig(BaseModel):
@@ -95,6 +97,7 @@ class ProjectConfig(BaseModel):
           datapoints: "_dtk_datapoints"
           detections: "_dtk_detections"
           tasks: "_dtk_tasks"
+          metrics: "_dtk_metrics"
 
         timeouts:
           load: 3600

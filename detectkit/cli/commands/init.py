@@ -15,7 +15,7 @@ def run_init(project_name: str, target_dir: str):
     Initialize a new detectkit project.
 
     Args:
-        project_name: Name of the project
+        project_name: Name of the project (or path - will extract basename)
         target_dir: Directory to create project in
 
     Creates:
@@ -27,7 +27,9 @@ def run_init(project_name: str, target_dir: str):
         └── sql/
             └── .gitkeep
     """
-    target_path = Path(target_dir) / project_name
+    # Extract just the directory name in case user passes a full path
+    project_name_clean = Path(project_name).name
+    target_path = Path(target_dir) / project_name_clean
 
     # Check if project already exists
     if target_path.exists():
@@ -41,7 +43,7 @@ def run_init(project_name: str, target_dir: str):
         return
 
     # Create project directory
-    click.echo(f"Creating detectkit project '{project_name}' in {target_dir}...")
+    click.echo(f"Creating detectkit project '{project_name_clean}' in {target_dir}...")
 
     target_path.mkdir(parents=True, exist_ok=True)
 
@@ -55,7 +57,7 @@ def run_init(project_name: str, target_dir: str):
 
     # Create detectkit_project.yml
     project_config = f"""# detectkit project configuration
-name: {project_name}
+name: {project_name_clean}
 version: '1.0'
 
 # Paths

@@ -5,6 +5,7 @@ Defines schemas for internal tables:
 - _dtk_datapoints: Metric data points
 - _dtk_detections: Anomaly detections
 - _dtk_tasks: Task status and locking
+- _dtk_metrics: Metric configuration metadata (informational)
 """
 
 from detectkit.core.models import ColumnDefinition, TableModel
@@ -125,14 +126,74 @@ def get_tasks_table_model() -> TableModel:
     )
 
 
+def get_metrics_table_model() -> TableModel:
+    """
+    Get TableModel for _dtk_metrics table.
+
+    This table stores metric configuration metadata for analytics dashboards.
+    It is INFORMATIONAL ONLY - does not affect library logic.
+    Updated on every dtk run via DELETE + INSERT pattern.
+
+    Schema:
+        - metric_name: Metric identifier (PRIMARY KEY)
+        - description: Optional metric description
+        - path: Path to .yml config file
+        - interval: Interval as string ("10min", "1h", etc.)
+        - loading_start_time: Start time for initial data loading
+        - loading_batch_size: Batch size for loading operations
+        - is_alert_enabled: Whether alerting is enabled (0/1)
+        - timezone: Timezone for alerts (e.g., "Europe/Moscow")
+        - direction: Required anomaly direction ("same", "any", "up", "down")
+        - consecutive_anomalies: Consecutive anomalies to trigger alert
+        - no_data_alert: Whether to alert on missing data (0/1)
+        - min_detectors: Minimum detectors that must agree
+        - tags: JSON array of tags
+        - enabled: Whether metric is enabled for processing (0/1)
+        - created_at: First time config was saved (UTC, millisecond precision)
+        - updated_at: Last config update (UTC, millisecond precision)
+
+    Primary Key: (metric_name)
+    Engine: MergeTree (uses DELETE + INSERT for guaranteed uniqueness)
+    """
+    return TableModel(
+        columns=[
+            ColumnDefinition("metric_name", "String"),
+            ColumnDefinition("description", "Nullable(String)", nullable=True),
+            ColumnDefinition("path", "String"),
+            ColumnDefinition("interval", "String"),
+            ColumnDefinition(
+                "loading_start_time",
+                "Nullable(DateTime64(3, 'UTC'))",
+                nullable=True
+            ),
+            ColumnDefinition("loading_batch_size", "UInt32"),
+            ColumnDefinition("is_alert_enabled", "UInt8"),
+            ColumnDefinition("timezone", "Nullable(String)", nullable=True),
+            ColumnDefinition("direction", "Nullable(String)", nullable=True),
+            ColumnDefinition("consecutive_anomalies", "UInt32"),
+            ColumnDefinition("no_data_alert", "UInt8"),
+            ColumnDefinition("min_detectors", "UInt32"),
+            ColumnDefinition("tags", "String"),
+            ColumnDefinition("enabled", "UInt8"),
+            ColumnDefinition("created_at", "DateTime64(3, 'UTC')"),
+            ColumnDefinition("updated_at", "DateTime64(3, 'UTC')"),
+        ],
+        primary_key=["metric_name"],
+        engine="MergeTree",
+        order_by=["metric_name"],
+    )
+
+
 # Table names as constants
 TABLE_DATAPOINTS = "_dtk_datapoints"
 TABLE_DETECTIONS = "_dtk_detections"
 TABLE_TASKS = "_dtk_tasks"
+TABLE_METRICS = "_dtk_metrics"
 
 # Map of table names to model factories
 INTERNAL_TABLES = {
     TABLE_DATAPOINTS: get_datapoints_table_model,
     TABLE_DETECTIONS: get_detections_table_model,
     TABLE_TASKS: get_tasks_table_model,
+    TABLE_METRICS: get_metrics_table_model,
 }

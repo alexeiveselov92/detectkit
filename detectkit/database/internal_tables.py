@@ -2,12 +2,13 @@
 Internal tables manager for detectk.
 
 High-level wrapper over BaseDatabaseManager for working with internal tables
-(_dtk_datapoints, _dtk_detections, _dtk_tasks).
+(_dtk_datapoints, _dtk_detections, _dtk_tasks, _dtk_metrics).
 
 This class provides convenient methods that use the UNIVERSAL BaseDatabaseManager
 methods underneath. It does NOT duplicate logic - just provides semantic wrappers.
 """
 
+import json
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
@@ -18,6 +19,7 @@ from detectkit.database.tables import (
     INTERNAL_TABLES,
     TABLE_DATAPOINTS,
     TABLE_DETECTIONS,
+    TABLE_METRICS,
     TABLE_TASKS,
 )
 
@@ -326,7 +328,13 @@ class InternalTablesManager:
                 "seasonality_columns": [],
             }
 
-        timestamps = [row["timestamp"] for row in results]
+        # Convert timezone-aware timestamps to naive to avoid numpy warning
+        timestamps = [
+            row["timestamp"].replace(tzinfo=None)
+            if hasattr(row["timestamp"], 'tzinfo') and row["timestamp"].tzinfo
+            else row["timestamp"]
+            for row in results
+        ]
         values = [row["value"] for row in results]
         seasonality = [row["seasonality_data"] for row in results]
 
@@ -721,4 +729,104 @@ class InternalTablesManager:
             process_type=process_type,
             status="running",
             last_processed_timestamp=last_processed_timestamp,
+        )
+
+    def upsert_metric_config(
+        self,
+        metric_config,  # MetricConfig type (avoiding circular import)
+        file_path: str,
+        table_name_override: Optional[str] = None
+    ) -> int:
+        """
+        Save or update metric configuration metadata to _dtk_metrics table.
+
+        This table is INFORMATIONAL ONLY - used by analysts for dashboards.
+        It does NOT affect library logic.
+
+        Updated on every dtk run via DELETE + INSERT pattern for guaranteed uniqueness.
+
+        Args:
+            metric_config: MetricConfig instance
+            file_path: Path to .yml config file
+            table_name_override: Optional override for table name (from ProjectConfig)
+
+        Returns:
+            Number of rows inserted (typically 1)
+
+        Example:
+            >>> internal.upsert_metric_config(
+            ...     metric_config=config,
+            ...     file_path="metrics/cpu_usage.yml",
+            ...     table_name_override="_dtk_metrics"
+            ... )
+        """
+        # Get table name (use override if provided, else default)
+        table_name = table_name_override or TABLE_METRICS
+        full_table_name = self._manager.get_full_table_name(
+            table_name, use_internal=True
+        )
+
+        # Get current UTC time (naive for numpy compatibility)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        # Parse loading_start_time if provided
+        loading_start_time_dt = None
+        if metric_config.loading_start_time:
+            try:
+                from datetime import datetime as dt
+                loading_start_time_dt = dt.strptime(
+                    metric_config.loading_start_time,
+                    "%Y-%m-%d %H:%M:%S"
+                ).replace(tzinfo=None)
+            except (ValueError, AttributeError):
+                # If parsing fails, leave as None
+                pass
+
+        # Extract alert configuration
+        is_alert_enabled = 0
+        timezone_str = None
+        direction = None
+        consecutive_anomalies = 3
+        no_data_alert = 0
+        min_detectors = 1
+
+        if metric_config.alerting:
+            is_alert_enabled = 1 if metric_config.alerting.enabled else 0
+            timezone_str = metric_config.alerting.timezone
+            direction = metric_config.alerting.direction
+            consecutive_anomalies = metric_config.alerting.consecutive_anomalies
+            no_data_alert = 1 if metric_config.alerting.no_data_alert else 0
+            min_detectors = metric_config.alerting.min_detectors
+
+        # Prepare data for INSERT
+        data = {
+            "metric_name": np.array([metric_config.name]),
+            "description": np.array([getattr(metric_config, 'description', None)]),
+            "path": np.array([file_path]),
+            "interval": np.array([str(metric_config.interval)]),
+            "loading_start_time": np.array(
+                [loading_start_time_dt], dtype="datetime64[ms]"
+            ) if loading_start_time_dt else np.array([None]),
+            "loading_batch_size": np.array(
+                [metric_config.loading_batch_size], dtype=np.uint32
+            ),
+            "is_alert_enabled": np.array([is_alert_enabled], dtype=np.uint8),
+            "timezone": np.array([timezone_str]),
+            "direction": np.array([direction]),
+            "consecutive_anomalies": np.array(
+                [consecutive_anomalies], dtype=np.uint32
+            ),
+            "no_data_alert": np.array([no_data_alert], dtype=np.uint8),
+            "min_detectors": np.array([min_detectors], dtype=np.uint32),
+            "tags": np.array([json.dumps(metric_config.tags or [])]),
+            "enabled": np.array([1 if metric_config.enabled else 0], dtype=np.uint8),
+            "created_at": np.array([now], dtype="datetime64[ms]"),
+            "updated_at": np.array([now], dtype="datetime64[ms]"),
+        }
+
+        # Use upsert_record for DELETE + INSERT pattern
+        return self._manager.upsert_record(
+            table_name=full_table_name,
+            key_columns={"metric_name": metric_config.name},
+            data=data
         )

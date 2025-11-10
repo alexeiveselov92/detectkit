@@ -245,6 +245,54 @@ class BaseDatabaseManager(ABC):
         """
         pass
 
+    @abstractmethod
+    def upsert_record(
+        self,
+        table_name: str,
+        key_columns: Dict[str, Any],
+        data: Dict[str, np.ndarray]
+    ) -> int:
+        """
+        Delete record by key columns, then insert new record.
+
+        This is a universal database-agnostic upsert pattern that guarantees
+        uniqueness by explicitly deleting old record before inserting new one.
+
+        Use this when ReplacingMergeTree or native UPSERT is not suitable
+        (e.g., for informational tables where guaranteed uniqueness is required).
+
+        Implementation varies by database:
+        - ClickHouse: ALTER TABLE ... DELETE + INSERT
+        - PostgreSQL: DELETE + INSERT (in transaction)
+        - MySQL: DELETE + INSERT (in transaction)
+
+        Args:
+            table_name: Fully qualified table name
+            key_columns: Dict of column names to values for WHERE clause
+                        (e.g., {"metric_name": "cpu_usage"})
+            data: Dict of column names to numpy arrays for INSERT
+                  (must include all key columns)
+
+        Returns:
+            Number of rows inserted (typically 1)
+
+        Raises:
+            DatabaseError: If operation fails
+
+        Example:
+            >>> manager.upsert_record(
+            ...     table_name="detectk_internal._dtk_metrics",
+            ...     key_columns={"metric_name": "cpu_usage"},
+            ...     data={
+            ...         "metric_name": np.array(["cpu_usage"]),
+            ...         "interval": np.array(["10min"]),
+            ...         "enabled": np.array([1]),
+            ...         ...
+            ...     }
+            ... )
+        """
+        pass
+
     @property
     @abstractmethod
     def internal_location(self) -> str:

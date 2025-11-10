@@ -297,6 +297,247 @@ This creates a **very conservative** alert:
 - Both must say "above" or both say "below"
 - Must persist for 3 consecutive points
 
+## Alert Cooldown (Spam Prevention)
+
+**New in v0.3.0** - Prevent alert fatigue from persistent anomalies with cooldown periods.
+
+### The Problem: Alert Spam
+
+With frequent monitoring intervals, long-running anomalies generate excessive duplicate alerts:
+
+**Example**: 10-minute interval metric with 5-hour anomaly:
+```
+10:00 - Anomaly detected → Alert sent ✓
+10:10 - Still anomalous   → Alert sent (duplicate!)
+10:20 - Still anomalous   → Alert sent (duplicate!)
+10:30 - Still anomalous   → Alert sent (duplicate!)
+... (27 more alerts over 5 hours)
+```
+
+**Result**: 30 identical alerts for a single issue.
+
+### The Solution: Alert Cooldown
+
+Configure minimum time between alerts:
+
+```yaml
+alerting:
+  enabled: true
+  channels:
+    - mattermost_ops
+  consecutive_anomalies: 3
+
+  # NEW: Cooldown configuration
+  alert_cooldown: "30min"              # Minimum 30 minutes between alerts
+  cooldown_reset_on_recovery: true     # Reset timer when metric recovers
+```
+
+### Cooldown Behavior
+
+#### With Recovery Reset (Recommended)
+
+**Configuration:**
+```yaml
+alert_cooldown: "30min"
+cooldown_reset_on_recovery: true  # Default
+```
+
+**Timeline:**
+```
+10:00 - Anomaly detected  → Alert sent ✓
+10:10 - Persists          → Skipped (cooldown)
+10:20 - Persists          → Skipped (cooldown)
+10:30 - Persists          → Skipped (cooldown)
+10:40 - RECOVERS to normal → Cooldown timer RESETS
+10:50 - NEW anomaly       → Alert sent ✓ (recovery reset cooldown)
+```
+
+**Advantages:**
+- Alert on first occurrence
+- Skip duplicate alerts during persistent issue
+- Alert again when new issue occurs after recovery
+- Best for most use cases
+
+#### Strict Cooldown (Noisy Metrics)
+
+**Configuration:**
+```yaml
+alert_cooldown: "1hour"
+cooldown_reset_on_recovery: false  # Strict mode
+```
+
+**Timeline:**
+```
+10:00 - Anomaly detected → Alert sent ✓
+10:10 - Persists         → Skipped (cooldown)
+10:20 - RECOVERS         → No alert (recovery doesn't reset)
+10:30 - NEW anomaly      → Skipped (only 30min < 1hour)
+11:00 - NEW anomaly      → Skipped (only 60min = 1hour)
+11:01 - NEW anomaly      → Alert sent ✓ (>1hour passed)
+```
+
+**Advantages:**
+- Absolute minimum time between any alerts
+- Useful for very noisy metrics
+- Prevents alert storms even with rapid recovery/anomaly cycles
+
+### Configuration Options
+
+#### String Format (Human-Readable)
+
+```yaml
+alert_cooldown: "10min"   # 10 minutes
+alert_cooldown: "30min"   # 30 minutes
+alert_cooldown: "1hour"   # 1 hour
+alert_cooldown: "2hours"  # 2 hours
+alert_cooldown: "1day"    # 1 day
+```
+
+#### Integer Format (Seconds)
+
+```yaml
+alert_cooldown: 600    # 10 minutes (600 seconds)
+alert_cooldown: 1800   # 30 minutes
+alert_cooldown: 3600   # 1 hour
+alert_cooldown: 7200   # 2 hours
+```
+
+#### Recovery Behavior
+
+```yaml
+# Reset cooldown on metric recovery (default)
+cooldown_reset_on_recovery: true
+
+# Strict cooldown regardless of recovery
+cooldown_reset_on_recovery: false
+```
+
+### Choosing Cooldown Settings
+
+#### By Metric Criticality
+
+**Critical metrics** (API availability, payment processing):
+```yaml
+alert_cooldown: "5min"                # Short cooldown
+cooldown_reset_on_recovery: true      # Alert on new issues quickly
+```
+
+**Important metrics** (Application performance, database latency):
+```yaml
+alert_cooldown: "30min"               # Standard cooldown
+cooldown_reset_on_recovery: true      # Default behavior
+```
+
+**Noisy metrics** (Non-critical warnings, experimental monitors):
+```yaml
+alert_cooldown: "2hours"              # Long cooldown
+cooldown_reset_on_recovery: false     # Strict mode
+```
+
+#### By Interval
+
+**Fast intervals** (1min, 5min):
+```yaml
+# More aggressive cooldown needed
+alert_cooldown: "30min"
+```
+
+**Slow intervals** (1hour, 1day):
+```yaml
+# Less aggressive cooldown
+alert_cooldown: "1hour"
+```
+
+### How Recovery Detection Works
+
+detectkit automatically detects recovery by checking if consecutive anomalies dropped below threshold:
+
+**Example** with `consecutive_anomalies: 3`:
+
+```
+Points:  A  A  A  N  N  N  A  A  A
+         ↑  ↑  ↑  ↑  ↑  ↑
+         1  2  3  Recovery detected!
+
+Timeline:
+10:00 - 1st anomaly
+10:10 - 2nd anomaly
+10:20 - 3rd anomaly → Alert sent (threshold met)
+10:30 - Normal point
+10:40 - Normal point
+10:50 - Normal point → Recovery detected, cooldown reset
+11:00 - NEW 1st anomaly
+11:10 - NEW 2nd anomaly
+11:20 - NEW 3rd anomaly → Alert sent (new issue)
+```
+
+### Complete Example
+
+```yaml
+name: api_response_time_p95
+description: API response time 95th percentile
+interval: "5min"
+
+query: |
+  SELECT
+    timestamp,
+    quantile(0.95)(response_time_ms) as value
+  FROM http_requests
+  WHERE timestamp >= %(from_date)s
+    AND timestamp < %(to_date)s
+  GROUP BY timestamp
+  ORDER BY timestamp
+
+detectors:
+  - type: mad
+    params:
+      threshold: 3.5
+      window_size: 288  # 24 hours
+
+alerting:
+  enabled: true
+  timezone: "UTC"
+
+  channels:
+    - mattermost_ops
+    - slack_incidents
+
+  # Anomaly filtering
+  min_detectors: 1
+  direction: "any"
+  consecutive_anomalies: 3
+
+  # Alert cooldown (v0.3.0)
+  alert_cooldown: "30min"              # No more than 1 alert per 30 minutes
+  cooldown_reset_on_recovery: true     # Alert again when new issue after recovery
+
+  # Special alerts
+  no_data_alert: false
+```
+
+### Best Practices
+
+1. **Start with recovery reset**: Use `cooldown_reset_on_recovery: true` initially
+2. **Tune cooldown duration**: Match to your team's response time (15min - 1hour typical)
+3. **Adjust for interval**: Faster intervals need longer cooldowns
+4. **Monitor alert frequency**: Track via `_dtk_tasks.alert_count` in database
+5. **Use strict mode sparingly**: Only for very noisy experimental metrics
+
+### Disabling Cooldown
+
+Omit `alert_cooldown` or set to `null`:
+
+```yaml
+alerting:
+  enabled: true
+  channels:
+    - mattermost_ops
+  consecutive_anomalies: 3
+  # No alert_cooldown = alert every time conditions met
+```
+
+**Warning**: Without cooldown, you may receive many duplicate alerts for persistent anomalies.
+
 ## Timezone Display
 
 Alerts display timestamps in UTC by default. Override per metric:

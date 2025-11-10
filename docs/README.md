@@ -436,14 +436,21 @@ Solutions:
 
 ## Project Status
 
-**Version**: 0.1.0 (initial release)
+**Version**: 0.3.0
 
 **Status**: Production-ready
 
 - ✅ Core features implemented
-- ✅ 287/288 tests passing (99.7%)
+- ✅ 291/311 tests passing
 - ✅ Published to PyPI
 - ✅ Tested in production
+
+### What's New in v0.3.0
+
+🎯 **Alert Cooldown** - Prevent alert spam from persistent anomalies
+- Configure minimum time between alerts
+- Automatic recovery detection
+- Stops duplicate alerts during long-running issues
 
 ## License
 
@@ -459,16 +466,17 @@ Contributions welcome! Please:
 
 ## Changelog
 
-### 0.1.0 (2024-03-15)
+See [CHANGELOG.md](../CHANGELOG.md) for complete version history.
 
-Initial release:
-- ✅ Statistical detectors (MAD, Z-Score, IQR, Manual Bounds)
-- ✅ Seasonality support (MAD detector)
-- ✅ Multi-channel alerting (Mattermost, Slack, Telegram, Email)
-- ✅ Database support (ClickHouse, PostgreSQL, MySQL)
-- ✅ Batch processing and incremental loading
-- ✅ CLI tool (`dtk`)
-- ✅ Complete documentation
+### Recent Releases
+
+- **[0.3.0]** (2025-11-10) - Alert cooldown system, spam prevention
+- **[0.2.8]** (2025-11-10) - Fix incomplete interval detection
+- **[0.2.7]** (2025-11-10) - Add _dtk_metrics table
+- **[0.2.0]** (2025-11-06) - Detector preprocessing and value weighting
+- **[0.1.0]** (2025-11-03) - Initial release
+
+[Full changelog →](../CHANGELOG.md)
 
 ---
 

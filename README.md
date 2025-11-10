@@ -6,11 +6,18 @@
 
 ## Status
 
-✅ **Production Ready** - Version 0.1.2
+✅ **Production Ready** - Version 0.3.0
 
 Published to PyPI: https://pypi.org/project/detectkit/
 
 Complete rewrite with modern architecture and full documentation (2025).
+
+### What's New in v0.3.0
+
+🎯 **Alert Cooldown** - Prevent alert spam from persistent anomalies
+- Configure minimum time between alerts (`alert_cooldown: "30min"`)
+- Automatic recovery detection (`cooldown_reset_on_recovery: true`)
+- Stops duplicate alerts during long-running issues
 
 ## Features
 
@@ -163,13 +170,14 @@ This project is currently in active development. Contributions are welcome once 
 
 ## Changelog
 
-### 0.1.0 (2025-11-07)
-- Initial release with complete rewrite
-- ✅ Core foundation: models, database, config
-- ✅ Metric loading with gap filling and seasonality extraction
-- ✅ Statistical detectors (Z-Score, MAD, IQR, Manual Bounds)
-- ✅ Alert channels (Webhook, Mattermost, Slack)
-- ✅ Alert orchestration with consecutive anomaly logic
-- ✅ Task manager for pipeline execution
-- ✅ CLI commands (dtk init, dtk run)
-- 📊 287 unit tests, 87% coverage
+See [CHANGELOG.md](CHANGELOG.md) for complete version history.
+
+### Recent Releases
+
+**[0.3.0]** (2025-11-10) - Alert cooldown system, spam prevention
+**[0.2.8]** (2025-11-10) - Fix incomplete interval detection
+**[0.2.7]** (2025-11-10) - Add _dtk_metrics table
+**[0.2.0]** (2025-11-06) - Detector preprocessing and value weighting
+**[0.1.0]** (2025-11-03) - Initial release
+
+[Full changelog →](CHANGELOG.md)

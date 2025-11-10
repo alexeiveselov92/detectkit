@@ -23,6 +23,10 @@ This directory contains practical examples for common monitoring scenarios.
 - [Gaming Metrics with Complex Seasonality](#example-10-gaming-metrics-with-complex-seasonality) - Multi-dimensional seasonality
 - [Multi-Detector Strategy](#example-11-multi-detector-strategy) - Combining multiple detectors
 
+### New Features (v0.2.0+, v0.3.0)
+- **[Alert Cooldown Example](alert-cooldown-example.yml)** - Prevent spam with alert cooldown (v0.3.0)
+- **[Detector Preprocessing Example](detector-preprocessing-example.yml)** - Advanced preprocessing features (v0.2.0)
+
 ---
 
 ## Example 1: CPU Usage Monitoring

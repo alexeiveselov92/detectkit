@@ -150,7 +150,7 @@ dtk --version
 Expected output:
 
 ```
-dtk, version 0.1.0
+dtk, version 0.3.0
 ```
 
 ## Upgrading

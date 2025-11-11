@@ -5,6 +5,13 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2025-11-11
+
+### Fixed
+- Critical bug: Newly added detectors no longer start processing from 1970-01-01 (epoch)
+- `get_last_detection_timestamp()` now properly handles epoch timestamps returned by ClickHouse for NULL values
+- This completes the epoch fix from v0.2.5 which only fixed the datapoints method
+
 ## [0.3.1] - 2025-11-10
 
 ### Fixed

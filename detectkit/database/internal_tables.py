@@ -267,7 +267,20 @@ class InternalTablesManager:
         )
 
         if result and result[0]["last_ts"]:
-            return result[0]["last_ts"]
+            last_ts = result[0]["last_ts"]
+
+            # ClickHouse returns epoch (1970-01-01 00:00:00) for NULL datetime
+            # Detect this and treat as None to avoid processing from 1970
+            epoch = datetime(1970, 1, 1, 0, 0, 0)
+
+            # Handle both timezone-aware and naive datetimes
+            if last_ts.tzinfo is not None:
+                epoch = epoch.replace(tzinfo=last_ts.tzinfo)
+
+            if last_ts == epoch:
+                return None
+
+            return last_ts
 
         return None
 

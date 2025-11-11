@@ -369,17 +369,26 @@ def find_metrics_by_tag(metrics_dir: Path, tag: str) -> List[Path]:
 
     matching_metrics = []
 
-    for metric_file in metrics_dir.glob("**/*.yml"):
-        try:
-            with open(metric_file) as f:
-                config = yaml.safe_load(f)
+    # Search both .yml and .yaml extensions (consistent with find_metric_by_name)
+    for pattern in ["**/*.yml", "**/*.yaml"]:
+        for metric_file in metrics_dir.glob(pattern):
+            try:
+                with open(metric_file) as f:
+                    config = yaml.safe_load(f)
 
-            if config and "tags" in config:
-                if tag in config["tags"]:
-                    matching_metrics.append(metric_file)
-        except Exception:
-            # Skip files that can't be parsed
-            continue
+                if config and "tags" in config:
+                    if tag in config["tags"]:
+                        matching_metrics.append(metric_file)
+            except Exception as e:
+                # Warn about unparseable files but continue searching
+                click.echo(
+                    click.style(
+                        f"Warning: Skipping {metric_file.relative_to(metrics_dir.parent)}: {e}",
+                        fg="yellow"
+                    ),
+                    err=True
+                )
+                continue
 
     return matching_metrics
 
@@ -406,8 +415,15 @@ def find_metric_by_name(metrics_dir: Path, name: str) -> Optional[Path]:
 
                 if config and config.get("name") == name:
                     return metric_file
-            except Exception:
-                # Skip files that can't be parsed
+            except Exception as e:
+                # Warn about unparseable files but continue searching
+                click.echo(
+                    click.style(
+                        f"Warning: Skipping {metric_file.relative_to(metrics_dir.parent)}: {e}",
+                        fg="yellow"
+                    ),
+                    err=True
+                )
                 continue
 
     return None

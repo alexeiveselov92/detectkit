@@ -5,6 +5,16 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2025-11-10
+
+### Fixed
+- CLI now shows warnings when metric files fail to parse (YAML syntax errors, validation errors, etc.) instead of silently skipping them
+- Tag selector (`--select tag:`) now searches both `.yml` and `.yaml` files (previously only searched `.yml`, inconsistent with name selector)
+
+### Changed
+- Improved error messages when no metrics are found - now provides feedback about which files were skipped due to parsing errors
+- Made metric file discovery consistent across both tag and name selectors
+
 ## [0.3.0] - 2025-11-10
 
 ### Added

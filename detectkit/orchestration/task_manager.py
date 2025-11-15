@@ -573,10 +573,10 @@ class TaskManager:
             interval=interval,
             conditions=AlertConditions(
                 min_detectors=1,  # At least one detector must flag anomaly
-                direction="any",  # Any direction (up or down)
+                direction=alerting_config.direction,  # Use direction from config
                 consecutive_anomalies=alerting_config.consecutive_anomalies,
             ),
-            timezone_display="UTC",
+            timezone_display=alerting_config.timezone,  # Use timezone from config
             internal=self.internal,  # For cooldown tracking
             alert_config=alerting_config,  # For cooldown settings
         )

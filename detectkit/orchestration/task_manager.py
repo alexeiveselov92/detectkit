@@ -286,6 +286,19 @@ class TaskManager:
         if actual_to is None:
             actual_to = datetime.now(timezone.utc)
 
+        # Normalize to naive UTC (ClickHouse returns aware UTC for DateTime64(3, 'UTC'))
+        if actual_from.tzinfo is not None:
+            actual_from = actual_from.replace(tzinfo=None)
+        if actual_to.tzinfo is not None:
+            actual_to = actual_to.replace(tzinfo=None)
+
+        # Guard: next interval hasn't arrived yet
+        if actual_from >= actual_to:
+            click.echo(f"  │ Next interval at {actual_from.strftime('%Y-%m-%d %H:%M:%S')}, "
+                       f"now {actual_to.strftime('%Y-%m-%d %H:%M:%S')}")
+            click.echo(click.style("  └─ Nothing to load yet, waiting for next interval", fg="yellow"))
+            return {"points_loaded": 0}
+
         # Calculate total points and batch size
         interval = config.get_interval()
         total_seconds = (actual_to - actual_from).total_seconds()

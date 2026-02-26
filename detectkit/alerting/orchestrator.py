@@ -332,7 +332,7 @@ class AlertOrchestrator:
             # At least one channel succeeded - update timestamp
             self.internal.update_alert_timestamp(
                 metric_name=self.metric_name,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
                 increment_count=True
             )
 
@@ -415,7 +415,7 @@ class AlertOrchestrator:
         cooldown_seconds = cooldown_interval.seconds
 
         # Calculate elapsed time
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         elapsed = (now - last_sent).total_seconds()
 
         # Check recovery reset (if enabled)

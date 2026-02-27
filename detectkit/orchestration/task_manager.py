@@ -303,6 +303,18 @@ class TaskManager:
         interval = config.get_interval()
         total_seconds = (actual_to - actual_from).total_seconds()
         total_points = int(total_seconds / interval.seconds)
+
+        # Guard: incomplete interval — not enough time for even 1 full interval
+        if total_points < 1:
+            next_interval = actual_from + timedelta(seconds=interval.seconds)
+            click.echo(f"  │ Next interval at {next_interval.strftime('%Y-%m-%d %H:%M:%S')}, "
+                       f"now {actual_to.strftime('%Y-%m-%d %H:%M:%S')}")
+            click.echo(click.style("  └─ Nothing to load yet, waiting for next interval", fg="yellow"))
+            return {"points_loaded": 0}
+
+        # Truncate actual_to to last complete interval boundary
+        actual_to = actual_from + timedelta(seconds=total_points * interval.seconds)
+
         batch_size = config.loading_batch_size
 
         click.echo(f"  │ Loading from {actual_from.strftime('%Y-%m-%d %H:%M:%S')} to {actual_to.strftime('%Y-%m-%d %H:%M:%S')}")

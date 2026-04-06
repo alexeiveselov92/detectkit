@@ -75,6 +75,7 @@ class AlertOrchestrator:
         timezone_display: str = "UTC",
         internal=None,  # InternalTablesManager (optional, for cooldown tracking)
         alert_config=None,  # AlertConfig (optional, for cooldown settings)
+        description: Optional[str] = None,
     ):
         """
         Initialize alert orchestrator.
@@ -86,6 +87,7 @@ class AlertOrchestrator:
             timezone_display: Timezone for alert display (default: UTC)
             internal: InternalTablesManager instance (optional, for cooldown tracking)
             alert_config: AlertConfig instance (optional, for cooldown settings)
+            description: Optional metric description shown in alert messages
         """
         self.metric_name = metric_name
         self.interval = interval
@@ -93,6 +95,7 @@ class AlertOrchestrator:
         self.timezone_display = timezone_display
         self.internal = internal
         self.alert_config = alert_config
+        self.description = description
 
     def should_alert(
         self,
@@ -287,6 +290,7 @@ class AlertOrchestrator:
             severity=max_severity,
             detection_metadata=combined_metadata,
             consecutive_count=consecutive_count,
+            description=self.description,
         )
 
     def send_alerts(
@@ -598,6 +602,7 @@ class AlertOrchestrator:
             detection_metadata={},
             consecutive_count=0,
             is_recovery=True,
+            description=self.description,
         )
 
     def send_recovery(

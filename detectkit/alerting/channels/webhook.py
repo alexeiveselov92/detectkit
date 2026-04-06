@@ -99,14 +99,26 @@ class WebhookChannel(BaseAlertChannel):
             >>> channel = WebhookChannel(webhook_url="https://...")
             >>> success = channel.send(alert_data)
         """
-        # Format message
-        message = self.format_message(alert_data, template)
+        # Format title and body separately for attachments format
+        title = self.format_title(alert_data)
+        body = self.format_message(alert_data, template)
 
-        # Prepare payload (Mattermost/Slack compatible format)
+        # Color: red for anomaly, green for recovery
+        color = "#36A64F" if alert_data.is_recovery else "#D63232"
+
+        # Prepare payload using Mattermost/Slack attachments format.
+        # Attachments give us: colored left sidebar, separate title, and
+        # automatic "Show more" collapse for long body text in Mattermost.
+        attachment = {
+            "color": color,
+            "title": title,
+            "text": body,
+        }
+
         payload = {
-            "text": message,
             "username": self.username,
             "icon_emoji": self.icon_emoji,
+            "attachments": [attachment],
         }
 
         # Add channel if specified (for Slack)
@@ -131,6 +143,35 @@ class WebhookChannel(BaseAlertChannel):
             # Log error but don't crash
             print(f"Failed to send webhook alert: {e}")
             return False
+
+    def get_default_template(self) -> str:
+        """
+        Get default anomaly message body template for webhook channels.
+
+        Metric name is shown in the attachment title, so it is omitted from the body.
+        """
+        return (
+            "{description_line}"
+            "Time: {timestamp}\n"
+            "Value: {value} | CI: {confidence_interval}\n"
+            "Direction: {direction} | Severity: {severity:.2f} | Consecutive: {consecutive_count}\n"
+            "Detector: {detector_name}\n"
+            "Parameters: {detector_params}"
+        )
+
+    def get_default_recovery_template(self) -> str:
+        """
+        Get default recovery message body template for webhook channels.
+
+        Metric name is shown in the attachment title, so it is omitted from the body.
+        """
+        return (
+            "{description_line}"
+            "Time: {timestamp}\n"
+            "Value: {value} | CI: {confidence_interval}\n"
+            "Detector: {detector_name}\n"
+            "Status: metric returned to normal"
+        )
 
     def __repr__(self) -> str:
         """String representation."""

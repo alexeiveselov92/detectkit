@@ -604,6 +604,7 @@ class TaskManager:
             timezone_display=alerting_config.timezone,  # Use timezone from config
             internal=self.internal,  # For cooldown tracking
             alert_config=alerting_config,  # For cooldown settings
+            description=config.description,  # Optional metric description for alerts
         )
 
         # Get last complete point

@@ -47,6 +47,7 @@ class AlertData:
     detection_metadata: Dict[str, Any]
     consecutive_count: int = 1
     is_recovery: bool = False
+    description: Optional[str] = None
 
 
 class BaseAlertChannel(ABC):
@@ -153,6 +154,9 @@ class BaseAlertChannel(ABC):
         else:
             confidence_str = "N/A"
 
+        # Format description line (empty string if no description)
+        description_line = f"{alert_data.description}\n" if alert_data.description else ""
+
         # Format message
         status = "RECOVERED" if alert_data.is_recovery else "ANOMALY"
 
@@ -171,6 +175,8 @@ class BaseAlertChannel(ABC):
                 severity=alert_data.severity,
                 consecutive_count=alert_data.consecutive_count,
                 status=status,
+                description=alert_data.description or "",
+                description_line=description_line,
             )
         except KeyError as e:
             # If template has unknown variables, fall back to default
@@ -178,39 +184,80 @@ class BaseAlertChannel(ABC):
 
         return message
 
+    def format_title(
+        self,
+        alert_data: AlertData,
+    ) -> str:
+        """
+        Format alert title from template.
+
+        Used by channels that support separate title fields (e.g., webhook attachments).
+
+        Args:
+            alert_data: Alert data to format
+
+        Returns:
+            Formatted title string
+        """
+        if alert_data.is_recovery:
+            title_template = self.get_default_recovery_title_template()
+        else:
+            title_template = self.get_default_title_template()
+
+        return title_template.format(metric_name=alert_data.metric_name)
+
     def get_default_template(self) -> str:
         """
-        Get default message template.
+        Get default message template for anomaly alerts.
 
         Returns:
             Default template string
         """
         return (
             "Anomaly detected in metric: {metric_name}\n"
+            "{description_line}"
             "Time: {timestamp}\n"
-            "Value: {value}\n"
-            "Confidence interval: {confidence_interval}\n"
+            "Value: {value} | CI: {confidence_interval}\n"
+            "Direction: {direction} | Severity: {severity:.2f} | Consecutive: {consecutive_count}\n"
             "Detector: {detector_name}\n"
-            "Parameters: {detector_params}\n"
-            "Direction: {direction}\n"
-            "Severity: {severity:.2f}"
+            "Parameters: {detector_params}"
         )
 
     def get_default_recovery_template(self) -> str:
         """
-        Get default recovery message template.
+        Get default message template for recovery alerts.
 
         Returns:
             Default recovery template string
         """
         return (
             "Metric recovered: {metric_name}\n"
+            "{description_line}"
             "Time: {timestamp}\n"
-            "Value: {value}\n"
-            "Confidence interval: {confidence_interval}\n"
+            "Value: {value} | CI: {confidence_interval}\n"
             "Detector: {detector_name}\n"
             "Status: metric returned to normal"
         )
+
+    def get_default_title_template(self) -> str:
+        """
+        Get default title template for anomaly alerts.
+
+        Used by channels that support separate title fields (e.g., webhook attachments).
+
+        Returns:
+            Default title template string
+        """
+        return "Anomaly detected: {metric_name}"
+
+    def get_default_recovery_title_template(self) -> str:
+        """
+        Get default title template for recovery alerts.
+
+        Returns:
+            Default recovery title template string
+        """
+        return "Metric recovered: {metric_name}"
 
     def __repr__(self) -> str:
         """String representation of channel."""

@@ -12,6 +12,13 @@ Published to PyPI: https://pypi.org/project/detectkit/
 
 Complete rewrite with modern architecture and full documentation (2025).
 
+### What's New in v0.3.6
+
+✅ **Recovery Notifications** - Know when your metrics stabilize
+- `notify_on_recovery: true` sends a message when anomaly resolves
+- Custom `template_recovery` for recovery message format
+- One notification per incident, no duplicates
+
 ### What's New in v0.3.0
 
 🎯 **Alert Cooldown** - Prevent alert spam from persistent anomalies

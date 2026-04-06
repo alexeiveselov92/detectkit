@@ -643,7 +643,36 @@ class TaskManager:
             else:
                 click.echo(click.style("  └─ No valid alert channels available", fg="yellow"))
         else:
-            click.echo("  └─ No alert needed (conditions not met)")
+            # Check recovery notification
+            if alerting_config.notify_on_recovery:
+                should_recover, recovery_data = orchestrator.should_send_recovery(
+                    recent_detections
+                )
+
+                if should_recover:
+                    click.echo(click.style(f"  │ ✓ Recovery detected! Sending to {len(alerting_config.channels)} channel(s)...", fg="green", bold=True))
+
+                    channels = self._create_alert_channels(alerting_config.channels)
+
+                    if channels:
+                        results = orchestrator.send_recovery(
+                            recovery_data,
+                            channels,
+                            template=alerting_config.template_recovery,
+                        )
+                        recovery_sent = sum(1 for success in results.values() if success)
+
+                        for channel_name, success in results.items():
+                            status = click.style("✓", fg="green") if success else click.style("✗", fg="red")
+                            click.echo(f"  │   {status} {channel_name}")
+
+                        click.echo(click.style(f"  └─ Sent {recovery_sent}/{len(channels)} recovery notifications", fg="green"))
+                    else:
+                        click.echo(click.style("  └─ No valid alert channels available", fg="yellow"))
+                else:
+                    click.echo("  └─ No alert needed (conditions not met)")
+            else:
+                click.echo("  └─ No alert needed (conditions not met)")
 
         return {"alerts_sent": alerts_sent}
 

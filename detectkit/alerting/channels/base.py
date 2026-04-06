@@ -46,6 +46,7 @@ class AlertData:
     severity: float
     detection_metadata: Dict[str, Any]
     consecutive_count: int = 1
+    is_recovery: bool = False
 
 
 class BaseAlertChannel(ABC):
@@ -99,6 +100,7 @@ class BaseAlertChannel(ABC):
         self,
         alert_data: AlertData,
         template: Optional[str] = None,
+        recovery_template: Optional[str] = None,
     ) -> str:
         """
         Format alert message from template.
@@ -127,7 +129,10 @@ class BaseAlertChannel(ABC):
             >>> message = channel.format_message(alert_data, template)
         """
         if template is None:
-            template = self.get_default_template()
+            if alert_data.is_recovery:
+                template = recovery_template or self.get_default_recovery_template()
+            else:
+                template = self.get_default_template()
 
         # Format timestamp to string
         from datetime import datetime
@@ -149,6 +154,8 @@ class BaseAlertChannel(ABC):
             confidence_str = "N/A"
 
         # Format message
+        status = "RECOVERED" if alert_data.is_recovery else "ANOMALY"
+
         try:
             message = template.format(
                 metric_name=alert_data.metric_name,
@@ -163,6 +170,7 @@ class BaseAlertChannel(ABC):
                 direction=alert_data.direction,
                 severity=alert_data.severity,
                 consecutive_count=alert_data.consecutive_count,
+                status=status,
             )
         except KeyError as e:
             # If template has unknown variables, fall back to default
@@ -186,6 +194,22 @@ class BaseAlertChannel(ABC):
             "Parameters: {detector_params}\n"
             "Direction: {direction}\n"
             "Severity: {severity:.2f}"
+        )
+
+    def get_default_recovery_template(self) -> str:
+        """
+        Get default recovery message template.
+
+        Returns:
+            Default recovery template string
+        """
+        return (
+            "Metric recovered: {metric_name}\n"
+            "Time: {timestamp}\n"
+            "Value: {value}\n"
+            "Confidence interval: {confidence_interval}\n"
+            "Detector: {detector_name}\n"
+            "Status: metric returned to normal"
         )
 
     def __repr__(self) -> str:

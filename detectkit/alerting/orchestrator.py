@@ -521,6 +521,124 @@ class AlertOrchestrator:
         # Recovery = consecutive dropped below threshold
         return consecutive < self.conditions.consecutive_anomalies
 
+    def should_send_recovery(
+        self,
+        recent_detections: List[DetectionRecord],
+    ) -> tuple[bool, Optional[AlertData]]:
+        """
+        Determine if recovery notification should be sent.
+
+        Recovery is sent when:
+        1. A previous alert was sent (last_alert_sent exists)
+        2. Metric has recovered (consecutive anomalies < threshold)
+        3. Recovery hasn't already been sent for this incident
+           (last_recovery_sent > last_alert_sent would mean already notified)
+
+        Args:
+            recent_detections: List of recent detection records (sorted by time, newest first)
+
+        Returns:
+            Tuple of (should_send, recovery_alert_data)
+        """
+        if not self.internal:
+            return False, None
+
+        # Check if there was a previous alert
+        last_alert = self.internal.get_last_alert_timestamp(self.metric_name)
+        if not last_alert:
+            return False, None  # Never alerted, nothing to recover from
+
+        # Check if recovery already sent for this incident
+        last_recovery = self.internal.get_last_recovery_timestamp(self.metric_name)
+        if last_recovery and last_recovery >= last_alert:
+            return False, None  # Already sent recovery for this alert
+
+        # Check if metric actually recovered
+        has_recovery = self._check_recovery_since_last_alert(last_alert)
+        if not has_recovery:
+            return False, None  # Still in anomaly state
+
+        # Build recovery AlertData from latest normal point
+        recovery_data = self._build_recovery_data(recent_detections)
+        if not recovery_data:
+            return False, None
+
+        return True, recovery_data
+
+    def _build_recovery_data(
+        self,
+        detections: List[DetectionRecord],
+    ) -> Optional[AlertData]:
+        """
+        Build AlertData for recovery notification from latest detection.
+
+        Args:
+            detections: Recent detection records
+
+        Returns:
+            AlertData with is_recovery=True, or None if no data
+        """
+        if not detections:
+            return None
+
+        # Use the latest detection point for recovery info
+        latest = detections[0]
+
+        return AlertData(
+            metric_name=self.metric_name,
+            timestamp=latest.timestamp,
+            timezone=self.timezone_display,
+            value=latest.value,
+            confidence_lower=latest.confidence_lower,
+            confidence_upper=latest.confidence_upper,
+            detector_name=latest.detector_name,
+            detector_params=latest.detector_params,
+            direction="none",
+            severity=0.0,
+            detection_metadata={},
+            consecutive_count=0,
+            is_recovery=True,
+        )
+
+    def send_recovery(
+        self,
+        alert_data: AlertData,
+        channels: List[BaseAlertChannel],
+        template: Optional[str] = None,
+    ) -> Dict[str, bool]:
+        """
+        Send recovery notifications through all configured channels.
+
+        Args:
+            alert_data: Recovery alert data (is_recovery=True)
+            channels: List of alert channels
+            template: Optional custom recovery message template
+
+        Returns:
+            Dict mapping channel name to success status
+        """
+        results = {}
+
+        for channel in channels:
+            try:
+                success = channel.send(alert_data, template)
+                channel_name = channel.__class__.__name__
+                results[channel_name] = success
+            except Exception as e:
+                channel_name = channel.__class__.__name__
+                print(f"Error sending recovery via {channel_name}: {e}")
+                results[channel_name] = False
+
+        # Update recovery timestamp after sending
+        if any(results.values()) and self.internal:
+            from datetime import timezone as tz
+            self.internal.update_recovery_timestamp(
+                metric_name=self.metric_name,
+                timestamp=datetime.now(tz.utc).replace(tzinfo=None),
+            )
+
+        return results
+
     def __repr__(self) -> str:
         """String representation."""
         return (

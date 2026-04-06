@@ -471,6 +471,79 @@ Timeline:
 11:20 - NEW 3rd anomaly → Alert sent (new issue)
 ```
 
+## Recovery Notifications
+
+In addition to cooldown reset, detectkit can send a separate notification when a metric **returns to normal** after an anomaly.
+
+### Enabling Recovery Notifications
+
+```yaml
+alerting:
+  enabled: true
+  channels:
+    - mattermost_ops
+  consecutive_anomalies: 3
+  notify_on_recovery: true   # Send notification when metric recovers
+```
+
+### Recovery Logic
+
+Recovery notification is sent when **all** of the following are true:
+
+1. A previous anomaly alert was sent for this metric
+2. The metric has returned to normal (consecutive anomalies below threshold)
+3. A recovery notification has not already been sent for this incident
+
+```
+Timeline with notify_on_recovery: true and consecutive_anomalies: 3:
+
+10:00 - 1st anomaly
+10:10 - 2nd anomaly
+10:20 - 3rd anomaly  → ALERT sent ("Anomaly detected in cpu_usage")
+10:30 - Normal point
+10:40 - Normal point → RECOVERY sent ("Metric recovered: cpu_usage")
+10:50 - Normal point
+11:00 - NEW 1st anomaly
+...
+11:20 - NEW 3rd anomaly → ALERT sent (new incident)
+11:30 - Normal point    → RECOVERY sent (new recovery)
+```
+
+### Custom Recovery Template
+
+Use `template_recovery` to customize the recovery message. Supports the same variables as anomaly templates, plus `{status}`:
+
+```yaml
+alerting:
+  notify_on_recovery: true
+  template_recovery: "✅ {metric_name} recovered at {timestamp}\nValue: {value} | Interval: {confidence_interval}"
+```
+
+**Available template variables:**
+
+| Variable | Description |
+|---|---|
+| `{metric_name}` | Metric name |
+| `{timestamp}` | Timestamp of the last detection point |
+| `{timezone}` | Configured timezone |
+| `{value}` | Metric value at recovery point |
+| `{confidence_lower}` | Lower confidence bound |
+| `{confidence_upper}` | Upper confidence bound |
+| `{confidence_interval}` | Formatted as `[lower, upper]` |
+| `{detector_name}` | Detector that was monitoring |
+| `{status}` | Always `"RECOVERED"` in recovery messages |
+
+### Recovery with Cooldown
+
+Recovery notifications work independently of `alert_cooldown`. The cooldown only applies to anomaly alerts. Recovery is always sent once per incident regardless of cooldown settings.
+
+```yaml
+alerting:
+  alert_cooldown: "30min"
+  cooldown_reset_on_recovery: true  # Resets cooldown timer on recovery
+  notify_on_recovery: true          # Also sends a recovery notification
+```
+
 ### Complete Example
 
 ```yaml
@@ -507,9 +580,13 @@ alerting:
   direction: "any"
   consecutive_anomalies: 3
 
-  # Alert cooldown (v0.3.0)
+  # Alert cooldown
   alert_cooldown: "30min"              # No more than 1 alert per 30 minutes
   cooldown_reset_on_recovery: true     # Alert again when new issue after recovery
+
+  # Recovery notifications
+  notify_on_recovery: true             # Send notification when metric stabilizes
+  template_recovery: "✅ {metric_name} is back to normal at {timestamp}"
 
   # Special alerts
   no_data_alert: false
@@ -518,10 +595,16 @@ alerting:
 ### Best Practices
 
 1. **Start with recovery reset**: Use `cooldown_reset_on_recovery: true` initially
-2. **Tune cooldown duration**: Match to your team's response time (15min - 1hour typical)
-3. **Adjust for interval**: Faster intervals need longer cooldowns
-4. **Monitor alert frequency**: Track via `_dtk_tasks.alert_count` in database
-5. **Use strict mode sparingly**: Only for very noisy experimental metrics
+2. **Enable recovery notifications**: `notify_on_recovery: true` is recommended for critical metrics
+3. **Tune cooldown duration**: Match to your team's response time (15min - 1hour typical)
+4. **Adjust for interval**: Faster intervals need longer cooldowns
+5. **Monitor alert frequency**: Track via `_dtk_tasks.alert_count` in database
+6. **Use strict mode sparingly**: Only for very noisy experimental metrics
+
+> **Note**: When upgrading from a previous version, the `last_recovery_sent` column must be added manually to the `_dtk_tasks` table:
+> ```sql
+> ALTER TABLE _dtk_tasks ADD COLUMN last_recovery_sent Nullable(DateTime64(3, 'UTC'));
+> ```
 
 ### Disabling Cooldown
 

@@ -976,3 +976,86 @@ class InternalTablesManager:
 
         # ClickHouse ALTER TABLE UPDATE is async, return 1 (optimistic)
         return 1
+
+    def get_last_recovery_timestamp(
+        self,
+        metric_name: str
+    ) -> Optional[datetime]:
+        """
+        Get timestamp of last sent recovery notification for a metric.
+
+        Args:
+            metric_name: Metric identifier
+
+        Returns:
+            Timestamp of last sent recovery, or None if never sent
+        """
+        full_table_name = self._manager.get_full_table_name(
+            TABLE_TASKS, use_internal=True
+        )
+
+        query = f"""
+        SELECT last_recovery_sent
+        FROM {full_table_name}
+        WHERE metric_name = %(metric_name)s
+          AND detector_id = 'pipeline'
+          AND process_type = 'pipeline'
+        LIMIT 1
+        """
+
+        results = self._manager.execute_query(
+            query,
+            params={"metric_name": metric_name}
+        )
+
+        if not results or not results[0].get("last_recovery_sent"):
+            return None
+
+        last_sent = results[0]["last_recovery_sent"]
+
+        if hasattr(last_sent, 'tzinfo') and last_sent.tzinfo is not None:
+            last_sent = last_sent.replace(tzinfo=None)
+
+        return last_sent
+
+    def update_recovery_timestamp(
+        self,
+        metric_name: str,
+        timestamp: datetime,
+    ) -> int:
+        """
+        Update last_recovery_sent timestamp after sending recovery notification.
+
+        Args:
+            metric_name: Metric identifier
+            timestamp: Timestamp when recovery was sent
+
+        Returns:
+            Number of rows updated (typically 1)
+        """
+        full_table_name = self._manager.get_full_table_name(
+            TABLE_TASKS, use_internal=True
+        )
+
+        if hasattr(timestamp, 'tzinfo') and timestamp.tzinfo is not None:
+            timestamp = timestamp.replace(tzinfo=None)
+
+        update_query = f"""
+        ALTER TABLE {full_table_name}
+        UPDATE
+            last_recovery_sent = %(timestamp)s,
+            updated_at = %(timestamp)s
+        WHERE metric_name = %(metric_name)s
+          AND detector_id = 'pipeline'
+          AND process_type = 'pipeline'
+        """
+
+        self._manager.execute_query(
+            update_query,
+            params={
+                "metric_name": metric_name,
+                "timestamp": timestamp
+            }
+        )
+
+        return 1

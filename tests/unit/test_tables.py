@@ -134,6 +134,7 @@ class TestTasksTable:
             "timeout_seconds",  # This was missing before
             "last_alert_sent",  # For alert cooldown tracking
             "alert_count",  # For alert statistics
+            "last_recovery_sent",  # For recovery notification tracking
         ]
         assert column_names == expected_columns
 

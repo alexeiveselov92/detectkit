@@ -181,6 +181,17 @@ class AlertConfig(BaseModel):
                     "Only applies if alert_cooldown is set. "
                     "True = cooldown resets on recovery, False = strict cooldown independent of recovery."
     )
+    notify_on_recovery: bool = Field(
+        default=False,
+        description="Send notification when metric recovers from anomaly state. "
+                    "Recovery is detected when consecutive anomalies drop below threshold "
+                    "after an alert was previously sent."
+    )
+    template_recovery: Optional[str] = Field(
+        default=None,
+        description="Custom template for recovery notification message. "
+                    "Supports same variables as anomaly templates plus {status}."
+    )
 
     @field_validator("consecutive_anomalies")
     @classmethod

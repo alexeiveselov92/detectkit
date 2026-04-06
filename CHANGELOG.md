@@ -5,6 +5,25 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6] - 2026-04-06
+
+### Added
+- Recovery notifications: `notify_on_recovery: true` in alerting config sends a message when metric stabilizes after an anomaly
+- `template_recovery` config option for custom recovery message template
+- `{status}` template variable in all alert templates (`"ANOMALY"` or `"RECOVERED"`)
+- `is_recovery` field on `AlertData` to distinguish recovery messages from anomaly alerts
+- `AlertOrchestrator.should_send_recovery()` — checks recovery conditions and returns AlertData
+- `AlertOrchestrator.send_recovery()` — sends recovery via configured channels and tracks timestamp
+- `_dtk_tasks.last_recovery_sent` column for deduplication (one recovery notification per incident)
+- `InternalTablesManager.get_last_recovery_timestamp()` and `update_recovery_timestamp()` methods
+- `BaseAlertChannel.get_default_recovery_template()` method
+
+### Migration
+Existing installations need to add the new column manually:
+```sql
+ALTER TABLE _dtk_tasks ADD COLUMN last_recovery_sent Nullable(DateTime64(3, 'UTC'));
+```
+
 ## [0.3.2] - 2025-11-11
 
 ### Fixed

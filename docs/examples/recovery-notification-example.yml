@@ -1,0 +1,201 @@
+# Example: Recovery Notifications
+#
+# This example demonstrates how to configure detectkit to send notifications
+# when a metric stabilizes after an anomaly (i.e., "all clear" messages).
+#
+# Scenario:
+# - API error rate monitored every 5 minutes
+# - Incident occurs: error rate spikes for 30 minutes
+# - After incident resolves, team should be notified automatically
+#
+# Features demonstrated:
+# - notify_on_recovery: Send "all clear" notification when metric stabilizes
+# - template_recovery: Custom recovery message format
+# - Combined with alert_cooldown for full lifecycle tracking
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Example 1: Minimal recovery setup
+# Just add notify_on_recovery: true to any existing alerting config
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: api_error_rate_minimal
+description: API error rate with basic recovery notifications
+interval: "5min"
+
+query: |
+  SELECT
+    toStartOfInterval(timestamp, INTERVAL 5 MINUTE) AS timestamp,
+    countIf(status_code >= 500) / count() AS value
+  FROM http_requests
+  WHERE timestamp >= %(from_date)s
+    AND timestamp < %(to_date)s
+  GROUP BY timestamp
+  ORDER BY timestamp
+
+detectors:
+  - type: manual_bounds
+    params:
+      upper_bound: 0.05  # Alert when error rate > 5%
+
+alerting:
+  enabled: true
+  channels:
+    - mattermost_ops
+  consecutive_anomalies: 2
+  direction: "up"
+
+  # ← THE ONLY CHANGE NEEDED:
+  notify_on_recovery: true  # Send notification when error rate drops back below threshold
+
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Example 2: Full lifecycle monitoring with custom templates
+# Anomaly alert + recovery notification with custom message formats
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: api_error_rate
+description: |
+  API 5xx error rate monitor.
+  Sends alerts on spike and recovery notification when resolved.
+interval: "5min"
+
+query: |
+  SELECT
+    toStartOfInterval(timestamp, INTERVAL 5 MINUTE) AS timestamp,
+    countIf(status_code >= 500) / count() * 100 AS value
+  FROM http_requests
+  WHERE timestamp >= %(from_date)s
+    AND timestamp < %(to_date)s
+  GROUP BY timestamp
+  ORDER BY timestamp
+
+loading_start_time: "2025-01-01 00:00:00"
+loading_batch_size: 2880  # 10 days of 5-min intervals
+
+detectors:
+  - type: manual_bounds
+    params:
+      upper_bound: 5.0  # Alert when error rate > 5%
+
+  - type: mad
+    params:
+      threshold: 4.0
+      window_size: 2016  # 7 days
+      min_samples: 100
+
+alerting:
+  enabled: true
+  timezone: "Europe/Moscow"
+
+  channels:
+    - mattermost_ops
+    - slack_incidents
+
+  # Alert filtering
+  min_detectors: 1
+  direction: "up"           # Errors only spike upward
+  consecutive_anomalies: 2  # Confirm before alerting
+
+  # Cooldown: prevent spam during long incidents
+  alert_cooldown: "20min"
+  cooldown_reset_on_recovery: true
+
+  # Recovery notifications (lifecycle tracking)
+  notify_on_recovery: true
+
+  # Custom templates
+  template_consecutive: |
+    ⚠️ INCIDENT: {metric_name}
+    Time: {timestamp}
+    Error rate: {value:.1f}% (normal: {confidence_interval})
+    Consecutive: {consecutive_count} intervals
+    Detector: {detector_name}
+
+  template_recovery: |
+    ✅ RESOLVED: {metric_name}
+    Time: {timestamp}
+    Error rate back to: {value:.1f}%
+    Normal range: {confidence_interval}
+
+tags:
+  - production
+  - api
+  - critical
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Example timeline (consecutive_anomalies: 2, alert_cooldown: 20min):
+#
+# 14:00 - Error rate: 1.2%  → Normal
+# 14:05 - Error rate: 7.8%  → Anomaly #1
+# 14:10 - Error rate: 9.3%  → Anomaly #2 → ALERT SENT ⚠️
+#          "INCIDENT: api_error_rate | Error rate: 9.3% (normal: [0.5, 4.0])"
+# 14:15 - Error rate: 11.2% → Skipped (cooldown)
+# 14:20 - Error rate: 8.6%  → Skipped (cooldown)
+# 14:25 - Error rate: 8.1%  → Skipped (cooldown)
+# 14:30 - Error rate: 3.8%  → Normal → RECOVERY SENT ✅
+#          "RESOLVED: api_error_rate | Error rate back to: 3.8%"
+# 14:35 - Error rate: 1.5%  → Normal (no duplicate recovery)
+# 14:40 - Error rate: 1.2%  → Normal
+# 15:00 - Error rate: 8.4%  → NEW Anomaly #1
+# 15:05 - Error rate: 10.1% → NEW Anomaly #2 → ALERT SENT ⚠️ (new incident)
+# ─────────────────────────────────────────────────────────────────────────────
+
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Example 3: Critical infrastructure — recovery as SLA event
+# When systems go down, on-call needs to know both failure AND restoration
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: payment_service_availability
+description: Payment service availability — tracks outages and restorations
+interval: "1min"
+
+query: |
+  SELECT
+    toStartOfMinute(timestamp) AS timestamp,
+    countIf(status = 'ok') / count() * 100 AS value
+  FROM payment_healthchecks
+  WHERE timestamp >= %(from_date)s
+    AND timestamp < %(to_date)s
+  GROUP BY timestamp
+  ORDER BY timestamp
+
+detectors:
+  - type: manual_bounds
+    params:
+      lower_bound: 99.0  # Availability must be >= 99%
+
+alerting:
+  enabled: true
+  timezone: "UTC"
+
+  channels:
+    - pagerduty_oncall
+    - slack_incidents
+    - email_sre_team
+
+  consecutive_anomalies: 1  # Alert immediately on availability drop
+  direction: "down"
+
+  alert_cooldown: "5min"
+  cooldown_reset_on_recovery: true
+
+  # Recovery notification is critical for SLA tracking
+  notify_on_recovery: true
+
+  template_consecutive: |
+    🚨 OUTAGE DETECTED: {metric_name}
+    Time: {timestamp} ({timezone})
+    Availability: {value:.2f}% (SLA: >= 99%)
+    Status: {status}
+
+  template_recovery: |
+    ✅ SERVICE RESTORED: {metric_name}
+    Time: {timestamp} ({timezone})
+    Availability: {value:.2f}%
+    Status: {status}
+
+tags:
+  - production
+  - payments
+  - sla-critical

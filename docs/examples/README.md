@@ -23,8 +23,9 @@ This directory contains practical examples for common monitoring scenarios.
 - [Gaming Metrics with Complex Seasonality](#example-10-gaming-metrics-with-complex-seasonality) - Multi-dimensional seasonality
 - [Multi-Detector Strategy](#example-11-multi-detector-strategy) - Combining multiple detectors
 
-### New Features (v0.2.0+, v0.3.0)
+### New Features (v0.2.0+, v0.3.0+)
 - **[Alert Cooldown Example](alert-cooldown-example.yml)** - Prevent spam with alert cooldown (v0.3.0)
+- **[Recovery Notifications Example](recovery-notification-example.yml)** - "All clear" messages when metric stabilizes
 - **[Detector Preprocessing Example](detector-preprocessing-example.yml)** - Advanced preprocessing features (v0.2.0)
 
 ---
@@ -586,6 +587,16 @@ alerting:
 | User Engagement | MAD | Optional | 2-3 | down |
 | Revenue | MAD | Yes (dow) | 2 | down |
 | Conversion Rate | MAD | Yes (hour) | 3 | down |
+
+## Alerting Feature Comparison
+
+| Feature | Config | Effect |
+|---------|--------|--------|
+| Basic alert | `consecutive_anomalies: 3` | Alert after 3 consecutive anomalies |
+| Cooldown | `alert_cooldown: "30min"` | No more than 1 alert per 30 min |
+| Cooldown reset | `cooldown_reset_on_recovery: true` | Cooldown resets when metric normalizes |
+| Recovery notify | `notify_on_recovery: true` | "All clear" sent once per incident |
+| Custom recovery | `template_recovery: "..."` | Custom message text for recovery |
 
 ## See Also
 

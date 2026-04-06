@@ -510,9 +510,13 @@ alerting:
   direction: "same"              # "same", "any", "up", "down" (default: "same")
   consecutive_anomalies: 3       # Consecutive anomalies to trigger (default: 3)
 
-  # Alert cooldown (v0.3.0) - Prevent spam from persistent anomalies
+  # Alert cooldown - Prevent spam from persistent anomalies
   alert_cooldown: "30min"        # Minimum time between alerts (default: null)
   cooldown_reset_on_recovery: true  # Reset cooldown when metric recovers (default: true)
+
+  # Recovery notifications
+  notify_on_recovery: false      # Send notification when metric stabilizes (default: false)
+  template_recovery: null        # Custom recovery message template (default: null)
 
   # Special alerts
   no_data_alert: false           # Alert on missing data (default: false)
@@ -537,6 +541,14 @@ alerting:
 - **`consecutive_anomalies`**: Consecutive points required
   - `1` = Alert on first anomaly
   - `3` = Alert after 3 consecutive anomalies (reduces false positives)
+
+- **`notify_on_recovery`**: Send notification when metric returns to normal
+  - `false` = No recovery notifications (default)
+  - `true` = Send one recovery notification per incident
+
+- **`template_recovery`**: Custom recovery message template
+  - Supports: `{metric_name}`, `{timestamp}`, `{value}`, `{confidence_interval}`, `{detector_name}`, `{status}`
+  - Default template: `"Metric recovered: {metric_name}\nTime: {timestamp}\nValue: {value}\n..."`
 
 ### Custom Table Names
 

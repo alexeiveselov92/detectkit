@@ -128,6 +128,11 @@ def get_tasks_table_model() -> TableModel:
                 nullable=True
             ),
             ColumnDefinition("alert_count", "UInt32", default="0"),
+            ColumnDefinition(
+                "last_recovery_sent",
+                "Nullable(DateTime64(3, 'UTC'))",
+                nullable=True
+            ),
         ],
         primary_key=["metric_name", "detector_id", "process_type"],
         engine="MergeTree",

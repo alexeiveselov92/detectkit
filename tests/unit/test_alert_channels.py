@@ -179,6 +179,108 @@ class TestBaseAlertChannel:
         assert len(channel.sent_messages) == 1
 
 
+class TestRecoveryFormatting:
+    """Test recovery message formatting."""
+
+    def test_format_recovery_default_template(self):
+        """Test recovery uses recovery template by default."""
+        channel = MockAlertChannel()
+
+        alert = AlertData(
+            metric_name="cpu_usage",
+            timestamp=datetime(2024, 1, 1, 12, 0, 0),
+            timezone="UTC",
+            value=85.0,
+            confidence_lower=70.0,
+            confidence_upper=90.0,
+            detector_name="zscore",
+            detector_params="{}",
+            direction="none",
+            severity=0.0,
+            detection_metadata={},
+            is_recovery=True,
+        )
+
+        message = channel.format_message(alert)
+
+        assert "recovered" in message.lower()
+        assert "cpu_usage" in message
+        assert "85.0" in message
+
+    def test_format_recovery_custom_template(self):
+        """Test recovery with custom template."""
+        channel = MockAlertChannel()
+
+        alert = AlertData(
+            metric_name="cpu_usage",
+            timestamp=datetime(2024, 1, 1, 12, 0, 0),
+            timezone="UTC",
+            value=85.0,
+            confidence_lower=70.0,
+            confidence_upper=90.0,
+            detector_name="zscore",
+            detector_params="{}",
+            direction="none",
+            severity=0.0,
+            detection_metadata={},
+            is_recovery=True,
+        )
+
+        template = "{status}: {metric_name} back to normal, value={value}"
+        message = channel.format_message(alert, template)
+
+        assert message == "RECOVERED: cpu_usage back to normal, value=85.0"
+
+    def test_format_anomaly_has_status_variable(self):
+        """Test that anomaly alerts also have {status} variable."""
+        channel = MockAlertChannel()
+
+        alert = AlertData(
+            metric_name="cpu_usage",
+            timestamp=datetime(2024, 1, 1, 12, 0, 0),
+            timezone="UTC",
+            value=95.0,
+            confidence_lower=70.0,
+            confidence_upper=90.0,
+            detector_name="zscore",
+            detector_params="{}",
+            direction="above",
+            severity=2.5,
+            detection_metadata={},
+            is_recovery=False,
+        )
+
+        template = "{status}: {metric_name} = {value}"
+        message = channel.format_message(alert, template)
+
+        assert message == "ANOMALY: cpu_usage = 95.0"
+
+    def test_get_default_recovery_template(self):
+        """Test default recovery template."""
+        channel = MockAlertChannel()
+        template = channel.get_default_recovery_template()
+
+        assert "recovered" in template.lower()
+        assert "{metric_name}" in template
+
+    def test_is_recovery_default_false(self):
+        """Test is_recovery defaults to False."""
+        alert = AlertData(
+            metric_name="test",
+            timestamp=datetime(2024, 1, 1),
+            timezone="UTC",
+            value=100.0,
+            confidence_lower=80.0,
+            confidence_upper=120.0,
+            detector_name="test",
+            detector_params="{}",
+            direction="above",
+            severity=1.0,
+            detection_metadata={},
+        )
+        assert alert.is_recovery is False
+
+
 class TestMattermostChannel:
     """Test MattermostChannel."""
 

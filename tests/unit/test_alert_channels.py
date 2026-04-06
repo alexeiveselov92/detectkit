@@ -337,10 +337,14 @@ class TestMattermostChannel:
 
         assert success is True
         assert mock_post.called
-        # Check payload structure
+        # Check payload structure (attachments format)
         call_args = mock_post.call_args
         payload = call_args[1]["json"]
-        assert "text" in payload
+        assert "attachments" in payload
+        assert len(payload["attachments"]) == 1
+        attachment = payload["attachments"][0]
+        assert attachment["color"] == "#D63232"  # red for anomaly
+        assert "cpu_usage" in attachment["title"]
         assert payload["username"] == "detectk"
         assert payload["icon_emoji"] == ":warning:"
 
@@ -372,7 +376,7 @@ class TestMattermostChannel:
 
         assert success is True
         payload = mock_post.call_args[1]["json"]
-        assert "CUSTOM: cpu_usage = 95.0" in payload["text"]
+        assert "CUSTOM: cpu_usage = 95.0" in payload["attachments"][0]["text"]
 
     @patch("detectkit.alerting.channels.webhook.requests.post")
     def test_send_request_error(self, mock_post):

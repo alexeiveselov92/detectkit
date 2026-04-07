@@ -192,6 +192,12 @@ class AlertConfig(BaseModel):
         description="Custom template for recovery notification message. "
                     "Supports same variables as anomaly templates plus {status}."
     )
+    mentions: List[str] = Field(
+        default_factory=list,
+        description="Users/groups to mention in alerts. Plain usernames without @. "
+                    "Special keywords: 'channel', 'all', 'here' for broadcast mentions. "
+                    "Each channel formats mentions in its native syntax."
+    )
 
     @field_validator("consecutive_anomalies")
     @classmethod

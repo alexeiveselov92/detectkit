@@ -4,7 +4,7 @@ Slack alert channel.
 Convenience wrapper around WebhookChannel for Slack.
 """
 
-from typing import Optional
+from typing import List, Optional
 
 from detectkit.alerting.channels.webhook import WebhookChannel
 
@@ -47,6 +47,34 @@ class SlackChannel(WebhookChannel):
             channel=channel,
             timeout=timeout,
         )
+
+    def format_mentions(self, mentions: List[str]) -> str:
+        """
+        Format mentions for Slack.
+
+        Slack uses <!keyword> for broadcast mentions and <@USER_ID> for
+        user pings. Plain @username is display-only in webhook messages.
+
+        Args:
+            mentions: List of usernames, user IDs, or special keywords
+
+        Returns:
+            Formatted mentions string
+        """
+        if not mentions:
+            return ""
+        parts = []
+        for m in mentions:
+            if m in ("channel", "here", "everyone"):
+                parts.append(f"<!{m}>")
+            elif m == "all":
+                parts.append("<!everyone>")
+            elif m.startswith("U") and len(m) >= 9 and m[1:].isalnum():
+                # Slack user ID format (e.g., U12345678)
+                parts.append(f"<@{m}>")
+            else:
+                parts.append(f"@{m}")
+        return " ".join(parts)
 
     def __repr__(self) -> str:
         """String representation."""

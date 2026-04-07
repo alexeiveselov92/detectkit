@@ -141,6 +141,26 @@ class EmailChannel(BaseAlertChannel):
         except smtplib.SMTPException as e:
             raise smtplib.SMTPException(f"Failed to send email alert: {e}")
 
+    def format_mentions(self, mentions: List[str]) -> str:
+        """
+        Format mentions for email.
+
+        Email has no mention syntax. Renders usernames as plain text,
+        filtering out broadcast keywords that are meaningless for email.
+
+        Args:
+            mentions: List of usernames
+
+        Returns:
+            Formatted string like "CC: user1, user2" or empty string
+        """
+        if not mentions:
+            return ""
+        user_mentions = [m for m in mentions if m not in ("channel", "all", "here")]
+        if not user_mentions:
+            return ""
+        return "CC: " + ", ".join(user_mentions)
+
     def __repr__(self) -> str:
         """String representation."""
         return f"EmailChannel(to={self.to_emails})"

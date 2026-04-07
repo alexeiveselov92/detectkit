@@ -157,6 +157,7 @@ class WebhookChannel(BaseAlertChannel):
             "Direction: {direction} | Severity: {severity:.2f} | Consecutive: {consecutive_count}\n"
             "Detector: {detector_name}\n"
             "Parameters: {detector_params}"
+            "{mentions_line}"
         )
 
     def get_default_recovery_template(self) -> str:
@@ -171,6 +172,7 @@ class WebhookChannel(BaseAlertChannel):
             "Value: {value} | CI: {confidence_interval}\n"
             "Detector: {detector_name}\n"
             "Status: metric returned to normal"
+            "{mentions_line}"
         )
 
     def __repr__(self) -> str:

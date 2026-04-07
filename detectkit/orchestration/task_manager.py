@@ -189,20 +189,13 @@ class TaskManager:
                     result["anomalies_detected"] = detect_result["anomalies_count"]
                     result["steps_completed"].append(PipelineStep.DETECT)
 
-                # Step 3: Send alerts
+                # Step 3: Send alerts (also handles recovery notifications)
                 if PipelineStep.ALERT in steps:
-                    # Skip alert if no anomalies detected in current run
-                    if result.get("anomalies_detected", 0) == 0:
-                        click.echo()
-                        click.echo(click.style("  ┌─ ALERT", fg="cyan", bold=True))
-                        click.echo("  │   No anomalies detected in current run, skipping alerts")
-                        result["alerts_sent"] = 0
-                    else:
-                        click.echo()
-                        click.echo(click.style("  ┌─ ALERT", fg="cyan", bold=True))
-                        alert_result = self._run_alert_step(config)
-                        result["alerts_sent"] = alert_result["alerts_sent"]
-                        result["steps_completed"].append(PipelineStep.ALERT)
+                    click.echo()
+                    click.echo(click.style("  ┌─ ALERT", fg="cyan", bold=True))
+                    alert_result = self._run_alert_step(config)
+                    result["alerts_sent"] = alert_result["alerts_sent"]
+                    result["steps_completed"].append(PipelineStep.ALERT)
 
             finally:
                 # Always release lock
@@ -600,7 +593,7 @@ class TaskManager:
                 metric_name=config.name,
                 interval=interval,
                 conditions=AlertConditions(
-                    min_detectors=1,  # At least one detector must flag anomaly
+                    min_detectors=alerting_config.min_detectors,
                     direction=alerting_config.direction,
                     consecutive_anomalies=alerting_config.consecutive_anomalies,
                 ),

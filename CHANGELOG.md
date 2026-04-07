@@ -5,6 +5,22 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.8] - 2026-04-07
+
+### Added
+- **Channel-agnostic mentions** in alert messages (`mentions` config field)
+- `format_mentions()` method on `BaseAlertChannel` — overridable per channel
+- Platform-specific formatting: Mattermost (`@user`), Slack (`<!here>`, `<@UID>`), Telegram (`@user`), Email (`CC: user`)
+- `{mentions}` and `{mentions_line}` template variables for custom placement
+- Special keywords: `here`, `channel`, `all` for broadcast mentions
+- Documentation: mentions guide, 4 example scenarios, updated configuration reference
+
+## [0.3.7] - 2026-04-06
+
+### Changed
+- Mattermost alerts now use attachments format with colored sidebar (red for anomaly, green for recovery)
+- Webhook default templates omit metric name from body (shown in attachment title)
+
 ## [0.3.6] - 2026-04-06
 
 ### Added

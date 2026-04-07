@@ -519,15 +519,21 @@ class AlertOrchestrator:
                 )
                 detection_records.append(record)
 
-        # Count consecutive anomalies (same logic as should_alert)
-        consecutive = self._count_consecutive_anomalies(
-            detections=detection_records,
-            min_detectors=self.conditions.min_detectors,
-            direction=self.conditions.direction
-        )
+        # Group by timestamp and sort (same format as should_alert uses)
+        detections_by_time = self._group_by_timestamp(detection_records)
+        timestamps_sorted = sorted(detections_by_time.keys(), reverse=True)
 
-        # Recovery = consecutive dropped below threshold
-        return consecutive < self.conditions.consecutive_anomalies
+        # Check that latest post-alert point is NOT anomalous
+        # (prevents false recovery when there are fewer post-alert points
+        # than consecutive_anomalies threshold)
+        latest_ts = timestamps_sorted[0]
+        latest_detections = detections_by_time[latest_ts]
+        latest_anomalies = [d for d in latest_detections if d.is_anomaly]
+        if len(latest_anomalies) >= self.conditions.min_detectors:
+            # Latest point is still anomalous — no recovery
+            return False
+
+        return True
 
     def should_send_recovery(
         self,

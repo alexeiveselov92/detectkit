@@ -4,7 +4,7 @@ Telegram alert channel implementation.
 Sends anomaly alerts via Telegram Bot API.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -104,6 +104,32 @@ class TelegramChannel(BaseAlertChannel):
             response.raise_for_status()
         except requests.RequestException as e:
             raise requests.RequestException(f"Failed to send Telegram alert: {e}")
+
+    def format_mentions(self, mentions: List[str]) -> str:
+        """
+        Format mentions for Telegram.
+
+        Telegram supports @username natively. For numeric user IDs
+        in HTML parse mode, uses tg://user deep link.
+
+        Args:
+            mentions: List of usernames or user IDs
+
+        Returns:
+            Formatted mentions string
+        """
+        if not mentions:
+            return ""
+        parts = []
+        for m in mentions:
+            if m in ("channel", "all", "here"):
+                # Telegram has no broadcast mention; include as plain text
+                parts.append(f"@{m}")
+            elif m.isdigit() and self.parse_mode == "HTML":
+                parts.append(f'<a href="tg://user?id={m}">{m}</a>')
+            else:
+                parts.append(f"@{m}")
+        return " ".join(parts)
 
     def __repr__(self) -> str:
         """String representation."""

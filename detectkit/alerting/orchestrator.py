@@ -76,6 +76,7 @@ class AlertOrchestrator:
         internal=None,  # InternalTablesManager (optional, for cooldown tracking)
         alert_config=None,  # AlertConfig (optional, for cooldown settings)
         description: Optional[str] = None,
+        mentions: Optional[List[str]] = None,
     ):
         """
         Initialize alert orchestrator.
@@ -88,6 +89,7 @@ class AlertOrchestrator:
             internal: InternalTablesManager instance (optional, for cooldown tracking)
             alert_config: AlertConfig instance (optional, for cooldown settings)
             description: Optional metric description shown in alert messages
+            mentions: Optional list of users/groups to mention in alerts
         """
         self.metric_name = metric_name
         self.interval = interval
@@ -96,6 +98,7 @@ class AlertOrchestrator:
         self.internal = internal
         self.alert_config = alert_config
         self.description = description
+        self.mentions = mentions or []
 
     def should_alert(
         self,
@@ -291,6 +294,7 @@ class AlertOrchestrator:
             detection_metadata=combined_metadata,
             consecutive_count=consecutive_count,
             description=self.description,
+            mentions=self.mentions,
         )
 
     def send_alerts(
@@ -603,6 +607,7 @@ class AlertOrchestrator:
             consecutive_count=0,
             is_recovery=True,
             description=self.description,
+            mentions=self.mentions,
         )
 
     def send_recovery(

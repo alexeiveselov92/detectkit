@@ -6,7 +6,7 @@ the send() method for delivering alerts to specific destinations.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from detectkit.detectors.base import DetectionResult
@@ -48,6 +48,7 @@ class AlertData:
     consecutive_count: int = 1
     is_recovery: bool = False
     description: Optional[str] = None
+    mentions: List[str] = field(default_factory=list)
 
 
 class BaseAlertChannel(ABC):
@@ -157,6 +158,10 @@ class BaseAlertChannel(ABC):
         # Format description line (empty string if no description)
         description_line = f"{alert_data.description}\n" if alert_data.description else ""
 
+        # Format mentions
+        mentions_str = self.format_mentions(alert_data.mentions)
+        mentions_line = f"\n{mentions_str}" if mentions_str else ""
+
         # Format message
         status = "RECOVERED" if alert_data.is_recovery else "ANOMALY"
 
@@ -177,12 +182,32 @@ class BaseAlertChannel(ABC):
                 status=status,
                 description=alert_data.description or "",
                 description_line=description_line,
+                mentions=mentions_str,
+                mentions_line=mentions_line,
             )
         except KeyError as e:
             # If template has unknown variables, fall back to default
             message = self.format_message(alert_data, self.get_default_template())
 
         return message
+
+    def format_mentions(self, mentions: List[str]) -> str:
+        """
+        Format mentions list into platform-native syntax.
+
+        Override in subclasses for platform-specific formatting.
+        Default implementation prepends @ to each mention.
+
+        Args:
+            mentions: List of usernames or special keywords
+                      ("channel", "all", "here")
+
+        Returns:
+            Formatted mentions string (e.g., "@john @here")
+        """
+        if not mentions:
+            return ""
+        return " ".join(f"@{m}" for m in mentions)
 
     def format_title(
         self,
@@ -221,6 +246,7 @@ class BaseAlertChannel(ABC):
             "Direction: {direction} | Severity: {severity:.2f} | Consecutive: {consecutive_count}\n"
             "Detector: {detector_name}\n"
             "Parameters: {detector_params}"
+            "{mentions_line}"
         )
 
     def get_default_recovery_template(self) -> str:
@@ -237,6 +263,7 @@ class BaseAlertChannel(ABC):
             "Value: {value} | CI: {confidence_interval}\n"
             "Detector: {detector_name}\n"
             "Status: metric returned to normal"
+            "{mentions_line}"
         )
 
     def get_default_title_template(self) -> str:

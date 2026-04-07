@@ -605,6 +605,7 @@ class TaskManager:
             internal=self.internal,  # For cooldown tracking
             alert_config=alerting_config,  # For cooldown settings
             description=config.description,  # Optional metric description for alerts
+            mentions=alerting_config.mentions,  # Users/groups to mention in alerts
         )
 
         # Get last complete point

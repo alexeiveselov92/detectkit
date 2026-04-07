@@ -36,6 +36,9 @@ def create_mock_alert_data(
     # Use current time
     now = datetime.now(timezone.utc)
 
+    # Get mentions from alerting config
+    mentions = metric_config.alerting.mentions if metric_config.alerting else []
+
     # Create realistic mock data
     return AlertData(
         metric_name=metric_config.name,
@@ -61,6 +64,7 @@ def create_mock_alert_data(
             ],
         },
         consecutive_count=3,
+        mentions=mentions,
     )
 
 

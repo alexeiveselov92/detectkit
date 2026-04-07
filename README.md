@@ -12,6 +12,14 @@ Published to PyPI: https://pypi.org/project/detectkit/
 
 Complete rewrite with modern architecture and full documentation (2025).
 
+### What's New in v0.3.8
+
+✅ **Mentions** - @mention users and groups in alert messages
+- Channel-agnostic: write usernames once, each platform formats natively
+- `mentions: ["oncall_user", "here"]` in metric config
+- Supports Mattermost, Slack (with User IDs), Telegram, Email
+- Custom placement via `{mentions}` template variable
+
 ### What's New in v0.3.6
 
 ✅ **Recovery Notifications** - Know when your metrics stabilize
@@ -31,7 +39,8 @@ Complete rewrite with modern architecture and full documentation (2025).
 - ✅ **Pure numpy arrays** - No pandas dependency in core logic
 - ✅ **Batch processing** - Efficient vectorized operations
 - ✅ **Multiple detectors** - Statistical methods (Z-Score, MAD, IQR, Manual Bounds)
-- ✅ **Alert channels** - Mattermost, Slack, Webhook support
+- ✅ **Alert channels** - Mattermost, Slack, Telegram, Email, Webhook support
+- ✅ **Mentions** - @mention users/groups in alerts (channel-agnostic)
 - ✅ **Database agnostic** - ClickHouse, PostgreSQL, MySQL support
 - ✅ **Idempotent operations** - Resume from interruptions
 - 🚧 **CLI interface** - dbt-like commands (coming soon)
@@ -181,6 +190,8 @@ See [CHANGELOG.md](CHANGELOG.md) for complete version history.
 
 ### Recent Releases
 
+**[0.3.8]** (2026-04-07) - Channel-agnostic mentions in alerts
+**[0.3.6]** (2025-11-12) - Recovery notifications when metric stabilizes
 **[0.3.0]** (2025-11-10) - Alert cooldown system, spam prevention
 **[0.2.8]** (2025-11-10) - Fix incomplete interval detection
 **[0.2.7]** (2025-11-10) - Add _dtk_metrics table

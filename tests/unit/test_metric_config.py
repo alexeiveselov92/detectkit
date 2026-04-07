@@ -393,9 +393,9 @@ class TestMetricConfig:
         )
 
         assert config.alerting is not None
-        assert config.alerting.enabled is True
-        assert config.alerting.channels == ["mattermost"]
-        assert config.alerting.consecutive_anomalies == 5
+        assert config.alerting[0].enabled is True
+        assert config.alerting[0].channels == ["mattermost"]
+        assert config.alerting[0].consecutive_anomalies == 5
 
     def test_from_yaml_file(self):
         """Test loading from YAML file."""
@@ -434,7 +434,7 @@ alerting:
             assert config.seasonality_columns == ["hour", "day_of_week"]
             assert config.loading_batch_size == 5000
             assert len(config.detectors) == 2
-            assert config.alerting.enabled is True
+            assert config.alerting[0].enabled is True
         finally:
             temp_path.unlink()
 

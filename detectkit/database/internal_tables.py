@@ -814,13 +814,14 @@ class InternalTablesManager:
         no_data_alert = 0
         min_detectors = 1
 
-        if metric_config.alerting:
-            is_alert_enabled = 1 if metric_config.alerting.enabled else 0
-            timezone_str = metric_config.alerting.timezone
-            direction = metric_config.alerting.direction
-            consecutive_anomalies = metric_config.alerting.consecutive_anomalies
-            no_data_alert = 1 if metric_config.alerting.no_data_alert else 0
-            min_detectors = metric_config.alerting.min_detectors
+        first_alerting = metric_config.alerting[0] if metric_config.alerting else None
+        if first_alerting:
+            is_alert_enabled = 1 if first_alerting.enabled else 0
+            timezone_str = first_alerting.timezone
+            direction = first_alerting.direction
+            consecutive_anomalies = first_alerting.consecutive_anomalies
+            no_data_alert = 1 if first_alerting.no_data_alert else 0
+            min_detectors = first_alerting.min_detectors
 
         # Prepare data for INSERT
         data = {

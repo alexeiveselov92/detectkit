@@ -205,7 +205,7 @@ alerting:
 
 ### Multiple Channels
 
-Send alerts to multiple channels:
+Send alerts to multiple channels within a single config:
 
 ```yaml
 alerting:
@@ -217,6 +217,29 @@ alerting:
 ```
 
 All channels receive the same alert message.
+
+### Multiple Alert Configurations
+
+You can define multiple independent alerting configs per metric — each with its own channels, timezone, template, and conditions:
+
+```yaml
+alerting:
+  - enabled: true
+    channels:
+      - mattermost_ops
+    timezone: "Europe/Moscow"
+    consecutive_anomalies: 3
+
+  - enabled: true
+    channels:
+      - slack_critical
+    timezone: "UTC"
+    consecutive_anomalies: 1      # More sensitive for this channel
+    direction: "up"               # Only upward anomalies
+    template_consecutive: "templates/slack_alert.j2"
+```
+
+Each config is evaluated and sent independently. Single dict format (backward-compatible) continues to work.
 
 ## Alert Filtering
 

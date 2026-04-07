@@ -370,7 +370,7 @@ class TestUpsertMetricConfig:
         mock_alert.consecutive_anomalies = 3
         mock_alert.no_data_alert = True
         mock_alert.min_detectors = 2
-        mock_config.alerting = mock_alert
+        mock_config.alerting = [mock_alert]
 
         # Mock upsert_record to return 1 (success)
         mock_manager.upsert_record.return_value = 1

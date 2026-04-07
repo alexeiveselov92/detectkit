@@ -115,14 +115,14 @@ def run_test_alert(metric_name: str, profile: Optional[str] = None):
         return
 
     # Check if alerting is configured
-    if not metric_config.alerting or not metric_config.alerting.enabled:
+    if not metric_config.alerting:
         print(f"Error: Alerting not enabled for metric '{metric_name}'")
         print("Enable alerting in metric config (alerting.enabled: true)")
         return
 
-    if not metric_config.alerting.channels:
-        print(f"Error: No alert channels configured for metric '{metric_name}'")
-        print("Add channels in metric config (alerting.channels: [...])")
+    active_configs = [c for c in metric_config.alerting if c.enabled and c.channels]
+    if not active_configs:
+        print(f"Error: No active alert configs for metric '{metric_name}'")
         return
 
     # Load profiles
@@ -138,50 +138,51 @@ def run_test_alert(metric_name: str, profile: Optional[str] = None):
 
     alert_channels_config = profiles_data.get("alert_channels", {})
 
-    # Get timezone for display
-    timezone_display = metric_config.alerting.timezone or "UTC"
-
-    # Create mock alert data
     print(f"\n📨 Sending test alert for metric: {metric_name}")
-    print(f"   Timezone: {timezone_display}")
-    print(f"   Channels: {', '.join(metric_config.alerting.channels)}\n")
 
-    alert_data = create_mock_alert_data(metric_config, timezone_display)
+    total_success = 0
+    total_channels = 0
 
-    # Send to each configured channel
-    success_count = 0
-    for channel_name in metric_config.alerting.channels:
-        if channel_name not in alert_channels_config:
-            print(f"⚠️  Channel '{channel_name}' not found in profiles.yml - skipping")
-            continue
+    for i, alerting_config in enumerate(active_configs):
+        timezone_display = alerting_config.timezone or "UTC"
+        if len(active_configs) > 1:
+            print(f"\n   [config {i + 1}/{len(active_configs)}]")
+        print(f"   Timezone: {timezone_display}")
+        print(f"   Channels: {', '.join(alerting_config.channels)}\n")
 
-        channel_config = alert_channels_config[channel_name]
+        alert_data = create_mock_alert_data(metric_config, timezone_display)
 
-        try:
-            # Create channel instance
-            # channel_config must contain 'type' plus the remaining parameters
-            channel = AlertChannelFactory.create_from_config(channel_config)
+        success_count = 0
+        for channel_name in alerting_config.channels:
+            total_channels += 1
+            if channel_name not in alert_channels_config:
+                print(f"⚠️  Channel '{channel_name}' not found in profiles.yml - skipping")
+                continue
 
-            # Get custom template if configured
-            template = None
-            if metric_config.alerting.template_consecutive:
-                template = metric_config.alerting.template_consecutive
+            channel_config = alert_channels_config[channel_name]
 
-            # Send alert
-            print(f"   → Sending to {channel_name}...", end=" ")
-            success = channel.send(alert_data, template=template)
+            try:
+                channel = AlertChannelFactory.create_from_config(channel_config)
 
-            if success:
-                print("✓ SUCCESS")
-                success_count += 1
-            else:
-                print("✗ FAILED")
+                template = alerting_config.template_consecutive or None
 
-        except Exception as e:
-            print(f"✗ ERROR: {e}")
+                print(f"   → Sending to {channel_name}...", end=" ")
+                success = channel.send(alert_data, template=template)
 
-    # Summary
-    print(f"\n{'✓' if success_count > 0 else '✗'} Sent test alert to {success_count}/{len(metric_config.alerting.channels)} channels")
+                if success:
+                    print("✓ SUCCESS")
+                    success_count += 1
+                    total_success += 1
+                else:
+                    print("✗ FAILED")
+
+            except Exception as e:
+                print(f"✗ ERROR: {e}")
+
+        print(f"\n{'✓' if success_count > 0 else '✗'} Sent test alert to {success_count}/{len(alerting_config.channels)} channels")
+
+    if len(active_configs) > 1:
+        print(f"\nTotal: {total_success}/{total_channels} channels across {len(active_configs)} alert configs")
 
     if success_count > 0:
         print("\n💡 Check your configured channels to verify message formatting")

@@ -578,103 +578,109 @@ class TaskManager:
         alerts_sent = 0
 
         # Check if alerting is configured
-        if not config.alerting or not config.alerting.enabled:
+        if not config.alerting:
             click.echo("  │ Alerting not enabled")
             return {"alerts_sent": 0}
 
-        if not config.alerting.channels:
-            click.echo("  │ No alert channels configured")
+        active_configs = [c for c in config.alerting if c.enabled and c.channels]
+        if not active_configs:
+            click.echo("  │ No active alert configs")
             return {"alerts_sent": 0}
 
-        click.echo(f"  │ Checking alert conditions...")
-
-        # Get alerting config
-        alerting_config = config.alerting
-
-        # Create alert orchestrator
         interval = config.get_interval()
-        orchestrator = AlertOrchestrator(
-            metric_name=config.name,
-            interval=interval,
-            conditions=AlertConditions(
-                min_detectors=1,  # At least one detector must flag anomaly
-                direction=alerting_config.direction,  # Use direction from config
-                consecutive_anomalies=alerting_config.consecutive_anomalies,
-            ),
-            timezone_display=alerting_config.timezone,  # Use timezone from config
-            internal=self.internal,  # For cooldown tracking
-            alert_config=alerting_config,  # For cooldown settings
-            description=config.description,  # Optional metric description for alerts
-            mentions=alerting_config.mentions,  # Users/groups to mention in alerts
-        )
+        multi = len(active_configs) > 1
 
-        # Get last complete point
-        last_point = orchestrator.get_last_complete_point()
+        for i, alerting_config in enumerate(active_configs):
+            if multi:
+                click.echo(f"  │ [config {i + 1}/{len(active_configs)}] channels: {alerting_config.channels}")
 
-        # Load recent detections for consecutive anomaly checking
-        # We need N recent points where N = consecutive_anomalies
-        recent_detections = self._load_recent_detections(
-            metric_name=config.name,
-            last_point=last_point,
-            num_points=alerting_config.consecutive_anomalies,
-        )
+            click.echo(f"  │ Checking alert conditions...")
 
-        if not recent_detections:
-            click.echo("  │ No recent detections found")
-            return {"alerts_sent": 0}
+            orchestrator = AlertOrchestrator(
+                metric_name=config.name,
+                interval=interval,
+                conditions=AlertConditions(
+                    min_detectors=1,  # At least one detector must flag anomaly
+                    direction=alerting_config.direction,
+                    consecutive_anomalies=alerting_config.consecutive_anomalies,
+                ),
+                timezone_display=alerting_config.timezone,
+                internal=self.internal,
+                alert_config=alerting_config,
+                description=config.description,
+                mentions=alerting_config.mentions,  # Users/groups to mention in alerts
+            )
 
-        # Check if alert should be sent
-        should_alert, alert_data = orchestrator.should_alert(recent_detections)
+            # Get last complete point
+            last_point = orchestrator.get_last_complete_point()
 
-        if should_alert:
-            click.echo(click.style(f"  │ ⚠ Alert triggered! Sending to {len(alerting_config.channels)} channel(s)...", fg="yellow", bold=True))
+            # Load recent detections for consecutive anomaly checking
+            recent_detections = self._load_recent_detections(
+                metric_name=config.name,
+                last_point=last_point,
+                num_points=alerting_config.consecutive_anomalies,
+            )
 
-            # Create alert channels from config
-            channels = self._create_alert_channels(alerting_config.channels)
+            if not recent_detections:
+                click.echo("  │ No recent detections found")
+                if not multi:
+                    return {"alerts_sent": 0}
+                continue
 
-            if channels:
-                # Send alerts
-                results = orchestrator.send_alerts(alert_data, channels)
-                alerts_sent = sum(1 for success in results.values() if success)
+            # Check if alert should be sent
+            should_alert, alert_data = orchestrator.should_alert(recent_detections)
 
-                for channel_name, success in results.items():
-                    status = click.style("✓", fg="green") if success else click.style("✗", fg="red")
-                    click.echo(f"  │   {status} {channel_name}")
+            if should_alert:
+                click.echo(click.style(f"  │ ⚠ Alert triggered! Sending to {len(alerting_config.channels)} channel(s)...", fg="yellow", bold=True))
 
-                click.echo(click.style(f"  └─ Sent {alerts_sent}/{len(channels)} alerts", fg="green" if alerts_sent > 0 else "yellow"))
-            else:
-                click.echo(click.style("  └─ No valid alert channels available", fg="yellow"))
-        else:
-            # Check recovery notification
-            if alerting_config.notify_on_recovery:
-                should_recover, recovery_data = orchestrator.should_send_recovery(
-                    recent_detections
-                )
+                channels = self._create_alert_channels(alerting_config.channels)
 
-                if should_recover:
-                    click.echo(click.style(f"  │ ✓ Recovery detected! Sending to {len(alerting_config.channels)} channel(s)...", fg="green", bold=True))
+                if channels:
+                    results = orchestrator.send_alerts(alert_data, channels)
+                    sent = sum(1 for success in results.values() if success)
+                    alerts_sent += sent
 
-                    channels = self._create_alert_channels(alerting_config.channels)
+                    for channel_name, success in results.items():
+                        status = click.style("✓", fg="green") if success else click.style("✗", fg="red")
+                        click.echo(f"  │   {status} {channel_name}")
 
-                    if channels:
-                        results = orchestrator.send_recovery(
-                            recovery_data,
-                            channels,
-                            template=alerting_config.template_recovery,
-                        )
-                        recovery_sent = sum(1 for success in results.values() if success)
-
-                        for channel_name, success in results.items():
-                            status = click.style("✓", fg="green") if success else click.style("✗", fg="red")
-                            click.echo(f"  │   {status} {channel_name}")
-
-                        click.echo(click.style(f"  └─ Sent {recovery_sent}/{len(channels)} recovery notifications", fg="green"))
-                    else:
-                        click.echo(click.style("  └─ No valid alert channels available", fg="yellow"))
+                    click.echo(click.style(f"  {'│' if multi else '└─'} Sent {sent}/{len(channels)} alerts", fg="green" if sent > 0 else "yellow"))
                 else:
-                    click.echo("  └─ No alert needed (conditions not met)")
+                    click.echo(click.style(f"  {'│' if multi else '└─'} No valid alert channels available", fg="yellow"))
             else:
-                click.echo("  └─ No alert needed (conditions not met)")
+                # Check recovery notification
+                if alerting_config.notify_on_recovery:
+                    should_recover, recovery_data = orchestrator.should_send_recovery(
+                        recent_detections
+                    )
+
+                    if should_recover:
+                        click.echo(click.style(f"  │ ✓ Recovery detected! Sending to {len(alerting_config.channels)} channel(s)...", fg="green", bold=True))
+
+                        channels = self._create_alert_channels(alerting_config.channels)
+
+                        if channels:
+                            results = orchestrator.send_recovery(
+                                recovery_data,
+                                channels,
+                                template=alerting_config.template_recovery,
+                            )
+                            recovery_sent = sum(1 for success in results.values() if success)
+
+                            for channel_name, success in results.items():
+                                status = click.style("✓", fg="green") if success else click.style("✗", fg="red")
+                                click.echo(f"  │   {status} {channel_name}")
+
+                            click.echo(click.style(f"  {'│' if multi else '└─'} Sent {recovery_sent}/{len(channels)} recovery notifications", fg="green"))
+                        else:
+                            click.echo(click.style(f"  {'│' if multi else '└─'} No valid alert channels available", fg="yellow"))
+                    else:
+                        click.echo(f"  {'│' if multi else '└─'} No alert needed (conditions not met)")
+                else:
+                    click.echo(f"  {'│' if multi else '└─'} No alert needed (conditions not met)")
+
+        if multi:
+            click.echo(f"  └─ Total alerts sent: {alerts_sent}")
 
         return {"alerts_sent": alerts_sent}
 

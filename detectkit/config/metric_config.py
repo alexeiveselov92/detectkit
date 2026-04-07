@@ -341,9 +341,19 @@ class MetricConfig(BaseModel):
     detectors: List[DetectorConfig] = Field(
         default_factory=list, description="Detector configurations"
     )
-    alerting: Optional[AlertConfig] = Field(
-        default=None, description="Alert configuration"
+    alerting: Optional[List[AlertConfig]] = Field(
+        default=None, description="Alert configuration(s) — single dict or list of dicts"
     )
+
+    @field_validator("alerting", mode="before")
+    @classmethod
+    def normalize_alerting(cls, v):
+        """Normalize alerting to list. Accepts single dict/AlertConfig (backward compat) or list."""
+        if v is None:
+            return None
+        if isinstance(v, (dict, AlertConfig)):
+            return [v]
+        return v
     tables: Optional[TablesConfig] = Field(
         default=None, description="Custom table names (overrides defaults)"
     )

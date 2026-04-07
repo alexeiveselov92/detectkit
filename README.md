@@ -6,11 +6,10 @@
 
 ## Status
 
-✅ **Production Ready** - Version 0.3.0
+[![PyPI version](https://img.shields.io/pypi/v/detectkit.svg)](https://pypi.org/project/detectkit/)
+[![Python](https://img.shields.io/pypi/pyversions/detectkit.svg)](https://pypi.org/project/detectkit/)
 
-Published to PyPI: https://pypi.org/project/detectkit/
-
-Complete rewrite with modern architecture and full documentation (2025).
+✅ **Production Ready** — published to [PyPI](https://pypi.org/project/detectkit/)
 
 ### What's New in v0.3.8
 

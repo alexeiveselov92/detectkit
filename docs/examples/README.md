@@ -23,7 +23,8 @@ This directory contains practical examples for common monitoring scenarios.
 - [Gaming Metrics with Complex Seasonality](#example-10-gaming-metrics-with-complex-seasonality) - Multi-dimensional seasonality
 - [Multi-Detector Strategy](#example-11-multi-detector-strategy) - Combining multiple detectors
 
-### New Features (v0.2.0+, v0.3.0+)
+### New Features (v0.2.0+, v0.3.0+, v0.3.8+)
+- **[Mentions Example](mentions-example.yml)** - @mention users/groups in alerts across all channels (v0.3.8)
 - **[Alert Cooldown Example](alert-cooldown-example.yml)** - Prevent spam with alert cooldown (v0.3.0)
 - **[Recovery Notifications Example](recovery-notification-example.yml)** - "All clear" messages when metric stabilizes
 - **[Detector Preprocessing Example](detector-preprocessing-example.yml)** - Advanced preprocessing features (v0.2.0)
@@ -597,6 +598,7 @@ alerting:
 | Cooldown reset | `cooldown_reset_on_recovery: true` | Cooldown resets when metric normalizes |
 | Recovery notify | `notify_on_recovery: true` | "All clear" sent once per incident |
 | Custom recovery | `template_recovery: "..."` | Custom message text for recovery |
+| Mentions | `mentions: ["oncall", "here"]` | @mention users/groups in alerts |
 
 ## See Also
 

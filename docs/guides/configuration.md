@@ -518,6 +518,9 @@ alerting:
   notify_on_recovery: false      # Send notification when metric stabilizes (default: false)
   template_recovery: null        # Custom recovery message template (default: null)
 
+  # Mentions (v0.3.8) — tag users/groups in alerts
+  mentions: []                   # Plain usernames without @, e.g., ["oncall", "here"]
+
   # Special alerts
   no_data_alert: false           # Alert on missing data (default: false)
 
@@ -549,6 +552,12 @@ alerting:
 - **`template_recovery`**: Custom recovery message template
   - Supports: `{metric_name}`, `{timestamp}`, `{value}`, `{confidence_interval}`, `{detector_name}`, `{status}`
   - Default template: `"Metric recovered: {metric_name}\nTime: {timestamp}\nValue: {value}\n..."`
+
+- **`mentions`**: Users/groups to mention in alerts
+  - Plain usernames without `@` prefix (e.g., `["oncall_user", "here"]`)
+  - Special keywords: `here`, `channel`, `all` for broadcast mentions
+  - Each channel formats mentions in its native syntax
+  - Available as `{mentions}` and `{mentions_line}` template variables
 
 ### Custom Table Names
 

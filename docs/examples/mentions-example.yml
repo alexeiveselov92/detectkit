@@ -1,0 +1,209 @@
+# Example: Mentions in Alert Messages
+#
+# This example demonstrates how to @mention users and groups in alerts.
+# Mentions are channel-agnostic: you specify plain usernames in config,
+# and each channel formats them in its native syntax.
+#
+# Platform-specific formatting:
+#   Mattermost: @username, @here, @channel, @all
+#   Slack:      @username (display only), <!here>, <!channel>, <@USER_ID>
+#   Telegram:   @username
+#   Email:      Rendered as "CC: user1, user2" (no actual mention syntax)
+#
+# Features demonstrated:
+# - mentions: List of users/groups to mention
+# - {mentions} and {mentions_line} template variables
+# - Special keywords: "channel", "all", "here"
+
+# ---------------------------------------------------------------------------
+# Example 1: Basic mentions — notify on-call engineer
+# ---------------------------------------------------------------------------
+
+name: api_error_rate
+description: API 5xx error rate with on-call mention
+interval: "5min"
+
+query: |
+  SELECT
+    toStartOfInterval(timestamp, INTERVAL 5 MINUTE) AS timestamp,
+    countIf(status_code >= 500) / count() * 100 AS value
+  FROM http_requests
+  WHERE timestamp >= %(from_date)s
+    AND timestamp < %(to_date)s
+  GROUP BY timestamp
+  ORDER BY timestamp
+
+detectors:
+  - type: manual_bounds
+    params:
+      upper_bound: 5.0
+
+alerting:
+  enabled: true
+  channels:
+    - mattermost_ops
+  consecutive_anomalies: 2
+  direction: "up"
+
+  # Mention users in alert messages
+  # Use plain usernames (without @), detectkit adds @ automatically
+  mentions:
+    - oncall_engineer
+    - devops_team
+
+  # Result in Mattermost: "@oncall_engineer @devops_team" at the end of the message
+
+---
+# ---------------------------------------------------------------------------
+# Example 2: Broadcast mentions — alert the entire channel
+# ---------------------------------------------------------------------------
+
+name: payment_availability
+description: Payment service availability with channel-wide mention
+interval: "1min"
+
+query: |
+  SELECT
+    toStartOfMinute(timestamp) AS timestamp,
+    countIf(status = 'ok') / count() * 100 AS value
+  FROM payment_healthchecks
+  WHERE timestamp >= %(from_date)s
+    AND timestamp < %(to_date)s
+  GROUP BY timestamp
+  ORDER BY timestamp
+
+detectors:
+  - type: manual_bounds
+    params:
+      lower_bound: 99.0
+
+alerting:
+  enabled: true
+  channels:
+    - mattermost_critical
+    - slack_incidents
+  consecutive_anomalies: 1
+  direction: "down"
+
+  # Special keywords for broadcast mentions
+  mentions:
+    - here              # @here in Mattermost, <!here> in Slack
+    - sre_lead          # @sre_lead in both
+
+  notify_on_recovery: true
+
+  # Result in Mattermost: "@here @sre_lead"
+  # Result in Slack:      "<!here> @sre_lead"
+
+---
+# ---------------------------------------------------------------------------
+# Example 3: Custom template with mention placement
+# ---------------------------------------------------------------------------
+
+name: database_replication_lag
+description: DB replication lag with custom mention placement
+interval: "1min"
+
+query: |
+  SELECT
+    toStartOfMinute(timestamp) AS timestamp,
+    max(replication_lag_seconds) AS value
+  FROM db_metrics
+  WHERE timestamp >= %(from_date)s
+    AND timestamp < %(to_date)s
+  GROUP BY timestamp
+  ORDER BY timestamp
+
+detectors:
+  - type: manual_bounds
+    params:
+      upper_bound: 30  # Alert when lag > 30 seconds
+
+alerting:
+  enabled: true
+  timezone: "Europe/Moscow"
+  channels:
+    - mattermost_dba
+  consecutive_anomalies: 2
+  direction: "up"
+
+  mentions:
+    - dba_oncall
+    - platform_team
+
+  # Use {mentions} for inline placement in custom templates
+  # Use {mentions_line} for auto-newline (empty if no mentions)
+  template_consecutive: |
+    {mentions}
+    Replication lag alert: {metric_name}
+    Time: {timestamp}
+    Lag: {value:.0f}s (threshold: 30s)
+    Consecutive: {consecutive_count} intervals
+    Detector: {detector_name}
+
+  template_recovery: |
+    {mentions}
+    Replication lag resolved: {metric_name}
+    Time: {timestamp}
+    Current lag: {value:.0f}s
+
+  notify_on_recovery: true
+
+  # Result: "@dba_oncall @platform_team" appears at the top of the message
+
+---
+# ---------------------------------------------------------------------------
+# Example 4: Slack with user IDs for real pings
+# ---------------------------------------------------------------------------
+# Note: Slack webhooks do NOT actually ping users with @username.
+# For real Slack pings, use Slack User IDs (format: U + alphanumeric).
+# Find user IDs: Slack profile > ... > Copy member ID
+
+name: api_latency_p99
+description: API latency with Slack user ID mentions
+interval: "5min"
+
+query: |
+  SELECT
+    toStartOfInterval(timestamp, INTERVAL 5 MINUTE) AS timestamp,
+    quantile(0.99)(response_time_ms) AS value
+  FROM http_requests
+  WHERE timestamp >= %(from_date)s
+    AND timestamp < %(to_date)s
+  GROUP BY timestamp
+  ORDER BY timestamp
+
+detectors:
+  - type: mad
+    params:
+      threshold: 4.0
+      window_size: 288
+
+alerting:
+  enabled: true
+  channels:
+    - slack_backend
+  consecutive_anomalies: 3
+
+  mentions:
+    - U04ABCD1234         # Slack User ID — will become <@U04ABCD1234> (real ping)
+    - here                # Will become <!here> (channel broadcast)
+
+  # Result in Slack: "<@U04ABCD1234> <!here>"
+
+# ---------------------------------------------------------------------------
+# Template variables reference:
+#
+# {mentions}      — Formatted mentions string (e.g., "@user1 @user2")
+#                    Empty string if no mentions configured.
+#
+# {mentions_line} — Same as {mentions} but with a leading newline.
+#                    Empty string if no mentions configured.
+#                    Used in default templates to avoid blank lines.
+#
+# Special mention keywords:
+#   "here"     — Mattermost: @here     | Slack: <!here>
+#   "channel"  — Mattermost: @channel  | Slack: <!channel>
+#   "all"      — Mattermost: @all      | Slack: <!everyone>
+#   "everyone" — Mattermost: @everyone | Slack: <!everyone>
+# ---------------------------------------------------------------------------

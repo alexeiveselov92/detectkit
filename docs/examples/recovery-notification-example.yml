@@ -103,6 +103,11 @@ alerting:
   # Recovery notifications (lifecycle tracking)
   notify_on_recovery: true
 
+  # Mentions: tag users in both anomaly and recovery messages
+  mentions:
+    - oncall_engineer
+    - here                 # @here in Mattermost, <!here> in Slack
+
   # Custom templates
   template_consecutive: |
     ⚠️ INCIDENT: {metric_name}
@@ -183,7 +188,13 @@ alerting:
   # Recovery notification is critical for SLA tracking
   notify_on_recovery: true
 
+  # Mention SRE lead for critical outages
+  mentions:
+    - sre_lead
+    - channel              # @channel — notify everyone
+
   template_consecutive: |
+    {mentions}
     🚨 OUTAGE DETECTED: {metric_name}
     Time: {timestamp} ({timezone})
     Availability: {value:.2f}% (SLA: >= 99%)

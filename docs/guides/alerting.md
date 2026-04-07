@@ -10,6 +10,7 @@ detectkit's alerting system:
 - ✅ Supports multiple channels (Mattermost, Slack, Telegram, Email)
 - ✅ Filters by detector agreement and direction
 - ✅ Customizable templates
+- ✅ @mentions for users and groups (channel-agnostic)
 
 ## How Alerting Works
 
@@ -532,6 +533,8 @@ alerting:
 | `{confidence_interval}` | Formatted as `[lower, upper]` |
 | `{detector_name}` | Detector that was monitoring |
 | `{status}` | Always `"RECOVERED"` in recovery messages |
+| `{mentions}` | Formatted mentions string (e.g., `@user1 @user2`), empty if none |
+| `{mentions_line}` | Same as `{mentions}` with leading newline, empty if none |
 
 ### Recovery with Cooldown
 
@@ -621,6 +624,91 @@ alerting:
 
 **Warning**: Without cooldown, you may receive many duplicate alerts for persistent anomalies.
 
+## Mentions (v0.3.8)
+
+Tag specific users or groups in alert messages. Mentions are **channel-agnostic**: you write plain usernames in metric config, and each channel formats them in its native syntax.
+
+### Basic Setup
+
+```yaml
+alerting:
+  enabled: true
+  channels:
+    - mattermost_ops
+  consecutive_anomalies: 3
+  mentions:
+    - oncall_engineer
+    - devops_team
+```
+
+This appends `@oncall_engineer @devops_team` to alert messages in Mattermost.
+
+### Platform-Specific Formatting
+
+detectkit automatically formats mentions for each platform:
+
+| Config Value | Mattermost | Slack | Telegram | Email |
+|---|---|---|---|---|
+| `username` | `@username` | `@username` (display only) | `@username` | `CC: username` |
+| `here` | `@here` | `<!here>` (broadcast) | `@here` | *(ignored)* |
+| `channel` | `@channel` | `<!channel>` (broadcast) | `@channel` | *(ignored)* |
+| `all` | `@all` | `<!everyone>` (broadcast) | `@all` | *(ignored)* |
+| `U04ABCD1234` | `@U04ABCD1234` | `<@U04ABCD1234>` (real ping) | `@U04ABCD1234` | `CC: U04ABCD1234` |
+
+> **Slack note**: Slack webhooks do **not** actually ping users with `@username` — it's display-only. For real pings, use Slack User IDs (format: `U` + alphanumeric, found in user profile > "Copy member ID").
+
+### Special Keywords
+
+Use these keywords for broadcast mentions:
+
+- **`here`** — Notify active members (Mattermost: `@here`, Slack: `<!here>`)
+- **`channel`** — Notify all channel members (Mattermost: `@channel`, Slack: `<!channel>`)
+- **`all`** — Notify everyone (Mattermost: `@all`, Slack: `<!everyone>`)
+
+### Custom Template Placement
+
+By default, mentions appear at the end of the message. Use template variables for custom placement:
+
+- **`{mentions}`** — Formatted mentions string (e.g., `@user1 @user2`), empty string if none
+- **`{mentions_line}`** — Same but with a leading newline, empty string if none
+
+```yaml
+alerting:
+  mentions:
+    - oncall_engineer
+
+  # Place mentions at the top of the message
+  template_consecutive: |
+    {mentions}
+    Alert: {metric_name}
+    Time: {timestamp}
+    Value: {value} | CI: {confidence_interval}
+    Consecutive: {consecutive_count}
+```
+
+### Mentions with Recovery
+
+Mentions are included in both anomaly alerts and recovery notifications:
+
+```yaml
+alerting:
+  mentions:
+    - oncall_engineer
+  notify_on_recovery: true
+  template_recovery: |
+    {mentions}
+    Resolved: {metric_name} at {timestamp}
+    Value: {value}
+```
+
+### Configuration
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `mentions` | `List[str]` | `[]` | Users/groups to mention. Plain usernames without `@`. |
+
+No `@` prefix needed — detectkit adds the appropriate prefix for each channel.
+
 ## Timezone Display
 
 Alerts display timestamps in UTC by default. Override per metric:
@@ -693,6 +781,8 @@ alerting:
 - `severity` - Severity score (how far from bounds)
 - `direction` - "above" or "below"
 - `consecutive_count` - Number of consecutive anomalies
+- `mentions` - Formatted mentions (e.g., "@user1 @user2"), empty if none
+- `mentions_line` - Same with leading newline, empty if none
 
 ### Template Types
 

@@ -140,6 +140,48 @@ def get_tasks_table_model() -> TableModel:
     )
 
 
+def get_alert_states_table_model() -> TableModel:
+    """
+    Get TableModel for _dtk_alert_states table.
+
+    Stores alert state independently per alerting config (not per metric).
+    Each alerting config block in metric YAML gets its own row identified
+    by a hash of the config parameters.
+
+    Schema:
+        - metric_name: Metric identifier
+        - alert_config_id: MD5 hash of alerting config params (channels, conditions, etc.)
+        - last_alert_sent: Timestamp of last sent alert (nullable)
+        - last_recovery_sent: Timestamp of last sent recovery notification (nullable)
+        - alert_count: Total alerts sent for this config
+        - updated_at: Last update timestamp
+
+    Primary Key: (metric_name, alert_config_id)
+    Engine: ReplacingMergeTree(updated_at)
+    """
+    return TableModel(
+        columns=[
+            ColumnDefinition("metric_name", "String"),
+            ColumnDefinition("alert_config_id", "String"),
+            ColumnDefinition(
+                "last_alert_sent",
+                "Nullable(DateTime64(3, 'UTC'))",
+                nullable=True,
+            ),
+            ColumnDefinition(
+                "last_recovery_sent",
+                "Nullable(DateTime64(3, 'UTC'))",
+                nullable=True,
+            ),
+            ColumnDefinition("alert_count", "UInt32", default="0"),
+            ColumnDefinition("updated_at", "DateTime64(3, 'UTC')"),
+        ],
+        primary_key=["metric_name", "alert_config_id"],
+        engine="ReplacingMergeTree(updated_at)",
+        order_by=["metric_name", "alert_config_id"],
+    )
+
+
 def get_metrics_table_model() -> TableModel:
     """
     Get TableModel for _dtk_metrics table.
@@ -203,6 +245,7 @@ TABLE_DATAPOINTS = "_dtk_datapoints"
 TABLE_DETECTIONS = "_dtk_detections"
 TABLE_TASKS = "_dtk_tasks"
 TABLE_METRICS = "_dtk_metrics"
+TABLE_ALERT_STATES = "_dtk_alert_states"
 
 # Map of table names to model factories
 INTERNAL_TABLES = {
@@ -210,4 +253,5 @@ INTERNAL_TABLES = {
     TABLE_DETECTIONS: get_detections_table_model,
     TABLE_TASKS: get_tasks_table_model,
     TABLE_METRICS: get_metrics_table_model,
+    TABLE_ALERT_STATES: get_alert_states_table_model,
 }

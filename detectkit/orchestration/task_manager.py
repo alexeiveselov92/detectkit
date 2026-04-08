@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 from detectkit.utils.datetime_utils import now_utc, now_utc_naive, to_naive_utc, to_aware_utc
 from enum import Enum
 from typing import Dict, List, Optional
+import hashlib
 import json
 
 import click
@@ -29,6 +30,33 @@ from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.detectors.base import BaseDetector
 from detectkit.detectors.factory import DetectorFactory
 from detectkit.loaders.metric_loader import MetricLoader
+
+
+def _make_alert_config_id(alerting_config) -> str:
+    """
+    Generate a stable unique ID for an alerting config block.
+
+    Hashes ALL parameters that define the config's identity so that:
+    - Two configs with same channels but different conditions get different IDs
+    - The same config always gets the same ID across runs
+    - Changing any parameter produces a new ID (fresh state)
+
+    Args:
+        alerting_config: AlertConfig instance
+
+    Returns:
+        16-character hex string (MD5 truncated)
+    """
+    config_dict = {
+        "channels": sorted(alerting_config.channels),
+        "min_detectors": alerting_config.min_detectors,
+        "direction": alerting_config.direction,
+        "consecutive_anomalies": alerting_config.consecutive_anomalies,
+        "alert_cooldown": str(alerting_config.alert_cooldown) if alerting_config.alert_cooldown else None,
+        "cooldown_reset_on_recovery": alerting_config.cooldown_reset_on_recovery,
+    }
+    config_str = json.dumps(config_dict, sort_keys=True)
+    return hashlib.md5(config_str.encode()).hexdigest()[:16]
 
 
 class PipelineStep(str, Enum):
@@ -578,9 +606,12 @@ class TaskManager:
 
             click.echo(f"  │ Checking alert conditions...")
 
+            alert_config_id = _make_alert_config_id(alerting_config)
+
             orchestrator = AlertOrchestrator(
                 metric_name=config.name,
                 interval=interval,
+                alert_config_id=alert_config_id,
                 conditions=AlertConditions(
                     min_detectors=alerting_config.min_detectors,
                     direction=alerting_config.direction,

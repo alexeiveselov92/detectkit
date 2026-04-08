@@ -8,6 +8,7 @@ import pytest
 
 from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.database.tables import (
+    TABLE_ALERT_STATES,
     TABLE_DATAPOINTS,
     TABLE_DETECTIONS,
     TABLE_METRICS,
@@ -46,7 +47,7 @@ class TestEnsureTables:
         internal_manager.ensure_tables()
 
         # Verify create_table was called for each internal table
-        assert mock_manager.create_table.call_count == 4
+        assert mock_manager.create_table.call_count == 5
 
         # Verify correct table names
         created_tables = [
@@ -56,6 +57,7 @@ class TestEnsureTables:
         assert f"detectk_internal.{TABLE_DETECTIONS}" in created_tables
         assert f"detectk_internal.{TABLE_TASKS}" in created_tables
         assert f"detectk_internal.{TABLE_METRICS}" in created_tables
+        assert f"detectk_internal.{TABLE_ALERT_STATES}" in created_tables
 
     def test_skips_existing_tables(self, internal_manager, mock_manager):
         """Test that existing tables are not recreated."""
@@ -79,8 +81,8 @@ class TestEnsureTables:
         # Call ensure_tables
         internal_manager.ensure_tables()
 
-        # Verify create_table called only for missing tables (detections, tasks, metrics)
-        assert mock_manager.create_table.call_count == 3
+        # Verify create_table called only for missing tables (detections, tasks, metrics, alert_states)
+        assert mock_manager.create_table.call_count == 4
 
         created_tables = [
             call[0][0] for call in mock_manager.create_table.call_args_list
@@ -89,6 +91,7 @@ class TestEnsureTables:
         assert f"detectk_internal.{TABLE_DETECTIONS}" in created_tables
         assert f"detectk_internal.{TABLE_TASKS}" in created_tables
         assert f"detectk_internal.{TABLE_METRICS}" in created_tables
+        assert f"detectk_internal.{TABLE_ALERT_STATES}" in created_tables
 
 
 class TestSaveDatapoints:

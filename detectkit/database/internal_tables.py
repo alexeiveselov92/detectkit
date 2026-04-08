@@ -18,6 +18,7 @@ from detectkit.utils.datetime_utils import now_utc_naive, to_naive_utc, to_aware
 from detectkit.database.manager import BaseDatabaseManager
 from detectkit.database.tables import (
     INTERNAL_TABLES,
+    TABLE_ALERT_STATES,
     TABLE_DATAPOINTS,
     TABLE_DETECTIONS,
     TABLE_METRICS,
@@ -856,197 +857,206 @@ class InternalTablesManager:
 
     def get_last_alert_timestamp(
         self,
-        metric_name: str
+        metric_name: str,
+        alert_config_id: str,
     ) -> Optional[datetime]:
         """
-        Get timestamp of last sent alert for a metric.
-
-        Used for alert cooldown tracking - prevents sending alerts
-        too frequently for the same metric.
+        Get timestamp of last sent alert for a specific alerting config.
 
         Args:
             metric_name: Metric identifier
+            alert_config_id: MD5 hash of alerting config params
 
         Returns:
             Timestamp of last sent alert, or None if never sent
-
-        Example:
-            >>> last_sent = internal.get_last_alert_timestamp("cpu_usage")
-            >>> if last_sent:
-            ...     elapsed = (now_utc_naive() - last_sent).total_seconds()
-            ...     print(f"Last alert sent {elapsed}s ago")
         """
-        full_table_name = self._manager.get_full_table_name(
-            TABLE_TASKS, use_internal=True
-        )
-
-        # Query for pipeline task (detector_id="pipeline", process_type="pipeline")
-        query = f"""
-        SELECT last_alert_sent
-        FROM {full_table_name}
-        WHERE metric_name = %(metric_name)s
-          AND detector_id = 'pipeline'
-          AND process_type = 'pipeline'
-        LIMIT 1
-        """
-
-        results = self._manager.execute_query(
-            query,
-            params={"metric_name": metric_name}
-        )
-
-        if not results or not results[0]["last_alert_sent"]:
-            return None
-
-        last_sent = to_naive_utc(results[0]["last_alert_sent"])
-
-        return last_sent
+        state = self.get_alert_state(metric_name, alert_config_id)
+        return state["last_alert_sent"]
 
     def update_alert_timestamp(
         self,
         metric_name: str,
+        alert_config_id: str,
         timestamp: datetime,
-        increment_count: bool = True
+        increment_count: bool = True,
     ) -> int:
         """
-        Update last_alert_sent timestamp and optionally increment alert_count.
-
-        Called after successfully sending an alert to track cooldown state.
+        Update last_alert_sent timestamp for a specific alerting config.
 
         Args:
             metric_name: Metric identifier
-            timestamp: Timestamp when alert was sent (naive UTC, use now_utc_naive())
+            alert_config_id: MD5 hash of alerting config params
+            timestamp: Timestamp when alert was sent
             increment_count: Whether to increment alert_count (default: True)
 
         Returns:
-            Number of rows updated (typically 1)
-
-        Example:
-            >>> # After sending alert
-            >>> internal.update_alert_timestamp(
-            ...     "cpu_usage",
-            ...     now_utc_naive(),
-            ...     increment_count=True
-            ... )
+            1 (always)
         """
-        full_table_name = self._manager.get_full_table_name(
-            TABLE_TASKS, use_internal=True
+        self.upsert_alert_state(
+            metric_name=metric_name,
+            alert_config_id=alert_config_id,
+            last_alert_sent=timestamp,
+            increment_count=increment_count,
         )
-
-        timestamp = to_naive_utc(timestamp)
-
-        if increment_count:
-            # Update with alert_count increment
-            update_query = f"""
-            ALTER TABLE {full_table_name}
-            UPDATE
-                last_alert_sent = %(timestamp)s,
-                alert_count = alert_count + 1,
-                updated_at = %(timestamp)s
-            WHERE metric_name = %(metric_name)s
-              AND detector_id = 'pipeline'
-              AND process_type = 'pipeline'
-            SETTINGS mutations_sync = 1
-            """
-        else:
-            # Update without alert_count increment
-            update_query = f"""
-            ALTER TABLE {full_table_name}
-            UPDATE
-                last_alert_sent = %(timestamp)s,
-                updated_at = %(timestamp)s
-            WHERE metric_name = %(metric_name)s
-              AND detector_id = 'pipeline'
-              AND process_type = 'pipeline'
-            SETTINGS mutations_sync = 1
-            """
-
-        self._manager.execute_query(
-            update_query,
-            params={
-                "metric_name": metric_name,
-                "timestamp": timestamp
-            }
-        )
-
         return 1
 
     def get_last_recovery_timestamp(
         self,
-        metric_name: str
+        metric_name: str,
+        alert_config_id: str,
     ) -> Optional[datetime]:
         """
-        Get timestamp of last sent recovery notification for a metric.
+        Get timestamp of last sent recovery notification for a specific alerting config.
 
         Args:
             metric_name: Metric identifier
+            alert_config_id: MD5 hash of alerting config params
 
         Returns:
             Timestamp of last sent recovery, or None if never sent
         """
+        state = self.get_alert_state(metric_name, alert_config_id)
+        return state["last_recovery_sent"]
+
+    def update_recovery_timestamp(
+        self,
+        metric_name: str,
+        alert_config_id: str,
+        timestamp: datetime,
+    ) -> int:
+        """
+        Update last_recovery_sent timestamp for a specific alerting config.
+
+        Args:
+            metric_name: Metric identifier
+            alert_config_id: MD5 hash of alerting config params
+            timestamp: Timestamp when recovery was sent
+
+        Returns:
+            1 (always)
+        """
+        self.upsert_alert_state(
+            metric_name=metric_name,
+            alert_config_id=alert_config_id,
+            last_recovery_sent=timestamp,
+        )
+        return 1
+
+    # ─── Alert States (_dtk_alert_states) ───────────────────────────────────
+
+    def get_alert_state(
+        self,
+        metric_name: str,
+        alert_config_id: str,
+    ) -> Dict:
+        """
+        Get alert state for a specific alerting config.
+
+        Args:
+            metric_name: Metric identifier
+            alert_config_id: MD5 hash of alerting config params
+
+        Returns:
+            Dict with keys:
+                - last_alert_sent: datetime or None
+                - last_recovery_sent: datetime or None
+                - alert_count: int
+        """
         full_table_name = self._manager.get_full_table_name(
-            TABLE_TASKS, use_internal=True
+            TABLE_ALERT_STATES, use_internal=True
         )
 
         query = f"""
-        SELECT last_recovery_sent
+        SELECT last_alert_sent, last_recovery_sent, alert_count
         FROM {full_table_name}
+        FINAL
         WHERE metric_name = %(metric_name)s
-          AND detector_id = 'pipeline'
-          AND process_type = 'pipeline'
+          AND alert_config_id = %(alert_config_id)s
         LIMIT 1
         """
 
         results = self._manager.execute_query(
             query,
-            params={"metric_name": metric_name}
-        )
-
-        if not results or not results[0].get("last_recovery_sent"):
-            return None
-
-        last_sent = to_naive_utc(results[0]["last_recovery_sent"])
-
-        return last_sent
-
-    def update_recovery_timestamp(
-        self,
-        metric_name: str,
-        timestamp: datetime,
-    ) -> int:
-        """
-        Update last_recovery_sent timestamp after sending recovery notification.
-
-        Args:
-            metric_name: Metric identifier
-            timestamp: Timestamp when recovery was sent
-
-        Returns:
-            Number of rows updated (typically 1)
-        """
-        full_table_name = self._manager.get_full_table_name(
-            TABLE_TASKS, use_internal=True
-        )
-
-        timestamp = to_naive_utc(timestamp)
-
-        update_query = f"""
-        ALTER TABLE {full_table_name}
-        UPDATE
-            last_recovery_sent = %(timestamp)s,
-            updated_at = %(timestamp)s
-        WHERE metric_name = %(metric_name)s
-          AND detector_id = 'pipeline'
-          AND process_type = 'pipeline'
-        SETTINGS mutations_sync = 1
-        """
-
-        self._manager.execute_query(
-            update_query,
             params={
                 "metric_name": metric_name,
-                "timestamp": timestamp
+                "alert_config_id": alert_config_id,
             }
         )
 
-        return 1
+        if not results:
+            return {
+                "last_alert_sent": None,
+                "last_recovery_sent": None,
+                "alert_count": 0,
+            }
+
+        row = results[0]
+        return {
+            "last_alert_sent": to_naive_utc(row.get("last_alert_sent")),
+            "last_recovery_sent": to_naive_utc(row.get("last_recovery_sent")),
+            "alert_count": row.get("alert_count", 0) or 0,
+        }
+
+    def upsert_alert_state(
+        self,
+        metric_name: str,
+        alert_config_id: str,
+        last_alert_sent: Optional[datetime] = None,
+        last_recovery_sent: Optional[datetime] = None,
+        increment_count: bool = False,
+    ) -> None:
+        """
+        Upsert alert state for a specific alerting config.
+
+        Uses SELECT -> DELETE -> INSERT pattern to handle new rows and updates.
+
+        Args:
+            metric_name: Metric identifier
+            alert_config_id: MD5 hash of alerting config params
+            last_alert_sent: New last_alert_sent timestamp (None = keep existing)
+            last_recovery_sent: New last_recovery_sent timestamp (None = keep existing)
+            increment_count: Whether to increment alert_count by 1
+        """
+        full_table_name = self._manager.get_full_table_name(
+            TABLE_ALERT_STATES, use_internal=True
+        )
+
+        # Read existing state to preserve fields not being updated
+        existing = self.get_alert_state(metric_name, alert_config_id)
+
+        now = now_utc_naive()
+
+        new_last_alert = to_naive_utc(last_alert_sent) if last_alert_sent is not None else existing["last_alert_sent"]
+        new_last_recovery = to_naive_utc(last_recovery_sent) if last_recovery_sent is not None else existing["last_recovery_sent"]
+        new_alert_count = existing["alert_count"] + 1 if increment_count else existing["alert_count"]
+
+        # Delete existing row
+        delete_query = f"""
+        ALTER TABLE {full_table_name}
+        DELETE WHERE metric_name = %(metric_name)s
+          AND alert_config_id = %(alert_config_id)s
+        SETTINGS mutations_sync = 1
+        """
+        self._manager.execute_query(
+            delete_query,
+            params={
+                "metric_name": metric_name,
+                "alert_config_id": alert_config_id,
+            }
+        )
+
+        # Insert new row
+        insert_data = {
+            "metric_name": np.array([metric_name]),
+            "alert_config_id": np.array([alert_config_id]),
+            "last_alert_sent": np.array([new_last_alert], dtype="datetime64[ms]") if new_last_alert else np.array([None]),
+            "last_recovery_sent": np.array([new_last_recovery], dtype="datetime64[ms]") if new_last_recovery else np.array([None]),
+            "alert_count": np.array([new_alert_count], dtype=np.uint32),
+            "updated_at": np.array([now], dtype="datetime64[ms]"),
+        }
+
+        self._manager.insert_batch(
+            full_table_name,
+            insert_data,
+            conflict_strategy="ignore",
+        )

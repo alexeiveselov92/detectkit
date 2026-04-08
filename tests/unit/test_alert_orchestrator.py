@@ -71,6 +71,7 @@ class TestAlertOrchestrator:
         """Test initialization with defaults."""
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
         )
 
@@ -89,6 +90,7 @@ class TestAlertOrchestrator:
 
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             conditions=conditions,
             timezone_display="Europe/Moscow",
@@ -103,6 +105,7 @@ class TestAlertOrchestrator:
         """Test should_alert with no detections."""
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
         )
 
@@ -115,6 +118,7 @@ class TestAlertOrchestrator:
         """Test alert with single anomaly and default conditions."""
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
         )
 
@@ -148,6 +152,7 @@ class TestAlertOrchestrator:
         conditions = AlertConditions(min_detectors=2)
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             conditions=conditions,
         )
@@ -179,6 +184,7 @@ class TestAlertOrchestrator:
         conditions = AlertConditions(min_detectors=2)
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             conditions=conditions,
         )
@@ -228,6 +234,7 @@ class TestAlertOrchestrator:
         )
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             conditions=conditions,
         )
@@ -288,6 +295,7 @@ class TestAlertOrchestrator:
         )
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             conditions=conditions,
         )
@@ -348,6 +356,7 @@ class TestAlertOrchestrator:
         )
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             conditions=conditions,
         )
@@ -408,6 +417,7 @@ class TestAlertOrchestrator:
         )
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             conditions=conditions,
         )
@@ -454,6 +464,7 @@ class TestAlertOrchestrator:
         )
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             conditions=conditions,
         )
@@ -500,6 +511,7 @@ class TestAlertOrchestrator:
         )
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             conditions=conditions,
         )
@@ -569,6 +581,7 @@ class TestAlertOrchestrator:
         """Test determining last complete point."""
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
         )
 
@@ -582,6 +595,7 @@ class TestAlertOrchestrator:
         """Test last complete point with hourly interval."""
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("1h"),
         )
 
@@ -594,6 +608,7 @@ class TestAlertOrchestrator:
         """Test sending alerts through channels."""
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
         )
 
@@ -632,6 +647,7 @@ class TestAlertOrchestrator:
         """Test sending alerts with channel failure."""
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
         )
 
@@ -662,6 +678,7 @@ class TestAlertOrchestrator:
         """Test sending alerts with channel exception."""
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
         )
 
@@ -697,6 +714,7 @@ class TestAlertOrchestrator:
         )
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             conditions=conditions,
         )
@@ -733,6 +751,7 @@ class TestRecoveryNotifications:
         """Recovery returns False when no internal manager."""
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
         )
 
@@ -747,6 +766,7 @@ class TestRecoveryNotifications:
 
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             internal=internal,
         )
@@ -764,6 +784,7 @@ class TestRecoveryNotifications:
 
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             internal=internal,
         )
@@ -781,6 +802,7 @@ class TestRecoveryNotifications:
 
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             internal=internal,
         )
@@ -801,6 +823,7 @@ class TestRecoveryNotifications:
 
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             internal=internal,
         )
@@ -826,6 +849,7 @@ class TestRecoveryNotifications:
 
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             internal=internal,
         )
@@ -844,6 +868,7 @@ class TestRecoveryNotifications:
 
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             internal=internal,
         )
@@ -878,6 +903,7 @@ class TestRecoveryNotifications:
 
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
+            alert_config_id="test_config_id",
             interval=Interval("10min"),
             internal=internal,
         )

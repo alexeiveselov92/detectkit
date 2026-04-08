@@ -396,13 +396,15 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
             }
         )
 
-        # Convert last_processed_timestamp to naive UTC if needed
-        last_ts_naive = None
-        if last_processed_timestamp:
-            if last_processed_timestamp.tzinfo is not None:
-                last_ts_naive = last_processed_timestamp.replace(tzinfo=None)
-            else:
-                last_ts_naive = last_processed_timestamp
+        # Convert timestamps to naive UTC if needed (np.datetime64 has no tz support)
+        def _to_naive(dt: Optional[datetime]) -> Optional[datetime]:
+            if dt is None:
+                return None
+            return dt.replace(tzinfo=None) if dt.tzinfo is not None else dt
+
+        last_ts_naive = _to_naive(last_processed_timestamp)
+        last_alert_naive = _to_naive(existing_last_alert_sent)
+        last_recovery_naive = _to_naive(existing_last_recovery_sent)
 
         # Then insert new record (preserving alert tracking fields)
         insert_data = {
@@ -415,9 +417,9 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
             "last_processed_timestamp": np.array([last_ts_naive], dtype="datetime64[ms]") if last_ts_naive else np.array([None]),
             "error_message": np.array([error_message]),
             "timeout_seconds": np.array([timeout_seconds], dtype=np.int32),
-            "last_alert_sent": np.array([existing_last_alert_sent], dtype="datetime64[ms]") if existing_last_alert_sent else np.array([None]),
+            "last_alert_sent": np.array([last_alert_naive], dtype="datetime64[ms]") if last_alert_naive else np.array([None]),
             "alert_count": np.array([existing_alert_count], dtype=np.uint32),
-            "last_recovery_sent": np.array([existing_last_recovery_sent], dtype="datetime64[ms]") if existing_last_recovery_sent else np.array([None]),
+            "last_recovery_sent": np.array([last_recovery_naive], dtype="datetime64[ms]") if last_recovery_naive else np.array([None]),
         }
 
         self.insert_batch(

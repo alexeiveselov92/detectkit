@@ -954,6 +954,7 @@ class InternalTablesManager:
             WHERE metric_name = %(metric_name)s
               AND detector_id = 'pipeline'
               AND process_type = 'pipeline'
+            SETTINGS mutations_sync = 1
             """
         else:
             # Update without alert_count increment
@@ -965,6 +966,7 @@ class InternalTablesManager:
             WHERE metric_name = %(metric_name)s
               AND detector_id = 'pipeline'
               AND process_type = 'pipeline'
+            SETTINGS mutations_sync = 1
             """
 
         self._manager.execute_query(
@@ -975,7 +977,6 @@ class InternalTablesManager:
             }
         )
 
-        # ClickHouse ALTER TABLE UPDATE is async, return 1 (optimistic)
         return 1
 
     def get_last_recovery_timestamp(
@@ -1049,6 +1050,7 @@ class InternalTablesManager:
         WHERE metric_name = %(metric_name)s
           AND detector_id = 'pipeline'
           AND process_type = 'pipeline'
+        SETTINGS mutations_sync = 1
         """
 
         self._manager.execute_query(

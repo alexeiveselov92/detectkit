@@ -5,6 +5,59 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.13] - 2026-04-08
+
+### Added
+- New internal table `_dtk_alert_states` for independent alert state per alerting config block
+  (`last_alert_sent`, `last_recovery_sent`, `alert_count` keyed by `metric_name` + `alert_config_id`)
+- `alert_config_id` generated as MD5 hash of all config params (channels, min_detectors, direction,
+  consecutive_anomalies, alert_cooldown, cooldown_reset_on_recovery) — configs with the same channels
+  but different conditions correctly get different IDs and independent state
+
+### Fixed
+- **Multi-config alerting**: when a metric has multiple `alerting:` blocks, each now tracks its own
+  alert/recovery state independently — fixes false recoveries caused by shared `last_alert_sent`
+- **Recovery threshold**: recovery now requires 0 detectors flagging the latest point as anomalous
+  (previously used `< min_detectors`, causing false recovery when some detectors still saw anomaly)
+- **Recovery message point**: `_build_recovery_data()` now correctly uses the newest detection point
+  (`detections[-1]`) instead of the oldest (`detections[0]`)
+
+### Changed
+- `get_last_alert_timestamp`, `update_alert_timestamp`, `get_last_recovery_timestamp`,
+  `update_recovery_timestamp` now require `alert_config_id` parameter
+- `upsert_task_status` simplified — alert state no longer stored in `_dtk_tasks`
+- `AlertOrchestrator.__init__` requires `alert_config_id` parameter
+
+### Migration
+New table is created automatically on next `dtk run` via `ensure_tables()`.
+Existing alert state in `_dtk_tasks` is not migrated — first run after upgrade starts with clean state.
+
+## [0.3.12] - 2026-04-08
+
+### Fixed
+- Custom `template_consecutive` from alerting config now correctly passed to `send_alerts()`
+- Numpy timezone warning in `upsert_task_status`: strip tzinfo from datetime fields before
+  converting to `datetime64[ms]`
+
+### Changed
+- Centralized UTC datetime handling into `detectkit/utils/datetime_utils.py`
+  (`now_utc`, `now_utc_naive`, `to_naive_utc`, `to_aware_utc`)
+
+## [0.3.11] - 2026-04-08
+
+### Fixed
+- Recovery notifications never fired: `upsert_task_status` was destroying `last_alert_sent` /
+  `last_recovery_sent` on every DELETE+INSERT cycle (fields were reset to NULL)
+- Alert mutations now use `mutations_sync=1` to prevent race conditions between alert step
+  and lock release
+
+## [0.3.10] - 2026-04-08
+
+### Fixed
+- False recovery detection: check latest point's anomaly status instead of counting consecutive anomalies
+- Alert step now always runs (recovery notifications need it even when no new anomalies detected)
+- `min_detectors` now correctly read from alerting config instead of being hardcoded to 1
+
 ## [0.3.9] - 2026-04-07
 
 ### Added

@@ -8,6 +8,7 @@ Orchestrates the complete workflow:
 """
 
 from datetime import datetime, timezone, timedelta
+from detectkit.utils.datetime_utils import now_utc, now_utc_naive, to_naive_utc, to_aware_utc
 from enum import Enum
 from typing import Dict, List, Optional
 import json
@@ -268,7 +269,7 @@ class TaskManager:
                 if config.loading_start_time:
                     actual_from = datetime.strptime(
                         config.loading_start_time, "%Y-%m-%d %H:%M:%S"
-                    ).replace(tzinfo=timezone.utc)
+                    )  # naive UTC from config string
                     click.echo(f"  │ Starting fresh from: {config.loading_start_time}")
                 else:
                     raise ValueError(
@@ -277,13 +278,12 @@ class TaskManager:
                     )
 
         if actual_to is None:
-            actual_to = datetime.now(timezone.utc)
+            actual_to = now_utc_naive()
+        else:
+            actual_to = to_naive_utc(actual_to)
 
         # Normalize to naive UTC (ClickHouse returns aware UTC for DateTime64(3, 'UTC'))
-        if actual_from.tzinfo is not None:
-            actual_from = actual_from.replace(tzinfo=None)
-        if actual_to.tzinfo is not None:
-            actual_to = actual_to.replace(tzinfo=None)
+        actual_from = to_naive_utc(actual_from)
 
         # Guard: next interval hasn't arrived yet
         if actual_from >= actual_to:
@@ -379,15 +379,8 @@ class TaskManager:
         click.echo(f"  │ Running {len(config.detectors)} detector(s)...")
 
         # Determine to_date if not specified
-        actual_to = to_date or datetime.now(timezone.utc)
-        # Normalize to naive datetime (remove timezone info)
-        if actual_to and actual_to.tzinfo is not None:
-            actual_to = actual_to.replace(tzinfo=None)
-
-        # Normalize from_date to naive
-        normalized_from_date = from_date
-        if normalized_from_date and normalized_from_date.tzinfo is not None:
-            normalized_from_date = normalized_from_date.replace(tzinfo=None)
+        actual_to = to_naive_utc(to_date) if to_date else now_utc_naive()
+        normalized_from_date = to_naive_utc(from_date)
 
         # Run each detector
         for idx, detector_config in enumerate(config.detectors, 1):
@@ -425,9 +418,7 @@ class TaskManager:
                 metric_name=config.name,
                 detector_id=detector_id
             )
-            # Normalize last_detection_ts to naive if needed
-            if last_detection_ts and last_detection_ts.tzinfo is not None:
-                last_detection_ts = last_detection_ts.replace(tzinfo=None)
+            last_detection_ts = to_naive_utc(last_detection_ts)
 
             # Determine actual from_date
             actual_from = normalized_from_date
@@ -442,17 +433,15 @@ class TaskManager:
             # Apply start_time filter if configured
             start_time_str = detector_config.get_start_time()
             if start_time_str:
-                start_time = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
-                # Always normalize to naive datetime
-                start_time = start_time.replace(tzinfo=None)
+                start_time = to_naive_utc(
+                    datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+                )
                 if actual_from:
                     actual_from = max(actual_from, start_time)
                 else:
                     actual_from = start_time
 
-            # Ensure actual_from is naive (for comparison with actual_to)
-            if actual_from and actual_from.tzinfo is not None:
-                actual_from = actual_from.replace(tzinfo=None)
+            actual_from = to_naive_utc(actual_from)
 
             # Skip if nothing to detect
             if not actual_from or actual_from >= actual_to:

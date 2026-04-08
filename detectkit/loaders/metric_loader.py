@@ -11,6 +11,7 @@ Loads time-series data from databases with:
 
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
+from detectkit.utils.datetime_utils import now_utc_naive, to_naive_utc
 
 import numpy as np
 
@@ -118,12 +119,9 @@ class MetricLoader:
             >>> print(data["timestamp"])
             >>> print(data["value"])
         """
-        # Normalize datetimes to naive (remove timezone info)
-        # ClickHouse returns naive datetimes, so we need to compare with naive
-        if from_date.tzinfo is not None:
-            from_date = from_date.replace(tzinfo=None)
-        if to_date.tzinfo is not None:
-            to_date = to_date.replace(tzinfo=None)
+        # Normalize datetimes to naive UTC (ClickHouse returns naive UTC for DateTime64)
+        from_date = to_naive_utc(from_date)
+        to_date = to_naive_utc(to_date)
 
         # Get interval
         interval = self.config.get_interval()
@@ -344,7 +342,7 @@ class MetricLoader:
                     # Parse loading_start_time string (format: "YYYY-MM-DD HH:MM:SS" in UTC)
                     from_date = datetime.strptime(
                         self.config.loading_start_time, "%Y-%m-%d %H:%M:%S"
-                    ).replace(tzinfo=timezone.utc)
+                    )  # naive UTC from config string
                 else:
                     # No data and no loading_start_time - need to specify from_date
                     raise ValueError(
@@ -353,7 +351,7 @@ class MetricLoader:
                     )
 
         if to_date is None:
-            to_date = datetime.now(timezone.utc)
+            to_date = now_utc_naive()
 
         # Load and save
         data = self.load(from_date, to_date, fill_gaps=True)

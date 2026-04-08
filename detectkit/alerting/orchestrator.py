@@ -61,6 +61,7 @@ class AlertOrchestrator:
         >>> orchestrator = AlertOrchestrator(
         ...     metric_name="cpu_usage",
         ...     interval=Interval.parse("10min"),
+        ...     alert_config_id="abc123",
         ...     conditions=AlertConditions(consecutive_anomalies=3, direction="same")
         ... )
         >>> should_alert, alert_data = orchestrator.should_alert(recent_detections)
@@ -72,6 +73,7 @@ class AlertOrchestrator:
         self,
         metric_name: str,
         interval: Interval,
+        alert_config_id: str,
         conditions: Optional[AlertConditions] = None,
         timezone_display: str = "UTC",
         internal=None,  # InternalTablesManager (optional, for cooldown tracking)
@@ -85,6 +87,7 @@ class AlertOrchestrator:
         Args:
             metric_name: Name of the metric
             interval: Metric interval
+            alert_config_id: MD5 hash of alerting config params (for independent state per config)
             conditions: Alert conditions (defaults to AlertConditions())
             timezone_display: Timezone for alert display (default: UTC)
             internal: InternalTablesManager instance (optional, for cooldown tracking)
@@ -94,6 +97,7 @@ class AlertOrchestrator:
         """
         self.metric_name = metric_name
         self.interval = interval
+        self.alert_config_id = alert_config_id
         self.conditions = conditions or AlertConditions()
         self.timezone_display = timezone_display
         self.internal = internal
@@ -336,13 +340,14 @@ class AlertOrchestrator:
                 print(f"Error sending alert via {channel_name}: {e}")
                 results[channel_name] = False
 
-        # NEW: Update alert timestamp after sending (for cooldown tracking)
+        # Update alert timestamp after sending (for cooldown tracking)
         if any(results.values()) and self.internal:
             # At least one channel succeeded - update timestamp
             self.internal.update_alert_timestamp(
                 metric_name=self.metric_name,
+                alert_config_id=self.alert_config_id,
                 timestamp=now_utc_naive(),
-                increment_count=True
+                increment_count=True,
             )
 
         return results
@@ -363,7 +368,7 @@ class AlertOrchestrator:
             - Example: now=13:23, interval=10min -> 13:10
 
         Example:
-            >>> orchestrator = AlertOrchestrator("metric", Interval.parse("10min"))
+            >>> orchestrator = AlertOrchestrator("metric", Interval.parse("10min"), alert_config_id="abc123")
             >>> now = datetime(2024, 1, 1, 13, 23, 0, tzinfo=timezone.utc)
             >>> last_point = orchestrator.get_last_complete_point(now)
             >>> print(last_point)
@@ -412,7 +417,7 @@ class AlertOrchestrator:
             return False
 
         # Get last alert timestamp
-        last_sent = self.internal.get_last_alert_timestamp(self.metric_name)
+        last_sent = self.internal.get_last_alert_timestamp(self.metric_name, self.alert_config_id)
 
         if not last_sent:
             return False  # Never sent alert before
@@ -523,14 +528,15 @@ class AlertOrchestrator:
         detections_by_time = self._group_by_timestamp(detection_records)
         timestamps_sorted = sorted(detections_by_time.keys(), reverse=True)
 
-        # Check that latest post-alert point is NOT anomalous
-        # (prevents false recovery when there are fewer post-alert points
-        # than consecutive_anomalies threshold)
+        # Check that latest post-alert point is NOT anomalous by ANY detector.
+        # Recovery = zero detectors flag the latest point as anomalous.
+        # Using > 0 (not >= min_detectors) prevents false recovery when
+        # some but not all detectors still flag the metric as anomalous.
         latest_ts = timestamps_sorted[0]
         latest_detections = detections_by_time[latest_ts]
         latest_anomalies = [d for d in latest_detections if d.is_anomaly]
-        if len(latest_anomalies) >= self.conditions.min_detectors:
-            # Latest point is still anomalous — no recovery
+        if len(latest_anomalies) > 0:
+            # At least one detector still considers this point anomalous — no recovery
             return False
 
         return True
@@ -558,12 +564,12 @@ class AlertOrchestrator:
             return False, None
 
         # Check if there was a previous alert
-        last_alert = self.internal.get_last_alert_timestamp(self.metric_name)
+        last_alert = self.internal.get_last_alert_timestamp(self.metric_name, self.alert_config_id)
         if not last_alert:
             return False, None  # Never alerted, nothing to recover from
 
         # Check if recovery already sent for this incident
-        last_recovery = self.internal.get_last_recovery_timestamp(self.metric_name)
+        last_recovery = self.internal.get_last_recovery_timestamp(self.metric_name, self.alert_config_id)
         if last_recovery and last_recovery >= last_alert:
             return False, None  # Already sent recovery for this alert
 
@@ -595,8 +601,9 @@ class AlertOrchestrator:
         if not detections:
             return None
 
-        # Use the latest detection point for recovery info
-        latest = detections[0]
+        # Use the latest (newest) detection point for recovery info.
+        # detections are sorted oldest→newest by _load_recent_detections.
+        latest = detections[-1]
 
         return AlertData(
             metric_name=self.metric_name,
@@ -649,6 +656,7 @@ class AlertOrchestrator:
         if any(results.values()) and self.internal:
             self.internal.update_recovery_timestamp(
                 metric_name=self.metric_name,
+                alert_config_id=self.alert_config_id,
                 timestamp=now_utc_naive(),
             )
 
@@ -660,6 +668,7 @@ class AlertOrchestrator:
             f"AlertOrchestrator("
             f"metric='{self.metric_name}', "
             f"interval={self.interval}, "
+            f"config_id='{self.alert_config_id[:8]}...', "
             f"min_detectors={self.conditions.min_detectors}, "
             f"direction='{self.conditions.direction}', "
             f"consecutive={self.conditions.consecutive_anomalies})"

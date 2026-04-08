@@ -349,36 +349,6 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         # Get current UTC time (naive UTC for numpy compatibility)
         now = now_utc_naive()
 
-        # Read existing alert tracking fields before delete (preserve across upsert)
-        existing_last_alert_sent = None
-        existing_last_recovery_sent = None
-        existing_alert_count = 0
-
-        preserve_query = f"""
-        SELECT last_alert_sent, last_recovery_sent, alert_count
-        FROM {full_table}
-        WHERE metric_name = %(metric_name)s
-          AND detector_id = %(detector_id)s
-          AND process_type = %(process_type)s
-        ORDER BY updated_at DESC
-        LIMIT 1
-        """
-        try:
-            preserve_results = self.execute_query(
-                preserve_query,
-                params={
-                    "metric_name": metric_name,
-                    "detector_id": detector_id,
-                    "process_type": process_type,
-                }
-            )
-            if preserve_results:
-                existing_last_alert_sent = preserve_results[0].get("last_alert_sent")
-                existing_last_recovery_sent = preserve_results[0].get("last_recovery_sent")
-                existing_alert_count = preserve_results[0].get("alert_count", 0) or 0
-        except Exception:
-            pass  # If read fails, proceed with defaults
-
         # Delete existing record (if any), sync to ensure old row is gone before insert
         delete_query = f"""
         ALTER TABLE {full_table}
@@ -398,10 +368,8 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         )
 
         last_ts_naive = to_naive_utc(last_processed_timestamp)
-        last_alert_naive = to_naive_utc(existing_last_alert_sent)
-        last_recovery_naive = to_naive_utc(existing_last_recovery_sent)
 
-        # Then insert new record (preserving alert tracking fields)
+        # Insert new record (alert state is now stored in _dtk_alert_states, not here)
         insert_data = {
             "metric_name": np.array([metric_name]),
             "detector_id": np.array([detector_id]),
@@ -412,9 +380,9 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
             "last_processed_timestamp": np.array([last_ts_naive], dtype="datetime64[ms]") if last_ts_naive else np.array([None]),
             "error_message": np.array([error_message]),
             "timeout_seconds": np.array([timeout_seconds], dtype=np.int32),
-            "last_alert_sent": np.array([last_alert_naive], dtype="datetime64[ms]") if last_alert_naive else np.array([None]),
-            "alert_count": np.array([existing_alert_count], dtype=np.uint32),
-            "last_recovery_sent": np.array([last_recovery_naive], dtype="datetime64[ms]") if last_recovery_naive else np.array([None]),
+            "last_alert_sent": np.array([None]),
+            "alert_count": np.array([0], dtype=np.uint32),
+            "last_recovery_sent": np.array([None]),
         }
 
         self.insert_batch(

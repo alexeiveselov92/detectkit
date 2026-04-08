@@ -629,7 +629,7 @@ class TaskManager:
                 channels = self._create_alert_channels(alerting_config.channels)
 
                 if channels:
-                    results = orchestrator.send_alerts(alert_data, channels)
+                    results = orchestrator.send_alerts(alert_data, channels, template=alerting_config.template_consecutive)
                     sent = sum(1 for success in results.values() if success)
                     alerts_sent += sent
 

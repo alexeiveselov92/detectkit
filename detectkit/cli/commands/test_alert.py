@@ -8,11 +8,11 @@ Useful for:
 - Previewing alert templates
 """
 
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
+from detectkit.utils.datetime_utils import now_utc
 
 from detectkit.alerting.channels.base import AlertData
 from detectkit.alerting.channels.factory import AlertChannelFactory
@@ -34,7 +34,7 @@ def create_mock_alert_data(
         AlertData with mock anomaly data
     """
     # Use current time
-    now = datetime.now(timezone.utc)
+    now = now_utc()
 
     # Get mentions from alerting config
     mentions = metric_config.alerting.mentions if metric_config.alerting else []

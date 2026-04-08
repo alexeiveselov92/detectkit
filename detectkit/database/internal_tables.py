@@ -9,10 +9,11 @@ methods underneath. It does NOT duplicate logic - just provides semantic wrapper
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Dict, List, Optional
 
 import numpy as np
+from detectkit.utils.datetime_utils import now_utc_naive, to_naive_utc, to_aware_utc
 
 from detectkit.database.manager import BaseDatabaseManager
 from detectkit.database.tables import (
@@ -127,7 +128,7 @@ class InternalTablesManager:
                 num_rows, ",".join(seasonality_columns), dtype=object
             ),
             "created_at": np.full(
-                num_rows, datetime.now(timezone.utc).replace(tzinfo=None), dtype="datetime64[ms]"
+                num_rows, now_utc_naive(), dtype="datetime64[ms]"
             ),
         }
 
@@ -198,7 +199,7 @@ class InternalTablesManager:
             "detector_params": np.full(num_rows, detector_params, dtype=object),
             "detection_metadata": data["detection_metadata"],
             "created_at": np.full(
-                num_rows, datetime.now(timezone.utc).replace(tzinfo=None), dtype="datetime64[ms]"
+                num_rows, now_utc_naive(), dtype="datetime64[ms]"
             ),
         }
 
@@ -343,9 +344,7 @@ class InternalTablesManager:
 
         # Convert timezone-aware timestamps to naive to avoid numpy warning
         timestamps = [
-            row["timestamp"].replace(tzinfo=None)
-            if hasattr(row["timestamp"], 'tzinfo') and row["timestamp"].tzinfo
-            else row["timestamp"]
+            to_naive_utc(row["timestamp"])
             for row in results
         ]
         values = [row["value"] for row in results]
@@ -560,8 +559,7 @@ class InternalTablesManager:
                 ts_value = ts
             else:
                 # datetime object - normalize and convert to string
-                if hasattr(ts, 'tzinfo') and ts.tzinfo is not None:
-                    ts = ts.replace(tzinfo=None)
+                ts = to_naive_utc(ts)
                 ts_key = ts.isoformat()
                 ts_value = ts
 
@@ -791,7 +789,7 @@ class InternalTablesManager:
         )
 
         # Get current UTC time (naive for numpy compatibility)
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = now_utc_naive()
 
         # Parse loading_start_time if provided
         loading_start_time_dt = None
@@ -801,7 +799,7 @@ class InternalTablesManager:
                 loading_start_time_dt = dt.strptime(
                     metric_config.loading_start_time,
                     "%Y-%m-%d %H:%M:%S"
-                ).replace(tzinfo=None)
+                )  # already naive UTC from config string
             except (ValueError, AttributeError):
                 # If parsing fails, leave as None
                 pass
@@ -875,7 +873,7 @@ class InternalTablesManager:
         Example:
             >>> last_sent = internal.get_last_alert_timestamp("cpu_usage")
             >>> if last_sent:
-            ...     elapsed = (datetime.utcnow() - last_sent).total_seconds()
+            ...     elapsed = (now_utc_naive() - last_sent).total_seconds()
             ...     print(f"Last alert sent {elapsed}s ago")
         """
         full_table_name = self._manager.get_full_table_name(
@@ -900,11 +898,7 @@ class InternalTablesManager:
         if not results or not results[0]["last_alert_sent"]:
             return None
 
-        last_sent = results[0]["last_alert_sent"]
-
-        # Normalize to naive datetime if needed
-        if hasattr(last_sent, 'tzinfo') and last_sent.tzinfo is not None:
-            last_sent = last_sent.replace(tzinfo=None)
+        last_sent = to_naive_utc(results[0]["last_alert_sent"])
 
         return last_sent
 
@@ -921,7 +915,7 @@ class InternalTablesManager:
 
         Args:
             metric_name: Metric identifier
-            timestamp: Timestamp when alert was sent (typically datetime.utcnow())
+            timestamp: Timestamp when alert was sent (naive UTC, use now_utc_naive())
             increment_count: Whether to increment alert_count (default: True)
 
         Returns:
@@ -931,7 +925,7 @@ class InternalTablesManager:
             >>> # After sending alert
             >>> internal.update_alert_timestamp(
             ...     "cpu_usage",
-            ...     datetime.utcnow(),
+            ...     now_utc_naive(),
             ...     increment_count=True
             ... )
         """
@@ -939,9 +933,7 @@ class InternalTablesManager:
             TABLE_TASKS, use_internal=True
         )
 
-        # Normalize timestamp to naive if needed
-        if hasattr(timestamp, 'tzinfo') and timestamp.tzinfo is not None:
-            timestamp = timestamp.replace(tzinfo=None)
+        timestamp = to_naive_utc(timestamp)
 
         if increment_count:
             # Update with alert_count increment
@@ -1013,10 +1005,7 @@ class InternalTablesManager:
         if not results or not results[0].get("last_recovery_sent"):
             return None
 
-        last_sent = results[0]["last_recovery_sent"]
-
-        if hasattr(last_sent, 'tzinfo') and last_sent.tzinfo is not None:
-            last_sent = last_sent.replace(tzinfo=None)
+        last_sent = to_naive_utc(results[0]["last_recovery_sent"])
 
         return last_sent
 
@@ -1039,8 +1028,7 @@ class InternalTablesManager:
             TABLE_TASKS, use_internal=True
         )
 
-        if hasattr(timestamp, 'tzinfo') and timestamp.tzinfo is not None:
-            timestamp = timestamp.replace(tzinfo=None)
+        timestamp = to_naive_utc(timestamp)
 
         update_query = f"""
         ALTER TABLE {full_table_name}

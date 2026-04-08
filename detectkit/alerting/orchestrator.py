@@ -12,6 +12,7 @@ Handles:
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
+from detectkit.utils.datetime_utils import now_utc, now_utc_naive, to_naive_utc, to_aware_utc
 
 import numpy as np
 
@@ -340,7 +341,7 @@ class AlertOrchestrator:
             # At least one channel succeeded - update timestamp
             self.internal.update_alert_timestamp(
                 metric_name=self.metric_name,
-                timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
+                timestamp=now_utc_naive(),
                 increment_count=True
             )
 
@@ -369,11 +370,10 @@ class AlertOrchestrator:
             2024-01-01 13:10:00+00:00
         """
         if now is None:
-            now = datetime.now(timezone.utc)
+            now = now_utc()
 
         # Ensure UTC
-        if now.tzinfo is None:
-            now = now.replace(tzinfo=timezone.utc)
+        now = to_aware_utc(now)
 
         # Floor to interval
         interval_seconds = self.interval.seconds
@@ -423,7 +423,7 @@ class AlertOrchestrator:
         cooldown_seconds = cooldown_interval.seconds
 
         # Calculate elapsed time
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = now_utc_naive()
         elapsed = (now - last_sent).total_seconds()
 
         # Check recovery reset (if enabled)
@@ -647,10 +647,9 @@ class AlertOrchestrator:
 
         # Update recovery timestamp after sending
         if any(results.values()) and self.internal:
-            from datetime import timezone as tz
             self.internal.update_recovery_timestamp(
                 metric_name=self.metric_name,
-                timestamp=datetime.now(tz.utc).replace(tzinfo=None),
+                timestamp=now_utc_naive(),
             )
 
         return results

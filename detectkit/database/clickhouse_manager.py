@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import numpy as np
+from detectkit.utils.datetime_utils import now_utc_naive, to_naive_utc
 
 try:
     from clickhouse_driver import Client
@@ -345,8 +346,8 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
 
         full_table = self.get_full_table_name(TABLE_TASKS, use_internal=True)
 
-        # Get current UTC time (convert to naive UTC for numpy compatibility)
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        # Get current UTC time (naive UTC for numpy compatibility)
+        now = now_utc_naive()
 
         # Read existing alert tracking fields before delete (preserve across upsert)
         existing_last_alert_sent = None
@@ -396,15 +397,9 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
             }
         )
 
-        # Convert timestamps to naive UTC if needed (np.datetime64 has no tz support)
-        def _to_naive(dt: Optional[datetime]) -> Optional[datetime]:
-            if dt is None:
-                return None
-            return dt.replace(tzinfo=None) if dt.tzinfo is not None else dt
-
-        last_ts_naive = _to_naive(last_processed_timestamp)
-        last_alert_naive = _to_naive(existing_last_alert_sent)
-        last_recovery_naive = _to_naive(existing_last_recovery_sent)
+        last_ts_naive = to_naive_utc(last_processed_timestamp)
+        last_alert_naive = to_naive_utc(existing_last_alert_sent)
+        last_recovery_naive = to_naive_utc(existing_last_recovery_sent)
 
         # Then insert new record (preserving alert tracking fields)
         insert_data = {

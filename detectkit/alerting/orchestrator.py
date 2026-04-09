@@ -9,15 +9,58 @@ Handles:
 - Coordinating alert sending
 """
 
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from detectkit.utils.datetime_utils import now_utc, now_utc_naive, to_naive_utc, to_aware_utc
 
 import numpy as np
 
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
 from detectkit.core.interval import Interval
+
+
+def _parse_detection_metadata(metadata: Any) -> Dict:
+    """Parse detection_metadata stored as dict or JSON string into a dict."""
+    if metadata is None:
+        return {}
+    if isinstance(metadata, dict):
+        return metadata
+    if isinstance(metadata, (bytes, bytearray)):
+        try:
+            metadata = metadata.decode("utf-8")
+        except Exception:
+            return {}
+    if isinstance(metadata, str):
+        if not metadata:
+            return {}
+        try:
+            parsed = json.loads(metadata)
+            return parsed if isinstance(parsed, dict) else {}
+        except (ValueError, TypeError):
+            return {}
+    return {}
+
+
+def _direction_from_metadata(metadata: Any, is_anomaly: bool) -> str:
+    """
+    Resolve alert direction ("up"/"down"/"none") from detector metadata.
+
+    Detectors authoritatively write direction as "below"/"above" in
+    detection_metadata. This is the source of truth — confidence-bound
+    reconstruction does not work for one-sided detectors (e.g. ManualBounds
+    with only upper_bound set).
+    """
+    if not is_anomaly:
+        return "none"
+    parsed = _parse_detection_metadata(metadata)
+    raw = parsed.get("direction")
+    if raw == "below":
+        return "down"
+    if raw == "above":
+        return "up"
+    return "none"
 
 
 @dataclass
@@ -488,26 +531,19 @@ class AlertOrchestrator:
         # Convert to DetectionRecord format
         detection_records = []
         for det in recent_detections:
+            metadata_list = det.get("detection_metadata_list") or [None] * len(det["detector_ids"])
             # Group has multiple detectors per timestamp
             for i in range(len(det["detector_ids"])):
-                # Parse detection metadata
-                try:
-                    import json
-                    metadata = json.loads(det["detector_params_list"][i])
-                except:
-                    metadata = {}
-
-                # Determine direction
                 value = det["value"]
                 conf_lower = det["confidence_lowers"][i]
                 conf_upper = det["confidence_uppers"][i]
+                is_anomaly = det["is_anomaly_flags"][i]
 
-                if value < conf_lower:
-                    direction = "down"
-                elif value > conf_upper:
-                    direction = "up"
-                else:
-                    direction = "none"
+                # Use detector-authoritative direction from detection_metadata
+                # (works for one-sided detectors like ManualBounds where
+                # confidence_lower/upper may be None).
+                metadata = _parse_detection_metadata(metadata_list[i])
+                direction = _direction_from_metadata(metadata, is_anomaly)
 
                 record = DetectionRecord(
                     timestamp=np.datetime64(det["timestamp"]),
@@ -515,12 +551,12 @@ class AlertOrchestrator:
                     detector_id=det["detector_ids"][i],
                     detector_params=det["detector_params_list"][i],
                     value=value,
-                    is_anomaly=det["is_anomaly_flags"][i],
+                    is_anomaly=is_anomaly,
                     confidence_lower=conf_lower,
                     confidence_upper=conf_upper,
                     direction=direction,
                     severity=0.0,  # Not used for recovery check
-                    detection_metadata=metadata
+                    detection_metadata=metadata,
                 )
                 detection_records.append(record)
 
@@ -528,18 +564,64 @@ class AlertOrchestrator:
         detections_by_time = self._group_by_timestamp(detection_records)
         timestamps_sorted = sorted(detections_by_time.keys(), reverse=True)
 
-        # Check that latest post-alert point is NOT anomalous by ANY detector.
-        # Recovery = zero detectors flag the latest point as anomalous.
-        # Using > 0 (not >= min_detectors) prevents false recovery when
-        # some but not all detectors still flag the metric as anomalous.
+        # Direction-aware recovery: only block recovery on anomalies that
+        # match the alert's direction condition. For a "down"-only alert an
+        # "up" anomaly already means the alert condition no longer holds, so
+        # it should count as recovery.
+        direction_condition = self.conditions.direction
         latest_ts = timestamps_sorted[0]
         latest_detections = detections_by_time[latest_ts]
         latest_anomalies = [d for d in latest_detections if d.is_anomaly]
-        if len(latest_anomalies) > 0:
-            # At least one detector still considers this point anomalous — no recovery
-            return False
 
-        return True
+        if direction_condition == "down":
+            blocking = [d for d in latest_anomalies if d.direction == "down"]
+        elif direction_condition == "up":
+            blocking = [d for d in latest_anomalies if d.direction == "up"]
+        elif direction_condition == "same":
+            trigger_direction = self._get_alert_trigger_direction(last_alert_timestamp)
+            if trigger_direction is None:
+                # Unknown trigger direction → fall back to conservative behavior
+                blocking = latest_anomalies
+            else:
+                blocking = [d for d in latest_anomalies if d.direction == trigger_direction]
+        else:  # "any" and unknown — preserve historical behavior
+            blocking = latest_anomalies
+
+        return len(blocking) == 0
+
+    def _get_alert_trigger_direction(
+        self, last_alert_timestamp: datetime
+    ) -> Optional[str]:
+        """
+        Resolve the direction of the anomaly that triggered the last alert.
+
+        Used by direction="same" recovery logic. Loads the detection record
+        at last_alert_timestamp and returns the dominant anomaly direction
+        from detection_metadata.
+
+        Returns:
+            "up", "down", or None if not resolvable.
+        """
+        if not self.internal:
+            return None
+
+        trigger_detections = self.internal.get_recent_detections(
+            metric_name=self.metric_name,
+            last_point=last_alert_timestamp,
+            num_points=1,
+        )
+        if not trigger_detections:
+            return None
+
+        det = trigger_detections[0]
+        metadata_list = det.get("detection_metadata_list") or [None] * len(det["detector_ids"])
+        for i in range(len(det["detector_ids"])):
+            if not det["is_anomaly_flags"][i]:
+                continue
+            direction = _direction_from_metadata(metadata_list[i], True)
+            if direction in ("up", "down"):
+                return direction
+        return None
 
     def should_send_recovery(
         self,

@@ -23,6 +23,8 @@ from detectkit.alerting.orchestrator import (
     AlertConditions,
     AlertOrchestrator,
     DetectionRecord,
+    _direction_from_metadata,
+    _parse_detection_metadata,
 )
 from detectkit.config.metric_config import MetricConfig
 from detectkit.core.interval import Interval
@@ -737,7 +739,9 @@ class TaskManager:
                 if flag
             ]
 
-            # Determine direction and severity for the most severe detector
+            # Determine direction and severity for the most severe detector.
+            # Direction is read from detector metadata (authoritative for all
+            # detectors including ManualBounds where confidence bounds may be None).
             direction = "none"
             severity = 0.0
             confidence_lower = None
@@ -745,6 +749,9 @@ class TaskManager:
             detector_name = "unknown"
             detector_id = "unknown"
             detector_params = "{}"
+            metadata: dict = {}
+
+            metadata_list = row.get("detection_metadata_list") or [None] * len(row["detector_ids"])
 
             if is_anomaly and anomaly_indices:
                 # Get data from first anomalous detector
@@ -755,14 +762,12 @@ class TaskManager:
                 confidence_lower = row["confidence_lowers"][first_idx]
                 confidence_upper = row["confidence_uppers"][first_idx]
 
-                # Determine direction
-                value = row["value"]
-                if value < confidence_lower:
-                    direction = "down"
-                    severity = (confidence_lower - value) / max(abs(confidence_lower), 1e-10)
-                elif value > confidence_upper:
-                    direction = "up"
-                    severity = (value - confidence_upper) / max(abs(confidence_upper), 1e-10)
+                metadata = _parse_detection_metadata(metadata_list[first_idx])
+                direction = _direction_from_metadata(metadata, True)
+                try:
+                    severity = float(metadata.get("severity", 0.0) or 0.0)
+                except (TypeError, ValueError):
+                    severity = 0.0
 
             records.append(
                 DetectionRecord(
@@ -776,7 +781,7 @@ class TaskManager:
                     confidence_upper=confidence_upper,
                     direction=direction,
                     severity=severity,
-                    detection_metadata={},
+                    detection_metadata=metadata,
                 )
             )
 

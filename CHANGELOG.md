@@ -5,6 +5,26 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.14] - 2026-04-09
+
+### Fixed
+- **Direction-aware recovery**: recovery for `direction="up"` / `"down"` / `"same"` alerts no
+  longer waits for the metric to return inside the confidence interval. A `down`-only alert
+  now recovers as soon as the latest point is no longer a `down` anomaly (including when it
+  flips to an `up` anomaly), matching the semantics of `_count_consecutive_anomalies()`.
+- **ManualBoundsDetector recovery / alerting**: anomaly direction is now read from
+  `detection_metadata.direction` (authoritative `"below"`/`"above"` written by every detector)
+  instead of being reconstructed from `value` vs `confidence_lower/upper`. One-sided manual
+  bounds (e.g. only `upper_bound` set, `confidence_lower=None`) no longer break direction
+  resolution in `AlertOrchestrator._check_recovery_since_last_alert()` and
+  `TaskManager._load_recent_detections()`.
+
+### Changed
+- `InternalTablesManager.get_recent_detections()` now selects `detection_metadata` and exposes
+  it as `detection_metadata_list` in the grouped result.
+- New `AlertOrchestrator._get_alert_trigger_direction()` helper resolves the direction of the
+  alert-triggering point for `direction="same"` recovery checks.
+
 ## [0.3.13] - 2026-04-08
 
 ### Added

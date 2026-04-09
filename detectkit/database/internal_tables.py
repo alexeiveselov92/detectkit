@@ -467,6 +467,7 @@ class InternalTablesManager:
                 - detector_ids: List of detector IDs for this timestamp
                 - detector_names: List of detector names
                 - detector_params_list: List of detector params (JSON strings)
+                - detection_metadata_list: List of detection metadata (JSON strings)
                 - is_anomaly_flags: List of is_anomaly bools
                 - confidence_lowers: List of lower confidence bounds
                 - confidence_uppers: List of upper confidence bounds
@@ -531,6 +532,7 @@ class InternalTablesManager:
             detector_id,
             detector_name,
             detector_params,
+            detection_metadata,
             is_anomaly,
             confidence_lower,
             confidence_upper,
@@ -570,6 +572,7 @@ class InternalTablesManager:
                     "detector_ids": [],
                     "detector_names": [],
                     "detector_params_list": [],
+                    "detection_metadata_list": [],
                     "is_anomaly_flags": [],
                     "confidence_lowers": [],
                     "confidence_uppers": [],
@@ -579,6 +582,7 @@ class InternalTablesManager:
             grouped[ts_key]["detector_ids"].append(row["detector_id"])
             grouped[ts_key]["detector_names"].append(row["detector_name"])
             grouped[ts_key]["detector_params_list"].append(row["detector_params"])
+            grouped[ts_key]["detection_metadata_list"].append(row.get("detection_metadata"))
             grouped[ts_key]["is_anomaly_flags"].append(row["is_anomaly"])
             grouped[ts_key]["confidence_lowers"].append(row["confidence_lower"])
             grouped[ts_key]["confidence_uppers"].append(row["confidence_upper"])

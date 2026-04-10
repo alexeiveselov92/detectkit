@@ -683,19 +683,37 @@ class AlertOrchestrator:
         if not detections:
             return None
 
-        # Use the latest (newest) detection point for recovery info.
+        # Use the latest (newest) detection point for recovery timestamp/value.
         # detections are sorted oldest→newest by _load_recent_detections.
         latest = detections[-1]
+
+        # Use detector info and CI from the last anomalous detection
+        # (the one that triggered the alert), since normal points have
+        # detector_name="unknown" and confidence=None.
+        last_anomalous = next(
+            (d for d in reversed(detections) if d.is_anomaly),
+            None,
+        )
+        if last_anomalous:
+            recovery_detector_name = last_anomalous.detector_name
+            recovery_detector_params = last_anomalous.detector_params
+            recovery_ci_lower = last_anomalous.confidence_lower
+            recovery_ci_upper = last_anomalous.confidence_upper
+        else:
+            recovery_detector_name = latest.detector_name
+            recovery_detector_params = latest.detector_params
+            recovery_ci_lower = latest.confidence_lower
+            recovery_ci_upper = latest.confidence_upper
 
         return AlertData(
             metric_name=self.metric_name,
             timestamp=latest.timestamp,
             timezone=self.timezone_display,
             value=latest.value,
-            confidence_lower=latest.confidence_lower,
-            confidence_upper=latest.confidence_upper,
-            detector_name=latest.detector_name,
-            detector_params=latest.detector_params,
+            confidence_lower=recovery_ci_lower,
+            confidence_upper=recovery_ci_upper,
+            detector_name=recovery_detector_name,
+            detector_params=recovery_detector_params,
             direction="none",
             severity=0.0,
             detection_metadata={},

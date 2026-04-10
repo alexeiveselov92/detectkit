@@ -121,7 +121,8 @@ class TestBaseAlertChannel:
 
         message = channel.format_message(alert)
 
-        assert "2024-01-01 12:00:00" in message
+        # 12:00 UTC = 15:00 Moscow (UTC+3)
+        assert "2024-01-01 15:00:00" in message
         assert "Europe/Moscow" in message
 
     def test_format_message_missing_confidence(self):

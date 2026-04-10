@@ -144,10 +144,13 @@ class BaseAlertChannel(ABC):
         if isinstance(ts, np.datetime64):
             ts = ts.astype(datetime)
 
-        # Format timestamp with timezone
-        ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
+        # Convert naive UTC timestamp to target timezone if specified
         if alert_data.timezone:
-            ts_str = f"{ts_str} ({alert_data.timezone})"
+            from zoneinfo import ZoneInfo
+            ts = ts.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(alert_data.timezone))
+            ts_str = f"{ts.strftime('%Y-%m-%d %H:%M:%S')} ({alert_data.timezone})"
+        else:
+            ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
 
         # Format confidence interval
         if alert_data.confidence_lower is not None and alert_data.confidence_upper is not None:

@@ -76,6 +76,7 @@ alerting:
   mentions: [oncall_engineer, here]
   alert_cooldown: "30min"
   notify_on_recovery: true
+  suppress_until: "2026-04-11 18:00:00"  # Suppress alerts until this UTC time
 ```
 
 ### Python API

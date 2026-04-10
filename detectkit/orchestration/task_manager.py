@@ -606,6 +606,13 @@ class TaskManager:
             if multi:
                 click.echo(f"  │ [config {i + 1}/{len(active_configs)}] channels: {alerting_config.channels}")
 
+            # Check suppress_until
+            if alerting_config.suppress_until:
+                suppress_dt = datetime.strptime(alerting_config.suppress_until, "%Y-%m-%d %H:%M:%S")
+                if now_utc_naive() < suppress_dt:
+                    click.echo(f"  │ Alerts suppressed until {alerting_config.suppress_until} UTC")
+                    continue
+
             click.echo(f"  │ Checking alert conditions...")
 
             alert_config_id = _make_alert_config_id(alerting_config)

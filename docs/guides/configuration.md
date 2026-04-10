@@ -500,6 +500,7 @@ Alert configuration for the metric.
 ```yaml
 alerting:
   enabled: true                  # Enable/disable alerting
+  suppress_until: null           # Suppress alerts until UTC datetime (default: null)
   timezone: "Europe/Moscow"      # Display timezone (default: UTC)
   channels:                      # List of channel names from profiles.yml
     - mattermost_ops
@@ -552,6 +553,12 @@ alerting:
 - **`template_recovery`**: Custom recovery message template
   - Supports: `{metric_name}`, `{timestamp}`, `{value}`, `{confidence_interval}`, `{detector_name}`, `{status}`
   - Default template: `"Metric recovered: {metric_name}\nTime: {timestamp}\nValue: {value}\n..."`
+
+- **`suppress_until`**: Temporarily suppress alerts until a UTC datetime
+  - `null` = No suppression (default)
+  - `"2026-04-11 18:00:00"` = Suppress alerts until this UTC time
+  - Load and detect steps continue running; only alerting is paused
+  - Alerts auto-resume after the specified time — no need to edit config again
 
 - **`mentions`**: Users/groups to mention in alerts
   - Plain usernames without `@` prefix (e.g., `["oncall_user", "here"]`)

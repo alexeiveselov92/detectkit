@@ -146,6 +146,11 @@ class AlertConfig(BaseModel):
     """
 
     enabled: bool = Field(default=True, description="Enable alerting")
+    suppress_until: Optional[str] = Field(
+        default=None,
+        description="Suppress alerts until this UTC datetime (e.g., '2026-04-11 18:00:00'). "
+                    "Load and detect steps still run. Alerts auto-resume after this time."
+    )
     timezone: Optional[str] = Field(
         default=None, description="Timezone for displaying timestamps (e.g., 'Europe/Moscow')"
     )

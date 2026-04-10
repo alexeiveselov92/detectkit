@@ -5,6 +5,20 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.16] - 2026-04-10
+
+### Added
+- **`suppress_until`** field in alerting config — temporarily suppress alerts until a specified
+  UTC datetime without disabling the metric. Load and detect steps continue running; alerts
+  auto-resume after the specified time. One-time setup, no need to toggle `enabled` twice.
+
+### Fixed
+- **Timezone display in alerts**: timestamps are now converted from UTC to the configured
+  `timezone` (e.g., `Europe/Moscow`) before formatting. Previously, UTC time was displayed
+  with the timezone label appended, showing incorrect local time.
+- **Recovery alert metadata**: recovery messages now show the detector name and confidence
+  interval from the last anomalous detection instead of "Detector: unknown" and "CI: N/A".
+
 ## [0.3.14] - 2026-04-09
 
 ### Fixed

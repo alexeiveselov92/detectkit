@@ -495,6 +495,54 @@ Timeline:
 11:20 - NEW 3rd anomaly → Alert sent (new issue)
 ```
 
+## Temporary Alert Suppression
+
+When you've identified the root cause of an anomaly and want to stop alerts while the fix is deployed, use `suppress_until` to temporarily silence alerts without disabling the metric.
+
+### The Problem
+
+Using `enabled: false` requires two config edits — one to disable, another to re-enable later. If you forget the second edit, alerting stays off.
+
+### The Solution: `suppress_until`
+
+Set a UTC datetime after which alerts automatically resume:
+
+```yaml
+alerting:
+  enabled: true
+  suppress_until: "2026-04-11 18:00:00"  # Alerts suppressed until this UTC time
+  channels:
+    - mattermost_ops
+  consecutive_anomalies: 3
+```
+
+**Key behavior:**
+- Load and detect steps continue running normally — data collection is not interrupted
+- Only the alert step is skipped while `now < suppress_until`
+- After the specified time, alerts resume automatically — no second config edit needed
+- The `suppress_until` value can be left in the config after it expires — it has no effect once the time has passed
+
+### Timeline Example
+
+```
+Config: suppress_until: "2026-04-11 18:00:00"
+
+2026-04-10 14:00 - Anomaly detected → Suppressed (before 18:00 Apr 11)
+2026-04-10 15:00 - Anomaly detected → Suppressed
+2026-04-11 12:00 - Anomaly detected → Suppressed
+2026-04-11 18:01 - Anomaly detected → Alert sent ✓ (suppress period ended)
+2026-04-11 19:00 - Anomaly detected → Normal cooldown rules apply
+```
+
+### When to Use
+
+| Scenario | Use |
+|----------|-----|
+| Known issue being fixed, ETA ~6 hours | `suppress_until: "<now + 6h>"` |
+| Planned maintenance window | `suppress_until: "<end of window>"` |
+| Permanently disable alerting | `enabled: false` |
+| Reduce alert frequency | `alert_cooldown: "1hour"` |
+
 ## Recovery Notifications
 
 In addition to cooldown reset, detectkit can send a separate notification when a metric **returns to normal** after an anomaly.

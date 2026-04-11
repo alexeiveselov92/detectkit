@@ -5,6 +5,14 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.17] - 2026-04-11
+
+### Fixed
+- **Recovery alert CI display**: recovery messages now show the confidence interval from the
+  *current* detection point (matching the displayed value's seasonality group), not the stale
+  CI from the last anomalous point. Previously, with hourly seasonality, recovery could show
+  a CI from a different hour, making the value appear outside bounds when it was actually normal.
+
 ## [0.3.16] - 2026-04-10
 
 ### Added

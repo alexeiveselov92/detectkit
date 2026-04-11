@@ -760,8 +760,19 @@ class TaskManager:
 
             metadata_list = row.get("detection_metadata_list") or [None] * len(row["detector_ids"])
 
+            # Always read CI from the first detector so that recovery
+            # messages display the *current* confidence interval, not a
+            # stale one from the last anomalous point.
+            if row["confidence_lowers"] and row["confidence_uppers"]:
+                confidence_lower = row["confidence_lowers"][0]
+                confidence_upper = row["confidence_uppers"][0]
+            if row["detector_names"]:
+                detector_name = row["detector_names"][0]
+                detector_id = row["detector_ids"][0]
+                detector_params = row["detector_params_list"][0]
+
             if is_anomaly and anomaly_indices:
-                # Get data from first anomalous detector
+                # Override with data from first anomalous detector
                 first_idx = anomaly_indices[0]
                 detector_name = row["detector_names"][first_idx]
                 detector_id = row["detector_ids"][first_idx]

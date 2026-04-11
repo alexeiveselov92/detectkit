@@ -687,23 +687,25 @@ class AlertOrchestrator:
         # detections are sorted oldest→newest by _load_recent_detections.
         latest = detections[-1]
 
-        # Use detector info and CI from the last anomalous detection
-        # (the one that triggered the alert), since normal points have
-        # detector_name="unknown" and confidence=None.
-        last_anomalous = next(
-            (d for d in reversed(detections) if d.is_anomaly),
-            None,
-        )
-        if last_anomalous:
-            recovery_detector_name = last_anomalous.detector_name
-            recovery_detector_params = last_anomalous.detector_params
-            recovery_ci_lower = last_anomalous.confidence_lower
-            recovery_ci_upper = last_anomalous.confidence_upper
-        else:
-            recovery_detector_name = latest.detector_name
-            recovery_detector_params = latest.detector_params
-            recovery_ci_lower = latest.confidence_lower
-            recovery_ci_upper = latest.confidence_upper
+        # Use CI from the latest point (current detection) so the recovery
+        # message shows the actual confidence interval for this timestamp.
+        # Fall back to last anomalous detection only if latest has no CI
+        # (e.g. missing_data / insufficient_data points).
+        recovery_ci_lower = latest.confidence_lower
+        recovery_ci_upper = latest.confidence_upper
+        recovery_detector_name = latest.detector_name
+        recovery_detector_params = latest.detector_params
+
+        if recovery_ci_lower is None or recovery_ci_upper is None:
+            last_anomalous = next(
+                (d for d in reversed(detections) if d.is_anomaly),
+                None,
+            )
+            if last_anomalous:
+                recovery_detector_name = last_anomalous.detector_name
+                recovery_detector_params = last_anomalous.detector_params
+                recovery_ci_lower = last_anomalous.confidence_lower
+                recovery_ci_upper = last_anomalous.confidence_upper
 
         return AlertData(
             metric_name=self.metric_name,

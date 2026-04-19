@@ -1,0 +1,25 @@
+"""Schema management mixin (creates internal tables on demand)."""
+
+from __future__ import annotations
+
+from detectkit.database.internal_tables._base import _InternalTablesBase
+from detectkit.database.tables import INTERNAL_TABLES
+
+
+class _SchemaMixin(_InternalTablesBase):
+    def ensure_tables(self) -> None:
+        """Create every internal ``_dtk_*`` table that doesn't exist yet.
+
+        Idempotent: safe to call on every CLI invocation.
+        """
+        for table_name, model_factory in INTERNAL_TABLES.items():
+            full_table_name = self._manager.get_full_table_name(
+                table_name, use_internal=True
+            )
+            if not self._manager.table_exists(
+                table_name, schema=self._manager.internal_location
+            ):
+                table_model = model_factory()
+                self._manager.create_table(
+                    full_table_name, table_model, if_not_exists=True
+                )

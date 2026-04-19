@@ -13,6 +13,8 @@ from detectkit.utils.datetime_utils import (
     to_naive_utc,
     to_aware_utc,
 )
+from detectkit.utils.env_interpolation import interpolate_env_vars
+from detectkit.utils.json_utils import json_dumps_sorted, json_loads
 
 __all__ = [
     "weighted_percentile",
@@ -24,4 +26,7 @@ __all__ = [
     "now_utc_naive",
     "to_naive_utc",
     "to_aware_utc",
+    "interpolate_env_vars",
+    "json_dumps_sorted",
+    "json_loads",
 ]

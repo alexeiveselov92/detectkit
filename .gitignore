@@ -57,12 +57,6 @@ profiles.yml
 *.log
 .env
 
-# Internal development docs (not for public repo)
-init_plan.md
-TECHNICAL_SPEC.md
+# Personal Claude Code state (per-developer; not part of the repo)
 CLAUDE.md
-TODO.md
-PROGRESS.md
-ARCHITECTURE.md
-GRAFANA_DASHBOARD.md
 .claude/

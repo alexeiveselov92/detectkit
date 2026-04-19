@@ -2,7 +2,6 @@
 Alert channel factory for creating channel instances from configuration.
 """
 
-import os
 from typing import Dict, List
 
 from detectkit.alerting.channels.base import BaseAlertChannel
@@ -11,6 +10,7 @@ from detectkit.alerting.channels.slack import SlackChannel
 from detectkit.alerting.channels.webhook import WebhookChannel
 from detectkit.alerting.channels.telegram import TelegramChannel
 from detectkit.alerting.channels.email import EmailChannel
+from detectkit.utils.env_interpolation import interpolate_env_vars
 
 
 class AlertChannelFactory:
@@ -82,42 +82,12 @@ class AlertChannelFactory:
 
     @classmethod
     def _interpolate_env_vars(cls, params: Dict) -> Dict:
+        """Interpolate ``${VAR}`` and ``{{ env_var('VAR') }}`` placeholders.
+
+        Delegates to :func:`detectkit.utils.env_interpolation.interpolate_env_vars`,
+        which walks nested dicts/lists recursively.
         """
-        Interpolate environment variables in parameter values.
-
-        Supports formats:
-        - ${VAR_NAME}
-        - {{ env_var('VAR_NAME') }}
-
-        Args:
-            params: Parameters dictionary
-
-        Returns:
-            Parameters with interpolated values
-        """
-        import re
-
-        interpolated = {}
-
-        for key, value in params.items():
-            if isinstance(value, str):
-                # Handle ${VAR} format
-                value = re.sub(
-                    r'\$\{([^}]+)\}',
-                    lambda m: os.environ.get(m.group(1), m.group(0)),
-                    value,
-                )
-
-                # Handle {{ env_var('VAR') }} format
-                value = re.sub(
-                    r"\{\{\s*env_var\(['\"]([^'\"]+)['\"]\)\s*\}\}",
-                    lambda m: os.environ.get(m.group(1), m.group(0)),
-                    value,
-                )
-
-            interpolated[key] = value
-
-        return interpolated
+        return interpolate_env_vars(params)
 
     @classmethod
     def create_from_config(cls, channel_config: Dict) -> BaseAlertChannel:

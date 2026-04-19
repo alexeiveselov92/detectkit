@@ -234,8 +234,10 @@ class TestTaskManager:
         config.get_interval.return_value = mock_interval
         config.loading_batch_size = 1000
 
-        # Mock MetricLoader
-        with patch("detectkit.orchestration.task_manager.MetricLoader") as MockLoader:
+        # Mock MetricLoader (imported inside the LOAD-step mixin module)
+        with patch(
+            "detectkit.orchestration.task_manager._load_step.MetricLoader"
+        ) as MockLoader:
             mock_loader = MockLoader.return_value
             mock_loader.load_and_save.return_value = 100  # Returns int, not dict
 

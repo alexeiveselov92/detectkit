@@ -61,9 +61,15 @@ all = [
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    "pytest-requests-mock>=0.1",
+    "requests-mock>=1.12",
     "black>=23.0",
     "mypy>=1.0",
     "ruff>=0.1.0",
+]
+# Integration tests (require Docker)
+integration = [
+    "testcontainers[clickhouse]>=4.0",
 ]
 
 [project.scripts]
@@ -75,8 +81,10 @@ Documentation = "https://github.com/alexeiveselov92/detectkit"
 Repository = "https://github.com/alexeiveselov92/detectkit"
 Issues = "https://github.com/alexeiveselov92/detectkit/issues"
 
-[tool.setuptools]
-packages = ["detectkit"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["detectkit*"]
+exclude = ["tests*", "docs*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -86,9 +94,15 @@ python_functions = ["test_*"]
 addopts = [
     "--verbose",
     "--strict-markers",
-    "--cov=detectkitit",
+    "--tb=short",
+    "--cov=detectkit",
     "--cov-report=term-missing",
     "--cov-report=html",
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests (require external services)",
+    "slow: Slow running tests",
 ]
 
 [tool.black]

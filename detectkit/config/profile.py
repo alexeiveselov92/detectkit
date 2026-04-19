@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from detectkit.database.clickhouse_manager import ClickHouseDatabaseManager
 from detectkit.database.manager import BaseDatabaseManager
+from detectkit.utils.env_interpolation import interpolate_env_vars
 
 
 class ProfileConfig(BaseModel):
@@ -217,6 +218,10 @@ class ProfilesConfig(BaseModel):
 
         if not data:
             raise ValueError("Profiles file is empty")
+
+        # Resolve ${VAR} / {{ env_var('VAR') }} placeholders before validation
+        # so that secrets (DB passwords, webhook URLs) are not stored in YAML.
+        data = interpolate_env_vars(data)
 
         return cls.model_validate(data)
 

@@ -5,7 +5,16 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] - 2026-04-19
+
+### ⚠ Breaking
+- `DetectionResult` field order changed. The dataclass is now declared as
+  `timestamp, value, is_anomaly, processed_value=None, confidence_lower=None,
+  confidence_upper=None, detection_metadata=None`. Custom detectors that
+  construct `DetectionResult` with **keyword arguments** (the way every
+  built-in detector does) are unaffected. Detectors that relied on the
+  previous **positional** order (`DetectionResult(ts, val, processed_val,
+  True, ...)`) must switch to keyword arguments or reorder.
 
 ### Security
 - **SQL injection hardening**: every `_dtk_*` query now uses parameterised

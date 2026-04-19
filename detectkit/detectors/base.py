@@ -14,20 +14,7 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 
-try:
-    import orjson
-    HAS_ORJSON = True
-except ImportError:
-    import json
-    HAS_ORJSON = False
-
-
-def json_dumps_sorted(obj):
-    """JSON dumps with sorted keys - handles both orjson and standard json."""
-    if HAS_ORJSON:
-        return orjson.dumps(obj, option=orjson.OPT_SORT_KEYS).decode('utf-8')
-    else:
-        return json.dumps(obj, sort_keys=True)
+from detectkit.utils.json_utils import json_dumps_sorted
 
 
 @dataclass
@@ -38,8 +25,9 @@ class DetectionResult:
     Attributes:
         timestamp: Data point timestamp
         value: Actual metric value (ALWAYS original value)
-        processed_value: Value analyzed by detector (may be smoothed/transformed)
         is_anomaly: Whether point is anomalous
+        processed_value: Value analyzed by detector (may be smoothed/transformed).
+            Defaults to value when detector applies no preprocessing.
         confidence_lower: Lower bound of confidence interval (for processed_value)
         confidence_upper: Upper bound of confidence interval (for processed_value)
         detection_metadata: Additional metadata (severity, direction, etc.)
@@ -47,11 +35,15 @@ class DetectionResult:
 
     timestamp: np.datetime64
     value: float
-    processed_value: float
     is_anomaly: bool
+    processed_value: Optional[float] = None
     confidence_lower: Optional[float] = None
     confidence_upper: Optional[float] = None
     detection_metadata: Optional[Dict[str, Any]] = None
+
+    def __post_init__(self) -> None:
+        if self.processed_value is None:
+            self.processed_value = self.value
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for database storage."""
@@ -369,34 +361,39 @@ class BaseDetector(ABC):
         return ema
 
     def _compute_sma(self, values: np.ndarray, window: int) -> np.ndarray:
-        """
-        Compute Simple Moving Average.
+        """Compute a NaN-aware Simple Moving Average in O(n).
 
-        Args:
-            values: Input values
-            window: Window size for averaging
-
-        Returns:
-            Smoothed values
-
-        Note:
-            For first (window-1) points, uses available data.
+        Replaces the previous double-loop with a cumulative-sum trick:
+        we accumulate (sum, count) over the valid mask and read the
+        window contribution as a difference of two cumulative entries.
+        Output matches the original semantics: the first ``window-1``
+        points average over what's available, all-NaN windows yield NaN.
         """
         if window <= 0:
             raise ValueError(f"window must be positive, got {window}")
 
-        sma = np.zeros_like(values, dtype=float)
+        values = np.asarray(values, dtype=float)
+        n = values.size
+        if n == 0:
+            return values.copy()
 
-        for i in range(len(values)):
-            start = max(0, i - window + 1)
-            window_values = values[start:i+1]
-            # Filter out NaN values
-            valid_values = window_values[~np.isnan(window_values)]
-            if len(valid_values) > 0:
-                sma[i] = np.mean(valid_values)
-            else:
-                sma[i] = np.nan
+        valid_mask = ~np.isnan(values)
+        safe_values = np.where(valid_mask, values, 0.0)
 
+        # Pad with a leading zero so the difference at index ``i`` covers
+        # the inclusive range ``[i-window+1 .. i]`` without a branch.
+        cum_vals = np.concatenate(([0.0], np.cumsum(safe_values)))
+        cum_count = np.concatenate(([0], np.cumsum(valid_mask.astype(np.int64))))
+
+        idx = np.arange(n)
+        starts = np.maximum(0, idx - window + 1)
+        ends = idx + 1  # exclusive
+
+        window_sums = cum_vals[ends] - cum_vals[starts]
+        window_counts = cum_count[ends] - cum_count[starts]
+
+        with np.errstate(invalid="ignore", divide="ignore"):
+            sma = np.where(window_counts > 0, window_sums / window_counts, np.nan)
         return sma
 
     def _compute_weights(self, window_size: int) -> np.ndarray:

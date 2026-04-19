@@ -5,6 +5,83 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+- **SQL injection hardening**: every `_dtk_*` query now uses parameterised
+  placeholders. Previously `metric_name`, `detector_id` and timestamp filters
+  were interpolated via f-strings into `WHERE` and `ALTER TABLE … DELETE`
+  clauses; a crafted `metric_name` could execute arbitrary SQL. Affected
+  methods: `load_datapoints`, `delete_datapoints`, `delete_detections`,
+  `get_recent_detections` (all in `internal_tables`).
+- **Secrets in `profiles.yml`**: `${VAR}` and `{{ env_var('VAR') }}` placeholders
+  are now interpolated when the profile is loaded
+  (`ProfilesConfig.from_yaml`). Database passwords no longer have to live
+  in plaintext alongside the YAML.
+
+### Added
+- `detectkit.utils.env_interpolation.interpolate_env_vars` — recursive helper
+  used by both the profile loader and the alert-channel factory.
+- `detectkit.utils.json_utils` — single source of truth for JSON helpers
+  (replaces three local copies of `json_dumps_sorted`).
+- `detectkit.detectors.seasonality` — shared `parse_seasonality_data` /
+  `create_seasonality_mask` (replaces ~240 lines of duplication across MAD,
+  Z-Score and IQR).
+- GitHub Actions workflows: `ci.yml` (pytest / mypy / ruff / black on
+  Python 3.10–3.12) and `publish.yml` (PyPI trusted publishing on tags).
+- `.pre-commit-config.yaml` with ruff/black/mypy/yaml/whitespace hooks.
+- Integration test scaffold under `tests/integration/` using
+  `testcontainers[clickhouse]`. Marked with `@pytest.mark.integration` and
+  skipped in environments without Docker. Install via
+  `pip install -e ".[integration]"`.
+
+### Changed
+- `internal_tables.py` (1066 lines) became the `internal_tables/` package
+  with one mixin per logical table (`_datapoints`, `_detections`, `_tasks`,
+  `_metrics`, `_alert_states`, `_schema`). Public API
+  (`from detectkit.database.internal_tables import InternalTablesManager`)
+  unchanged.
+- `task_manager.py` (875 lines) became the `task_manager/` package
+  (`_load_step`, `_detect_step`, `_alert_step`, `_base`, `_types`,
+  `manager`). Public exports preserved.
+- `alerting/orchestrator.py` (777 lines) became the `alerting/orchestrator/`
+  package (`_decision`, `_cooldown`, `_recovery`, `_dispatch`, `_types`).
+- `_compute_sma` in `detectors/base.py` rewritten using cumulative sums; the
+  previous nested Python loop is gone.
+- `DetectionResult.processed_value` is now optional and defaults to `value`
+  when not supplied — convenient for detectors that don't pre-process data.
+- Pipeline failures now print the exception type and a traceback to stderr
+  instead of just the message string.
+- ClickHouse "epoch-as-NULL" handling consolidated into a single
+  `_normalize_max_timestamp` helper used by every `MAX(timestamp)` query.
+
+### Fixed
+- `pytest.ini` and `pyproject.toml` no longer fight over pytest configuration:
+  the `pytest.ini` file was removed and `--cov=detectkit` (was
+  `--cov=detectkitit`) is the single source of truth.
+- `[tool.setuptools]` `packages = ["detectkit"]` only shipped the top-level
+  package; switched to `setuptools.packages.find` so detector / alerting /
+  CLI submodules end up in the wheel.
+- Stale unit tests that still expected the pre-`processed_value` schema and
+  the wrong `_dtk_detections` column order have been refreshed.
+
+### Removed
+- Public-repo `.gitignore` no longer hides `TECHNICAL_SPEC.md`,
+  `ARCHITECTURE.md`, `TODO.md`, `PROGRESS.md`, `init_plan.md`,
+  `GRAFANA_DASHBOARD.md`. `CLAUDE.md` and `.claude/` remain ignored.
+
+### Migration notes (0.3.x → next)
+- If you patched `detectkit.orchestration.task_manager.MetricLoader` in tests,
+  update the dotted path to
+  `detectkit.orchestration.task_manager._load_step.MetricLoader` (or import
+  `MetricLoader` directly from `detectkit.loaders.metric_loader`).
+- If you imported the private helpers `_parse_detection_metadata` /
+  `_direction_from_metadata` from `detectkit.alerting.orchestrator` —
+  they're still re-exported from the same path, no change needed.
+- To use env-var interpolation for DB credentials, set the variable in your
+  shell and reference it as `password: "{{ env_var('CLICKHOUSE_PASSWORD') }}"`
+  in `profiles.yml`. Previously this only worked for alerting channels.
+
 ## [0.3.17] - 2026-04-11
 
 ### Fixed

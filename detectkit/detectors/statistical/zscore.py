@@ -23,12 +23,15 @@ Note: Z-Score is more sensitive to outliers than MAD because
 both mean and std are affected by extreme values.
 """
 
-import json
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 
 from detectkit.detectors.base import BaseDetector, DetectionResult
+from detectkit.detectors.seasonality import (
+    create_seasonality_mask,
+    parse_seasonality_data,
+)
 
 
 class ZScoreDetector(BaseDetector):
@@ -141,78 +144,6 @@ class ZScoreDetector(BaseDetector):
         if min_samples_per_group < 1:
             raise ValueError("min_samples_per_group must be at least 1")
 
-    def _parse_seasonality_data(
-        self, seasonality_data: np.ndarray, seasonality_columns: List[str]
-    ) -> Dict[str, np.ndarray]:
-        """
-        Parse seasonality JSON strings into structured data.
-
-        Args:
-            seasonality_data: Array of JSON strings
-            seasonality_columns: List of column names
-
-        Returns:
-            Dict with column names as keys, numpy arrays as values
-        """
-        if len(seasonality_data) == 0:
-            return {}
-
-        parsed_data = {col: [] for col in seasonality_columns}
-
-        for json_str in seasonality_data:
-            if json_str is None or json_str == "{}":
-                for col in seasonality_columns:
-                    parsed_data[col].append(None)
-            else:
-                try:
-                    data_dict = json.loads(json_str)
-                    for col in seasonality_columns:
-                        parsed_data[col].append(data_dict.get(col))
-                except (json.JSONDecodeError, TypeError):
-                    for col in seasonality_columns:
-                        parsed_data[col].append(None)
-
-        return {col: np.array(vals) for col, vals in parsed_data.items()}
-
-    def _create_seasonality_mask(
-        self,
-        seasonality_dict: Dict[str, np.ndarray],
-        window_start: int,
-        current_idx: int,
-        group_columns: List[str],
-    ) -> np.ndarray:
-        """
-        Create boolean mask for seasonality group.
-
-        Args:
-            seasonality_dict: Parsed seasonality data
-            window_start: Start index of window
-            current_idx: Current point index
-            group_columns: List of columns to group by
-
-        Returns:
-            Boolean mask for window indices matching current point's seasonality
-        """
-        if not group_columns or not seasonality_dict:
-            window_size = current_idx - window_start
-            return np.ones(window_size, dtype=bool)
-
-        current_values = {}
-        for col in group_columns:
-            if col in seasonality_dict:
-                current_values[col] = seasonality_dict[col][current_idx]
-            else:
-                return np.ones(current_idx - window_start, dtype=bool)
-
-        mask = np.ones(current_idx - window_start, dtype=bool)
-
-        for col in group_columns:
-            current_val = current_values[col]
-            window_vals = seasonality_dict[col][window_start:current_idx]
-            mask &= (window_vals == current_val)
-
-        return mask
-
     def detect(self, data: Dict[str, np.ndarray]) -> list[DetectionResult]:
         """
         Perform Z-Score based anomaly detection with optional seasonality support.
@@ -264,7 +195,7 @@ class ZScoreDetector(BaseDetector):
             and len(seasonality_columns) > 0
             and len(seasonality_data) > 0
         ):
-            seasonality_dict = self._parse_seasonality_data(
+            seasonality_dict = parse_seasonality_data(
                 seasonality_data, seasonality_columns
             )
 
@@ -337,7 +268,7 @@ class ZScoreDetector(BaseDetector):
                     group_cols = [group] if isinstance(group, str) else group
 
                     # Create mask for this seasonality group
-                    season_mask = self._create_seasonality_mask(
+                    season_mask = create_seasonality_mask(
                         seasonality_dict, window_start, i, group_cols
                     )
 

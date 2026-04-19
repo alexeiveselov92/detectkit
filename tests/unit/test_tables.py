@@ -72,11 +72,13 @@ class TestDetectionsTable:
         expected_columns = [
             "metric_name",
             "detector_id",
+            "detector_name",
             "timestamp",
             "is_anomaly",
             "confidence_lower",
             "confidence_upper",
             "value",
+            "processed_value",
             "detector_params",
             "detection_metadata",
             "created_at",

@@ -11,28 +11,14 @@ Loads time-series data from databases with:
 
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
-from detectkit.utils.datetime_utils import now_utc_naive, to_naive_utc
 
 import numpy as np
-
-try:
-    import orjson
-    HAS_ORJSON = True
-except ImportError:
-    import json
-    HAS_ORJSON = False
-
-
-def json_dumps_sorted(obj):
-    """JSON dumps with sorted keys - handles both orjson and standard json."""
-    if HAS_ORJSON:
-        return orjson.dumps(obj, option=orjson.OPT_SORT_KEYS).decode('utf-8')
-    else:
-        return json.dumps(obj, sort_keys=True)
 
 from detectkit.config.metric_config import MetricConfig
 from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.database.manager import BaseDatabaseManager
+from detectkit.utils.datetime_utils import now_utc_naive, to_naive_utc
+from detectkit.utils.json_utils import json_dumps_sorted
 from detectkit.loaders.query_template import QueryTemplate
 
 

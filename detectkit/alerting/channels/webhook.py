@@ -6,10 +6,14 @@ Compatible with Mattermost, Slack, and other webhook-based systems.
 """
 
 from typing import Dict, Optional
+from urllib.parse import urlparse
 
 import requests
 
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
+from detectkit.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class WebhookChannel(BaseAlertChannel):
@@ -70,6 +74,16 @@ class WebhookChannel(BaseAlertChannel):
         if not webhook_url:
             raise ValueError("webhook_url is required")
 
+        parsed = urlparse(webhook_url)
+        if parsed.scheme != "https":
+            raise ValueError(
+                f"webhook_url must use the https:// scheme (got {parsed.scheme!r}). "
+                "Plain HTTP webhooks are rejected to prevent credential leakage "
+                "and SSRF against internal services."
+            )
+        if not parsed.netloc:
+            raise ValueError("webhook_url must include a host")
+
         self.webhook_url = webhook_url
         self.username = username
         self.icon_emoji = icon_emoji
@@ -129,19 +143,20 @@ class WebhookChannel(BaseAlertChannel):
         headers = {"Content-Type": "application/json"}
         headers.update(self.extra_headers)
 
-        # Send to webhook
+        # Send to webhook. Redirects are disabled to prevent downgrading from
+        # https to http or being redirected to internal hosts.
         try:
             response = requests.post(
                 self.webhook_url,
                 json=payload,
                 headers=headers,
                 timeout=self.timeout,
+                allow_redirects=False,
             )
             response.raise_for_status()
             return True
-        except requests.RequestException as e:
-            # Log error but don't crash
-            print(f"Failed to send webhook alert: {e}")
+        except requests.RequestException:
+            logger.error("Failed to send webhook alert", exc_info=True)
             return False
 
     def get_default_template(self) -> str:

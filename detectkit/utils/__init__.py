@@ -15,6 +15,7 @@ from detectkit.utils.datetime_utils import (
 )
 from detectkit.utils.env_interpolation import interpolate_env_vars
 from detectkit.utils.json_utils import json_dumps_sorted, json_loads
+from detectkit.utils.logging import get_logger
 
 __all__ = [
     "weighted_percentile",
@@ -29,4 +30,5 @@ __all__ = [
     "interpolate_env_vars",
     "json_dumps_sorted",
     "json_loads",
+    "get_logger",
 ]

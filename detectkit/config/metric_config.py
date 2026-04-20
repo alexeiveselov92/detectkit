@@ -380,6 +380,38 @@ class MetricConfig(BaseModel):
 
         return self
 
+    @model_validator(mode="after")
+    def validate_detector_seasonality_components(self) -> "MetricConfig":
+        """Ensure ``seasonality_components`` only references declared columns.
+
+        Allowed names are the union of
+        :attr:`seasonality_columns` (features computed from timestamps) and
+        :attr:`query_columns.seasonality` (raw columns pulled from the user
+        query). Detectors referencing anything else would silently receive
+        empty seasonality data and quietly degrade to a no-grouping run, so
+        we fail fast at config-load time instead.
+        """
+        allowed: set = set(self.seasonality_columns or [])
+        if self.query_columns and self.query_columns.seasonality:
+            allowed.update(self.query_columns.seasonality)
+
+        for idx, detector in enumerate(self.detectors):
+            components = detector.get_seasonality_components()
+            if not components:
+                continue
+            for item in components:
+                names = item if isinstance(item, list) else [item]
+                unknown = [n for n in names if n not in allowed]
+                if unknown:
+                    raise ValueError(
+                        f"Detector[{idx}] (type={detector.type!r}) references "
+                        f"unknown seasonality components {unknown}. "
+                        f"Declare them in `seasonality_columns` or "
+                        f"`query_columns.seasonality` first. "
+                        f"Allowed: {sorted(allowed) or '[]'}"
+                    )
+        return self
+
     @field_validator("name")
     @classmethod
     def validate_name(cls, v: str) -> str:

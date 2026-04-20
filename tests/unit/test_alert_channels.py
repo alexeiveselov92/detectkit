@@ -447,3 +447,56 @@ class TestMattermostChannel:
         assert "MattermostChannel" in repr_str
         assert "https://example.com" in repr_str
         assert "bot" in repr_str
+
+
+class TestWebhookUrlValidation:
+    """HTTPS-only enforcement and redirect safety."""
+
+    def test_rejects_plain_http(self):
+        from detectkit.alerting.channels.webhook import WebhookChannel
+
+        with pytest.raises(ValueError, match="https:// scheme"):
+            WebhookChannel(webhook_url="http://example.com/hook")
+
+    def test_rejects_ftp_scheme(self):
+        from detectkit.alerting.channels.webhook import WebhookChannel
+
+        with pytest.raises(ValueError, match="https:// scheme"):
+            WebhookChannel(webhook_url="ftp://example.com/hook")
+
+    def test_rejects_missing_host(self):
+        from detectkit.alerting.channels.webhook import WebhookChannel
+
+        with pytest.raises(ValueError, match="host"):
+            WebhookChannel(webhook_url="https:///path")
+
+    def test_slack_inherits_https_only(self):
+        from detectkit.alerting.channels.slack import SlackChannel
+
+        with pytest.raises(ValueError, match="https:// scheme"):
+            SlackChannel(webhook_url="http://hooks.slack.com/services/xxx")
+
+    @patch("detectkit.alerting.channels.webhook.requests.post")
+    def test_send_disables_redirects(self, mock_post):
+        from detectkit.alerting.channels.webhook import WebhookChannel
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        channel = WebhookChannel(webhook_url="https://example.com/hooks/xxx")
+        alert = AlertData(
+            metric_name="m",
+            timestamp=datetime(2024, 1, 1),
+            timezone="UTC",
+            value=1.0,
+            confidence_lower=None,
+            confidence_upper=None,
+            detector_name="d",
+            detector_params="{}",
+            direction="above",
+            severity=1.0,
+            detection_metadata={},
+        )
+        channel.send(alert)
+        assert mock_post.call_args.kwargs["allow_redirects"] is False

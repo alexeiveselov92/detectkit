@@ -5,6 +5,68 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-04-20
+
+### ⚠ Breaking
+
+- **Webhook alert channels require HTTPS.** `WebhookChannel`, `SlackChannel`
+  and `MattermostChannel` now raise `ValueError` at construction time when
+  `webhook_url` is not `https://`. Redirects are no longer followed
+  (`allow_redirects=False`), so HTTP → HTTPS endpoints must point directly
+  at the final URL.
+- **`QueryTemplate` rejects unsafe Jinja2 context values.** Values spliced
+  into a user query must be `bool`/`int`/`float`/`datetime`/`None`,
+  short strings matching `[a-zA-Z0-9_.- ]*`, or homogeneous lists of the
+  above. Pass arbitrary values through the driver's native `%(name)s`
+  placeholders instead.
+- **`MetricConfig` validates detector seasonality references at load time.**
+  Any `seasonality_components` entry that is not declared in
+  `seasonality_columns` or `query_columns.seasonality` is rejected. Configs
+  that previously relied on silent fall-through will now fail fast.
+
+### Security
+
+- **Identifier escaping across ClickHouse DDL/DML.** All splice sites in
+  `ClickHouseDatabaseManager` (`_ensure_databases`, `create_table`,
+  `insert_batch`, `get_last_timestamp`, `upsert_task_status`,
+  `upsert_record`) now funnel table/column/database names through
+  `_quote_ident` / `_quote_qualified`. Database names are also validated
+  when the manager is constructed.
+- **Jinja2 query context whitelist.** Attempts to pass values containing
+  `;`, quotes, or arbitrary SQL through `QueryTemplate.render(context=…)`
+  raise `ValueError` before rendering (see Breaking above).
+- **Webhook SSRF hardening.** HTTPS-only + `allow_redirects=False` makes it
+  significantly harder to abuse an alert channel to reach internal
+  services.
+
+### Fixed
+
+- **Stale task locks are auto-released.** `InternalTablesManager.check_lock`
+  now filters out running-state rows whose
+  `started_at + timeout_seconds` is in the past, so a worker that died
+  mid-run no longer permanently holds a metric's lock. No schema change is
+  required (`timeout_seconds` has been stored since 0.3.x).
+
+### Added
+
+- **`detectkit.utils.logging.get_logger`.** Library modules now use the
+  stdlib `logging` framework (`detectkit.*` logger hierarchy) instead of
+  `print()` in error paths: `WebhookChannel.send`,
+  `_DispatchMixin._dispatch`, `TaskManager._resolve_alert_channels`.
+  A `NullHandler` is attached in `detectkit/__init__.py` so the library
+  never emits handler-less warnings; configure your application's root
+  logger to surface these records.
+
+### Upgrade notes
+
+- If you used plain HTTP webhooks in development, switch to HTTPS or point
+  the channel at an HTTPS-terminating tunnel (e.g. `ngrok`).
+- If you passed dynamic values into `QueryTemplate` context, migrate them
+  to native `%(name)s` placeholders handed to `execute_query`.
+- If any metric YAML lists `seasonality_components` that don't appear in
+  `seasonality_columns`/`query_columns.seasonality`, add them there — or
+  drop the dead reference.
+
 ## [0.4.0] - 2026-04-19
 
 ### ⚠ Breaking

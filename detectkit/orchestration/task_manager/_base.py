@@ -13,6 +13,9 @@ from detectkit.alerting.orchestrator import (
     _parse_detection_metadata,
 )
 from detectkit.database.internal_tables import InternalTablesManager
+from detectkit.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class _TaskManagerBase:
@@ -130,9 +133,11 @@ class _TaskManagerBase:
                 # Config-level problems (missing channel, bad type, missing
                 # driver, wrong constructor args) — skip this channel but
                 # keep going so a single typo doesn't kill the whole run.
-                print(
-                    f"Warning: Failed to create channel '{channel_name}': "
-                    f"{type(exc).__name__}: {exc}"
+                logger.warning(
+                    "Failed to create channel %r: %s: %s",
+                    channel_name,
+                    type(exc).__name__,
+                    exc,
                 )
 
         return channels

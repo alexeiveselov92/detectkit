@@ -3,12 +3,59 @@ SQL query templating with Jinja2.
 
 Provides templating capabilities for SQL queries with built-in variables
 and custom context.
+
+Security model
+--------------
+Jinja2 autoescape is disabled (SQL does not use HTML escaping), so values from
+the user-supplied ``context`` are substituted verbatim. To prevent SQL
+injection we constrain:
+
+* Context **keys** to Python-identifier style names.
+* Context **values** to scalars / datetimes / short allow-listed strings
+  (``[a-zA-Z0-9_.\\- ]``) or homogeneous lists of those.
+
+If a template needs arbitrary user values (quoted literals, dynamic predicates)
+they should be passed through the native driver placeholders (``%(name)s``)
+handed to ``execute_query``, not through Jinja2 context.
 """
 
 from datetime import datetime
 from typing import Any, Dict, Optional
+import re
 
 from jinja2 import Environment, StrictUndefined, Template, TemplateSyntaxError, Undefined, UndefinedError
+
+
+_CONTEXT_KEY_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+_SAFE_STR_RE = re.compile(r"^[a-zA-Z0-9_.\- ]*$")
+_SAFE_SCALAR_TYPES = (bool, int, float, datetime)
+
+
+def _validate_context_value(key: str, value: Any) -> None:
+    """Raise ``ValueError`` if *value* is not safe to splice into SQL via Jinja2.
+
+    Allowed: bool / int / float / datetime / None, short allow-listed strings,
+    and homogeneous lists of those. Anything else must go through the driver's
+    parameterized query interface.
+    """
+    if value is None or isinstance(value, _SAFE_SCALAR_TYPES):
+        return
+    if isinstance(value, str):
+        if not _SAFE_STR_RE.fullmatch(value):
+            raise ValueError(
+                f"Unsafe query template context: key={key!r} value={value!r} "
+                "contains characters outside [a-zA-Z0-9_.- ]. "
+                "Use driver placeholders (%(name)s) for arbitrary values."
+            )
+        return
+    if isinstance(value, (list, tuple)):
+        for i, item in enumerate(value):
+            _validate_context_value(f"{key}[{i}]", item)
+        return
+    raise TypeError(
+        f"Unsupported query template context type for key={key!r}: "
+        f"{type(value).__name__}"
+    )
 
 
 class QueryTemplate:
@@ -104,8 +151,16 @@ class QueryTemplate:
         if interval_seconds is not None:
             template_context["interval_seconds"] = interval_seconds
 
-        # Add custom variables (overwrites built-ins if conflict)
+        # Add custom variables (overwrites built-ins if conflict).
+        # Validate each entry so user-supplied YAML cannot splice arbitrary SQL.
         if context:
+            for key, value in context.items():
+                if not isinstance(key, str) or not _CONTEXT_KEY_RE.fullmatch(key):
+                    raise ValueError(
+                        f"Invalid query template context key: {key!r} "
+                        "(must match [a-zA-Z_][a-zA-Z0-9_]*)"
+                    )
+                _validate_context_value(key, value)
             template_context.update(context)
 
         # Compile and render template

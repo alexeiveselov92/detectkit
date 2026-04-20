@@ -17,8 +17,13 @@ class _TasksMixin(_InternalTablesBase):
         process_type: str,
         timeout_seconds: int = 3600,
     ) -> bool:
-        """Try to acquire the task lock; return False if it's already held."""
-        # TODO: respect *timeout_seconds* by treating stale 'running' rows as released.
+        """Try to acquire the task lock; return False if it's already held.
+
+        Rows whose ``started_at + timeout_seconds`` has already passed are
+        treated as stale and ignored (the new ``upsert_task_status`` below
+        will overwrite them). This prevents a crashed worker from holding a
+        metric's lock forever.
+        """
         if self.check_lock(metric_name, detector_id, process_type):
             return False
 
@@ -57,6 +62,10 @@ class _TasksMixin(_InternalTablesBase):
         full_table_name = self._manager.get_full_table_name(
             TABLE_TASKS, use_internal=True
         )
+        # A running row is only considered an active lock while
+        # started_at + timeout_seconds > now(). Anything older is stale and
+        # treated as released. ``timeout_seconds`` may be NULL on legacy rows;
+        # fall back to 3600s (the default used by acquire_lock) in that case.
         query = f"""
         SELECT *
         FROM {full_table_name}
@@ -64,6 +73,7 @@ class _TasksMixin(_InternalTablesBase):
           AND detector_id = %(detector_id)s
           AND process_type = %(process_type)s
           AND status = 'running'
+          AND started_at + toIntervalSecond(coalesce(timeout_seconds, 3600)) > now()
         """
         results = self._manager.execute_query(
             query,

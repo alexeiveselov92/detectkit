@@ -187,6 +187,47 @@ class TestMetricConfig:
                 seasonality_columns=["hour", "hour"],
             )
 
+    def test_detector_seasonality_components_unknown_rejected(self):
+        """Detector references a column not declared on the metric."""
+        with pytest.raises(ValueError, match="unknown seasonality components"):
+            MetricConfig(
+                name="cpu",
+                query="SELECT 1",
+                interval="10min",
+                seasonality_columns=["hour"],
+                detectors=[
+                    DetectorConfig(
+                        type="mad",
+                        params={"seasonality_components": ["day_of_week"]},
+                    )
+                ],
+            )
+
+    def test_detector_seasonality_components_accepts_declared(self):
+        """Declared columns on the metric or query_columns are accepted."""
+        config = MetricConfig(
+            name="cpu",
+            query="SELECT 1",
+            interval="10min",
+            seasonality_columns=["hour", "day_of_week"],
+            query_columns={"seasonality": ["custom_flag"]},
+            detectors=[
+                DetectorConfig(
+                    type="mad",
+                    params={
+                        "seasonality_components": [
+                            "hour",
+                            ["day_of_week", "custom_flag"],
+                        ]
+                    },
+                )
+            ],
+        )
+        assert config.detectors[0].get_seasonality_components() == [
+            "hour",
+            ["day_of_week", "custom_flag"],
+        ]
+
     def test_loading_batch_size_validation(self):
         """Test batch size validation."""
         # Valid batch size

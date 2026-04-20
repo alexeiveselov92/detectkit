@@ -334,6 +334,22 @@ class TestTaskLocking:
 
         assert status is None
 
+    def test_check_lock_filters_stale_rows_via_sql(
+        self, internal_manager, mock_manager
+    ):
+        """The lock query must filter out rows where the timeout has elapsed.
+
+        We can't run the ClickHouse SQL in a unit test, so verify the emitted
+        query carries the ``started_at + toIntervalSecond(...)`` clause.
+        """
+        mock_manager.execute_query.return_value = []
+
+        internal_manager.check_lock("cpu_usage", "load", "load")
+
+        query = mock_manager.execute_query.call_args[0][0]
+        assert "started_at + toIntervalSecond" in query
+        assert "> now()" in query
+
     def test_update_task_progress(self, internal_manager, mock_manager):
         """Test updating task progress."""
         last_ts = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)

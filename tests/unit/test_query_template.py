@@ -360,3 +360,52 @@ class TestQueryTemplate:
         )
 
         assert "['cpu', 'memory', 'disk']" in rendered
+
+
+class TestContextSafety:
+    """Reject context values that could splice arbitrary SQL."""
+
+    def test_rejects_sql_injection_in_value(self):
+        template = QueryTemplate()
+        query = "SELECT * FROM {{ table_name }}"
+        with pytest.raises(ValueError, match="Unsafe query template context"):
+            template.render(
+                query,
+                context={"table_name": "metrics; DROP TABLE foo"},
+            )
+
+    def test_rejects_quote_in_value(self):
+        template = QueryTemplate()
+        query = "SELECT * FROM {{ t }}"
+        with pytest.raises(ValueError, match="Unsafe query template context"):
+            template.render(query, context={"t": "metrics' OR '1'='1"})
+
+    def test_rejects_list_with_unsafe_item(self):
+        template = QueryTemplate()
+        query = "SELECT {{ cols }}"
+        with pytest.raises(ValueError, match="Unsafe query template context"):
+            template.render(query, context={"cols": ["ok", "bad; drop"]})
+
+    def test_rejects_bad_key(self):
+        template = QueryTemplate()
+        query = "SELECT 1"
+        with pytest.raises(ValueError, match="Invalid query template context key"):
+            template.render(query, context={"bad key!": "value"})
+
+    def test_rejects_unsupported_type(self):
+        template = QueryTemplate()
+        query = "SELECT 1"
+        with pytest.raises(TypeError):
+            template.render(query, context={"t": object()})
+
+    def test_accepts_dotted_identifier(self):
+        """Qualified identifiers like `db.table` are allowed."""
+        template = QueryTemplate()
+        query = "SELECT * FROM {{ fq }}"
+        rendered = template.render(query, context={"fq": "analytics.metrics"})
+        assert "FROM analytics.metrics" in rendered
+
+    def test_accepts_none(self):
+        template = QueryTemplate()
+        query = "SELECT {{ value }}"
+        template.render(query, context={"value": None})  # should not raise

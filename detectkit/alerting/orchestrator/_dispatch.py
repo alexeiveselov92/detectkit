@@ -7,6 +7,9 @@ from typing import Dict, List, Optional
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
 from detectkit.alerting.orchestrator._base import _OrchestratorBase
 from detectkit.utils.datetime_utils import now_utc_naive
+from detectkit.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class _DispatchMixin(_OrchestratorBase):
@@ -62,8 +65,10 @@ class _DispatchMixin(_OrchestratorBase):
             channel_name = channel.__class__.__name__
             try:
                 results[channel_name] = bool(channel.send(alert_data, template))
-            except Exception as exc:
+            except Exception:
                 # One bad channel must not abort the others.
-                print(f"Error sending {kind} via {channel_name}: {exc}")
+                logger.error(
+                    "Error sending %s via %s", kind, channel_name, exc_info=True
+                )
                 results[channel_name] = False
         return results

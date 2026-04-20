@@ -2,8 +2,13 @@
 ClickHouse database manager implementation.
 
 Implements BaseDatabaseManager for ClickHouse using universal methods.
+
+All identifiers spliced into DDL/DML are first validated by :func:`_quote_ident`
+so that table, column and database names cannot be used for SQL injection
+(value arguments still flow through the driver's ``%(name)s`` placeholders).
 """
 
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -18,6 +23,25 @@ except ImportError:
 
 from detectkit.core.models import ColumnDefinition, TableModel
 from detectkit.database.manager import BaseDatabaseManager
+
+
+_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _quote_ident(name: str) -> str:
+    """Validate and backtick-quote a ClickHouse identifier."""
+    if not isinstance(name, str) or not _IDENT_RE.fullmatch(name):
+        raise ValueError(f"Invalid SQL identifier: {name!r}")
+    return f"`{name}`"
+
+
+def _quote_qualified(name: str) -> str:
+    """Backtick-quote a possibly-qualified identifier like ``db.table``."""
+    if not isinstance(name, str) or not name:
+        raise ValueError(f"Invalid SQL identifier: {name!r}")
+    # Strip pre-existing backticks so callers can pass either form safely.
+    stripped = name.replace("`", "")
+    return ".".join(_quote_ident(part) for part in stripped.split("."))
 
 
 class ClickHouseDatabaseManager(BaseDatabaseManager):
@@ -53,6 +77,9 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
                 "Install with: pip install detectk[clickhouse]"
             )
 
+        # Validate database names up front so later f-strings are safe.
+        _quote_ident(internal_database)
+        _quote_ident(data_database)
         self._internal_database = internal_database
         self._data_database = data_database
 
@@ -71,7 +98,7 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
     def _ensure_databases(self) -> None:
         """Create internal and data databases if they don't exist."""
         for db in [self._internal_database, self._data_database]:
-            self._client.execute(f"CREATE DATABASE IF NOT EXISTS {db}")
+            self._client.execute(f"CREATE DATABASE IF NOT EXISTS {_quote_ident(db)}")
 
     def execute_query(
         self,
@@ -121,10 +148,11 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
             table_model: Table schema definition
             if_not_exists: Add IF NOT EXISTS clause
         """
-        # Build column definitions
+        # Build column definitions. Column names are validated; type / default
+        # strings come from the TableModel registry in code, not user input.
         col_defs = []
         for col in table_model.columns:
-            col_def = f"{col.name} {col.type}"
+            col_def = f"{_quote_ident(col.name)} {col.type}"
             if col.default is not None:
                 col_def += f" DEFAULT {self._format_default(col.default)}"
             col_defs.append(col_def)
@@ -138,7 +166,7 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         engine = table_model.engine or "MergeTree"
         order_by = table_model.order_by or table_model.primary_key
 
-        order_by_clause = ", ".join(order_by)
+        order_by_clause = ", ".join(_quote_ident(c) for c in order_by)
 
         # Add parentheses only if engine doesn't already have them
         if "(" in engine:
@@ -147,7 +175,7 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
             engine_clause = f"{engine}()"
 
         ddl = f"""
-        CREATE TABLE {if_not_exists_clause}{table_name} (
+        CREATE TABLE {if_not_exists_clause}{_quote_qualified(table_name)} (
             {columns_sql}
         )
         ENGINE = {engine_clause}
@@ -261,9 +289,10 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         # Duplicates are silently ignored by MergeTree
         # Note: For ReplacingMergeTree, use conflict_strategy="replace"
 
-        # Insert data
+        # Insert data. Table and column names are validated before splicing.
+        quoted_cols = ", ".join(_quote_ident(c) for c in column_names)
         self._client.execute(
-            f"INSERT INTO {table_name} ({', '.join(column_names)}) VALUES",
+            f"INSERT INTO {_quote_qualified(table_name)} ({quoted_cols}) VALUES",
             rows
         )
 
@@ -293,8 +322,8 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
             Last timestamp or None if no data
         """
         query = f"""
-        SELECT max({timestamp_column}) as last_ts
-        FROM {table_name}
+        SELECT max({_quote_ident(timestamp_column)}) as last_ts
+        FROM {_quote_qualified(table_name)}
         WHERE metric_name = %(metric_name)s
         """
 
@@ -351,7 +380,7 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
 
         # Delete existing record (if any), sync to ensure old row is gone before insert
         delete_query = f"""
-        ALTER TABLE {full_table}
+        ALTER TABLE {_quote_qualified(full_table)}
         DELETE WHERE metric_name = %(metric_name)s
           AND detector_id = %(detector_id)s
           AND process_type = %(process_type)s
@@ -411,10 +440,13 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         Returns:
             Number of rows inserted (typically 1)
         """
-        # Step 1: DELETE existing record (if any)
-        where_parts = [f"{col} = %({col})s" for col in key_columns.keys()]
+        # Step 1: DELETE existing record (if any). Column names must be valid
+        # identifiers so we can safely splice them and their placeholders.
+        where_parts = [
+            f"{_quote_ident(col)} = %({col})s" for col in key_columns.keys()
+        ]
         delete_query = f"""
-        ALTER TABLE {table_name}
+        ALTER TABLE {_quote_qualified(table_name)}
         DELETE WHERE {' AND '.join(where_parts)}
         """
 

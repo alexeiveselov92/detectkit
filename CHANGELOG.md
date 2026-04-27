@@ -5,6 +5,18 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-04-27
+
+### Fixed
+- **`min_detectors >= 2` never fired**: `_load_recent_detections` collapsed
+  every detector at a given timestamp into a single `DetectionRecord`, so
+  `should_alert` saw at most one record per timestamp regardless of how
+  many detectors actually flagged the point. Channels configured with
+  `min_detectors: 2` therefore went silent even when both detectors agreed
+  on a "down" anomaly, while a parallel `min_detectors: 1` channel fired
+  normally. Now one record is emitted per detector per timestamp, matching
+  the contract that the orchestrator and recovery code already expect.
+
 ## [0.4.0] - 2026-04-19
 
 ### ⚠ Breaking

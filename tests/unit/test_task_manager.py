@@ -354,3 +354,98 @@ class TestTaskManager:
 
         assert "TaskManager" in repr_str
         assert "ClickHouseDatabaseManager" in repr_str
+
+
+class TestLoadRecentDetections:
+    """Tests for ``_load_recent_detections`` fanout behavior."""
+
+    def _make_manager(self, results):
+        internal_manager = Mock()
+        internal_manager.get_recent_detections.return_value = results
+        manager = TaskManager(
+            internal_manager=internal_manager,
+            db_manager=Mock(),
+        )
+        return manager
+
+    def test_emits_one_record_per_detector_per_timestamp(self):
+        """Two detectors at the same timestamp must yield two DetectionRecords.
+
+        Regression test: previously detectors were aggregated into a single
+        record per timestamp, which silently broke ``min_detectors >= 2``.
+        """
+        ts = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        results = [
+            {
+                "timestamp": ts,
+                "detector_ids": ["mad_id", "manual_id"],
+                "detector_names": ["MADDetector", "ManualBoundsDetector"],
+                "detector_params_list": ['{"threshold":3.0}', '{"lower_bound":7}'],
+                "detection_metadata_list": [
+                    '{"direction":"below","severity":2.5}',
+                    '{"direction":"below"}',
+                ],
+                "is_anomaly_flags": [True, True],
+                "confidence_lowers": [29.0, 7.0],
+                "confidence_uppers": [75.1, None],
+                "value": 5.0,
+            }
+        ]
+        manager = self._make_manager(results)
+
+        records = manager._load_recent_detections(
+            metric_name="m",
+            last_point=ts,
+            num_points=1,
+        )
+
+        assert len(records) == 2
+        names = {r.detector_name for r in records}
+        assert names == {"MADDetector", "ManualBoundsDetector"}
+        assert all(r.is_anomaly for r in records)
+        assert all(r.direction == "down" for r in records)
+        # Bounds are kept per-detector, not flattened to detector[0].
+        mad = next(r for r in records if r.detector_name == "MADDetector")
+        manual = next(r for r in records if r.detector_name == "ManualBoundsDetector")
+        assert mad.confidence_upper == 75.1
+        assert manual.confidence_upper is None
+
+    def test_chronological_order_with_multiple_timestamps(self):
+        """Output must be oldest→newest (recovery reads ``[-1]``)."""
+        older = datetime(2024, 1, 1, 11, 50, 0, tzinfo=timezone.utc)
+        newer = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        # ``get_recent_detections`` returns newest first.
+        results = [
+            {
+                "timestamp": newer,
+                "detector_ids": ["a"],
+                "detector_names": ["A"],
+                "detector_params_list": ["{}"],
+                "detection_metadata_list": [None],
+                "is_anomaly_flags": [False],
+                "confidence_lowers": [10.0],
+                "confidence_uppers": [20.0],
+                "value": 15.0,
+            },
+            {
+                "timestamp": older,
+                "detector_ids": ["a"],
+                "detector_names": ["A"],
+                "detector_params_list": ["{}"],
+                "detection_metadata_list": [None],
+                "is_anomaly_flags": [False],
+                "confidence_lowers": [10.0],
+                "confidence_uppers": [20.0],
+                "value": 12.0,
+            },
+        ]
+        manager = self._make_manager(results)
+
+        records = manager._load_recent_detections(
+            metric_name="m",
+            last_point=newer,
+            num_points=2,
+        )
+
+        assert [r.timestamp for r in records] == [older, newer]
+        assert records[-1].value == 15.0  # newest is last (recovery contract)

@@ -36,7 +36,13 @@ class _TaskManagerBase:
         last_point: datetime,
         num_points: int,
     ) -> List[DetectionRecord]:
-        """Build :class:`DetectionRecord` rows for the last *num_points* timestamps."""
+        """Build :class:`DetectionRecord` rows for the last *num_points* timestamps.
+
+        Emits one record *per detector per timestamp* so the orchestrator can
+        evaluate multi-detector consensus (``min_detectors``). Collapsing
+        detectors into a single record breaks ``min_detectors >= 2`` because
+        ``should_alert`` counts records, not flags.
+        """
         results = self.internal.get_recent_detections(
             metric_name=metric_name,
             last_point=last_point,
@@ -46,69 +52,39 @@ class _TaskManagerBase:
             return []
 
         records: List[DetectionRecord] = []
-        for row in results:
-            is_anomaly = any(row["is_anomaly_flags"])
-            anomaly_indices = [
-                i for i, flag in enumerate(row["is_anomaly_flags"]) if flag
-            ]
-
-            direction = "none"
-            severity = 0.0
-            confidence_lower = None
-            confidence_upper = None
-            detector_name = "unknown"
-            detector_id = "unknown"
-            detector_params = "{}"
-            metadata: dict = {}
-
+        # SQL returns timestamps DESC; iterate reversed so output is oldest→newest
+        # (recovery code reads ``detections[-1]`` to find the latest point).
+        for row in reversed(results):
             metadata_list = (
                 row.get("detection_metadata_list")
                 or [None] * len(row["detector_ids"])
             )
-
-            # Always read the first detector's CI so recovery messages
-            # display the *current* confidence interval, not a stale one.
-            if row["confidence_lowers"] and row["confidence_uppers"]:
-                confidence_lower = row["confidence_lowers"][0]
-                confidence_upper = row["confidence_uppers"][0]
-            if row["detector_names"]:
-                detector_name = row["detector_names"][0]
-                detector_id = row["detector_ids"][0]
-                detector_params = row["detector_params_list"][0]
-
-            if is_anomaly and anomaly_indices:
-                first_idx = anomaly_indices[0]
-                detector_name = row["detector_names"][first_idx]
-                detector_id = row["detector_ids"][first_idx]
-                detector_params = row["detector_params_list"][first_idx]
-                confidence_lower = row["confidence_lowers"][first_idx]
-                confidence_upper = row["confidence_uppers"][first_idx]
-
-                metadata = _parse_detection_metadata(metadata_list[first_idx])
-                direction = _direction_from_metadata(metadata, True)
+            for i in range(len(row["detector_ids"])):
+                is_anomaly = bool(row["is_anomaly_flags"][i])
+                metadata = _parse_detection_metadata(metadata_list[i])
+                direction = _direction_from_metadata(metadata, is_anomaly)
                 try:
                     severity = float(metadata.get("severity", 0.0) or 0.0)
                 except (TypeError, ValueError):
                     severity = 0.0
 
-            records.append(
-                DetectionRecord(
-                    timestamp=row["timestamp"],
-                    detector_name=detector_name,
-                    detector_id=detector_id,
-                    detector_params=detector_params,
-                    value=row["value"],
-                    is_anomaly=is_anomaly,
-                    confidence_lower=confidence_lower,
-                    confidence_upper=confidence_upper,
-                    direction=direction,
-                    severity=severity,
-                    detection_metadata=metadata,
+                records.append(
+                    DetectionRecord(
+                        timestamp=row["timestamp"],
+                        detector_name=row["detector_names"][i],
+                        detector_id=row["detector_ids"][i],
+                        detector_params=row["detector_params_list"][i],
+                        value=row["value"],
+                        is_anomaly=is_anomaly,
+                        confidence_lower=row["confidence_lowers"][i],
+                        confidence_upper=row["confidence_uppers"][i],
+                        direction=direction,
+                        severity=severity,
+                        detection_metadata=metadata,
+                    )
                 )
-            )
 
-        # Caller wants chronological order; the SQL returns DESC.
-        return list(reversed(records))
+        return records
 
     def _create_alert_channels(
         self, channel_names: List[str]

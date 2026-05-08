@@ -48,6 +48,40 @@ class _DatapointsMixin(_InternalTablesBase):
         last_ts = self._manager.get_last_timestamp(full_table_name, metric_name)
         return self._normalize_max_timestamp(last_ts)
 
+    def get_value_at(
+        self, metric_name: str, timestamp: datetime
+    ) -> Optional[float]:
+        """Return the stored ``value`` for an exact timestamp.
+
+        Returns ``None`` if there is no row at that timestamp **or** the
+        row's value is NULL/NaN — i.e. ``None`` means "no real datapoint".
+        Used by the ``no_data_alert`` decision path.
+        """
+        full_table_name = self._manager.get_full_table_name(
+            TABLE_DATAPOINTS, use_internal=True
+        )
+        query = f"""
+        SELECT value
+        FROM {full_table_name}
+        WHERE metric_name = %(metric_name)s AND timestamp = %(timestamp)s
+        LIMIT 1
+        """
+        results = self._manager.execute_query(
+            query, params={"metric_name": metric_name, "timestamp": timestamp}
+        )
+        if not results:
+            return None
+        value = results[0].get("value")
+        if value is None:
+            return None
+        try:
+            value_f = float(value)
+        except (TypeError, ValueError):
+            return None
+        if np.isnan(value_f):
+            return None
+        return value_f
+
     def load_datapoints(
         self,
         metric_name: str,

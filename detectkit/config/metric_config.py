@@ -197,6 +197,14 @@ class AlertConfig(BaseModel):
         description="Custom template for recovery notification message. "
                     "Supports same variables as anomaly templates plus {status}."
     )
+    template_no_data: Optional[str] = Field(
+        default=None,
+        description="Custom template for no-data alert message. "
+                    "Used when no_data_alert is true and the latest expected "
+                    "interval has no datapoint. Supports {metric_name}, "
+                    "{timestamp}, {timezone}, {description}, {description_line}, "
+                    "{mentions}, {mentions_line}, {status}."
+    )
     mentions: List[str] = Field(
         default_factory=list,
         description="Users/groups to mention in alerts. Plain usernames without @. "

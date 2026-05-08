@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
@@ -132,6 +133,59 @@ class _DecisionMixin(_OrchestratorBase):
             severity=max_severity,
             detection_metadata=combined_metadata,
             consecutive_count=consecutive_count,
+            description=self.description,
+            mentions=self.mentions,
+        )
+
+    def should_alert_no_data(
+        self,
+        last_point: datetime,
+    ) -> Tuple[bool, Optional[AlertData]]:
+        """Decide whether to fire a no-data alert for *last_point*.
+
+        Conditions (all must hold):
+            1. ``alert_config.no_data_alert`` is true.
+            2. Not currently in alert cooldown for this alert config.
+            3. The latest expected datapoint is missing — there is no row
+               in ``_dtk_datapoints`` for *last_point* OR the row's value
+               is NULL/NaN. ``get_value_at`` returns ``None`` for both.
+
+        ``min_detectors`` and ``consecutive_anomalies`` deliberately do
+        not apply here: missing data is a single binary metric-level
+        signal, not a per-detector vote.
+        """
+        if not self.alert_config or not getattr(
+            self.alert_config, "no_data_alert", False
+        ):
+            return False, None
+        if not self.internal:
+            return False, None
+
+        if self._is_in_cooldown():
+            return False, None
+
+        value = self.internal.get_value_at(self.metric_name, last_point)
+        if value is not None and not (isinstance(value, float) and math.isnan(value)):
+            return False, None
+
+        return True, self._build_no_data_alert_data(last_point)
+
+    def _build_no_data_alert_data(self, last_point: datetime) -> AlertData:
+        """Construct the AlertData payload for a no-data alert."""
+        return AlertData(
+            metric_name=self.metric_name,
+            timestamp=np.datetime64(last_point, "ms"),
+            timezone=self.timezone_display,
+            value=None,
+            confidence_lower=None,
+            confidence_upper=None,
+            detector_name="no_data",
+            detector_params="",
+            direction="none",
+            severity=0.0,
+            detection_metadata={"reason": "no_data"},
+            consecutive_count=0,
+            is_no_data=True,
             description=self.description,
             mentions=self.mentions,
         )

@@ -23,7 +23,7 @@ class AlertData:
         metric_name: Name of the metric
         timestamp: Timestamp of the anomaly (datetime64)
         timezone: Timezone for display (e.g., "Europe/Moscow")
-        value: Actual metric value
+        value: Actual metric value (None for no-data alerts)
         confidence_lower: Lower confidence bound
         confidence_upper: Upper confidence bound
         detector_name: Name/ID of detector that found the anomaly
@@ -32,12 +32,14 @@ class AlertData:
         severity: Severity score
         detection_metadata: Additional metadata from detector
         consecutive_count: Number of consecutive anomalies
+        is_recovery: True for recovery notifications
+        is_no_data: True for missing-data alerts (no_data_alert)
     """
 
     metric_name: str
     timestamp: Any  # datetime64 or datetime
     timezone: str
-    value: float
+    value: Optional[float]
     confidence_lower: Optional[float]
     confidence_upper: Optional[float]
     detector_name: str
@@ -47,6 +49,7 @@ class AlertData:
     detection_metadata: Dict[str, Any]
     consecutive_count: int = 1
     is_recovery: bool = False
+    is_no_data: bool = False
     description: Optional[str] = None
     mentions: List[str] = field(default_factory=list)
 
@@ -111,13 +114,14 @@ class BaseAlertChannel(ABC):
         - {metric_name}
         - {timestamp}
         - {timezone}
-        - {value}
+        - {value} / {value_display}
         - {confidence_lower}
         - {confidence_upper}
         - {detector_name}
         - {direction}
         - {severity}
         - {consecutive_count}
+        - {status}
 
         Args:
             alert_data: Alert data to format
@@ -131,13 +135,16 @@ class BaseAlertChannel(ABC):
             >>> message = channel.format_message(alert_data, template)
         """
         if template is None:
-            if alert_data.is_recovery:
+            if alert_data.is_no_data:
+                template = self.get_default_no_data_template()
+            elif alert_data.is_recovery:
                 template = recovery_template or self.get_default_recovery_template()
             else:
                 template = self.get_default_template()
 
         # Format timestamp to string
         from datetime import datetime
+        import math
         import numpy as np
 
         ts = alert_data.timestamp
@@ -158,6 +165,15 @@ class BaseAlertChannel(ABC):
         else:
             confidence_str = "N/A"
 
+        # Display-safe value: stays usable even when value is None/NaN (no-data).
+        raw_value = alert_data.value
+        if raw_value is None or (isinstance(raw_value, float) and math.isnan(raw_value)):
+            value_display = "no data"
+            value_for_template: Any = "no data"
+        else:
+            value_display = f"{raw_value}"
+            value_for_template = raw_value
+
         # Format description line (empty string if no description)
         description_line = f"{alert_data.description}\n" if alert_data.description else ""
 
@@ -166,14 +182,20 @@ class BaseAlertChannel(ABC):
         mentions_line = f"\n{mentions_str}" if mentions_str else ""
 
         # Format message
-        status = "RECOVERED" if alert_data.is_recovery else "ANOMALY"
+        if alert_data.is_no_data:
+            status = "NO_DATA"
+        elif alert_data.is_recovery:
+            status = "RECOVERED"
+        else:
+            status = "ANOMALY"
 
         try:
             message = template.format(
                 metric_name=alert_data.metric_name,
                 timestamp=ts_str,
                 timezone=alert_data.timezone,
-                value=alert_data.value,
+                value=value_for_template,
+                value_display=value_display,
                 confidence_lower=alert_data.confidence_lower,
                 confidence_upper=alert_data.confidence_upper,
                 confidence_interval=confidence_str,
@@ -188,9 +210,20 @@ class BaseAlertChannel(ABC):
                 mentions=mentions_str,
                 mentions_line=mentions_line,
             )
-        except KeyError as e:
-            # If template has unknown variables, fall back to default
-            message = self.format_message(alert_data, self.get_default_template())
+        except (KeyError, ValueError, TypeError):
+            # Template has an unknown variable or a format spec that doesn't fit
+            # the actual value (e.g. ``{value:.2f}`` in a no-data template where
+            # value is a string). Fall back to the kind-appropriate default.
+            if alert_data.is_no_data:
+                fallback = self.get_default_no_data_template()
+            elif alert_data.is_recovery:
+                fallback = self.get_default_recovery_template()
+            else:
+                fallback = self.get_default_template()
+            if template == fallback:
+                # Already on the default — re-raise instead of recursing.
+                raise
+            message = self.format_message(alert_data, fallback)
 
         return message
 
@@ -227,7 +260,9 @@ class BaseAlertChannel(ABC):
         Returns:
             Formatted title string
         """
-        if alert_data.is_recovery:
+        if alert_data.is_no_data:
+            title_template = self.get_default_no_data_title_template()
+        elif alert_data.is_recovery:
             title_template = self.get_default_recovery_title_template()
         else:
             title_template = self.get_default_title_template()
@@ -288,6 +323,25 @@ class BaseAlertChannel(ABC):
             Default recovery title template string
         """
         return "Metric recovered: {metric_name}"
+
+    def get_default_no_data_template(self) -> str:
+        """
+        Get default message template for no-data alerts.
+
+        Used when ``no_data_alert: true`` and the latest expected interval
+        has no datapoint (no row OR row with NULL/NaN value).
+        """
+        return (
+            "No data for metric: {metric_name}\n"
+            "{description_line}"
+            "Time: {timestamp}\n"
+            "Status: query returned no datapoint for the latest interval"
+            "{mentions_line}"
+        )
+
+    def get_default_no_data_title_template(self) -> str:
+        """Get default title template for no-data alerts."""
+        return "No data: {metric_name}"
 
     def __repr__(self) -> str:
         """String representation of channel."""

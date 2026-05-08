@@ -103,8 +103,13 @@ class WebhookChannel(BaseAlertChannel):
         title = self.format_title(alert_data)
         body = self.format_message(alert_data, template)
 
-        # Color: red for anomaly, green for recovery
-        color = "#36A64F" if alert_data.is_recovery else "#D63232"
+        # Color: red for anomaly, green for recovery, amber for no-data.
+        if alert_data.is_recovery:
+            color = "#36A64F"
+        elif alert_data.is_no_data:
+            color = "#F0AD4E"
+        else:
+            color = "#D63232"
 
         # Prepare payload using Mattermost/Slack attachments format.
         # Attachments give us: colored left sidebar, separate title, and
@@ -172,6 +177,15 @@ class WebhookChannel(BaseAlertChannel):
             "Value: {value} | CI: {confidence_interval}\n"
             "Detector: {detector_name}\n"
             "Status: metric returned to normal"
+            "{mentions_line}"
+        )
+
+    def get_default_no_data_template(self) -> str:
+        """Default no-data body template (metric name lives in the title)."""
+        return (
+            "{description_line}"
+            "Time: {timestamp}\n"
+            "Status: query returned no datapoint for the latest interval"
             "{mentions_line}"
         )
 

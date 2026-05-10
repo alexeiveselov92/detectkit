@@ -5,6 +5,52 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-05-10
+
+### Added
+- **`no_data_alert` now actually fires.** The flag had been defined and
+  persisted but was never read by the orchestrator, so missing-data
+  alerts silently never went out. New `should_alert_no_data()` checks
+  the latest expected interval in `_dtk_datapoints` (no row OR row with
+  NULL/NaN value → "missing") and dispatches a dedicated alert through
+  the same channels, honouring the existing `alert_cooldown` /
+  `suppress_until` machinery. New `template_no_data` field on
+  `AlertingConfig` for the message body.
+- **Project-level `error_alerting`.** New optional section in
+  `detectkit_project.yml` that catches any pipeline exception (DB
+  outage, query timeout, lock failure, channel HTTP, etc.) and ships
+  one alert through the named channels. After the alert fires the run
+  aborts (`result["abort_run"] = True`) so a dead source doesn't cause
+  N alerts for N metrics. No persistent cooldown — storing state in
+  the DB doesn't help when the DB itself is down, and a local file
+  would break the dbt-style stateless model. Custom `template`,
+  `mentions`, and `timezone` supported.
+- `AlertData` gains `is_no_data`, `is_error`, `error_type`,
+  `error_message`. `format_message` handles three new statuses
+  (`NO_DATA`, `ERROR`, plus the existing `RECOVERED` / `ANOMALY`),
+  exposes `{value_display}` as a NaN-safe template variable, and
+  falls back to a kind-appropriate default if a user template uses
+  `{value:.2f}` on a no-data / error payload. `WebhookChannel` adds
+  amber `#F0AD4E` for no-data and keeps red for error (visual parity
+  with existing anomaly cards).
+
+### Fixed
+- `[dev]` extras pinned `pytest-requests-mock>=0.1`, which does not
+  exist on PyPI. Every CI Test job aborted in 10s with "No matching
+  distribution found" before pytest could even start. Replaced with
+  `pytest-mock`.
+- `AlertData.value` is now `Optional[float]` (was `float`). Required
+  by the no-data / error paths where there is no real value; unchanged
+  semantics for existing anomaly / recovery callers.
+
+### Internal
+- Whole codebase brought up to ruff + black compliance (autofixed
+  pyupgrade rules, `raise ... from e`, `zip(strict=True)`, formatting).
+  No behaviour changes; 385 unit tests still pass. CI's lint job is
+  now actually a gate rather than a permanent red tile.
+- `[tool.ruff]` migrated to `[tool.ruff.lint]` to silence the
+  deprecation warning.
+
 ## [0.4.1] - 2026-04-27
 
 ### Fixed

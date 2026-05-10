@@ -23,7 +23,9 @@ This directory contains practical examples for common monitoring scenarios.
 - [Gaming Metrics with Complex Seasonality](#example-10-gaming-metrics-with-complex-seasonality) - Multi-dimensional seasonality
 - [Multi-Detector Strategy](#example-11-multi-detector-strategy) - Combining multiple detectors
 
-### New Features (v0.2.0+, v0.3.0+, v0.3.8+)
+### New Features (v0.2.0+ → v0.5.0)
+- **[No-Data Alerts (v0.5.0)](#example-12-no-data-alerts-v050)** - Fire when the latest interval has no datapoint
+- **[Project-Level Error Alerting (v0.5.0)](#example-13-project-level-error-alerting-v050)** - Catch DB outages and pipeline crashes at the project level
 - **[Mentions Example](mentions-example.yml)** - @mention users/groups in alerts across all channels (v0.3.8)
 - **[Alert Cooldown Example](alert-cooldown-example.yml)** - Prevent spam with alert cooldown (v0.3.0)
 - **[Recovery Notifications Example](recovery-notification-example.yml)** - "All clear" messages when metric stabilizes
@@ -577,6 +579,140 @@ alerting:
 
 ---
 
+## Example 12: No-Data Alerts (v0.5.0)
+
+Fire an alert when a metric stops producing data — e.g., the source
+ETL hung and no rows arrive for the latest interval.
+
+### Configuration
+
+```yaml
+# metrics/hourly_revenue.yml
+name: hourly_revenue_usd
+description: Total revenue per hour, sourced from the orders ETL
+interval: 1hour
+
+query: |
+  SELECT
+    toStartOfHour(timestamp) AS timestamp,
+    SUM(amount_usd) AS value
+  FROM transactions
+  WHERE timestamp >= %(from_date)s
+    AND timestamp < %(to_date)s
+    AND status = 'completed'
+  GROUP BY timestamp
+  ORDER BY timestamp
+
+detectors:
+  - type: mad
+    params:
+      threshold: 3.0
+      window_size: 720    # 30 days
+      min_samples: 100
+
+alerting:
+  enabled: true
+  channels:
+    - mattermost_finance
+    - email_oncall
+  consecutive_anomalies: 2
+  direction: "down"
+
+  # No-data alert (v0.5.0) — fires if the previous full hour has no row
+  no_data_alert: true
+  template_no_data: |
+    🟠 hourly_revenue stopped reporting
+    Last expected hour: {timestamp} ({timezone})
+    Likely cause: orders ETL is hung. Check the upstream job.
+    {mentions}
+  mentions: [oncall_data]
+  alert_cooldown: "1hour"   # don't spam every cron tick
+```
+
+### Why This Works
+
+- Hourly cron schedule means a missing hour is a real signal, not noise
+- `no_data_alert` independently checks the last full interval, so it
+  fires even when there are no anomalies to evaluate against
+- Custom `template_no_data` makes the on-call action obvious — they
+  don't need to guess what "no data" means
+- `alert_cooldown: "1hour"` ensures only one no-data alert per cron
+  tick, even if the ETL stays broken
+
+### When NOT to Use
+
+- Naturally sparse metrics (events that don't happen every interval)
+- High-cardinality slicing where empty buckets are normal
+
+---
+
+## Example 13: Project-Level Error Alerting (v0.5.0)
+
+Catch failures at the **project** level — DB outages, query timeouts,
+lock failures — that affect every metric in the run.
+
+### Configuration
+
+```yaml
+# detectkit_project.yml
+name: my_monitoring
+default_profile: prod
+
+paths:
+  metrics: metrics
+  sql: sql
+  templates: templates
+
+# v0.5.0: catch pipeline crashes (one alert per dtk run, then abort)
+error_alerting:
+  enabled: true
+  channels:
+    - mattermost_oncall
+    - email_oncall
+  mentions: [oncall_engineer, here]
+  timezone: "Europe/Moscow"
+  template: |
+    🔥 detectkit pipeline failure
+    Metric: {metric_name}
+    {error_type}: {error_message}
+    Time: {timestamp} ({timezone})
+    {mentions}
+```
+
+### Why This Works
+
+- Without `error_alerting`, the run silently moves to the next metric
+  on failure — ops only notices when expected anomaly alerts stop
+  arriving (could be hours)
+- One alert per `dtk run` (subsequent failures suppressed) — if CH is
+  down, you don't get 30 identical alerts
+- Run aborts after the first error alert — no point loading the rest
+  if the source is dead
+- Channels reuse `profiles.yml` — no config duplication
+- Pair with cron exit-code monitoring: `error_alerting` covers
+  in-process crashes, cron monitoring covers `dtk run` not running
+  at all
+
+### Channel Config (in profiles.yml)
+
+```yaml
+# profiles.yml
+alert_channels:
+  mattermost_oncall:
+    type: mattermost
+    webhook_url: "https://mattermost.example.com/hooks/xxx"
+    channel: "oncall-alerts"
+
+  email_oncall:
+    type: email
+    smtp_host: smtp.gmail.com
+    smtp_port: 587
+    from_email: detectkit@example.com
+    to_emails: [oncall@example.com]
+```
+
+---
+
 ## Common Patterns Summary
 
 | Use Case | Detector | Seasonality | Consecutive | Direction |
@@ -599,6 +735,10 @@ alerting:
 | Recovery notify | `notify_on_recovery: true` | "All clear" sent once per incident |
 | Custom recovery | `template_recovery: "..."` | Custom message text for recovery |
 | Mentions | `mentions: ["oncall", "here"]` | @mention users/groups in alerts |
+| Suppress | `suppress_until: "2026-04-11 18:00:00"` | Pause alerts until UTC time |
+| **No-data alert (v0.5.0)** | `no_data_alert: true` | Fire when latest interval has no row |
+| **No-data template (v0.5.0)** | `template_no_data: "..."` | Custom no-data message body |
+| **Project errors (v0.5.0)** | `error_alerting:` in `detectkit_project.yml` | Catch pipeline crashes (DB outage etc.) |
 
 ## See Also
 

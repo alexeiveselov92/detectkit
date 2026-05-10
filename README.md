@@ -13,7 +13,8 @@
 - **Statistical detectors** — Z-Score, MAD, IQR, Manual Bounds
 - **Multi-channel alerting** — Mattermost, Slack, Telegram, Email, Webhook
 - **@mentions** — tag users/groups in alerts, each channel formats natively
-- **Alert lifecycle** — consecutive anomalies, cooldown, recovery notifications
+- **Alert lifecycle** — consecutive anomalies, cooldown, recovery notifications, no-data alerts
+- **Project-level error alerts** — catch DB outages and pipeline crashes once per run
 - **Database agnostic** — ClickHouse, PostgreSQL, MySQL
 - **Idempotent** — resume from interruptions, no duplicate processing
 - **CLI** — `dtk init`, `dtk run --select`, tag-based selectors

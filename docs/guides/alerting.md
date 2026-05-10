@@ -695,6 +695,174 @@ alerting:
 
 **Warning**: Without cooldown, you may receive many duplicate alerts for persistent anomalies.
 
+## Missing Data Alerts (v0.5.0)
+
+Detect when a metric stops producing data — the source query returned
+no rows for the latest interval, or the row's value is `NULL` / `NaN`.
+
+> **Note**: prior to v0.5.0 the `no_data_alert` flag existed but was
+> never read by the orchestrator. If you set it to `true` on an older
+> version and saw nothing fire, that was the bug. Upgrading to v0.5.0
+> is enough — no schema change.
+
+### How It Works
+
+At the alert step, after the regular anomaly check, detectkit:
+
+1. Computes the **last complete interval** by flooring `now` to an
+   interval boundary and stepping back one interval (the in-progress
+   bucket is intentionally skipped — it's not "missing", it's "not
+   yet ready").
+2. Looks up that timestamp in `_dtk_datapoints` for the metric.
+3. Fires a no-data alert if the row is missing OR the row exists with
+   a `NULL` / `NaN` value. The load step writes `NaN` (never `0`) for
+   gap-filled intervals, so the two cases are equivalent.
+
+`min_detectors` and `consecutive_anomalies` **do not apply** to no-data
+— missing data is a single binary metric-level signal, not a
+per-detector vote. The check honours `alert_cooldown` and
+`suppress_until` like anomaly alerts.
+
+### Configuration
+
+```yaml
+alerting:
+  enabled: true
+  channels:
+    - mattermost_ops
+  no_data_alert: true                # default: false
+  template_no_data: null             # optional custom body
+  alert_cooldown: "1hour"            # respected by no-data path
+```
+
+### Custom Template
+
+```yaml
+alerting:
+  no_data_alert: true
+  template_no_data: |
+    🟠 {metric_name} stopped reporting
+    {description_line}Last expected interval: {timestamp} ({timezone})
+    Action: check the upstream pipeline / source DB
+    {mentions}
+  mentions: [oncall_engineer]
+```
+
+**Available variables** (no `{value}` / `{confidence_interval}` — there
+is no value):
+
+| Variable | Description |
+|---|---|
+| `{metric_name}` | Metric name |
+| `{timestamp}` | Timestamp of the missing interval (formatted, in `{timezone}`) |
+| `{timezone}` | Configured timezone |
+| `{description}` | Metric `description`, empty string if none |
+| `{description_line}` | Same with trailing newline, empty if none |
+| `{status}` | Always `"NO_DATA"` |
+| `{mentions}` / `{mentions_line}` | Formatted mentions |
+| `{value_display}` | Always the literal string `"no data"` |
+
+If a template uses `{value:.2f}` or another numeric format spec on a
+no-data alert, detectkit falls back to the default no-data template
+rather than crashing — but write the template with no-data in mind.
+
+### Visual Distinction
+
+Webhook channels (Slack/Mattermost) render no-data alerts with the
+amber color `#F0AD4E` to distinguish them from anomalies (red) and
+recoveries (green).
+
+### When to Use
+
+- Cron-driven loaders where source absence is a real failure signal
+  (e.g., revenue by hour — empty hour means the upstream ETL is broken)
+- Health-check style metrics where "no data" is meaningful
+- **Don't** enable on metrics with naturally sparse intervals — you'll
+  just spam channels every cron tick
+
+## Project-Level Error Alerts (v0.5.0)
+
+When a metric pipeline crashes (DB unreachable, query timeout, lock
+acquisition failure, channel HTTP error), the failure is logged and
+the run moves to the next metric. With CH down for the whole project
+all metrics fail in a row and ops finds out only when expected alerts
+stop arriving.
+
+`error_alerting` in `detectkit_project.yml` catches that case and
+sends one notification per `dtk run`.
+
+### Configuration
+
+```yaml
+# detectkit_project.yml
+name: my_monitoring
+default_profile: prod
+
+error_alerting:
+  enabled: true
+  channels:
+    - mattermost_oncall          # channels resolved from profiles.yml
+  mentions: [oncall_engineer, here]
+  timezone: "Europe/Moscow"
+  template: |                    # optional, defaults documented below
+    🔥 Pipeline failure
+    Metric: {metric_name}
+    {error_type}: {error_message}
+    Time: {timestamp} ({timezone})
+    {mentions}
+```
+
+See the [Configuration Guide](configuration.md#error_alerting-object-optional)
+for full field reference.
+
+### Behaviour
+
+- **One alert per run.** After the first error alert fires, an
+  in-process flag suppresses subsequent failures and the run aborts
+  (`result["abort_run"] = True` → CLI breaks the metric loop). If the
+  source DB is down, processing the next 30 metrics won't change
+  anything.
+- **No persistent cooldown** between separate `dtk run` invocations.
+  Storing state in the DB doesn't help when the DB itself is down,
+  and a local file would break the dbt-style stateless model. Cron
+  schedule cadence covers spacing.
+- **Channel failures are swallowed.** A flaky webhook cannot crash the
+  run — dispatch is wrapped in its own `try/except`.
+- Channels are resolved from the same `profiles.yml` channel block as
+  per-metric alerts. Reuse the names, no config duplication.
+
+### Default Template
+
+```
+Pipeline failed for metric: {metric_name}
+{description_line}Time: {timestamp}
+Error: {error_type}: {error_message}
+{mentions_line}
+```
+
+### Template Variables
+
+| Variable | Description |
+|---|---|
+| `{metric_name}` | Name of the metric whose pipeline failed |
+| `{error_type}` | Exception class name (e.g., `ConnectionRefusedError`) |
+| `{error_message}` | Exception `str(exc)` |
+| `{timestamp}` | When the alert was built (formatted in `{timezone}`) |
+| `{timezone}` | `error_alerting.timezone` or `UTC` |
+| `{status}` | Always `"ERROR"` |
+| `{mentions}` / `{mentions_line}` | Formatted mentions |
+| `{description}` / `{description_line}` | Empty for error alerts (no metric context) |
+
+Webhook channels render error alerts in red (same as anomalies).
+
+### When to Use
+
+- Production deployments where silent failure is unacceptable
+- Multi-metric projects where one infra issue affects everything
+- Pair with cron monitoring (`dtk run` exit code) for full coverage —
+  `error_alerting` covers in-process failures, cron monitors `dtk run`
+  not running at all
+
 ## Mentions (v0.3.8)
 
 Tag specific users or groups in alert messages. Mentions are **channel-agnostic**: you write plain usernames in metric config, and each channel formats them in its native syntax.
@@ -842,23 +1010,37 @@ alerting:
 
 ### Available Template Variables
 
-- `metric_name` - Metric name
-- `timestamp` - Timestamp (formatted)
-- `timezone` - Timezone display name
-- `value` - Current metric value
-- `confidence_lower` - Lower bound of confidence interval
-- `confidence_upper` - Upper bound of confidence interval
-- `detector_name` - Detector that triggered (e.g., "MADDetector:threshold=3.0")
-- `severity` - Severity score (how far from bounds)
-- `direction` - "above" or "below"
-- `consecutive_count` - Number of consecutive anomalies
-- `mentions` - Formatted mentions (e.g., "@user1 @user2"), empty if none
-- `mentions_line` - Same with leading newline, empty if none
+| Variable | Description | Available in |
+|---|---|---|
+| `metric_name` | Metric name | all |
+| `timestamp` | Timestamp (formatted in `{timezone}`) | all |
+| `timezone` | Timezone display name | all |
+| `value` | Current metric value (numeric, or string `"no data"` for no-data) | all |
+| `value_display` | NaN-safe string version — always renders, falls back to `"no data"` | all (v0.5.0) |
+| `confidence_lower` / `confidence_upper` | Bounds of confidence interval | anomaly, recovery |
+| `confidence_interval` | Formatted as `[lower, upper]` or `"N/A"` | all |
+| `detector_name` | Detector that triggered (e.g., `"MADDetector:threshold=3.0"`) | anomaly, recovery |
+| `severity` | Severity score (how far from bounds) | anomaly |
+| `direction` | `"above"` or `"below"` | anomaly |
+| `consecutive_count` | Number of consecutive anomalies | anomaly |
+| `status` | `"ANOMALY"`, `"RECOVERED"`, `"NO_DATA"`, or `"ERROR"` | all (v0.5.0 added NO_DATA / ERROR) |
+| `error_type` / `error_message` | Exception details | error only (v0.5.0) |
+| `description` / `description_line` | Metric description | all |
+| `mentions` / `mentions_line` | Formatted mentions | all |
+
+> **Format-spec safety**: if a template uses `{value:.2f}` (or any
+> numeric format spec) on a no-data or error alert where there's no
+> real value, detectkit falls back to the kind-appropriate default
+> template instead of crashing. Still cleaner to write
+> kind-appropriate templates from the start.
 
 ### Template Types
 
 - **`template_single`** - Used for first anomaly in sequence
 - **`template_consecutive`** - Used for consecutive anomalies (default: same as single)
+- **`template_recovery`** - Used for recovery notifications
+- **`template_no_data`** - Used for no-data alerts (v0.5.0)
+- **`error_alerting.template`** - Used for project-level pipeline errors (v0.5.0, in `detectkit_project.yml`)
 
 ## Testing Alerts
 

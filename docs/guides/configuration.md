@@ -68,6 +68,63 @@ Default names for internal tables:
 - **`query_timeout`** (default: `300`) - SQL query execution timeout in seconds
 - **`lock_timeout`** (default: `3600`) - How long to hold task locks before expiring
 
+#### `error_alerting` (object, optional)
+
+**New in v0.5.0** — project-scoped error alerting. Catches any exception
+from `TaskManager.run_metric` (DB outage, query timeout, lock acquisition
+failure, channel HTTP error, etc.) and ships **one** alert through the
+named channels. After the alert fires the rest of the `dtk run`
+invocation aborts — if the source DB is down there's no point loading
+the next 30 metrics.
+
+```yaml
+# detectkit_project.yml
+error_alerting:
+  enabled: true                       # default: false
+  channels:                           # channel names from profiles.yml
+    - mattermost_oncall
+    - email_oncall
+  mentions: [oncall_engineer, here]   # optional, same syntax as metric mentions
+  timezone: "Europe/Moscow"           # optional, used for {timestamp} display
+  template: |                         # optional, see template variables below
+    🔥 detectkit pipeline failed
+    Metric: {metric_name}
+    {error_type}: {error_message}
+    Time: {timestamp} ({timezone})
+    {mentions}
+```
+
+**Fields**:
+
+- **`enabled`** (default: `false`) - Master switch.
+- **`channels`** (default: `[]`) - Channel names from `profiles.yml`. If
+  none resolve, error alerting silently no-ops.
+- **`template`** (default: `null`) - Custom message body. Default is
+  `"Pipeline failed for metric: {metric_name}\n...Time: {timestamp}\nError: {error_type}: {error_message}\n{mentions_line}"`.
+- **`mentions`** (default: `[]`) - Same syntax as metric-level mentions.
+- **`timezone`** (default: `null` / UTC) - Display timezone for `{timestamp}`.
+
+**Template variables** (in addition to `{metric_name}`, `{timestamp}`,
+`{timezone}`, `{mentions}`, `{mentions_line}`, `{description}`,
+`{description_line}`):
+
+- `{error_type}` - Exception class name (e.g., `ConnectionRefusedError`)
+- `{error_message}` - Exception `str(exc)`
+- `{status}` - Always `"ERROR"`
+
+**Behaviour notes**:
+
+- **One alert per `dtk run`.** Subsequent metric failures in the same
+  invocation are suppressed via an in-memory flag.
+- **Run aborts** after the first error alert (`result["abort_run"] = True`
+  → CLI breaks the metric loop).
+- **No persistent cooldown** between separate `dtk run` invocations.
+  Storing state in the DB doesn't help when the DB itself is down, and
+  a local file would break the dbt-style stateless model. Use cron
+  schedule cadence to space out repeated alerts.
+- A flaky channel cannot crash the run — dispatch is wrapped in its
+  own `try/except`.
+
 ## Profiles Configuration
 
 File: `profiles.yml`
@@ -522,8 +579,9 @@ alerting:
   # Mentions (v0.3.8) — tag users/groups in alerts
   mentions: []                   # Plain usernames without @, e.g., ["oncall", "here"]
 
-  # Special alerts
-  no_data_alert: false           # Alert on missing data (default: false)
+  # Missing data alert (v0.5.0)
+  no_data_alert: false           # Fire alert when last interval has no row (default: false)
+  template_no_data: null         # Custom no-data message template
 
   # Custom templates
   template_single: null          # Custom single anomaly template
@@ -565,6 +623,29 @@ alerting:
   - Special keywords: `here`, `channel`, `all` for broadcast mentions
   - Each channel formats mentions in its native syntax
   - Available as `{mentions}` and `{mentions_line}` template variables
+
+- **`no_data_alert`** (v0.5.0): Alert when the latest expected interval
+  has no datapoint
+  - `false` (default) — disabled
+  - `true` — at the alert step, checks `_dtk_datapoints` for the last
+    complete interval. If no row exists OR the row's value is `NULL` /
+    `NaN`, fires a dedicated alert with `status=NO_DATA` through the
+    same `channels`. Honours `alert_cooldown` and `suppress_until`.
+  - `min_detectors` and `consecutive_anomalies` deliberately do **not**
+    apply — missing data is a single binary signal, not a per-detector
+    vote.
+  - Webhook channels render no-data alerts in amber (`#F0AD4E`) instead
+    of red.
+
+- **`template_no_data`** (v0.5.0): Custom message body for no-data alerts
+  - Default: `"No data for metric: {metric_name}\n...Time: {timestamp}\nStatus: query returned no datapoint for the latest interval"`
+  - Variables: `{metric_name}`, `{timestamp}`, `{timezone}`,
+    `{description}`, `{description_line}`, `{mentions}`,
+    `{mentions_line}`, `{status}` (always `"NO_DATA"`)
+  - **Avoid** `{value:.2f}` / `{confidence_interval}` — there is no
+    value for no-data alerts. The formatter falls back to the default
+    template if your template uses a numeric format spec on a
+    non-numeric value, but it's cleaner not to rely on the fallback.
 
 ### Custom Table Names
 

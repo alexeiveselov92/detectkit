@@ -50,6 +50,9 @@ class AlertData:
     consecutive_count: int = 1
     is_recovery: bool = False
     is_no_data: bool = False
+    is_error: bool = False
+    error_type: Optional[str] = None
+    error_message: Optional[str] = None
     description: Optional[str] = None
     mentions: List[str] = field(default_factory=list)
 
@@ -135,7 +138,9 @@ class BaseAlertChannel(ABC):
             >>> message = channel.format_message(alert_data, template)
         """
         if template is None:
-            if alert_data.is_no_data:
+            if alert_data.is_error:
+                template = self.get_default_error_template()
+            elif alert_data.is_no_data:
                 template = self.get_default_no_data_template()
             elif alert_data.is_recovery:
                 template = recovery_template or self.get_default_recovery_template()
@@ -182,7 +187,9 @@ class BaseAlertChannel(ABC):
         mentions_line = f"\n{mentions_str}" if mentions_str else ""
 
         # Format message
-        if alert_data.is_no_data:
+        if alert_data.is_error:
+            status = "ERROR"
+        elif alert_data.is_no_data:
             status = "NO_DATA"
         elif alert_data.is_recovery:
             status = "RECOVERED"
@@ -205,6 +212,8 @@ class BaseAlertChannel(ABC):
                 severity=alert_data.severity,
                 consecutive_count=alert_data.consecutive_count,
                 status=status,
+                error_type=alert_data.error_type or "",
+                error_message=alert_data.error_message or "",
                 description=alert_data.description or "",
                 description_line=description_line,
                 mentions=mentions_str,
@@ -214,7 +223,9 @@ class BaseAlertChannel(ABC):
             # Template has an unknown variable or a format spec that doesn't fit
             # the actual value (e.g. ``{value:.2f}`` in a no-data template where
             # value is a string). Fall back to the kind-appropriate default.
-            if alert_data.is_no_data:
+            if alert_data.is_error:
+                fallback = self.get_default_error_template()
+            elif alert_data.is_no_data:
                 fallback = self.get_default_no_data_template()
             elif alert_data.is_recovery:
                 fallback = self.get_default_recovery_template()
@@ -260,7 +271,9 @@ class BaseAlertChannel(ABC):
         Returns:
             Formatted title string
         """
-        if alert_data.is_no_data:
+        if alert_data.is_error:
+            title_template = self.get_default_error_title_template()
+        elif alert_data.is_no_data:
             title_template = self.get_default_no_data_title_template()
         elif alert_data.is_recovery:
             title_template = self.get_default_recovery_title_template()
@@ -342,6 +355,20 @@ class BaseAlertChannel(ABC):
     def get_default_no_data_title_template(self) -> str:
         """Get default title template for no-data alerts."""
         return "No data: {metric_name}"
+
+    def get_default_error_template(self) -> str:
+        """Default body template for project-level error alerts."""
+        return (
+            "Pipeline failed for metric: {metric_name}\n"
+            "{description_line}"
+            "Time: {timestamp}\n"
+            "{error_type}: {error_message}"
+            "{mentions_line}"
+        )
+
+    def get_default_error_title_template(self) -> str:
+        """Default title template for project-level error alerts."""
+        return "Pipeline error: {metric_name}"
 
     def __repr__(self) -> str:
         """String representation of channel."""

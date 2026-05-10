@@ -186,7 +186,7 @@ def run_command(
 
     # Process each metric
     for metric_path, config in metrics:
-        process_metric(
+        result = process_metric(
             metric_path=metric_path,
             config=config,
             project_root=project_root,
@@ -197,6 +197,17 @@ def run_command(
             full_refresh=full_refresh,
             force=force,
         )
+        # Project-level error alert was dispatched — stop processing the
+        # rest of the metrics. The DB / source is presumed unreachable;
+        # subsequent metrics would all fail with the same error.
+        if result and result.get("abort_run"):
+            click.echo(click.style(
+                "✗ Aborting run after project error alert. "
+                "Remaining metrics skipped.",
+                fg="red",
+                bold=True,
+            ))
+            break
 
 
 def parse_steps(steps_str: str) -> List[PipelineStep]:
@@ -439,7 +450,7 @@ def process_metric(
     to_date: Optional[datetime],
     full_refresh: bool,
     force: bool,
-):
+) -> Optional[dict]:
     """
     Process a single metric.
 
@@ -473,6 +484,7 @@ def process_metric(
     click.echo()
 
     # Run pipeline
+    result = None
     try:
         # Log step headers
         if PipelineStep.LOAD in steps:
@@ -514,3 +526,4 @@ def process_metric(
         click.echo(traceback.format_exc())
 
     click.echo()
+    return result

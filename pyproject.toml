@@ -61,7 +61,7 @@ all = [
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
-    "pytest-requests-mock>=0.1",
+    "pytest-mock>=3.0",
     "requests-mock>=1.12",
     "black>=23.0",
     "mypy>=1.0",
@@ -147,6 +147,8 @@ ignore_missing_imports = true
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -161,5 +163,5 @@ ignore = [
     "B008", # do not perform function calls in argument defaults
 ]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # unused imports in __init__.py

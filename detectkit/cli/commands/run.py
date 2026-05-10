@@ -14,6 +14,7 @@ from detectkit.config.profile import ProfilesConfig
 from detectkit.config.project_config import ProjectConfig
 from detectkit.config.validator import validate_metric_uniqueness
 from detectkit.database.internal_tables import InternalTablesManager
+from detectkit.orchestration.error_dispatch import dispatch_project_error_alert
 from detectkit.orchestration.task_manager import PipelineStep, TaskManager
 
 
@@ -159,6 +160,15 @@ def run_command(
                 bold=True,
             )
         )
+        # Profiles are loaded → channels can be resolved → fire the
+        # project-level error alert before bailing. Otherwise a dead DB
+        # silently kills the entire run with no notification.
+        dispatch_project_error_alert(
+            profiles_config=profiles_config,
+            project_config=project_config,
+            metric_name="<startup>",
+            exc=e,
+        )
         return
 
     # Create internal tables manager
@@ -174,6 +184,12 @@ def run_command(
                 fg="red",
                 bold=True,
             )
+        )
+        dispatch_project_error_alert(
+            profiles_config=profiles_config,
+            project_config=project_config,
+            metric_name="<startup>",
+            exc=e,
         )
         return
 

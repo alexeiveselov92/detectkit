@@ -2,12 +2,16 @@
 
 from unittest.mock import Mock
 
+import numpy as np
+
+import detectkit.orchestration.task_manager.manager as manager_module
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
 from detectkit.config.project_config import (
     ProjectConfig,
     ProjectErrorAlertingConfig,
 )
 from detectkit.orchestration.task_manager import TaskManager, TaskStatus
+from detectkit.utils.datetime_utils import now_utc_naive
 
 
 class _RecordingChannel(BaseAlertChannel):
@@ -41,21 +45,62 @@ def _make_project_config(
     )
 
 
-def _make_task_manager(*, project_config, recording_channel=None, channels_factory=None):
-    """Build a TaskManager and stub _create_alert_channels."""
-    tm = TaskManager(
+def _make_task_manager(*, project_config):
+    """Build a TaskManager with all collaborators mocked."""
+    return TaskManager(
         internal_manager=Mock(),
         db_manager=Mock(),
-        profiles_config=Mock(),  # presence-only — channels factory is stubbed
+        profiles_config=Mock(),
         project_config=project_config,
     )
-    if channels_factory is not None:
-        tm._create_alert_channels = channels_factory
-    elif recording_channel is not None:
-        tm._create_alert_channels = lambda names: [recording_channel]
-    else:
-        tm._create_alert_channels = lambda names: []
-    return tm
+
+
+def _patch_dispatcher_to_record(monkeypatch, recording_channel: BaseAlertChannel):
+    """Replace ``dispatch_project_error_alert`` so it forwards to *recording_channel*.
+
+    Since v0.5.x TaskManager delegates the dispatch to the standalone
+    helper (so the CLI can use the same code path for startup failures).
+    These tests pin TaskManager's *behaviour around* the dispatcher
+    (per-run dedup, abort signalling, return-value plumbing), not the
+    dispatcher's internals — those have their own unit tests in
+    ``test_error_dispatch.py``.
+    """
+
+    def _record(*, profiles_config, project_config, metric_name, exc):
+        cfg = project_config.error_alerting
+        alert_data = AlertData(
+            metric_name=metric_name,
+            timestamp=np.datetime64(now_utc_naive(), "ms"),
+            timezone=cfg.timezone or "UTC",
+            value=None,
+            confidence_lower=None,
+            confidence_upper=None,
+            detector_name="pipeline",
+            detector_params="",
+            direction="none",
+            severity=0.0,
+            detection_metadata={"reason": "pipeline_error"},
+            consecutive_count=0,
+            is_error=True,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+            description=None,
+            mentions=cfg.mentions,
+        )
+        try:
+            recording_channel.send(alert_data, template=cfg.template)
+        except Exception:
+            pass
+        return True
+
+    monkeypatch.setattr(manager_module, "dispatch_project_error_alert", _record)
+
+
+def _patch_dispatcher_returning(monkeypatch, return_value: bool):
+    """Replace the dispatcher with one that just returns *return_value*."""
+    monkeypatch.setattr(
+        manager_module, "dispatch_project_error_alert", Mock(return_value=return_value)
+    )
 
 
 class TestProjectErrorAlertingConfig:
@@ -77,38 +122,29 @@ class TestProjectErrorAlertingConfig:
 class TestMaybeSendErrorAlert:
     """``TaskManager._maybe_send_error_alert`` behaviour."""
 
-    def test_disabled_returns_false(self):
-        tm = _make_task_manager(
-            project_config=_make_project_config(enabled=False),
-            recording_channel=_RecordingChannel(),
-        )
+    def test_disabled_returns_false(self, monkeypatch):
+        channel = _RecordingChannel()
+        _patch_dispatcher_to_record(monkeypatch, channel)
+        tm = _make_task_manager(project_config=_make_project_config(enabled=False))
         assert tm._maybe_send_error_alert("m", RuntimeError("boom")) is False
         assert tm._error_alert_sent_in_run is False
+        assert channel.received == []  # dispatcher never invoked
 
-    def test_no_project_config_returns_false(self):
+    def test_no_project_config_returns_false(self, monkeypatch):
+        _patch_dispatcher_to_record(monkeypatch, _RecordingChannel())
         tm = TaskManager(
             internal_manager=Mock(),
             db_manager=Mock(),
             profiles_config=Mock(),
             project_config=None,
         )
-        tm._create_alert_channels = lambda names: []
         assert tm._maybe_send_error_alert("m", RuntimeError("boom")) is False
 
-    def test_no_channels_in_config_returns_false(self):
-        tm = _make_task_manager(
-            project_config=_make_project_config(channels=[]),
-            recording_channel=_RecordingChannel(),
-        )
-        assert tm._maybe_send_error_alert("m", RuntimeError("boom")) is False
-        assert tm._error_alert_sent_in_run is False
-
-    def test_dispatches_to_channel(self):
+    def test_dispatches_to_channel(self, monkeypatch):
         channel = _RecordingChannel()
-        tm = _make_task_manager(
-            project_config=_make_project_config(mentions=["oncall"]),
-            recording_channel=channel,
-        )
+        _patch_dispatcher_to_record(monkeypatch, channel)
+        tm = _make_task_manager(project_config=_make_project_config(mentions=["oncall"]))
+
         result = tm._maybe_send_error_alert(
             "league_metric",
             RuntimeError("Connection refused (clickhouse-8.services:9100)"),
@@ -118,7 +154,7 @@ class TestMaybeSendErrorAlert:
         assert tm._error_alert_sent_in_run is True
         assert len(channel.received) == 1
 
-        alert_data, template = channel.received[0]
+        alert_data, _ = channel.received[0]
         assert isinstance(alert_data, AlertData)
         assert alert_data.is_error is True
         assert alert_data.metric_name == "league_metric"
@@ -126,60 +162,26 @@ class TestMaybeSendErrorAlert:
         assert "Connection refused" in alert_data.error_message
         assert alert_data.mentions == ["oncall"]
 
-    def test_uses_custom_template(self):
-        channel = _RecordingChannel()
-        tm = _make_task_manager(
-            project_config=_make_project_config(
-                template="X={metric_name} Y={error_type}",
-            ),
-            recording_channel=channel,
-        )
-        tm._maybe_send_error_alert("m", ValueError("bad"))
-
-        _, template = channel.received[0]
-        assert template == "X={metric_name} Y={error_type}"
-
-    def test_dedup_within_run(self):
+    def test_dedup_within_run(self, monkeypatch):
         """Second call in the same run is suppressed but still aborts."""
         channel = _RecordingChannel()
-        tm = _make_task_manager(
-            project_config=_make_project_config(),
-            recording_channel=channel,
-        )
+        _patch_dispatcher_to_record(monkeypatch, channel)
+        tm = _make_task_manager(project_config=_make_project_config())
 
         first = tm._maybe_send_error_alert("m1", RuntimeError("a"))
         second = tm._maybe_send_error_alert("m2", RuntimeError("b"))
 
         assert first is True
-        # Already alerted → second call should NOT dispatch a new alert,
+        # Already alerted → second call must NOT re-invoke the dispatcher,
         # but MUST still signal abort so the CLI breaks the loop.
         assert second is True
         assert len(channel.received) == 1
         assert channel.received[0][0].metric_name == "m1"
 
-    def test_channel_dispatch_exception_is_swallowed(self):
-        """A crashing channel.send() must not crash run_metric."""
-        bad_channel = Mock(spec=BaseAlertChannel)
-        bad_channel.__class__ = type(
-            "ExplodingChannel", (BaseAlertChannel,), {"send": lambda *_: None}
-        )
-        bad_channel.send.side_effect = ConnectionError("network blew up")
-
-        tm = _make_task_manager(
-            project_config=_make_project_config(),
-            recording_channel=bad_channel,
-        )
-        # No exception should leak out, and we still signal abort + mark sent.
-        result = tm._maybe_send_error_alert("m", RuntimeError("boom"))
-        assert result is True
-        assert tm._error_alert_sent_in_run is True
-
-    def test_no_valid_channels_resolved(self):
-        """Channel factory returning [] (e.g. all names invalid) → False, no abort."""
-        tm = _make_task_manager(
-            project_config=_make_project_config(),
-            channels_factory=lambda names: [],
-        )
+    def test_dispatcher_returning_false_does_not_abort(self, monkeypatch):
+        """Helper returning False (e.g. no channels resolved) → no abort."""
+        _patch_dispatcher_returning(monkeypatch, False)
+        tm = _make_task_manager(project_config=_make_project_config())
         assert tm._maybe_send_error_alert("m", RuntimeError("boom")) is False
         assert tm._error_alert_sent_in_run is False
 
@@ -187,14 +189,12 @@ class TestMaybeSendErrorAlert:
 class TestRunMetricSetsAbortFlag:
     """End-to-end: run_metric pushes ``abort_run`` into the result dict."""
 
-    def test_run_metric_failure_sets_abort_when_error_alerting_enabled(self):
+    def test_run_metric_failure_sets_abort_when_error_alerting_enabled(self, monkeypatch):
         from detectkit.config.metric_config import MetricConfig
 
         channel = _RecordingChannel()
-        tm = _make_task_manager(
-            project_config=_make_project_config(),
-            recording_channel=channel,
-        )
+        _patch_dispatcher_to_record(monkeypatch, channel)
+        tm = _make_task_manager(project_config=_make_project_config())
         tm.internal.acquire_lock.return_value = True
         # Force LOAD step to blow up like the user's ClickHouse outage.
         tm._run_load_step = Mock(side_effect=RuntimeError("Connection refused"))
@@ -209,13 +209,11 @@ class TestRunMetricSetsAbortFlag:
         assert "Connection refused" in result["error"]
         assert len(channel.received) == 1
 
-    def test_run_metric_failure_no_abort_when_disabled(self):
+    def test_run_metric_failure_no_abort_when_disabled(self, monkeypatch):
         from detectkit.config.metric_config import MetricConfig
 
-        tm = _make_task_manager(
-            project_config=_make_project_config(enabled=False),
-            recording_channel=_RecordingChannel(),
-        )
+        _patch_dispatcher_to_record(monkeypatch, _RecordingChannel())
+        tm = _make_task_manager(project_config=_make_project_config(enabled=False))
         tm.internal.acquire_lock.return_value = True
         tm._run_load_step = Mock(side_effect=RuntimeError("boom"))
 

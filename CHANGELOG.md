@@ -5,6 +5,23 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-05-10
+
+### Fixed
+- **Project `error_alerting` now fires for startup failures.** In v0.5.0
+  the dispatch lived inside `TaskManager.run_metric`, but three classes
+  of failures crash earlier — at the CLI level, before a TaskManager
+  exists: `ProfilesConfig.from_yaml`, `profiles_config.create_manager`
+  (the user-reported "Connection reset by peer" case), and
+  `internal_manager.ensure_tables`. The DB outage that the feature was
+  designed for is exactly the case that crashed in
+  `create_manager` → no alert went out.
+  Extracted the dispatch into `detectkit.orchestration.error_dispatch.
+  dispatch_project_error_alert` and call it from both the CLI early
+  paths (with `metric_name="<startup>"`) and from `TaskManager`. The
+  helper takes `profiles_config + project_config` directly so it does
+  not need a TaskManager instance to run.
+
 ## [0.5.0] - 2026-05-10
 
 ### Added

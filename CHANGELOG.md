@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   paths (with `metric_name="<startup>"`) and from `TaskManager`. The
   helper takes `profiles_config + project_config` directly so it does
   not need a TaskManager instance to run.
+- **`dtk test-alert` no longer crashes with `AttributeError`.** The
+  command had been broken since v0.3.9 (when `alerting` became a list):
+  `create_mock_alert_data` still dereferenced
+  `metric_config.alerting.mentions`. Now it sources mentions from the
+  specific `AlertingConfig` under test — more correct anyway since
+  different alert routes can ping different teams.
 
 ## [0.5.0] - 2026-05-10
 

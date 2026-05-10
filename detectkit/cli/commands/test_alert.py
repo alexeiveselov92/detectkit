@@ -20,6 +20,7 @@ from detectkit.utils.datetime_utils import now_utc
 
 def create_mock_alert_data(
     metric_config: MetricConfig,
+    alerting_config,
     timezone_display: str = "UTC",
 ) -> AlertData:
     """
@@ -27,6 +28,10 @@ def create_mock_alert_data(
 
     Args:
         metric_config: Metric configuration
+        alerting_config: Single ``AlertingConfig`` from
+            ``metric_config.alerting`` to source mentions/timezone from.
+            ``metric_config.alerting`` is a list — the test command
+            iterates it and passes one entry at a time.
         timezone_display: Timezone for display
 
     Returns:
@@ -35,8 +40,9 @@ def create_mock_alert_data(
     # Use current time
     now = now_utc()
 
-    # Get mentions from alerting config
-    mentions = metric_config.alerting.mentions if metric_config.alerting else []
+    # Mentions are per-AlertingConfig (different alert routes can mention
+    # different teams). Pull them from the specific config we're testing.
+    mentions = list(alerting_config.mentions) if alerting_config else []
 
     # Create realistic mock data
     return AlertData(
@@ -147,7 +153,7 @@ def run_test_alert(metric_name: str, profile: str | None = None):
         print(f"   Timezone: {timezone_display}")
         print(f"   Channels: {', '.join(alerting_config.channels)}\n")
 
-        alert_data = create_mock_alert_data(metric_config, timezone_display)
+        alert_data = create_mock_alert_data(metric_config, alerting_config, timezone_display)
 
         success_count = 0
         for channel_name in alerting_config.channels:

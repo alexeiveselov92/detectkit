@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import traceback
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import click
 import numpy as np
@@ -29,13 +29,13 @@ class TaskManager(_LoadStepMixin, _DetectStepMixin, _AlertStepMixin):
     def run_metric(
         self,
         config: MetricConfig,
-        steps: Optional[List[PipelineStep]] = None,
-        from_date: Optional[datetime] = None,
-        to_date: Optional[datetime] = None,
+        steps: list[PipelineStep] | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
         full_refresh: bool = False,
         force: bool = False,
-        metric_file_path: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        metric_file_path: str | None = None,
+    ) -> dict[str, Any]:
         """Execute the requested pipeline steps for *config*."""
         steps = steps or [
             PipelineStep.LOAD,
@@ -44,7 +44,7 @@ class TaskManager(_LoadStepMixin, _DetectStepMixin, _AlertStepMixin):
         ]
         metric_name = config.name
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "status": TaskStatus.SUCCESS,
             "steps_completed": [],
             "datapoints_loaded": 0,
@@ -81,18 +81,14 @@ class TaskManager(_LoadStepMixin, _DetectStepMixin, _AlertStepMixin):
 
             try:
                 if PipelineStep.LOAD in steps:
-                    load_result = self._run_load_step(
-                        config, from_date, to_date, full_refresh
-                    )
+                    load_result = self._run_load_step(config, from_date, to_date, full_refresh)
                     result["datapoints_loaded"] = load_result["points_loaded"]
                     result["steps_completed"].append(PipelineStep.LOAD)
 
                 if PipelineStep.DETECT in steps:
                     click.echo()
                     click.echo(click.style("  ┌─ DETECT", fg="cyan", bold=True))
-                    detect_result = self._run_detect_step(
-                        config, from_date, to_date, full_refresh
-                    )
+                    detect_result = self._run_detect_step(config, from_date, to_date, full_refresh)
                     result["anomalies_detected"] = detect_result["anomalies_count"]
                     result["steps_completed"].append(PipelineStep.DETECT)
 
@@ -105,11 +101,7 @@ class TaskManager(_LoadStepMixin, _DetectStepMixin, _AlertStepMixin):
 
             finally:
                 if not force:
-                    status = (
-                        "completed"
-                        if result["status"] == TaskStatus.SUCCESS
-                        else "failed"
-                    )
+                    status = "completed" if result["status"] == TaskStatus.SUCCESS else "failed"
                     self.internal.release_lock(
                         metric_name=metric_name,
                         detector_id="pipeline",
@@ -141,9 +133,7 @@ class TaskManager(_LoadStepMixin, _DetectStepMixin, _AlertStepMixin):
 
         return result
 
-    def _maybe_send_error_alert(
-        self, metric_name: str, exc: BaseException
-    ) -> bool:
+    def _maybe_send_error_alert(self, metric_name: str, exc: BaseException) -> bool:
         """Dispatch the project-level error alert, if configured.
 
         Returns ``True`` when an alert was actually attempted (meaning the
@@ -195,8 +185,7 @@ class TaskManager(_LoadStepMixin, _DetectStepMixin, _AlertStepMixin):
 
             click.echo(
                 click.style(
-                    f"  │ ⚠ Project error alert → sending to "
-                    f"{len(channels)} channel(s)...",
+                    f"  │ ⚠ Project error alert → sending to " f"{len(channels)} channel(s)...",
                     fg="yellow",
                     bold=True,
                 )
@@ -223,7 +212,7 @@ class TaskManager(_LoadStepMixin, _DetectStepMixin, _AlertStepMixin):
 
             click.echo(
                 click.style(
-                    f"  │ Aborting remaining metrics for this run.",
+                    "  │ Aborting remaining metrics for this run.",
                     fg="yellow",
                 )
             )

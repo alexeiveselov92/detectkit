@@ -4,7 +4,6 @@ Implementation of 'dtk init' command.
 Creates a new detectkit project with proper structure.
 """
 
-import os
 from pathlib import Path
 
 import click

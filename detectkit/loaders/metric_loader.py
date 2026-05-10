@@ -9,17 +9,16 @@ Loads time-series data from databases with:
 - Integration with InternalTablesManager
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional
+from datetime import datetime, timedelta
 
 import numpy as np
 
 from detectkit.config.metric_config import MetricConfig
 from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.database.manager import BaseDatabaseManager
+from detectkit.loaders.query_template import QueryTemplate
 from detectkit.utils.datetime_utils import now_utc_naive, to_naive_utc
 from detectkit.utils.json_utils import json_dumps_sorted
-from detectkit.loaders.query_template import QueryTemplate
 
 
 class MetricLoader:
@@ -70,7 +69,7 @@ class MetricLoader:
         from_date: datetime,
         to_date: datetime,
         fill_gaps: bool = True,
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         """
         Load metric data from database.
 
@@ -234,8 +233,8 @@ class MetricLoader:
                     seasonality_from_query = np.pad(
                         seasonality_from_query,
                         (0, new_length - original_length),
-                        mode='constant',
-                        constant_values=empty_json
+                        mode="constant",
+                        constant_values=empty_json,
                     )
 
         # Determine final seasonality data and columns
@@ -257,7 +256,7 @@ class MetricLoader:
             "seasonality_columns": seasonality_columns,
         }
 
-    def save(self, data: Dict[str, np.ndarray]) -> int:
+    def save(self, data: dict[str, np.ndarray]) -> int:
         """
         Save loaded data to _dtk_datapoints table.
 
@@ -286,8 +285,8 @@ class MetricLoader:
 
     def load_and_save(
         self,
-        from_date: Optional[datetime] = None,
-        to_date: Optional[datetime] = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
     ) -> int:
         """
         Load and save data in one operation with batching.
@@ -315,9 +314,7 @@ class MetricLoader:
         # Determine date range
         if from_date is None:
             # Get last saved timestamp
-            last_ts = self.internal_manager.get_last_datapoint_timestamp(
-                self.config.name
-            )
+            last_ts = self.internal_manager.get_last_datapoint_timestamp(self.config.name)
             if last_ts:
                 # Start from next interval after last timestamp
                 interval = self.config.get_interval()
@@ -343,7 +340,7 @@ class MetricLoader:
         data = self.load(from_date, to_date, fill_gaps=True)
         return self.save(data)
 
-    def _create_empty_result(self) -> Dict[str, np.ndarray]:
+    def _create_empty_result(self) -> dict[str, np.ndarray]:
         """Create empty result dictionary."""
         return {
             "timestamp": np.array([], dtype="datetime64[ms]"),
@@ -389,7 +386,7 @@ class MetricLoader:
             return full_timestamps, np.full(len(full_timestamps), np.nan)
 
         # Create mapping from existing timestamps to values
-        ts_to_value = dict(zip(timestamps, values))
+        ts_to_value = dict(zip(timestamps, values, strict=True))
 
         # Fill values for full range
         filled_values = np.array(
@@ -402,7 +399,7 @@ class MetricLoader:
     def _extract_seasonality(
         self,
         timestamps: np.ndarray,
-        seasonality_columns: List[str],
+        seasonality_columns: list[str],
     ) -> np.ndarray:
         """
         Extract seasonality features from timestamps.

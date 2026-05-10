@@ -9,14 +9,13 @@ Useful for:
 """
 
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
-from detectkit.utils.datetime_utils import now_utc
 
 from detectkit.alerting.channels.base import AlertData
 from detectkit.alerting.channels.factory import AlertChannelFactory
 from detectkit.config.metric_config import MetricConfig
+from detectkit.utils.datetime_utils import now_utc
 
 
 def create_mock_alert_data(
@@ -68,7 +67,7 @@ def create_mock_alert_data(
     )
 
 
-def run_test_alert(metric_name: str, profile: Optional[str] = None):
+def run_test_alert(metric_name: str, profile: str | None = None):
     """
     Send test alert for specified metric.
 
@@ -95,9 +94,7 @@ def run_test_alert(metric_name: str, profile: Optional[str] = None):
 
     # Find metric config
     metrics_dir = project_root / metrics_dir_name
-    metric_files = list(metrics_dir.glob("**/*.yml")) + list(
-        metrics_dir.glob("**/*.yaml")
-    )
+    metric_files = list(metrics_dir.glob("**/*.yml")) + list(metrics_dir.glob("**/*.yaml"))
 
     metric_config = None
     for metric_file in metric_files:
@@ -179,11 +176,15 @@ def run_test_alert(metric_name: str, profile: Optional[str] = None):
             except Exception as e:
                 print(f"✗ ERROR: {e}")
 
-        print(f"\n{'✓' if success_count > 0 else '✗'} Sent test alert to {success_count}/{len(alerting_config.channels)} channels")
+        print(
+            f"\n{'✓' if success_count > 0 else '✗'} Sent test alert to {success_count}/{len(alerting_config.channels)} channels"
+        )
 
     if len(active_configs) > 1:
-        print(f"\nTotal: {total_success}/{total_channels} channels across {len(active_configs)} alert configs")
+        print(
+            f"\nTotal: {total_success}/{total_channels} channels across {len(active_configs)} alert configs"
+        )
 
     if success_count > 0:
         print("\n💡 Check your configured channels to verify message formatting")
-        print(f"   Mock data used: value=0.8532, confidence=[0.4521, 0.6234], severity=4.52")
+        print("   Mock data used: value=0.8532, confidence=[0.4521, 0.6234], severity=4.52")

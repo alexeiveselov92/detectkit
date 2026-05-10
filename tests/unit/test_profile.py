@@ -4,7 +4,6 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 import pytest
-import yaml
 
 from detectkit.config.profile import ProfileConfig, ProfilesConfig
 

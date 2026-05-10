@@ -66,6 +66,4 @@ def test_metric_name_with_quotes_is_safe(internal_tables):
         interval_seconds=60,
         seasonality_columns=[],
     )
-    assert (
-        internal_tables.get_last_datapoint_timestamp("post_attack") is not None
-    )
+    assert internal_tables.get_last_datapoint_timestamp("post_attack") is not None

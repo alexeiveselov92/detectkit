@@ -4,8 +4,6 @@ Slack alert channel.
 Convenience wrapper around WebhookChannel for Slack.
 """
 
-from typing import List, Optional
-
 from detectkit.alerting.channels.webhook import WebhookChannel
 
 
@@ -36,7 +34,7 @@ class SlackChannel(WebhookChannel):
         webhook_url: str,
         username: str = "detectk",
         icon_emoji: str = ":warning:",
-        channel: Optional[str] = None,
+        channel: str | None = None,
         timeout: int = 10,
     ):
         """Initialize Slack channel with webhook URL."""
@@ -48,7 +46,7 @@ class SlackChannel(WebhookChannel):
             timeout=timeout,
         )
 
-    def format_mentions(self, mentions: List[str]) -> str:
+    def format_mentions(self, mentions: list[str]) -> str:
         """
         Format mentions for Slack.
 
@@ -78,6 +76,8 @@ class SlackChannel(WebhookChannel):
 
     def __repr__(self) -> str:
         """String representation."""
-        url_preview = self.webhook_url[:30] + "..." if len(self.webhook_url) > 30 else self.webhook_url
+        url_preview = (
+            self.webhook_url[:30] + "..." if len(self.webhook_url) > 30 else self.webhook_url
+        )
         channel_info = f", channel='{self.channel}'" if self.channel else ""
         return f"SlackChannel(url='{url_preview}', username='{self.username}'{channel_info})"

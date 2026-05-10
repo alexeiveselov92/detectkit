@@ -1,9 +1,5 @@
 """Tests for env variable interpolation utility."""
 
-import os
-
-import pytest
-
 from detectkit.utils.env_interpolation import interpolate_env_vars
 
 

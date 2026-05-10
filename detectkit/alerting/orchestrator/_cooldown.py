@@ -24,9 +24,7 @@ class _CooldownMixin(_OrchestratorBase):
         if not self.internal:
             return False
 
-        last_sent = self.internal.get_last_alert_timestamp(
-            self.metric_name, self.alert_config_id
-        )
+        last_sent = self.internal.get_last_alert_timestamp(self.metric_name, self.alert_config_id)
         if not last_sent:
             return False
 

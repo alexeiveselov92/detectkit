@@ -5,7 +5,7 @@ Manages database connections and locations (similar to dbt profiles).
 """
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field, field_validator
@@ -42,28 +42,21 @@ class ProfileConfig(BaseModel):
     password: str = Field(default="", description="Database password")
 
     # Internal location for _dtk_* tables
-    internal_database: Optional[str] = Field(
-        default=None,
-        description="Database for internal tables (ClickHouse/MySQL)"
+    internal_database: str | None = Field(
+        default=None, description="Database for internal tables (ClickHouse/MySQL)"
     )
-    internal_schema: Optional[str] = Field(
-        default=None,
-        description="Schema for internal tables (PostgreSQL)"
+    internal_schema: str | None = Field(
+        default=None, description="Schema for internal tables (PostgreSQL)"
     )
 
     # Data location for user tables
-    data_database: Optional[str] = Field(
-        default=None,
-        description="Database for user data tables (ClickHouse/MySQL)"
+    data_database: str | None = Field(
+        default=None, description="Database for user data tables (ClickHouse/MySQL)"
     )
-    data_schema: Optional[str] = Field(
-        default=None,
-        description="Schema for user data (PostgreSQL)"
-    )
+    data_schema: str | None = Field(default=None, description="Schema for user data (PostgreSQL)")
 
-    settings: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Additional database settings"
+    settings: dict[str, Any] = Field(
+        default_factory=dict, description="Additional database settings"
     )
 
     @field_validator("type")
@@ -73,8 +66,7 @@ class ProfileConfig(BaseModel):
         allowed_types = {"clickhouse", "postgres", "mysql"}
         if v not in allowed_types:
             raise ValueError(
-                f"Invalid database type: {v}. "
-                f"Allowed types: {', '.join(allowed_types)}"
+                f"Invalid database type: {v}. " f"Allowed types: {', '.join(allowed_types)}"
             )
         return v
 
@@ -176,15 +168,15 @@ class ProfilesConfig(BaseModel):
         alert_channels: Dictionary mapping channel names to configurations
     """
 
-    profiles: Dict[str, ProfileConfig]
-    default_profile: Optional[str] = None
-    alert_channels: Dict[str, Dict[str, Any]] = Field(
+    profiles: dict[str, ProfileConfig]
+    default_profile: str | None = None
+    alert_channels: dict[str, dict[str, Any]] = Field(
         default_factory=dict, description="Alert channel configurations"
     )
 
     @field_validator("default_profile")
     @classmethod
-    def validate_default_profile(cls, v: Optional[str], info) -> Optional[str]:
+    def validate_default_profile(cls, v: str | None, info) -> str | None:
         """Validate default profile exists."""
         if v is not None:
             profiles = info.data.get("profiles", {})
@@ -213,7 +205,7 @@ class ProfilesConfig(BaseModel):
         if not path.exists():
             raise FileNotFoundError(f"Profiles file not found: {path}")
 
-        with open(path, "r") as f:
+        with open(path) as f:
             data = yaml.safe_load(f)
 
         if not data:
@@ -225,7 +217,7 @@ class ProfilesConfig(BaseModel):
 
         return cls.model_validate(data)
 
-    def get_profile(self, name: Optional[str] = None) -> ProfileConfig:
+    def get_profile(self, name: str | None = None) -> ProfileConfig:
         """
         Get profile configuration by name.
 
@@ -254,7 +246,7 @@ class ProfilesConfig(BaseModel):
 
         return self.profiles[name]
 
-    def create_manager(self, profile_name: Optional[str] = None) -> BaseDatabaseManager:
+    def create_manager(self, profile_name: str | None = None) -> BaseDatabaseManager:
         """
         Create database manager for a profile.
 
@@ -267,7 +259,7 @@ class ProfilesConfig(BaseModel):
         profile = self.get_profile(profile_name)
         return profile.create_manager()
 
-    def get_alert_channel_config(self, channel_name: str) -> Dict[str, Any]:
+    def get_alert_channel_config(self, channel_name: str) -> dict[str, Any]:
         """
         Get alert channel configuration by name.
 
@@ -283,8 +275,7 @@ class ProfilesConfig(BaseModel):
         if channel_name not in self.alert_channels:
             available = ", ".join(sorted(self.alert_channels.keys()))
             raise ValueError(
-                f"Alert channel '{channel_name}' not found. "
-                f"Available channels: {available}"
+                f"Alert channel '{channel_name}' not found. " f"Available channels: {available}"
             )
 
         return self.alert_channels[channel_name]

@@ -7,9 +7,7 @@ the send() method for delivering alerts to specific destinations.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
-
-from detectkit.detectors.base import DetectionResult
+from typing import Any
 
 
 @dataclass
@@ -39,22 +37,22 @@ class AlertData:
     metric_name: str
     timestamp: Any  # datetime64 or datetime
     timezone: str
-    value: Optional[float]
-    confidence_lower: Optional[float]
-    confidence_upper: Optional[float]
+    value: float | None
+    confidence_lower: float | None
+    confidence_upper: float | None
     detector_name: str
     detector_params: str
     direction: str
     severity: float
-    detection_metadata: Dict[str, Any]
+    detection_metadata: dict[str, Any]
     consecutive_count: int = 1
     is_recovery: bool = False
     is_no_data: bool = False
     is_error: bool = False
-    error_type: Optional[str] = None
-    error_message: Optional[str] = None
-    description: Optional[str] = None
-    mentions: List[str] = field(default_factory=list)
+    error_type: str | None = None
+    error_message: str | None = None
+    description: str | None = None
+    mentions: list[str] = field(default_factory=list)
 
 
 class BaseAlertChannel(ABC):
@@ -77,7 +75,7 @@ class BaseAlertChannel(ABC):
     def send(
         self,
         alert_data: AlertData,
-        template: Optional[str] = None,
+        template: str | None = None,
     ) -> bool:
         """
         Send alert to this channel.
@@ -107,8 +105,8 @@ class BaseAlertChannel(ABC):
     def format_message(
         self,
         alert_data: AlertData,
-        template: Optional[str] = None,
-        recovery_template: Optional[str] = None,
+        template: str | None = None,
+        recovery_template: str | None = None,
     ) -> str:
         """
         Format alert message from template.
@@ -148,8 +146,9 @@ class BaseAlertChannel(ABC):
                 template = self.get_default_template()
 
         # Format timestamp to string
-        from datetime import datetime
         import math
+        from datetime import datetime
+
         import numpy as np
 
         ts = alert_data.timestamp
@@ -159,6 +158,7 @@ class BaseAlertChannel(ABC):
         # Convert naive UTC timestamp to target timezone if specified
         if alert_data.timezone:
             from zoneinfo import ZoneInfo
+
             ts = ts.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(alert_data.timezone))
             ts_str = f"{ts.strftime('%Y-%m-%d %H:%M:%S')} ({alert_data.timezone})"
         else:
@@ -166,7 +166,9 @@ class BaseAlertChannel(ABC):
 
         # Format confidence interval
         if alert_data.confidence_lower is not None and alert_data.confidence_upper is not None:
-            confidence_str = f"[{alert_data.confidence_lower:.2f}, {alert_data.confidence_upper:.2f}]"
+            confidence_str = (
+                f"[{alert_data.confidence_lower:.2f}, {alert_data.confidence_upper:.2f}]"
+            )
         else:
             confidence_str = "N/A"
 
@@ -238,7 +240,7 @@ class BaseAlertChannel(ABC):
 
         return message
 
-    def format_mentions(self, mentions: List[str]) -> str:
+    def format_mentions(self, mentions: list[str]) -> str:
         """
         Format mentions list into platform-native syntax.
 

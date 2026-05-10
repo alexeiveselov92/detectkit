@@ -1,7 +1,6 @@
 """Tests for BaseDetector and DetectionResult."""
 
-from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pytest
@@ -23,7 +22,7 @@ class MockDetector(BaseDetector):
         if self.params.get("min_samples", 0) < 1:
             raise ValueError("min_samples must be at least 1")
 
-    def detect(self, data: Dict[str, np.ndarray]) -> list[DetectionResult]:
+    def detect(self, data: dict[str, np.ndarray]) -> list[DetectionResult]:
         """Mock detection - marks values > threshold as anomalies."""
         results = []
         timestamps = data["timestamp"]
@@ -31,7 +30,7 @@ class MockDetector(BaseDetector):
 
         threshold = self.params["threshold"]
 
-        for ts, val in zip(timestamps, values):
+        for ts, val in zip(timestamps, values, strict=False):
             is_anomaly = not np.isnan(val) and val > threshold
             results.append(
                 DetectionResult(
@@ -46,7 +45,7 @@ class MockDetector(BaseDetector):
 
         return results
 
-    def _get_non_default_params(self) -> Dict[str, Any]:
+    def _get_non_default_params(self) -> dict[str, Any]:
         """Return non-default parameters."""
         defaults = {"threshold": 3.0, "min_samples": 30}
         return {k: v for k, v in self.params.items() if v != defaults.get(k)}
@@ -108,6 +107,7 @@ class TestDetectionResult:
 
         # Parse metadata JSON and check values
         import json
+
         metadata = json.loads(d["detection_metadata"])
         assert metadata["direction"] == "up"
         assert metadata["severity"] == "high"
@@ -167,9 +167,9 @@ class TestBaseDetector:
         results = detector.detect(data)
 
         assert len(results) == 3
-        assert results[0].is_anomaly == False  # 3.0 <= 5.0
-        assert results[1].is_anomaly == True  # 6.0 > 5.0
-        assert results[2].is_anomaly == False  # 4.0 <= 5.0
+        assert not results[0].is_anomaly  # 3.0 <= 5.0
+        assert results[1].is_anomaly  # 6.0 > 5.0
+        assert not results[2].is_anomaly  # 4.0 <= 5.0
 
     def test_detect_with_nan(self):
         """Test detect with NaN values."""
@@ -190,8 +190,8 @@ class TestBaseDetector:
         results = detector.detect(data)
 
         assert len(results) == 2
-        assert results[0].is_anomaly == False
-        assert results[1].is_anomaly == False  # NaN is not anomaly
+        assert not results[0].is_anomaly
+        assert not results[1].is_anomaly  # NaN is not anomaly
 
     def test_get_detector_id_same_params(self):
         """Test that same params produce same ID."""
@@ -230,6 +230,7 @@ class TestBaseDetector:
 
         # Parse JSON and check values
         import json
+
         params = json.loads(params_json)
         assert params["threshold"] == 5.0
         # min_samples=30 is default, so not included

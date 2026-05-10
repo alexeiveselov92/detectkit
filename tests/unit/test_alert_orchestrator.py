@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 from unittest.mock import Mock
 
 import numpy as np
-import pytest
 
 from detectkit.alerting.channels.base import AlertData
 from detectkit.alerting.orchestrator import (
@@ -127,7 +126,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T12:00:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc123",
-                detector_params='{}',
+                detector_params="{}",
                 value=100.0,
                 is_anomaly=True,
                 confidence_lower=80.0,
@@ -163,7 +162,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T12:00:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc123",
-                detector_params='{}',
+                detector_params="{}",
                 value=100.0,
                 is_anomaly=True,
                 confidence_lower=80.0,
@@ -194,7 +193,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T12:00:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc123",
-                detector_params='{}',
+                detector_params="{}",
                 value=100.0,
                 is_anomaly=True,
                 confidence_lower=80.0,
@@ -207,7 +206,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T12:00:00", "ms"),
                 detector_name="mad",
                 detector_id="def456",
-                detector_params='{}',
+                detector_params="{}",
                 value=100.0,
                 is_anomaly=True,
                 confidence_lower=75.0,
@@ -245,7 +244,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T12:00:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=100.0,
                 is_anomaly=True,
                 confidence_lower=80.0,
@@ -258,7 +257,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T11:50:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=90.0,
                 is_anomaly=True,
                 confidence_lower=70.0,
@@ -271,7 +270,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T11:40:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=110.0,
                 is_anomaly=True,
                 confidence_lower=90.0,
@@ -306,7 +305,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T12:00:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=100.0,
                 is_anomaly=True,
                 confidence_lower=80.0,
@@ -319,7 +318,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T11:50:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=105.0,
                 is_anomaly=True,
                 confidence_lower=85.0,
@@ -332,7 +331,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T11:40:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=110.0,
                 is_anomaly=True,
                 confidence_lower=90.0,
@@ -367,7 +366,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T12:00:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=100.0,
                 is_anomaly=True,
                 confidence_lower=80.0,
@@ -380,7 +379,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T11:50:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=105.0,
                 is_anomaly=True,
                 confidence_lower=85.0,
@@ -393,7 +392,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T11:40:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=90.0,
                 is_anomaly=True,
                 confidence_lower=70.0,
@@ -427,7 +426,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T12:00:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=100.0,
                 is_anomaly=True,
                 confidence_lower=80.0,
@@ -440,7 +439,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T11:50:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=105.0,
                 is_anomaly=True,
                 confidence_lower=85.0,
@@ -475,7 +474,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T12:00:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=100.0,
                 is_anomaly=True,
                 confidence_lower=80.0,
@@ -488,7 +487,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T11:50:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=105.0,
                 is_anomaly=True,
                 confidence_lower=85.0,
@@ -522,7 +521,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T12:00:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=100.0,
                 is_anomaly=True,
                 confidence_lower=80.0,
@@ -535,7 +534,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T11:50:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=85.0,
                 is_anomaly=True,
                 confidence_lower=75.0,
@@ -548,7 +547,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T11:40:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=50.0,
                 is_anomaly=False,  # Normal point breaks consecutive
                 confidence_lower=40.0,
@@ -561,7 +560,7 @@ class TestAlertOrchestrator:
                 timestamp=np.datetime64("2024-01-01T11:30:00", "ms"),
                 detector_name="zscore",
                 detector_id="abc",
-                detector_params='{}',
+                detector_params="{}",
                 value=110.0,
                 is_anomaly=True,
                 confidence_lower=90.0,
@@ -831,7 +830,9 @@ class TestRecoveryNotifications:
         # Mock recovery check
         orchestrator._check_recovery_since_last_alert = Mock(return_value=True)
 
-        detections = [self._make_detection("2024-01-01T12:00:00", is_anomaly=False, direction="none")]
+        detections = [
+            self._make_detection("2024-01-01T12:00:00", is_anomaly=False, direction="none")
+        ]
         should_recover, data = orchestrator.should_send_recovery(detections)
 
         assert should_recover is True
@@ -856,7 +857,9 @@ class TestRecoveryNotifications:
 
         orchestrator._check_recovery_since_last_alert = Mock(return_value=True)
 
-        detections = [self._make_detection("2024-01-01T15:00:00", is_anomaly=False, direction="none")]
+        detections = [
+            self._make_detection("2024-01-01T15:00:00", is_anomaly=False, direction="none")
+        ]
         should_recover, data = orchestrator.should_send_recovery(detections)
 
         assert should_recover is True

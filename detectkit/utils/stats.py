@@ -4,16 +4,10 @@ Statistical utility functions for detectors.
 Provides weighted statistics functions for use in detectors.
 """
 
-from typing import Optional
-
 import numpy as np
 
 
-def weighted_percentile(
-    data: np.ndarray,
-    weights: np.ndarray,
-    percentile: float
-) -> float:
+def weighted_percentile(data: np.ndarray, weights: np.ndarray, percentile: float) -> float:
     """
     Compute weighted percentile.
 
@@ -96,11 +90,7 @@ def weighted_median(data: np.ndarray, weights: np.ndarray) -> float:
     return weighted_percentile(data, weights, 50.0)
 
 
-def weighted_mad(
-    data: np.ndarray,
-    weights: np.ndarray,
-    center: Optional[float] = None
-) -> float:
+def weighted_mad(data: np.ndarray, weights: np.ndarray, center: float | None = None) -> float:
     """
     Compute weighted Median Absolute Deviation.
 
@@ -152,10 +142,7 @@ def weighted_mean(data: np.ndarray, weights: np.ndarray) -> float:
 
 
 def weighted_std(
-    data: np.ndarray,
-    weights: np.ndarray,
-    center: Optional[float] = None,
-    ddof: int = 0
+    data: np.ndarray, weights: np.ndarray, center: float | None = None, ddof: int = 0
 ) -> float:
     """
     Compute weighted standard deviation.
@@ -190,7 +177,7 @@ def weighted_std(
     # Apply Bessel's correction if ddof=1
     if ddof == 1:
         # For weighted data: variance / (1 - sum(weights^2))
-        sum_weights_sq = np.sum(weights ** 2)
+        sum_weights_sq = np.sum(weights**2)
         variance = variance / (1 - sum_weights_sq)
 
     return np.sqrt(variance)

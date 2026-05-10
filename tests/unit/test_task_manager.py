@@ -1,9 +1,7 @@
 """Tests for TaskManager."""
 
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, Mock, patch
-
-import pytest
+from unittest.mock import Mock, patch
 
 from detectkit.config.metric_config import MetricConfig
 from detectkit.orchestration.task_manager import PipelineStep, TaskManager, TaskStatus
@@ -235,9 +233,7 @@ class TestTaskManager:
         config.loading_batch_size = 1000
 
         # Mock MetricLoader (imported inside the LOAD-step mixin module)
-        with patch(
-            "detectkit.orchestration.task_manager._load_step.MetricLoader"
-        ) as MockLoader:
+        with patch("detectkit.orchestration.task_manager._load_step.MetricLoader") as MockLoader:
             mock_loader = MockLoader.return_value
             mock_loader.load_and_save.return_value = 100  # Returns int, not dict
 
@@ -317,9 +313,7 @@ class TestTaskManager:
         assert status["metric_name"] == "cpu_usage"
         assert status["is_locked"] is True
         assert status["locked_by"] == "worker-1"
-        assert status["last_datapoint"] == datetime(
-            2024, 1, 1, 11, 50, 0, tzinfo=timezone.utc
-        )
+        assert status["last_datapoint"] == datetime(2024, 1, 1, 11, 50, 0, tzinfo=timezone.utc)
 
     def test_get_metric_status_not_locked(self):
         """Test getting status for unlocked metric."""

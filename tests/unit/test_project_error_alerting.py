@@ -1,9 +1,6 @@
 """Tests for project-level error alerting (TaskManager._maybe_send_error_alert)."""
 
-from types import SimpleNamespace
 from unittest.mock import Mock
-
-import pytest
 
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
 from detectkit.config.project_config import (
@@ -44,9 +41,7 @@ def _make_project_config(
     )
 
 
-def _make_task_manager(
-    *, project_config, recording_channel=None, channels_factory=None
-):
+def _make_task_manager(*, project_config, recording_channel=None, channels_factory=None):
     """Build a TaskManager and stub _create_alert_channels."""
     tm = TaskManager(
         internal_manager=Mock(),
@@ -264,9 +259,7 @@ class TestErrorAlertFormatting:
 
     def test_status_is_error(self):
         channel = _RecordingChannel()
-        message = channel.format_message(
-            self._error_alert(), template="status={status}"
-        )
+        message = channel.format_message(self._error_alert(), template="status={status}")
         assert message == "status=ERROR"
 
     def test_custom_template_with_error_vars(self):
@@ -276,8 +269,7 @@ class TestErrorAlertFormatting:
             template="{metric_name}: {error_type} - {error_message}",
         )
         assert message == (
-            "cpu_usage: RuntimeError - "
-            "Connection refused (clickhouse-8.services:9100)"
+            "cpu_usage: RuntimeError - " "Connection refused (clickhouse-8.services:9100)"
         )
 
     def test_invalid_format_falls_back_to_default(self):

@@ -29,12 +29,7 @@ class TestQueryTemplate:
         """
 
         rendered = template.render(
-            query,
-            context={
-                "table_name": "cpu_metrics",
-                "column1": "timestamp",
-                "column2": "value"
-            }
+            query, context={"table_name": "cpu_metrics", "column1": "timestamp", "column2": "value"}
         )
 
         assert "timestamp" in rendered
@@ -85,7 +80,7 @@ class TestQueryTemplate:
             query,
             dtk_start_time=datetime(2024, 1, 1),
             dtk_end_time=datetime(2024, 1, 2),
-            interval_seconds=600
+            interval_seconds=600,
         )
 
         assert "2024-01-01" in rendered
@@ -98,11 +93,7 @@ class TestQueryTemplate:
         query = "SELECT * FROM metrics WHERE interval = {{ interval_seconds }}"
 
         # Built-in interval_seconds=600, but context overrides to 300
-        rendered = template.render(
-            query,
-            context={"interval_seconds": 300},
-            interval_seconds=600
-        )
+        rendered = template.render(query, context={"interval_seconds": 300}, interval_seconds=600)
 
         assert "interval = 300" in rendered
         assert "600" not in rendered
@@ -158,10 +149,7 @@ class TestQueryTemplate:
         )
         """
 
-        rendered = template.render(
-            query,
-            context={"metric_names": ["cpu", "memory", "disk"]}
-        )
+        rendered = template.render(query, context={"metric_names": ["cpu", "memory", "disk"]})
 
         assert "'cpu'" in rendered
         assert "'memory'" in rendered
@@ -185,12 +173,7 @@ class TestQueryTemplate:
         """
 
         rendered = template.render(
-            query,
-            context={
-                "filter_enabled": True,
-                "min_value": 0.1,
-                "max_value": 0.9
-            }
+            query, context={"filter_enabled": True, "min_value": 0.1, "max_value": 0.9}
         )
 
         assert "value >= 0.1" in rendered
@@ -212,7 +195,7 @@ class TestQueryTemplate:
         query = "SELECT * FROM {{ table_name }}"
 
         # Missing table_name variable
-        with pytest.raises(Exception):
+        with pytest.raises(Exception, match=""):
             template.render(query, context={})
 
     def test_render_with_defaults_missing_variable(self):
@@ -246,10 +229,7 @@ class TestQueryTemplate:
         FROM metrics
         """
 
-        rendered = template.render(
-            query,
-            context={"columns": ["timestamp", "value"]}
-        )
+        rendered = template.render(query, context={"columns": ["timestamp", "value"]})
 
         # Check both columns are present
         assert "timestamp" in rendered
@@ -279,11 +259,11 @@ class TestQueryTemplate:
                 "database": "analytics",
                 "table": "metrics",
                 "aggregation": "avg",
-                "metric_filter": "cpu_usage"
+                "metric_filter": "cpu_usage",
             },
             dtk_start_time=datetime(2024, 1, 1),
             dtk_end_time=datetime(2024, 1, 2),
-            interval_seconds=600
+            interval_seconds=600,
         )
 
         assert "analytics.metrics" in rendered
@@ -320,10 +300,7 @@ class TestQueryTemplate:
           AND interval = {{ interval }}
         """
 
-        rendered = template.render(
-            query,
-            context={"threshold": 0.95, "interval": 600}
-        )
+        rendered = template.render(query, context={"threshold": 0.95, "interval": 600})
 
         assert "value > 0.95" in rendered
         assert "interval = 600" in rendered
@@ -354,9 +331,6 @@ class TestQueryTemplate:
         WHERE metric_name IN {{ metric_list }}
         """
 
-        rendered = template.render(
-            query,
-            context={"metric_list": ["cpu", "memory", "disk"]}
-        )
+        rendered = template.render(query, context={"metric_list": ["cpu", "memory", "disk"]})
 
         assert "['cpu', 'memory', 'disk']" in rendered

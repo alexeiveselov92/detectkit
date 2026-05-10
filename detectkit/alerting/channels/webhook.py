@@ -5,8 +5,6 @@ Sends alerts to any webhook endpoint that accepts JSON payload.
 Compatible with Mattermost, Slack, and other webhook-based systems.
 """
 
-from typing import Dict, Optional
-
 import requests
 
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
@@ -62,9 +60,9 @@ class WebhookChannel(BaseAlertChannel):
         webhook_url: str,
         username: str = "detectk",
         icon_emoji: str = ":warning:",
-        channel: Optional[str] = None,
+        channel: str | None = None,
         timeout: int = 10,
-        extra_headers: Optional[Dict[str, str]] = None,
+        extra_headers: dict[str, str] | None = None,
     ):
         """Initialize webhook channel."""
         if not webhook_url:
@@ -80,7 +78,7 @@ class WebhookChannel(BaseAlertChannel):
     def send(
         self,
         alert_data: AlertData,
-        template: Optional[str] = None,
+        template: str | None = None,
     ) -> bool:
         """
         Send alert to webhook.
@@ -200,6 +198,8 @@ class WebhookChannel(BaseAlertChannel):
 
     def __repr__(self) -> str:
         """String representation."""
-        url_preview = self.webhook_url[:30] + "..." if len(self.webhook_url) > 30 else self.webhook_url
+        url_preview = (
+            self.webhook_url[:30] + "..." if len(self.webhook_url) > 30 else self.webhook_url
+        )
         channel_info = f", channel='{self.channel}'" if self.channel else ""
         return f"WebhookChannel(url='{url_preview}', username='{self.username}'{channel_info})"

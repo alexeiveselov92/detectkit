@@ -362,7 +362,7 @@ class BaseAlertChannel(ABC):
             "Pipeline failed for metric: {metric_name}\n"
             "{description_line}"
             "Time: {timestamp}\n"
-            "{error_type}: {error_message}"
+            "Error: {error_type}: {error_message}"
             "{mentions_line}"
         )
 

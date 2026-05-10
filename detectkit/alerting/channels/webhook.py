@@ -194,7 +194,7 @@ class WebhookChannel(BaseAlertChannel):
         return (
             "{description_line}"
             "Time: {timestamp}\n"
-            "{error_type}: {error_message}"
+            "Error: {error_type}: {error_message}"
             "{mentions_line}"
         )
 

@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import numpy as np
-import pytest
 
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
 from detectkit.alerting.orchestrator import AlertOrchestrator
@@ -145,9 +144,7 @@ class TestShouldAlertNoData:
             last_alert_timestamp=datetime.utcnow() - timedelta(seconds=60),
         )
         orchestrator = self._orchestrator(
-            alert_config=_make_alert_config(
-                no_data_alert=True, alert_cooldown="30min"
-            ),
+            alert_config=_make_alert_config(no_data_alert=True, alert_cooldown="30min"),
             internal=internal,
         )
 
@@ -162,9 +159,7 @@ class TestShouldAlertNoData:
             last_alert_timestamp=datetime.utcnow() - timedelta(hours=2),
         )
         orchestrator = self._orchestrator(
-            alert_config=_make_alert_config(
-                no_data_alert=True, alert_cooldown="30min"
-            ),
+            alert_config=_make_alert_config(no_data_alert=True, alert_cooldown="30min"),
             internal=internal,
         )
 

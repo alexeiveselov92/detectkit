@@ -2,8 +2,6 @@
 Detector factory for creating detector instances from configuration.
 """
 
-from typing import Dict, List
-
 from detectkit.detectors.base import BaseDetector
 from detectkit.detectors.statistical.iqr import IQRDetector
 from detectkit.detectors.statistical.mad import MADDetector
@@ -34,7 +32,7 @@ class DetectorFactory:
     }
 
     @classmethod
-    def create(cls, detector_type: str, params: Dict = None) -> BaseDetector:
+    def create(cls, detector_type: str, params: dict = None) -> BaseDetector:
         """
         Create detector instance from type and parameters.
 
@@ -59,8 +57,7 @@ class DetectorFactory:
         if detector_type not in cls.DETECTOR_TYPES:
             available = ", ".join(sorted(cls.DETECTOR_TYPES.keys()))
             raise ValueError(
-                f"Unknown detector type: '{detector_type}'. "
-                f"Available types: {available}"
+                f"Unknown detector type: '{detector_type}'. " f"Available types: {available}"
             )
 
         detector_class = cls.DETECTOR_TYPES[detector_type]
@@ -68,12 +65,10 @@ class DetectorFactory:
         try:
             return detector_class(**params)
         except TypeError as e:
-            raise ValueError(
-                f"Invalid parameters for {detector_type} detector: {e}"
-            ) from e
+            raise ValueError(f"Invalid parameters for {detector_type} detector: {e}") from e
 
     @classmethod
-    def create_from_config(cls, detector_config: Dict) -> BaseDetector:
+    def create_from_config(cls, detector_config: dict) -> BaseDetector:
         """
         Create detector from configuration dictionary.
 
@@ -97,7 +92,7 @@ class DetectorFactory:
         return cls.create(detector_type, params)
 
     @classmethod
-    def create_multiple(cls, detector_configs: List[Dict]) -> List[BaseDetector]:
+    def create_multiple(cls, detector_configs: list[dict]) -> list[BaseDetector]:
         """
         Create multiple detectors from list of configurations.
 
@@ -123,7 +118,7 @@ class DetectorFactory:
         return detectors
 
     @classmethod
-    def list_available_types(cls) -> List[str]:
+    def list_available_types(cls) -> list[str]:
         """
         Get list of available detector types.
 

@@ -6,12 +6,11 @@ ensuring data integrity and preventing configuration errors.
 """
 
 from pathlib import Path
-from typing import List, Tuple
 
 from detectkit.config.metric_config import MetricConfig
 
 
-def validate_metric_uniqueness(metric_paths: List[Path]) -> List[Tuple[Path, MetricConfig]]:
+def validate_metric_uniqueness(metric_paths: list[Path]) -> list[tuple[Path, MetricConfig]]:
     """
     Load all metrics and validate that metric names are unique.
 
@@ -43,7 +42,7 @@ def validate_metric_uniqueness(metric_paths: List[Path]) -> List[Tuple[Path, Met
         Metric names must be unique across the project.
         Please rename one of the metrics.
     """
-    configs: List[Tuple[Path, MetricConfig]] = []
+    configs: list[tuple[Path, MetricConfig]] = []
     seen_names: dict[str, Path] = {}
 
     for metric_path in metric_paths:
@@ -51,9 +50,7 @@ def validate_metric_uniqueness(metric_paths: List[Path]) -> List[Tuple[Path, Met
         try:
             config = MetricConfig.from_yaml_file(metric_path)
         except Exception as e:
-            raise ValueError(
-                f"Failed to parse metric config at {metric_path}:\n{e}"
-            ) from e
+            raise ValueError(f"Failed to parse metric config at {metric_path}:\n{e}") from e
 
         # Check for duplicate metric names
         if config.name in seen_names:
@@ -72,7 +69,7 @@ def validate_metric_uniqueness(metric_paths: List[Path]) -> List[Tuple[Path, Met
     return configs
 
 
-def validate_project_metrics(project_root: Path) -> List[Tuple[Path, MetricConfig]]:
+def validate_project_metrics(project_root: Path) -> list[tuple[Path, MetricConfig]]:
     """
     Load and validate all metrics in the project.
 

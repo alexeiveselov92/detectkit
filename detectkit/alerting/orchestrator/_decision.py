@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -17,8 +16,8 @@ from detectkit.utils.datetime_utils import now_utc, to_aware_utc
 class _DecisionMixin(_OrchestratorBase):
     def should_alert(
         self,
-        recent_detections: List[DetectionRecord],
-    ) -> Tuple[bool, Optional[AlertData]]:
+        recent_detections: list[DetectionRecord],
+    ) -> tuple[bool, AlertData | None]:
         """Decide whether to fire an alert from recent detections.
 
         Steps (cheap → expensive):
@@ -37,15 +36,11 @@ class _DecisionMixin(_OrchestratorBase):
         detections_by_time = self._group_by_timestamp(recent_detections)
         timestamps_sorted = sorted(detections_by_time.keys(), reverse=True)
 
-        latest_anomalies = [
-            d for d in detections_by_time[timestamps_sorted[0]] if d.is_anomaly
-        ]
+        latest_anomalies = [d for d in detections_by_time[timestamps_sorted[0]] if d.is_anomaly]
         if len(latest_anomalies) < self.conditions.min_detectors:
             return False, None
 
-        consecutive = self._count_consecutive_anomalies(
-            detections_by_time, timestamps_sorted
-        )
+        consecutive = self._count_consecutive_anomalies(detections_by_time, timestamps_sorted)
         if consecutive < self.conditions.consecutive_anomalies:
             return False, None
 
@@ -53,13 +48,13 @@ class _DecisionMixin(_OrchestratorBase):
 
     def _count_consecutive_anomalies(
         self,
-        detections_by_time: Dict[np.datetime64, List[DetectionRecord]],
-        timestamps_sorted: List[np.datetime64],
+        detections_by_time: dict[np.datetime64, list[DetectionRecord]],
+        timestamps_sorted: list[np.datetime64],
     ) -> int:
         """Walk timestamps newest→oldest counting matching anomalies."""
         direction_condition = self.conditions.direction
         consecutive = 0
-        prev_direction: Optional[str] = None
+        prev_direction: str | None = None
 
         for ts in timestamps_sorted:
             anomalies = [d for d in detections_by_time[ts] if d.is_anomaly]
@@ -96,7 +91,7 @@ class _DecisionMixin(_OrchestratorBase):
 
     def _build_alert_data(
         self,
-        anomalies: List[DetectionRecord],
+        anomalies: list[DetectionRecord],
         consecutive_count: int,
     ) -> AlertData:
         primary = anomalies[0]
@@ -140,7 +135,7 @@ class _DecisionMixin(_OrchestratorBase):
     def should_alert_no_data(
         self,
         last_point: datetime,
-    ) -> Tuple[bool, Optional[AlertData]]:
+    ) -> tuple[bool, AlertData | None]:
         """Decide whether to fire a no-data alert for *last_point*.
 
         Conditions (all must hold):
@@ -154,9 +149,7 @@ class _DecisionMixin(_OrchestratorBase):
         not apply here: missing data is a single binary metric-level
         signal, not a per-detector vote.
         """
-        if not self.alert_config or not getattr(
-            self.alert_config, "no_data_alert", False
-        ):
+        if not self.alert_config or not getattr(self.alert_config, "no_data_alert", False):
             return False, None
         if not self.internal:
             return False, None
@@ -190,7 +183,7 @@ class _DecisionMixin(_OrchestratorBase):
             mentions=self.mentions,
         )
 
-    def get_last_complete_point(self, now: Optional[datetime] = None) -> datetime:
+    def get_last_complete_point(self, now: datetime | None = None) -> datetime:
         """Floor ``now`` to the previous fully completed interval boundary."""
         if now is None:
             now = now_utc()

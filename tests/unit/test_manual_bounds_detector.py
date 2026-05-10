@@ -65,11 +65,11 @@ class TestManualBoundsDetectorDetect:
         results = detector.detect(data)
 
         assert len(results) == 5
-        assert results[0].is_anomaly == False  # 10.0 <= 50.0
-        assert results[1].is_anomaly == False  # 40.0 <= 50.0
-        assert results[2].is_anomaly == False  # 50.0 <= 50.0
-        assert results[3].is_anomaly == True   # 60.0 > 50.0
-        assert results[4].is_anomaly == True   # 100.0 > 50.0
+        assert not results[0].is_anomaly  # 10.0 <= 50.0
+        assert not results[1].is_anomaly  # 40.0 <= 50.0
+        assert not results[2].is_anomaly  # 50.0 <= 50.0
+        assert results[3].is_anomaly  # 60.0 > 50.0
+        assert results[4].is_anomaly  # 100.0 > 50.0
 
     def test_detect_lower_bound_only(self):
         """Test detection with lower bound only."""
@@ -87,11 +87,11 @@ class TestManualBoundsDetectorDetect:
         results = detector.detect(data)
 
         assert len(results) == 5
-        assert results[0].is_anomaly == True   # 5.0 < 20.0
-        assert results[1].is_anomaly == True   # 10.0 < 20.0
-        assert results[2].is_anomaly == False  # 20.0 >= 20.0
-        assert results[3].is_anomaly == False  # 30.0 >= 20.0
-        assert results[4].is_anomaly == False  # 100.0 >= 20.0
+        assert results[0].is_anomaly  # 5.0 < 20.0
+        assert results[1].is_anomaly  # 10.0 < 20.0
+        assert not results[2].is_anomaly  # 20.0 >= 20.0
+        assert not results[3].is_anomaly  # 30.0 >= 20.0
+        assert not results[4].is_anomaly  # 100.0 >= 20.0
 
     def test_detect_both_bounds(self):
         """Test detection with both bounds."""
@@ -109,12 +109,12 @@ class TestManualBoundsDetectorDetect:
         results = detector.detect(data)
 
         assert len(results) == 6
-        assert results[0].is_anomaly == True   # 10.0 < 20.0
-        assert results[1].is_anomaly == False  # 20.0 in range
-        assert results[2].is_anomaly == False  # 50.0 in range
-        assert results[3].is_anomaly == False  # 80.0 in range
-        assert results[4].is_anomaly == True   # 90.0 > 80.0
-        assert results[5].is_anomaly == True   # 100.0 > 80.0
+        assert results[0].is_anomaly  # 10.0 < 20.0
+        assert not results[1].is_anomaly  # 20.0 in range
+        assert not results[2].is_anomaly  # 50.0 in range
+        assert not results[3].is_anomaly  # 80.0 in range
+        assert results[4].is_anomaly  # 90.0 > 80.0
+        assert results[5].is_anomaly  # 100.0 > 80.0
 
     def test_detect_with_nan(self):
         """Test detection with NaN values."""
@@ -132,11 +132,11 @@ class TestManualBoundsDetectorDetect:
         results = detector.detect(data)
 
         assert len(results) == 4
-        assert results[0].is_anomaly == False  # 50.0 in range
-        assert results[1].is_anomaly == False  # NaN is not anomaly
+        assert not results[0].is_anomaly  # 50.0 in range
+        assert not results[1].is_anomaly  # NaN is not anomaly
         assert results[1].detection_metadata["reason"] == "missing_data"
-        assert results[2].is_anomaly == True   # 150.0 > 100.0
-        assert results[3].is_anomaly == True   # 5.0 < 10.0
+        assert results[2].is_anomaly  # 150.0 > 100.0
+        assert results[3].is_anomaly  # 5.0 < 10.0
 
     def test_detect_direction(self):
         """Test that direction is correctly identified."""
@@ -200,9 +200,7 @@ class TestManualBoundsDetectorDetect:
         detector = ManualBoundsDetector(lower_bound=20.0, upper_bound=80.0)
 
         data = {
-            "timestamp": np.array(
-                [np.datetime64("2024-01-01T00:00:00", "ms")]
-            ),
+            "timestamp": np.array([np.datetime64("2024-01-01T00:00:00", "ms")]),
             "value": np.array([50.0]),
             "seasonality_data": np.array(["{}"] * 1),
             "seasonality_columns": [],
@@ -218,9 +216,7 @@ class TestManualBoundsDetectorDetect:
         detector = ManualBoundsDetector(lower_bound=20.0, upper_bound=80.0)
 
         data = {
-            "timestamp": np.array(
-                [np.datetime64("2024-01-01T00:00:00", "ms")]
-            ),
+            "timestamp": np.array([np.datetime64("2024-01-01T00:00:00", "ms")]),
             "value": np.array([50.0]),
             "seasonality_data": np.array(["{}"] * 1),
             "seasonality_columns": [],
@@ -229,7 +225,7 @@ class TestManualBoundsDetectorDetect:
         results = detector.detect(data)
 
         # Normal value should have empty metadata (no direction, distance, severity)
-        assert results[0].is_anomaly == False
+        assert not results[0].is_anomaly
         assert "direction" not in results[0].detection_metadata
         assert "distance" not in results[0].detection_metadata
         assert "severity" not in results[0].detection_metadata
@@ -265,6 +261,7 @@ class TestManualBoundsDetectorHashAndParams:
         params_json = detector.get_detector_params()
 
         import json
+
         params = json.loads(params_json)
         assert params["lower_bound"] == 10.0
         assert params["upper_bound"] == 100.0
@@ -275,6 +272,7 @@ class TestManualBoundsDetectorHashAndParams:
         params_json = detector.get_detector_params()
 
         import json
+
         params = json.loads(params_json)
         assert params["upper_bound"] == 100.0
         assert "lower_bound" not in params  # None is excluded

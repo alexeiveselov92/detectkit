@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
@@ -16,9 +16,9 @@ class _DatapointsMixin(_InternalTablesBase):
     def save_datapoints(
         self,
         metric_name: str,
-        data: Dict[str, np.ndarray],
+        data: dict[str, np.ndarray],
         interval_seconds: int,
-        seasonality_columns: List[str],
+        seasonality_columns: list[str],
     ) -> int:
         """Insert a batch of metric datapoints. Duplicates are ignored."""
         num_rows = len(data["timestamp"])
@@ -28,38 +28,26 @@ class _DatapointsMixin(_InternalTablesBase):
             "value": data["value"],
             "seasonality_data": data["seasonality_data"],
             "interval_seconds": np.full(num_rows, interval_seconds, dtype=np.int32),
-            "seasonality_columns": np.full(
-                num_rows, ",".join(seasonality_columns), dtype=object
-            ),
+            "seasonality_columns": np.full(num_rows, ",".join(seasonality_columns), dtype=object),
             "created_at": np.full(num_rows, now_utc_naive(), dtype="datetime64[ms]"),
         }
-        full_table_name = self._manager.get_full_table_name(
-            TABLE_DATAPOINTS, use_internal=True
-        )
-        return self._manager.insert_batch(
-            full_table_name, insert_data, conflict_strategy="ignore"
-        )
+        full_table_name = self._manager.get_full_table_name(TABLE_DATAPOINTS, use_internal=True)
+        return self._manager.insert_batch(full_table_name, insert_data, conflict_strategy="ignore")
 
-    def get_last_datapoint_timestamp(self, metric_name: str) -> Optional[datetime]:
+    def get_last_datapoint_timestamp(self, metric_name: str) -> datetime | None:
         """Return the most recent timestamp stored for *metric_name*, if any."""
-        full_table_name = self._manager.get_full_table_name(
-            TABLE_DATAPOINTS, use_internal=True
-        )
+        full_table_name = self._manager.get_full_table_name(TABLE_DATAPOINTS, use_internal=True)
         last_ts = self._manager.get_last_timestamp(full_table_name, metric_name)
         return self._normalize_max_timestamp(last_ts)
 
-    def get_value_at(
-        self, metric_name: str, timestamp: datetime
-    ) -> Optional[float]:
+    def get_value_at(self, metric_name: str, timestamp: datetime) -> float | None:
         """Return the stored ``value`` for an exact timestamp.
 
         Returns ``None`` if there is no row at that timestamp **or** the
         row's value is NULL/NaN — i.e. ``None`` means "no real datapoint".
         Used by the ``no_data_alert`` decision path.
         """
-        full_table_name = self._manager.get_full_table_name(
-            TABLE_DATAPOINTS, use_internal=True
-        )
+        full_table_name = self._manager.get_full_table_name(TABLE_DATAPOINTS, use_internal=True)
         query = f"""
         SELECT value
         FROM {full_table_name}
@@ -85,16 +73,14 @@ class _DatapointsMixin(_InternalTablesBase):
     def load_datapoints(
         self,
         metric_name: str,
-        from_timestamp: Optional[datetime] = None,
-        to_timestamp: Optional[datetime] = None,
-    ) -> Dict[str, np.ndarray]:
+        from_timestamp: datetime | None = None,
+        to_timestamp: datetime | None = None,
+    ) -> dict[str, np.ndarray]:
         """Load datapoints for *metric_name* in the [from, to) range."""
-        full_table_name = self._manager.get_full_table_name(
-            TABLE_DATAPOINTS, use_internal=True
-        )
+        full_table_name = self._manager.get_full_table_name(TABLE_DATAPOINTS, use_internal=True)
 
         where_parts = ["metric_name = %(metric_name)s"]
-        params: Dict[str, Any] = {"metric_name": metric_name}
+        params: dict[str, Any] = {"metric_name": metric_name}
         if from_timestamp:
             where_parts.append("timestamp >= %(from_timestamp)s")
             params["from_timestamp"] = from_timestamp
@@ -123,9 +109,7 @@ class _DatapointsMixin(_InternalTablesBase):
         seasonality = [row["seasonality_data"] for row in results]
 
         seasonality_columns_str = results[0].get("seasonality_columns", "") or ""
-        seasonality_columns = [
-            c.strip() for c in seasonality_columns_str.split(",") if c.strip()
-        ]
+        seasonality_columns = [c.strip() for c in seasonality_columns_str.split(",") if c.strip()]
 
         return {
             "timestamp": np.array(timestamps, dtype="datetime64[ms]"),
@@ -137,16 +121,14 @@ class _DatapointsMixin(_InternalTablesBase):
     def delete_datapoints(
         self,
         metric_name: str,
-        from_timestamp: Optional[datetime] = None,
-        to_timestamp: Optional[datetime] = None,
+        from_timestamp: datetime | None = None,
+        to_timestamp: datetime | None = None,
     ) -> int:
         """Issue an ``ALTER TABLE ... DELETE`` over the matching range."""
-        full_table_name = self._manager.get_full_table_name(
-            TABLE_DATAPOINTS, use_internal=True
-        )
+        full_table_name = self._manager.get_full_table_name(TABLE_DATAPOINTS, use_internal=True)
 
         where_parts = ["metric_name = %(metric_name)s"]
-        params: Dict[str, Any] = {"metric_name": metric_name}
+        params: dict[str, Any] = {"metric_name": metric_name}
         if from_timestamp:
             where_parts.append("timestamp >= %(from_timestamp)s")
             params["from_timestamp"] = from_timestamp
@@ -154,9 +136,7 @@ class _DatapointsMixin(_InternalTablesBase):
             where_parts.append("timestamp < %(to_timestamp)s")
             params["to_timestamp"] = to_timestamp
 
-        query = (
-            f"ALTER TABLE {full_table_name} DELETE WHERE {' AND '.join(where_parts)}"
-        )
+        query = f"ALTER TABLE {full_table_name} DELETE WHERE {' AND '.join(where_parts)}"
         self._manager.execute_query(query, params=params)
         # ClickHouse mutation is async; row count is unavailable
         return 0

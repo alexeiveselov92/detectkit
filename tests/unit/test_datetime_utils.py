@@ -1,14 +1,12 @@
 """Tests for detectkit.utils.datetime_utils."""
 
-from datetime import datetime, timezone, timedelta
-
-import pytest
+from datetime import datetime, timezone
 
 from detectkit.utils.datetime_utils import (
     now_utc,
     now_utc_naive,
-    to_naive_utc,
     to_aware_utc,
+    to_naive_utc,
 )
 
 

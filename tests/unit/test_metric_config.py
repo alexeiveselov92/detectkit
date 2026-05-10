@@ -1,10 +1,9 @@
 """Tests for MetricConfig."""
 
 from pathlib import Path
-from tempfile import NamedTemporaryFile, TemporaryDirectory
+from tempfile import NamedTemporaryFile
 
 import pytest
-import yaml
 
 from detectkit.config.metric_config import (
     AlertConfig,
@@ -31,10 +30,7 @@ class TestDetectorConfig:
 
     def test_detector_with_params(self):
         """Test detector with parameters."""
-        config = DetectorConfig(
-            type="mad",
-            params={"threshold": 3.0, "use_seasonality": True}
-        )
+        config = DetectorConfig(type="mad", params={"threshold": 3.0, "use_seasonality": True})
 
         assert config.type == "mad"
         assert config.params["threshold"] == 3.0

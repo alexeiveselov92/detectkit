@@ -10,10 +10,8 @@ look for those helpers.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from detectkit.database.manager import BaseDatabaseManager
-
 
 _EPOCH_NAIVE = datetime(1970, 1, 1, 0, 0, 0)
 
@@ -25,7 +23,7 @@ class _InternalTablesBase:
         self._manager = manager
 
     @staticmethod
-    def _normalize_max_timestamp(value: Optional[datetime]) -> Optional[datetime]:
+    def _normalize_max_timestamp(value: datetime | None) -> datetime | None:
         """Treat the Unix epoch sentinel as a missing value.
 
         ClickHouse's ``max(timestamp)`` over an empty selection returns

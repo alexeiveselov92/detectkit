@@ -13,7 +13,6 @@ Functions:
 """
 
 from datetime import datetime, timezone
-from typing import Optional
 
 
 def now_utc() -> datetime:
@@ -26,7 +25,7 @@ def now_utc_naive() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def to_naive_utc(dt: Optional[datetime]) -> Optional[datetime]:
+def to_naive_utc(dt: datetime | None) -> datetime | None:
     """Strip tzinfo from a UTC datetime, returning naive UTC.
 
     Args:
@@ -40,7 +39,7 @@ def to_naive_utc(dt: Optional[datetime]) -> Optional[datetime]:
     return dt.replace(tzinfo=None) if dt.tzinfo is not None else dt
 
 
-def to_aware_utc(dt: Optional[datetime]) -> Optional[datetime]:
+def to_aware_utc(dt: datetime | None) -> datetime | None:
     """Attach UTC timezone to a naive datetime.
 
     Args:

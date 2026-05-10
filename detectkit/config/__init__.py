@@ -1,13 +1,13 @@
 """Configuration management for detectkit."""
 
-from detectkit.config.profile import ProfileConfig, ProfilesConfig
 from detectkit.config.metric_config import (
-    MetricConfig,
-    DetectorConfig,
     AlertConfig,
+    DetectorConfig,
+    MetricConfig,
     QueryColumnsConfig,
     TablesConfig,
 )
+from detectkit.config.profile import ProfileConfig, ProfilesConfig
 from detectkit.config.project_config import (
     ProjectConfig,
     ProjectPathsConfig,

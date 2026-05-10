@@ -5,7 +5,6 @@ Defines configuration structure for detectkit_project.yml.
 """
 
 from pathlib import Path
-from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -36,12 +35,8 @@ class ProjectTablesConfig(BaseModel):
         metrics: Default metrics configuration table name
     """
 
-    datapoints: str = Field(
-        default="_dtk_datapoints", description="Default datapoints table"
-    )
-    detections: str = Field(
-        default="_dtk_detections", description="Default detections table"
-    )
+    datapoints: str = Field(default="_dtk_datapoints", description="Default datapoints table")
+    detections: str = Field(default="_dtk_detections", description="Default detections table")
     tasks: str = Field(default="_dtk_tasks", description="Default tasks table")
     metrics: str = Field(default="_dtk_metrics", description="Default metrics config table")
 
@@ -101,16 +96,14 @@ class ProjectErrorAlertingConfig(BaseModel):
     """
 
     enabled: bool = Field(default=False, description="Enable project error alerting")
-    channels: List[str] = Field(
+    channels: list[str] = Field(
         default_factory=list, description="Channel names to dispatch error alerts to"
     )
-    template: Optional[str] = Field(
-        default=None, description="Custom error message template"
-    )
-    mentions: List[str] = Field(
+    template: str | None = Field(default=None, description="Custom error message template")
+    mentions: list[str] = Field(
         default_factory=list, description="Users/groups to mention in error alerts"
     )
-    timezone: Optional[str] = Field(
+    timezone: str | None = Field(
         default=None, description="Optional display timezone for {timestamp}"
     )
 
@@ -164,7 +157,7 @@ class ProjectConfig(BaseModel):
         default_factory=ProjectTimeoutsConfig, description="Operation timeouts"
     )
     default_profile: str = Field(..., description="Default database profile")
-    error_alerting: Optional[ProjectErrorAlertingConfig] = Field(
+    error_alerting: ProjectErrorAlertingConfig | None = Field(
         default=None,
         description="Project-level error alerting (DB outages, query failures, etc.)",
     )
@@ -206,7 +199,7 @@ class ProjectConfig(BaseModel):
         if not path.exists():
             raise FileNotFoundError(f"Project config file not found: {path}")
 
-        with open(path, "r") as f:
+        with open(path) as f:
             data = yaml.safe_load(f)
 
         if not data:

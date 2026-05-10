@@ -19,7 +19,7 @@ Seasonality support:
 - Applies multipliers to adjust confidence intervals
 """
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 
@@ -65,13 +65,13 @@ class MADDetector(BaseDetector):
         threshold: float = 3.0,
         window_size: int = 100,
         min_samples: int = 30,
-        seasonality_components: Optional[List[Union[str, List[str]]]] = None,
+        seasonality_components: list[str | list[str]] | None = None,
         min_samples_per_group: int = 10,
         input_type: str = "values",
-        smoothing: Optional[str] = None,
+        smoothing: str | None = None,
         smoothing_alpha: float = 0.3,
         smoothing_window: int = 10,
-        window_weights: Optional[str] = None,
+        window_weights: str | None = None,
         weight_decay: float = 0.95,
     ):
         """
@@ -125,7 +125,7 @@ class MADDetector(BaseDetector):
         if min_samples > window_size:
             raise ValueError("min_samples cannot exceed window_size")
 
-    def detect(self, data: Dict[str, np.ndarray]) -> list[DetectionResult]:
+    def detect(self, data: dict[str, np.ndarray]) -> list[DetectionResult]:
         """
         Perform MAD-based anomaly detection with seasonality support.
 
@@ -171,9 +171,7 @@ class MADDetector(BaseDetector):
         # Parse seasonality data once
         seasonality_dict = {}
         if len(seasonality_data) > 0 and seasonality_columns:
-            seasonality_dict = parse_seasonality_data(
-                seasonality_data, seasonality_columns
-            )
+            seasonality_dict = parse_seasonality_data(seasonality_data, seasonality_columns)
 
         results = []
         n_points = len(timestamps)
@@ -226,7 +224,7 @@ class MADDetector(BaseDetector):
 
             # STEP 1: Compute GLOBAL statistics (entire window)
             # Use weighted statistics if weights are not uniform
-            from detectkit.utils import weighted_median, weighted_mad
+            from detectkit.utils import weighted_mad, weighted_median
 
             global_median = weighted_median(window_valid, weights)
             global_mad = weighted_mad(window_valid, weights, center=global_median)
@@ -258,13 +256,15 @@ class MADDetector(BaseDetector):
                     # Check if enough samples in group
                     if len(group_values) < min_samples_per_group:
                         # Insufficient data - skip this group (multiplier = 1.0)
-                        multipliers_applied.append({
-                            "group": group_cols,
-                            "median_multiplier": 1.0,
-                            "mad_multiplier": 1.0,
-                            "reason": "insufficient_group_data",
-                            "group_size": int(len(group_values)),
-                        })
+                        multipliers_applied.append(
+                            {
+                                "group": group_cols,
+                                "median_multiplier": 1.0,
+                                "mad_multiplier": 1.0,
+                                "reason": "insufficient_group_data",
+                                "group_size": int(len(group_values)),
+                            }
+                        )
                         continue
 
                     # Compute group statistics with weights
@@ -287,12 +287,14 @@ class MADDetector(BaseDetector):
                     adjusted_median *= median_multiplier
                     adjusted_mad *= mad_multiplier
 
-                    multipliers_applied.append({
-                        "group": group_cols,
-                        "median_multiplier": float(median_multiplier),
-                        "mad_multiplier": float(mad_multiplier),
-                        "group_size": int(len(group_values)),
-                    })
+                    multipliers_applied.append(
+                        {
+                            "group": group_cols,
+                            "median_multiplier": float(median_multiplier),
+                            "mad_multiplier": float(mad_multiplier),
+                            "group_size": int(len(group_values)),
+                        }
+                    )
 
             # STEP 3: Build confidence interval
             if adjusted_mad == 0:
@@ -304,7 +306,9 @@ class MADDetector(BaseDetector):
                 confidence_upper = adjusted_median + threshold * adjusted_mad
 
             # STEP 4: Check if current PROCESSED value is anomalous
-            is_anomaly = (current_processed < confidence_lower) or (current_processed > confidence_upper)
+            is_anomaly = (current_processed < confidence_lower) or (
+                current_processed > confidence_upper
+            )
 
             # Build metadata
             metadata = {
@@ -338,11 +342,13 @@ class MADDetector(BaseDetector):
                 # Severity: how many adjusted MAD units away
                 severity = distance / adjusted_mad if adjusted_mad > 0 else float("inf")
 
-                metadata.update({
-                    "direction": direction,
-                    "severity": float(severity),
-                    "distance": float(distance),
-                })
+                metadata.update(
+                    {
+                        "direction": direction,
+                        "severity": float(severity),
+                        "distance": float(distance),
+                    }
+                )
 
             results.append(
                 DetectionResult(
@@ -358,7 +364,7 @@ class MADDetector(BaseDetector):
 
         return results
 
-    def _get_non_default_params(self) -> Dict[str, Any]:
+    def _get_non_default_params(self) -> dict[str, Any]:
         """
         Get parameters that differ from defaults.
 
@@ -387,6 +393,7 @@ class MADDetector(BaseDetector):
         }
 
         return {
-            k: v for k, v in self.params.items()
+            k: v
+            for k, v in self.params.items()
             if v != defaults.get(k) and k not in execution_params
         }

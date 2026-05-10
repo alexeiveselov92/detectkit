@@ -9,7 +9,6 @@ writes go through DELETE+INSERT so updates are immediately visible.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, Optional
 
 import numpy as np
 
@@ -23,11 +22,9 @@ class _AlertStatesMixin(_InternalTablesBase):
         self,
         metric_name: str,
         alert_config_id: str,
-    ) -> Dict:
+    ) -> dict:
         """Read the persisted alert state, defaulting to an empty record."""
-        full_table_name = self._manager.get_full_table_name(
-            TABLE_ALERT_STATES, use_internal=True
-        )
+        full_table_name = self._manager.get_full_table_name(TABLE_ALERT_STATES, use_internal=True)
         query = f"""
         SELECT last_alert_sent, last_recovery_sent, alert_count
         FROM {full_table_name}
@@ -61,14 +58,12 @@ class _AlertStatesMixin(_InternalTablesBase):
         self,
         metric_name: str,
         alert_config_id: str,
-        last_alert_sent: Optional[datetime] = None,
-        last_recovery_sent: Optional[datetime] = None,
+        last_alert_sent: datetime | None = None,
+        last_recovery_sent: datetime | None = None,
         increment_count: bool = False,
     ) -> None:
         """Write a new alert-state row, preserving fields not being updated."""
-        full_table_name = self._manager.get_full_table_name(
-            TABLE_ALERT_STATES, use_internal=True
-        )
+        full_table_name = self._manager.get_full_table_name(TABLE_ALERT_STATES, use_internal=True)
 
         existing = self.get_alert_state(metric_name, alert_config_id)
         new_last_alert = (
@@ -82,9 +77,7 @@ class _AlertStatesMixin(_InternalTablesBase):
             else existing["last_recovery_sent"]
         )
         new_alert_count = (
-            existing["alert_count"] + 1
-            if increment_count
-            else existing["alert_count"]
+            existing["alert_count"] + 1 if increment_count else existing["alert_count"]
         )
 
         delete_query = f"""
@@ -118,15 +111,13 @@ class _AlertStatesMixin(_InternalTablesBase):
             "alert_count": np.array([new_alert_count], dtype=np.uint32),
             "updated_at": np.array([now], dtype="datetime64[ms]"),
         }
-        self._manager.insert_batch(
-            full_table_name, insert_data, conflict_strategy="ignore"
-        )
+        self._manager.insert_batch(full_table_name, insert_data, conflict_strategy="ignore")
 
     def get_last_alert_timestamp(
         self,
         metric_name: str,
         alert_config_id: str,
-    ) -> Optional[datetime]:
+    ) -> datetime | None:
         """Convenience accessor for ``alert_state['last_alert_sent']``."""
         return self.get_alert_state(metric_name, alert_config_id)["last_alert_sent"]
 
@@ -149,11 +140,9 @@ class _AlertStatesMixin(_InternalTablesBase):
         self,
         metric_name: str,
         alert_config_id: str,
-    ) -> Optional[datetime]:
+    ) -> datetime | None:
         """Convenience accessor for ``alert_state['last_recovery_sent']``."""
-        return self.get_alert_state(metric_name, alert_config_id)[
-            "last_recovery_sent"
-        ]
+        return self.get_alert_state(metric_name, alert_config_id)["last_recovery_sent"]
 
     def update_recovery_timestamp(
         self,

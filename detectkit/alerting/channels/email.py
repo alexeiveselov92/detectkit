@@ -7,7 +7,6 @@ Sends anomaly alerts via SMTP email.
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import List, Optional
 
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
 
@@ -51,12 +50,12 @@ class EmailChannel(BaseAlertChannel):
         smtp_host: str,
         smtp_port: int,
         from_email: str,
-        to_emails: List[str],
-        smtp_username: Optional[str] = None,
-        smtp_password: Optional[str] = None,
+        to_emails: list[str],
+        smtp_username: str | None = None,
+        smtp_password: str | None = None,
         use_tls: bool = True,
         subject_template: str = "Anomaly Alert: {metric_name}",
-        template: Optional[str] = None,
+        template: str | None = None,
         **kwargs,
     ):
         """
@@ -115,9 +114,7 @@ class EmailChannel(BaseAlertChannel):
         msg = MIMEMultipart("alternative")
         msg["From"] = self.from_email
         msg["To"] = ", ".join(self.to_emails)
-        msg["Subject"] = self.subject_template.format(
-            metric_name=alert_data.metric_name
-        )
+        msg["Subject"] = self.subject_template.format(metric_name=alert_data.metric_name)
 
         # Attach plain text body
         msg.attach(MIMEText(message_body, "plain"))
@@ -139,9 +136,9 @@ class EmailChannel(BaseAlertChannel):
             server.quit()
 
         except smtplib.SMTPException as e:
-            raise smtplib.SMTPException(f"Failed to send email alert: {e}")
+            raise smtplib.SMTPException(f"Failed to send email alert: {e}") from e
 
-    def format_mentions(self, mentions: List[str]) -> str:
+    def format_mentions(self, mentions: list[str]) -> str:
         """
         Format mentions for email.
 

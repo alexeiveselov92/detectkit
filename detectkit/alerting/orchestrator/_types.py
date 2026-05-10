@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 import numpy as np
 
 from detectkit.utils.json_utils import json_loads
 
 
-def _parse_detection_metadata(metadata: Any) -> Dict:
+def _parse_detection_metadata(metadata: Any) -> dict:
     """Coerce a stored metadata payload into a plain ``dict``.
 
     Accepts the shapes that come back from the database (``dict``,
@@ -75,8 +75,8 @@ class DetectionRecord:
     detector_params: str  # JSON-encoded params used for grouping
     value: float
     is_anomaly: bool
-    confidence_lower: Optional[float]
-    confidence_upper: Optional[float]
+    confidence_lower: float | None
+    confidence_upper: float | None
     direction: str  # "up", "down", "none"
     severity: float
-    detection_metadata: Dict
+    detection_metadata: dict

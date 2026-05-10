@@ -4,8 +4,6 @@ Telegram alert channel implementation.
 Sends anomaly alerts via Telegram Bot API.
 """
 
-from typing import Any, Dict, List, Optional
-
 import requests
 
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
@@ -43,7 +41,7 @@ class TelegramChannel(BaseAlertChannel):
         chat_id: str,
         parse_mode: str = "Markdown",
         disable_notification: bool = False,
-        template: Optional[str] = None,
+        template: str | None = None,
         **kwargs,
     ):
         """
@@ -103,9 +101,9 @@ class TelegramChannel(BaseAlertChannel):
             response = requests.post(url, json=payload, timeout=10)
             response.raise_for_status()
         except requests.RequestException as e:
-            raise requests.RequestException(f"Failed to send Telegram alert: {e}")
+            raise requests.RequestException(f"Failed to send Telegram alert: {e}") from e
 
-    def format_mentions(self, mentions: List[str]) -> str:
+    def format_mentions(self, mentions: list[str]) -> str:
         """
         Format mentions for Telegram.
 

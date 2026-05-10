@@ -37,9 +37,7 @@ def make_alert_config_id(alerting_config) -> str:
         "direction": alerting_config.direction,
         "consecutive_anomalies": alerting_config.consecutive_anomalies,
         "alert_cooldown": (
-            str(alerting_config.alert_cooldown)
-            if alerting_config.alert_cooldown
-            else None
+            str(alerting_config.alert_cooldown) if alerting_config.alert_cooldown else None
         ),
         "cooldown_reset_on_recovery": alerting_config.cooldown_reset_on_recovery,
     }

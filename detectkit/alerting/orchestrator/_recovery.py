@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -19,8 +18,8 @@ from detectkit.alerting.orchestrator._types import (
 class _RecoveryMixin(_OrchestratorBase):
     def should_send_recovery(
         self,
-        recent_detections: List[DetectionRecord],
-    ) -> Tuple[bool, Optional[AlertData]]:
+        recent_detections: list[DetectionRecord],
+    ) -> tuple[bool, AlertData | None]:
         """Decide whether to send a recovery notification.
 
         Conditions (all must hold):
@@ -31,9 +30,7 @@ class _RecoveryMixin(_OrchestratorBase):
         if not self.internal:
             return False, None
 
-        last_alert = self.internal.get_last_alert_timestamp(
-            self.metric_name, self.alert_config_id
-        )
+        last_alert = self.internal.get_last_alert_timestamp(self.metric_name, self.alert_config_id)
         if not last_alert:
             return False, None
 
@@ -51,9 +48,7 @@ class _RecoveryMixin(_OrchestratorBase):
             return False, None
         return True, recovery_data
 
-    def _check_recovery_since_last_alert(
-        self, last_alert_timestamp: datetime
-    ) -> bool:
+    def _check_recovery_since_last_alert(self, last_alert_timestamp: datetime) -> bool:
         """Return ``True`` when the metric has recovered since *last_alert_timestamp*.
 
         Direction-aware: a "down"-only alert is not blocked by a fresh
@@ -76,12 +71,9 @@ class _RecoveryMixin(_OrchestratorBase):
             # No fresh detections at all → assume recovery.
             return True
 
-        records: List[DetectionRecord] = []
+        records: list[DetectionRecord] = []
         for det in recent_detections:
-            metadata_list = (
-                det.get("detection_metadata_list")
-                or [None] * len(det["detector_ids"])
-            )
+            metadata_list = det.get("detection_metadata_list") or [None] * len(det["detector_ids"])
             for i in range(len(det["detector_ids"])):
                 is_anomaly = det["is_anomaly_flags"][i]
                 metadata = _parse_detection_metadata(metadata_list[i])
@@ -103,9 +95,7 @@ class _RecoveryMixin(_OrchestratorBase):
 
         detections_by_time = self._group_by_timestamp(records)
         timestamps_sorted = sorted(detections_by_time.keys(), reverse=True)
-        latest_anomalies = [
-            d for d in detections_by_time[timestamps_sorted[0]] if d.is_anomaly
-        ]
+        latest_anomalies = [d for d in detections_by_time[timestamps_sorted[0]] if d.is_anomaly]
 
         direction_condition = self.conditions.direction
         if direction_condition == "down":
@@ -113,23 +103,17 @@ class _RecoveryMixin(_OrchestratorBase):
         elif direction_condition == "up":
             blocking = [d for d in latest_anomalies if d.direction == "up"]
         elif direction_condition == "same":
-            trigger_direction = self._get_alert_trigger_direction(
-                last_alert_timestamp
-            )
+            trigger_direction = self._get_alert_trigger_direction(last_alert_timestamp)
             if trigger_direction is None:
                 blocking = latest_anomalies  # conservative fallback
             else:
-                blocking = [
-                    d for d in latest_anomalies if d.direction == trigger_direction
-                ]
+                blocking = [d for d in latest_anomalies if d.direction == trigger_direction]
         else:  # "any" / unknown — preserve historical behaviour
             blocking = latest_anomalies
 
         return len(blocking) == 0
 
-    def _get_alert_trigger_direction(
-        self, last_alert_timestamp: datetime
-    ) -> Optional[str]:
+    def _get_alert_trigger_direction(self, last_alert_timestamp: datetime) -> str | None:
         """Return the direction of the anomaly that triggered the last alert."""
         if not self.internal:
             return None
@@ -143,10 +127,7 @@ class _RecoveryMixin(_OrchestratorBase):
             return None
 
         det = trigger_detections[0]
-        metadata_list = (
-            det.get("detection_metadata_list")
-            or [None] * len(det["detector_ids"])
-        )
+        metadata_list = det.get("detection_metadata_list") or [None] * len(det["detector_ids"])
         for i in range(len(det["detector_ids"])):
             if not det["is_anomaly_flags"][i]:
                 continue
@@ -157,8 +138,8 @@ class _RecoveryMixin(_OrchestratorBase):
 
     def _build_recovery_data(
         self,
-        detections: List[DetectionRecord],
-    ) -> Optional[AlertData]:
+        detections: list[DetectionRecord],
+    ) -> AlertData | None:
         """Construct the AlertData payload sent as a recovery notification."""
         if not detections:
             return None
@@ -175,9 +156,7 @@ class _RecoveryMixin(_OrchestratorBase):
         recovery_detector_params = latest.detector_params
 
         if recovery_ci_lower is None or recovery_ci_upper is None:
-            last_anomalous = next(
-                (d for d in reversed(detections) if d.is_anomaly), None
-            )
+            last_anomalous = next((d for d in reversed(detections) if d.is_anomaly), None)
             if last_anomalous:
                 recovery_detector_name = last_anomalous.detector_name
                 recovery_detector_params = last_anomalous.detector_params

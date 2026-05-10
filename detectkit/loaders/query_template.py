@@ -6,9 +6,14 @@ and custom context.
 """
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
-from jinja2 import Environment, StrictUndefined, Template, TemplateSyntaxError, Undefined, UndefinedError
+from jinja2 import (
+    Environment,
+    StrictUndefined,
+    TemplateSyntaxError,
+    Undefined,
+)
 
 
 class QueryTemplate:
@@ -49,10 +54,10 @@ class QueryTemplate:
     def render(
         self,
         query: str,
-        context: Optional[Dict[str, Any]] = None,
-        dtk_start_time: Optional[datetime] = None,
-        dtk_end_time: Optional[datetime] = None,
-        interval_seconds: Optional[int] = None,
+        context: dict[str, Any] | None = None,
+        dtk_start_time: datetime | None = None,
+        dtk_end_time: datetime | None = None,
+        interval_seconds: int | None = None,
     ) -> str:
         """
         Render SQL query template with context.
@@ -113,19 +118,17 @@ class QueryTemplate:
             template = self._env.from_string(query)
             return template.render(template_context)
         except TemplateSyntaxError as e:
-            raise TemplateSyntaxError(
-                f"Invalid template syntax: {e.message}", e.lineno
-            )
+            raise TemplateSyntaxError(f"Invalid template syntax: {e.message}", e.lineno) from e
         except Exception as e:
-            raise Exception(f"Template rendering failed: {e}")
+            raise Exception(f"Template rendering failed: {e}") from e
 
     def render_with_defaults(
         self,
         query: str,
-        context: Optional[Dict[str, Any]] = None,
-        dtk_start_time: Optional[datetime] = None,
-        dtk_end_time: Optional[datetime] = None,
-        interval_seconds: Optional[int] = None,
+        context: dict[str, Any] | None = None,
+        dtk_start_time: datetime | None = None,
+        dtk_end_time: datetime | None = None,
+        interval_seconds: int | None = None,
     ) -> str:
         """
         Render query with sensible defaults for missing variables.

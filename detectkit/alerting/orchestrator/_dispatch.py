@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
-
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
 from detectkit.alerting.orchestrator._base import _OrchestratorBase
 from detectkit.utils.datetime_utils import now_utc_naive
@@ -13,9 +11,9 @@ class _DispatchMixin(_OrchestratorBase):
     def send_alerts(
         self,
         alert_data: AlertData,
-        channels: List[BaseAlertChannel],
-        template: Optional[str] = None,
-    ) -> Dict[str, bool]:
+        channels: list[BaseAlertChannel],
+        template: str | None = None,
+    ) -> dict[str, bool]:
         """Send *alert_data* to every channel; record success per-channel.
 
         Updates ``last_alert_sent`` (and increments the counter) when at
@@ -36,9 +34,9 @@ class _DispatchMixin(_OrchestratorBase):
     def send_recovery(
         self,
         alert_data: AlertData,
-        channels: List[BaseAlertChannel],
-        template: Optional[str] = None,
-    ) -> Dict[str, bool]:
+        channels: list[BaseAlertChannel],
+        template: str | None = None,
+    ) -> dict[str, bool]:
         """Send a recovery notification and stamp ``last_recovery_sent``."""
         results = self._dispatch(channels, alert_data, template, "recovery")
 
@@ -52,12 +50,12 @@ class _DispatchMixin(_OrchestratorBase):
 
     @staticmethod
     def _dispatch(
-        channels: List[BaseAlertChannel],
+        channels: list[BaseAlertChannel],
         alert_data: AlertData,
-        template: Optional[str],
+        template: str | None,
         kind: str,
-    ) -> Dict[str, bool]:
-        results: Dict[str, bool] = {}
+    ) -> dict[str, bool]:
+        results: dict[str, bool] = {}
         for channel in channels:
             channel_name = channel.__class__.__name__
             try:

@@ -6,7 +6,6 @@ Executes metric processing pipeline.
 
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
 import click
 
@@ -20,13 +19,13 @@ from detectkit.orchestration.task_manager import PipelineStep, TaskManager
 
 def run_command(
     select: str,
-    exclude: Optional[str],
+    exclude: str | None,
     steps: str,
-    from_date: Optional[str],
-    to_date: Optional[str],
+    from_date: str | None,
+    to_date: str | None,
     full_refresh: bool,
     force: bool,
-    profile: Optional[str],
+    profile: str | None,
 ):
     """
     Execute metric processing pipeline.
@@ -96,7 +95,9 @@ def run_command(
         try:
             excluded_metrics = select_metrics(exclude, project_root)
             excluded_names = {config.name for _, config in excluded_metrics}
-            metrics = [(path, config) for path, config in metrics if config.name not in excluded_names]
+            metrics = [
+                (path, config) for path, config in metrics if config.name not in excluded_names
+            ]
 
             if excluded_metrics:
                 click.echo(f"Excluded {len(excluded_metrics)} metric(s) matching: {exclude}")
@@ -186,7 +187,7 @@ def run_command(
 
     # Process each metric
     for metric_path, config in metrics:
-        process_metric(
+        result = process_metric(
             metric_path=metric_path,
             config=config,
             project_root=project_root,
@@ -197,9 +198,21 @@ def run_command(
             full_refresh=full_refresh,
             force=force,
         )
+        # Project-level error alert was dispatched — stop processing the
+        # rest of the metrics. The DB / source is presumed unreachable;
+        # subsequent metrics would all fail with the same error.
+        if result and result.get("abort_run"):
+            click.echo(
+                click.style(
+                    "✗ Aborting run after project error alert. " "Remaining metrics skipped.",
+                    fg="red",
+                    bold=True,
+                )
+            )
+            break
 
 
-def parse_steps(steps_str: str) -> List[PipelineStep]:
+def parse_steps(steps_str: str) -> list[PipelineStep]:
     """
     Parse comma-separated steps string.
 
@@ -223,9 +236,7 @@ def parse_steps(steps_str: str) -> List[PipelineStep]:
     for step_str in steps_str.split(","):
         step_str = step_str.strip().lower()
         if step_str not in step_map:
-            raise click.BadParameter(
-                f"Invalid step: {step_str}. Valid steps: load, detect, alert"
-            )
+            raise click.BadParameter(f"Invalid step: {step_str}. Valid steps: load, detect, alert")
         steps.append(step_map[step_str])
 
     return steps
@@ -260,12 +271,11 @@ def parse_date(date_str: str) -> datetime:
             continue
 
     raise click.BadParameter(
-        f"Invalid date format: {date_str}. "
-        f"Use YYYY-MM-DD or 'YYYY-MM-DD HH:MM:SS'"
+        f"Invalid date format: {date_str}. " f"Use YYYY-MM-DD or 'YYYY-MM-DD HH:MM:SS'"
     )
 
 
-def find_project_root() -> Optional[Path]:
+def find_project_root() -> Path | None:
     """
     Find detectkit project root by looking for detectkit_project.yml.
 
@@ -290,7 +300,7 @@ def find_project_root() -> Optional[Path]:
     return None
 
 
-def select_metrics(selector: str, project_root: Path) -> List[tuple[Path, MetricConfig]]:
+def select_metrics(selector: str, project_root: Path) -> list[tuple[Path, MetricConfig]]:
     """
     Select metrics based on selector and validate uniqueness.
 
@@ -319,7 +329,7 @@ def select_metrics(selector: str, project_root: Path) -> List[tuple[Path, Metric
         return []
 
     # Collect metric paths based on selector
-    metric_paths: List[Path] = []
+    metric_paths: list[Path] = []
 
     # Tag selector
     if selector.startswith("tag:"):
@@ -354,7 +364,7 @@ def select_metrics(selector: str, project_root: Path) -> List[tuple[Path, Metric
     return validate_metric_uniqueness(metric_paths)
 
 
-def find_metrics_by_tag(metrics_dir: Path, tag: str) -> List[Path]:
+def find_metrics_by_tag(metrics_dir: Path, tag: str) -> list[Path]:
     """
     Find all metrics with specific tag.
 
@@ -384,16 +394,16 @@ def find_metrics_by_tag(metrics_dir: Path, tag: str) -> List[Path]:
                 click.echo(
                     click.style(
                         f"Warning: Skipping {metric_file.relative_to(metrics_dir.parent)}: {e}",
-                        fg="yellow"
+                        fg="yellow",
                     ),
-                    err=True
+                    err=True,
                 )
                 continue
 
     return matching_metrics
 
 
-def find_metric_by_name(metrics_dir: Path, name: str) -> Optional[Path]:
+def find_metric_by_name(metrics_dir: Path, name: str) -> Path | None:
     """
     Find metric by name field (searches recursively in subdirectories).
 
@@ -420,9 +430,9 @@ def find_metric_by_name(metrics_dir: Path, name: str) -> Optional[Path]:
                 click.echo(
                     click.style(
                         f"Warning: Skipping {metric_file.relative_to(metrics_dir.parent)}: {e}",
-                        fg="yellow"
+                        fg="yellow",
                     ),
-                    err=True
+                    err=True,
                 )
                 continue
 
@@ -434,12 +444,12 @@ def process_metric(
     config: MetricConfig,
     project_root: Path,
     task_manager: TaskManager,
-    steps: List[PipelineStep],
-    from_date: Optional[datetime],
-    to_date: Optional[datetime],
+    steps: list[PipelineStep],
+    from_date: datetime | None,
+    to_date: datetime | None,
     full_refresh: bool,
     force: bool,
-):
+) -> dict | None:
     """
     Process a single metric.
 
@@ -473,6 +483,7 @@ def process_metric(
     click.echo()
 
     # Run pipeline
+    result = None
     try:
         # Log step headers
         if PipelineStep.LOAD in steps:
@@ -511,6 +522,8 @@ def process_metric(
             )
         )
         import traceback
+
         click.echo(traceback.format_exc())
 
     click.echo()
+    return result

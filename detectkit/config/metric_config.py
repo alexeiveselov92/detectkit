@@ -5,7 +5,7 @@ Defines configuration structure for individual metrics loaded from YAML files.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -47,9 +47,7 @@ class DetectorConfig(BaseModel):
     """
 
     type: str = Field(..., description="Detector type")
-    params: Dict[str, Any] = Field(
-        default_factory=dict, description="Detector parameters"
-    )
+    params: dict[str, Any] = Field(default_factory=dict, description="Detector parameters")
 
     @field_validator("type")
     @classmethod
@@ -65,12 +63,11 @@ class DetectorConfig(BaseModel):
         }
         if v not in allowed_types:
             raise ValueError(
-                f"Invalid detector type: {v}. "
-                f"Allowed: {', '.join(sorted(allowed_types))}"
+                f"Invalid detector type: {v}. " f"Allowed: {', '.join(sorted(allowed_types))}"
             )
         return v
 
-    def get_algorithm_params(self) -> Dict[str, Any]:
+    def get_algorithm_params(self) -> dict[str, Any]:
         """
         Extract algorithm parameters (exclude execution parameters).
 
@@ -85,15 +82,15 @@ class DetectorConfig(BaseModel):
         execution_params = {"start_time", "batch_size", "seasonality_components"}
         return {k: v for k, v in self.params.items() if k not in execution_params}
 
-    def get_start_time(self) -> Optional[str]:
+    def get_start_time(self) -> str | None:
         """Get start_time execution parameter if configured."""
         return self.params.get("start_time")
 
-    def get_batch_size(self) -> Optional[int]:
+    def get_batch_size(self) -> int | None:
         """Get batch_size execution parameter if configured."""
         return self.params.get("batch_size")
 
-    def get_seasonality_components(self) -> Optional[List[Union[str, List[str]]]]:
+    def get_seasonality_components(self) -> list[str | list[str]] | None:
         """Get seasonality_components configuration if configured."""
         return self.params.get("seasonality_components")
 
@@ -118,11 +115,9 @@ class QueryColumnsConfig(BaseModel):
         ```
     """
 
-    timestamp: str = Field(
-        default="timestamp", description="Timestamp column name in query"
-    )
+    timestamp: str = Field(default="timestamp", description="Timestamp column name in query")
     metric: str = Field(default="value", description="Metric value column name in query")
-    seasonality: Optional[List[str]] = Field(
+    seasonality: list[str] | None = Field(
         default=None, description="Seasonality column names in query"
     )
 
@@ -146,62 +141,64 @@ class AlertConfig(BaseModel):
     """
 
     enabled: bool = Field(default=True, description="Enable alerting")
-    suppress_until: Optional[str] = Field(
+    suppress_until: str | None = Field(
         default=None,
         description="Suppress alerts until this UTC datetime (e.g., '2026-04-11 18:00:00'). "
-                    "Load and detect steps still run. Alerts auto-resume after this time."
+        "Load and detect steps still run. Alerts auto-resume after this time.",
     )
-    timezone: Optional[str] = Field(
+    timezone: str | None = Field(
         default=None, description="Timezone for displaying timestamps (e.g., 'Europe/Moscow')"
     )
-    channels: List[str] = Field(
-        default_factory=list, description="Alert channel names"
-    )
-    min_detectors: int = Field(
-        default=1, description="Minimum detectors that must agree"
-    )
+    channels: list[str] = Field(default_factory=list, description="Alert channel names")
+    min_detectors: int = Field(default=1, description="Minimum detectors that must agree")
     direction: str = Field(
         default="same", description="Required anomaly direction: 'same', 'any', 'up', 'down'"
     )
     consecutive_anomalies: int = Field(
         default=3, description="Consecutive anomalies to trigger alert"
     )
-    no_data_alert: bool = Field(
-        default=False, description="Alert when no data is available"
-    )
-    template_single: Optional[str] = Field(
+    no_data_alert: bool = Field(default=False, description="Alert when no data is available")
+    template_single: str | None = Field(
         default=None, description="Custom template for single anomaly"
     )
-    template_consecutive: Optional[str] = Field(
+    template_consecutive: str | None = Field(
         default=None, description="Custom template for consecutive anomalies"
     )
-    alert_cooldown: Optional[Union[str, int]] = Field(
+    alert_cooldown: str | int | None = Field(
         default=None,
         description="Minimum interval between alerts (e.g., '30min', 1800). "
-                    "If None, no cooldown is applied (alerts sent every time conditions are met)."
+        "If None, no cooldown is applied (alerts sent every time conditions are met).",
     )
     cooldown_reset_on_recovery: bool = Field(
         default=True,
         description="Reset cooldown timer when anomaly recovers to normal. "
-                    "Only applies if alert_cooldown is set. "
-                    "True = cooldown resets on recovery, False = strict cooldown independent of recovery."
+        "Only applies if alert_cooldown is set. "
+        "True = cooldown resets on recovery, False = strict cooldown independent of recovery.",
     )
     notify_on_recovery: bool = Field(
         default=False,
         description="Send notification when metric recovers from anomaly state. "
-                    "Recovery is detected when consecutive anomalies drop below threshold "
-                    "after an alert was previously sent."
+        "Recovery is detected when consecutive anomalies drop below threshold "
+        "after an alert was previously sent.",
     )
-    template_recovery: Optional[str] = Field(
+    template_recovery: str | None = Field(
         default=None,
         description="Custom template for recovery notification message. "
-                    "Supports same variables as anomaly templates plus {status}."
+        "Supports same variables as anomaly templates plus {status}.",
     )
-    mentions: List[str] = Field(
+    template_no_data: str | None = Field(
+        default=None,
+        description="Custom template for no-data alert message. "
+        "Used when no_data_alert is true and the latest expected "
+        "interval has no datapoint. Supports {metric_name}, "
+        "{timestamp}, {timezone}, {description}, {description_line}, "
+        "{mentions}, {mentions_line}, {status}.",
+    )
+    mentions: list[str] = Field(
         default_factory=list,
         description="Users/groups to mention in alerts. Plain usernames without @. "
-                    "Special keywords: 'channel', 'all', 'here' for broadcast mentions. "
-                    "Each channel formats mentions in its native syntax."
+        "Special keywords: 'channel', 'all', 'here' for broadcast mentions. "
+        "Each channel formats mentions in its native syntax.",
     )
 
     @field_validator("consecutive_anomalies")
@@ -250,12 +247,8 @@ class TablesConfig(BaseModel):
         ```
     """
 
-    datapoints: Optional[str] = Field(
-        default=None, description="Custom datapoints table name"
-    )
-    detections: Optional[str] = Field(
-        default=None, description="Custom detections table name"
-    )
+    datapoints: str | None = Field(default=None, description="Custom datapoints table name")
+    detections: str | None = Field(default=None, description="Custom detections table name")
 
 
 class MetricConfig(BaseModel):
@@ -316,37 +309,34 @@ class MetricConfig(BaseModel):
     """
 
     name: str = Field(..., description="Metric name")
-    description: Optional[str] = Field(
-        default=None,
-        description="Optional metric description (supports multi-line text)"
+    description: str | None = Field(
+        default=None, description="Optional metric description (supports multi-line text)"
     )
-    tags: Optional[List[str]] = Field(
+    tags: list[str] | None = Field(
         default=None,
         description="Optional tags for metric selection (e.g., ['critical', 'api', '10min'])",
     )
-    profile: Optional[str] = Field(
+    profile: str | None = Field(
         default=None, description="Profile name to use (overrides default_profile)"
     )
-    query: Optional[str] = Field(default=None, description="Inline SQL query")
-    query_file: Optional[Path] = Field(default=None, description="Path to SQL file")
-    query_columns: Optional[QueryColumnsConfig] = Field(
+    query: str | None = Field(default=None, description="Inline SQL query")
+    query_file: Path | None = Field(default=None, description="Path to SQL file")
+    query_columns: QueryColumnsConfig | None = Field(
         default=None, description="Column name mapping for query results"
     )
-    interval: Union[int, str] = Field(..., description="Data interval")
-    loading_start_time: Optional[str] = Field(
+    interval: int | str = Field(..., description="Data interval")
+    loading_start_time: str | None = Field(
         default=None,
         description="Start time for initial data loading (UTC, format: YYYY-MM-DD HH:MM:SS)",
     )
-    seasonality_columns: List[str] = Field(
+    seasonality_columns: list[str] = Field(
         default_factory=list, description="Seasonality features to extract"
     )
-    loading_batch_size: int = Field(
-        default=10000, description="Batch size for loading"
-    )
-    detectors: List[DetectorConfig] = Field(
+    loading_batch_size: int = Field(default=10000, description="Batch size for loading")
+    detectors: list[DetectorConfig] = Field(
         default_factory=list, description="Detector configurations"
     )
-    alerting: Optional[List[AlertConfig]] = Field(
+    alerting: list[AlertConfig] | None = Field(
         default=None, description="Alert configuration(s) — single dict or list of dicts"
     )
 
@@ -359,13 +349,14 @@ class MetricConfig(BaseModel):
         if isinstance(v, (dict, AlertConfig)):
             return [v]
         return v
-    tables: Optional[TablesConfig] = Field(
+
+    tables: TablesConfig | None = Field(
         default=None, description="Custom table names (overrides defaults)"
     )
     enabled: bool = Field(default=True, description="Whether metric is enabled")
 
     # Parsed interval (computed from string/int)
-    _interval: Optional[Interval] = None
+    _interval: Interval | None = None
 
     @model_validator(mode="after")
     def validate_query_source(self) -> "MetricConfig":
@@ -374,9 +365,7 @@ class MetricConfig(BaseModel):
             raise ValueError("Either 'query' or 'query_file' must be specified")
 
         if self.query is not None and self.query_file is not None:
-            raise ValueError(
-                "Only one of 'query' or 'query_file' can be specified, not both"
-            )
+            raise ValueError("Only one of 'query' or 'query_file' can be specified, not both")
 
         return self
 
@@ -389,14 +378,13 @@ class MetricConfig(BaseModel):
         # Allow alphanumeric, underscore, dash
         if not all(c.isalnum() or c in ("_", "-") for c in v):
             raise ValueError(
-                "Metric name can only contain alphanumeric characters, "
-                "underscores, and dashes"
+                "Metric name can only contain alphanumeric characters, " "underscores, and dashes"
             )
         return v
 
     @field_validator("tags")
     @classmethod
-    def validate_tags(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+    def validate_tags(cls, v: list[str] | None) -> list[str] | None:
         """Validate tags field."""
         if v is None:
             return v
@@ -435,7 +423,7 @@ class MetricConfig(BaseModel):
 
     @field_validator("seasonality_columns")
     @classmethod
-    def validate_seasonality_columns(cls, v: List[str]) -> List[str]:
+    def validate_seasonality_columns(cls, v: list[str]) -> list[str]:
         """Validate seasonality columns."""
         allowed_columns = {
             "hour",
@@ -475,7 +463,7 @@ class MetricConfig(BaseModel):
             self._interval = Interval(self.interval)
         return self._interval
 
-    def get_query_text(self, project_root: Optional[Path] = None) -> str:
+    def get_query_text(self, project_root: Path | None = None) -> str:
         """
         Get SQL query text (from inline query or file).
 
@@ -509,7 +497,7 @@ class MetricConfig(BaseModel):
         if not query_path.exists():
             raise FileNotFoundError(f"Query file not found: {query_path}")
 
-        with open(query_path, "r") as f:
+        with open(query_path) as f:
             return f.read()
 
     @classmethod
@@ -539,7 +527,7 @@ class MetricConfig(BaseModel):
         if not path.exists():
             raise FileNotFoundError(f"Metric config file not found: {path}")
 
-        with open(path, "r") as f:
+        with open(path) as f:
             data = yaml.safe_load(f)
 
         if not data:

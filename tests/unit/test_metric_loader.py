@@ -1,7 +1,7 @@
 """Tests for MetricLoader."""
 
-from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
+from datetime import datetime, timezone
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -215,6 +215,7 @@ class TestSeasonalityExtraction:
 
         # Check seasonality data
         import json
+
         s1 = json.loads(data["seasonality_data"][0])
         s2 = json.loads(data["seasonality_data"][1])
 
@@ -236,6 +237,7 @@ class TestSeasonalityExtraction:
         )
 
         import json
+
         s1 = json.loads(data["seasonality_data"][0])
         s2 = json.loads(data["seasonality_data"][1])
 
@@ -264,6 +266,7 @@ class TestSeasonalityExtraction:
         )
 
         import json
+
         s = json.loads(data["seasonality_data"][0])
 
         assert s["hour"] == 15
@@ -293,6 +296,7 @@ class TestSeasonalityExtraction:
 
         # Seasonality data should be empty JSON objects
         import json
+
         s = json.loads(data["seasonality_data"][0])
         assert s == {}
 
@@ -345,9 +349,7 @@ class TestSave:
 class TestLoadAndSave:
     """Test load_and_save() method."""
 
-    def test_load_and_save_with_dates(
-        self, metric_loader, mock_db_manager, mock_internal_manager
-    ):
+    def test_load_and_save_with_dates(self, metric_loader, mock_db_manager, mock_internal_manager):
         """Test load_and_save with explicit dates."""
         mock_db_manager.execute_query.return_value = [
             {"timestamp": datetime(2024, 1, 1, 0, 0), "value": 0.5},
@@ -381,7 +383,7 @@ class TestLoadAndSave:
 
         # Verify query was called with correct from_date
         # (should be last_ts + interval)
-        query_call = mock_db_manager.execute_query.call_args[0][0]
+        mock_db_manager.execute_query.call_args[0][0]
         # Just verify it was called
         assert mock_db_manager.execute_query.called
 

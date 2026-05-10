@@ -5,8 +5,6 @@ Sends alerts to any webhook endpoint that accepts JSON payload.
 Compatible with Mattermost, Slack, and other webhook-based systems.
 """
 
-from typing import Dict, Optional
-
 import requests
 
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
@@ -62,9 +60,9 @@ class WebhookChannel(BaseAlertChannel):
         webhook_url: str,
         username: str = "detectk",
         icon_emoji: str = ":warning:",
-        channel: Optional[str] = None,
+        channel: str | None = None,
         timeout: int = 10,
-        extra_headers: Optional[Dict[str, str]] = None,
+        extra_headers: dict[str, str] | None = None,
     ):
         """Initialize webhook channel."""
         if not webhook_url:
@@ -80,7 +78,7 @@ class WebhookChannel(BaseAlertChannel):
     def send(
         self,
         alert_data: AlertData,
-        template: Optional[str] = None,
+        template: str | None = None,
     ) -> bool:
         """
         Send alert to webhook.
@@ -103,8 +101,13 @@ class WebhookChannel(BaseAlertChannel):
         title = self.format_title(alert_data)
         body = self.format_message(alert_data, template)
 
-        # Color: red for anomaly, green for recovery
-        color = "#36A64F" if alert_data.is_recovery else "#D63232"
+        # Color: red for anomaly, green for recovery, amber for no-data.
+        if alert_data.is_recovery:
+            color = "#36A64F"
+        elif alert_data.is_no_data:
+            color = "#F0AD4E"
+        else:
+            color = "#D63232"
 
         # Prepare payload using Mattermost/Slack attachments format.
         # Attachments give us: colored left sidebar, separate title, and
@@ -175,8 +178,28 @@ class WebhookChannel(BaseAlertChannel):
             "{mentions_line}"
         )
 
+    def get_default_no_data_template(self) -> str:
+        """Default no-data body template (metric name lives in the title)."""
+        return (
+            "{description_line}"
+            "Time: {timestamp}\n"
+            "Status: query returned no datapoint for the latest interval"
+            "{mentions_line}"
+        )
+
+    def get_default_error_template(self) -> str:
+        """Default error body template (metric name lives in the title)."""
+        return (
+            "{description_line}"
+            "Time: {timestamp}\n"
+            "Error: {error_type}: {error_message}"
+            "{mentions_line}"
+        )
+
     def __repr__(self) -> str:
         """String representation."""
-        url_preview = self.webhook_url[:30] + "..." if len(self.webhook_url) > 30 else self.webhook_url
+        url_preview = (
+            self.webhook_url[:30] + "..." if len(self.webhook_url) > 30 else self.webhook_url
+        )
         channel_info = f", channel='{self.channel}'" if self.channel else ""
         return f"WebhookChannel(url='{url_preview}', username='{self.username}'{channel_info})"

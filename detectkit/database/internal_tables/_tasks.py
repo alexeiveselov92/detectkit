@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, Optional
 
 from detectkit.database.internal_tables._base import _InternalTablesBase
 from detectkit.database.tables import TABLE_TASKS
@@ -37,8 +36,8 @@ class _TasksMixin(_InternalTablesBase):
         detector_id: str,
         process_type: str,
         status: str,
-        last_processed_timestamp: Optional[datetime] = None,
-        error_message: Optional[str] = None,
+        last_processed_timestamp: datetime | None = None,
+        error_message: str | None = None,
     ) -> None:
         """Mark the task as ``completed`` or ``failed``."""
         self._manager.upsert_task_status(
@@ -50,13 +49,9 @@ class _TasksMixin(_InternalTablesBase):
             error_message=error_message,
         )
 
-    def check_lock(
-        self, metric_name: str, detector_id: str, process_type: str
-    ) -> Optional[Dict]:
+    def check_lock(self, metric_name: str, detector_id: str, process_type: str) -> dict | None:
         """Return the running-task row, or ``None`` if no lock is active."""
-        full_table_name = self._manager.get_full_table_name(
-            TABLE_TASKS, use_internal=True
-        )
+        full_table_name = self._manager.get_full_table_name(TABLE_TASKS, use_internal=True)
         query = f"""
         SELECT *
         FROM {full_table_name}

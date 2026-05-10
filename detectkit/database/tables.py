@@ -116,23 +116,13 @@ def get_tasks_table_model() -> TableModel:
             ColumnDefinition("started_at", "DateTime64(3, 'UTC')"),
             ColumnDefinition("updated_at", "DateTime64(3, 'UTC')"),
             ColumnDefinition(
-                "last_processed_timestamp",
-                "Nullable(DateTime64(3, 'UTC'))",
-                nullable=True
+                "last_processed_timestamp", "Nullable(DateTime64(3, 'UTC'))", nullable=True
             ),
             ColumnDefinition("error_message", "Nullable(String)", nullable=True),
             ColumnDefinition("timeout_seconds", "Int32"),
-            ColumnDefinition(
-                "last_alert_sent",
-                "Nullable(DateTime64(3, 'UTC'))",
-                nullable=True
-            ),
+            ColumnDefinition("last_alert_sent", "Nullable(DateTime64(3, 'UTC'))", nullable=True),
             ColumnDefinition("alert_count", "UInt32", default="0"),
-            ColumnDefinition(
-                "last_recovery_sent",
-                "Nullable(DateTime64(3, 'UTC'))",
-                nullable=True
-            ),
+            ColumnDefinition("last_recovery_sent", "Nullable(DateTime64(3, 'UTC'))", nullable=True),
         ],
         primary_key=["metric_name", "detector_id", "process_type"],
         engine="MergeTree",
@@ -217,11 +207,7 @@ def get_metrics_table_model() -> TableModel:
             ColumnDefinition("description", "Nullable(String)", nullable=True),
             ColumnDefinition("path", "String"),
             ColumnDefinition("interval", "String"),
-            ColumnDefinition(
-                "loading_start_time",
-                "Nullable(DateTime64(3, 'UTC'))",
-                nullable=True
-            ),
+            ColumnDefinition("loading_start_time", "Nullable(DateTime64(3, 'UTC'))", nullable=True),
             ColumnDefinition("loading_batch_size", "UInt32"),
             ColumnDefinition("is_alert_enabled", "UInt8"),
             ColumnDefinition("timezone", "Nullable(String)", nullable=True),

@@ -73,11 +73,11 @@ class TestMADDetectorDetect:
         assert len(results) == 20
         # First min_samples-1 points skipped
         for i in range(5):
-            assert results[i].is_anomaly == False
+            assert not results[i].is_anomaly
             assert results[i].detection_metadata["reason"] == "insufficient_data"
         # Rest should be normal
         for i in range(5, 20):
-            assert results[i].is_anomaly == False
+            assert not results[i].is_anomaly
 
     def test_detect_with_anomalies(self):
         """Test detection with clear anomalies."""
@@ -98,7 +98,7 @@ class TestMADDetectorDetect:
 
         assert len(results) == 15
         # Point at index 13 (value=50.0) should be anomaly
-        assert results[13].is_anomaly == True
+        assert results[13].is_anomaly
         assert results[13].detection_metadata["direction"] == "above"
 
     def test_detect_with_nan(self):
@@ -120,7 +120,7 @@ class TestMADDetectorDetect:
 
         assert len(results) == 13
         # NaN should not be anomaly
-        assert results[10].is_anomaly == False
+        assert not results[10].is_anomaly
         assert results[10].detection_metadata["reason"] == "missing_data"
 
     def test_detect_below_threshold(self):
@@ -141,7 +141,7 @@ class TestMADDetectorDetect:
         results = detector.detect(data)
 
         # Point at index 13 (value=0.0) should be anomaly
-        assert results[13].is_anomaly == True
+        assert results[13].is_anomaly
         assert results[13].detection_metadata["direction"] == "below"
 
     def test_detect_confidence_intervals(self):
@@ -187,7 +187,7 @@ class TestMADDetectorDetect:
 
         # Last result should only consider last 5 points (all 10.0)
         # So 10.0 should not be anomaly
-        assert results[-1].is_anomaly == False
+        assert not results[-1].is_anomaly
 
     def test_detect_metadata(self):
         """Test that detection metadata is populated."""
@@ -232,7 +232,7 @@ class TestMADDetectorDetect:
 
         # Anomalous point should have severity
         anomaly_result = results[13]
-        assert anomaly_result.is_anomaly == True
+        assert anomaly_result.is_anomaly
         assert "severity" in anomaly_result.detection_metadata
         assert anomaly_result.detection_metadata["severity"] > 0
 
@@ -269,6 +269,7 @@ class TestMADDetectorHashAndParams:
 
         # Only non-default param
         import json
+
         params = json.loads(params_json)
         assert params["threshold"] == 2.5
         assert "window_size" not in params  # default

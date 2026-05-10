@@ -7,8 +7,6 @@ where the same parsing code lived in three nearly identical copies.
 
 from __future__ import annotations
 
-from typing import Dict, List
-
 import numpy as np
 
 from detectkit.utils.json_utils import json_loads
@@ -16,8 +14,8 @@ from detectkit.utils.json_utils import json_loads
 
 def parse_seasonality_data(
     seasonality_data: np.ndarray,
-    seasonality_columns: List[str],
-) -> Dict[str, np.ndarray]:
+    seasonality_columns: list[str],
+) -> dict[str, np.ndarray]:
     """Parse an array of JSON strings into per-column numpy arrays.
 
     Args:
@@ -40,7 +38,7 @@ def parse_seasonality_data(
     if len(seasonality_data) == 0:
         return {}
 
-    parsed: Dict[str, list] = {col: [] for col in seasonality_columns}
+    parsed: dict[str, list] = {col: [] for col in seasonality_columns}
     for payload in seasonality_data:
         if payload is None or payload == "{}":
             for col in seasonality_columns:
@@ -59,10 +57,10 @@ def parse_seasonality_data(
 
 
 def create_seasonality_mask(
-    seasonality_dict: Dict[str, np.ndarray],
+    seasonality_dict: dict[str, np.ndarray],
     window_start: int,
     current_idx: int,
-    group_columns: List[str],
+    group_columns: list[str],
 ) -> np.ndarray:
     """Boolean mask selecting window indices that match the current point.
 
@@ -82,7 +80,7 @@ def create_seasonality_mask(
     if not group_columns or not seasonality_dict:
         return np.ones(window_size, dtype=bool)
 
-    current_values: Dict[str, object] = {}
+    current_values: dict[str, object] = {}
     for col in group_columns:
         if col not in seasonality_dict:
             return np.ones(window_size, dtype=bool)

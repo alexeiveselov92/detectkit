@@ -2,9 +2,9 @@
 Tests for metric configuration validator.
 """
 
-import pytest
 from pathlib import Path
-from pydantic import ValidationError
+
+import pytest
 
 from detectkit.config.validator import validate_metric_uniqueness, validate_project_metrics
 

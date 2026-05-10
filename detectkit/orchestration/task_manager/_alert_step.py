@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict
 
 import click
 
@@ -15,7 +14,7 @@ from detectkit.utils.datetime_utils import now_utc_naive
 
 
 class _AlertStepMixin(_TaskManagerBase):
-    def _run_alert_step(self, config: MetricConfig) -> Dict[str, int]:
+    def _run_alert_step(self, config: MetricConfig) -> dict[str, int]:
         """Walk every active alert config and send/recover as needed."""
         alerts_sent = 0
 
@@ -39,13 +38,10 @@ class _AlertStepMixin(_TaskManagerBase):
                 )
 
             if alerting_config.suppress_until:
-                suppress_dt = datetime.strptime(
-                    alerting_config.suppress_until, "%Y-%m-%d %H:%M:%S"
-                )
+                suppress_dt = datetime.strptime(alerting_config.suppress_until, "%Y-%m-%d %H:%M:%S")
                 if now_utc_naive() < suppress_dt:
                     click.echo(
-                        f"  │ Alerts suppressed until "
-                        f"{alerting_config.suppress_until} UTC"
+                        f"  │ Alerts suppressed until " f"{alerting_config.suppress_until} UTC"
                     )
                     continue
 
@@ -69,6 +65,29 @@ class _AlertStepMixin(_TaskManagerBase):
             )
 
             last_point = orchestrator.get_last_complete_point()
+
+            # No-data branch must run BEFORE the recent_detections short-circuit
+            # below: when data is missing there are no detections to evaluate,
+            # so the regular path would silently exit with alerts_sent=0.
+            should_no_data, no_data_alert_data = orchestrator.should_alert_no_data(last_point)
+            if should_no_data:
+                click.echo(
+                    click.style(
+                        f"  │ ⚠ No-data alert! Latest interval "
+                        f"{last_point.strftime('%Y-%m-%d %H:%M:%S')} has no datapoint.",
+                        fg="yellow",
+                        bold=True,
+                    )
+                )
+                alerts_sent += self._send_alerts(
+                    orchestrator=orchestrator,
+                    alerting_config=alerting_config,
+                    alert_data=no_data_alert_data,
+                    multi=multi,
+                    template=alerting_config.template_no_data,
+                )
+                continue
+
             recent_detections = self._load_recent_detections(
                 metric_name=config.name,
                 last_point=last_point,
@@ -99,9 +118,7 @@ class _AlertStepMixin(_TaskManagerBase):
                     multi=multi,
                 )
             else:
-                click.echo(
-                    f"  {'│' if multi else '└─'} No alert needed (conditions not met)"
-                )
+                click.echo(f"  {'│' if multi else '└─'} No alert needed (conditions not met)")
 
         if multi:
             click.echo(f"  └─ Total alerts sent: {alerts_sent}")
@@ -116,34 +133,45 @@ class _AlertStepMixin(_TaskManagerBase):
         alerting_config,
         alert_data,
         multi: bool,
+        template=None,
     ) -> int:
-        click.echo(click.style(
-            f"  │ ⚠ Alert triggered! "
-            f"Sending to {len(alerting_config.channels)} channel(s)...",
-            fg="yellow",
-            bold=True,
-        ))
+        # No-data alerts log their own header above; only show the generic
+        # "Alert triggered!" line for anomaly alerts.
+        if not getattr(alert_data, "is_no_data", False):
+            click.echo(
+                click.style(
+                    f"  │ ⚠ Alert triggered! "
+                    f"Sending to {len(alerting_config.channels)} channel(s)...",
+                    fg="yellow",
+                    bold=True,
+                )
+            )
 
         channels = self._create_alert_channels(alerting_config.channels)
         if not channels:
-            click.echo(click.style(
-                f"  {'│' if multi else '└─'} No valid alert channels available",
-                fg="yellow",
-            ))
+            click.echo(
+                click.style(
+                    f"  {'│' if multi else '└─'} No valid alert channels available",
+                    fg="yellow",
+                )
+            )
             return 0
 
-        results = orchestrator.send_alerts(
-            alert_data, channels, template=alerting_config.template_consecutive
-        )
+        if template is None:
+            template = alerting_config.template_consecutive
+
+        results = orchestrator.send_alerts(alert_data, channels, template=template)
         sent = sum(1 for ok in results.values() if ok)
         for channel_name, ok in results.items():
             mark = click.style("✓", fg="green") if ok else click.style("✗", fg="red")
             click.echo(f"  │   {mark} {channel_name}")
 
-        click.echo(click.style(
-            f"  {'│' if multi else '└─'} Sent {sent}/{len(channels)} alerts",
-            fg="green" if sent > 0 else "yellow",
-        ))
+        click.echo(
+            click.style(
+                f"  {'│' if multi else '└─'} Sent {sent}/{len(channels)} alerts",
+                fg="green" if sent > 0 else "yellow",
+            )
+        )
         return sent
 
     def _maybe_send_recovery(
@@ -154,28 +182,28 @@ class _AlertStepMixin(_TaskManagerBase):
         recent_detections,
         multi: bool,
     ) -> None:
-        should_recover, recovery_data = orchestrator.should_send_recovery(
-            recent_detections
-        )
+        should_recover, recovery_data = orchestrator.should_send_recovery(recent_detections)
         if not should_recover:
-            click.echo(
-                f"  {'│' if multi else '└─'} No alert needed (conditions not met)"
-            )
+            click.echo(f"  {'│' if multi else '└─'} No alert needed (conditions not met)")
             return
 
-        click.echo(click.style(
-            f"  │ ✓ Recovery detected! "
-            f"Sending to {len(alerting_config.channels)} channel(s)...",
-            fg="green",
-            bold=True,
-        ))
+        click.echo(
+            click.style(
+                f"  │ ✓ Recovery detected! "
+                f"Sending to {len(alerting_config.channels)} channel(s)...",
+                fg="green",
+                bold=True,
+            )
+        )
 
         channels = self._create_alert_channels(alerting_config.channels)
         if not channels:
-            click.echo(click.style(
-                f"  {'│' if multi else '└─'} No valid alert channels available",
-                fg="yellow",
-            ))
+            click.echo(
+                click.style(
+                    f"  {'│' if multi else '└─'} No valid alert channels available",
+                    fg="yellow",
+                )
+            )
             return
 
         results = orchestrator.send_recovery(
@@ -186,8 +214,10 @@ class _AlertStepMixin(_TaskManagerBase):
             mark = click.style("✓", fg="green") if ok else click.style("✗", fg="red")
             click.echo(f"  │   {mark} {channel_name}")
 
-        click.echo(click.style(
-            f"  {'│' if multi else '└─'} Sent {recovery_sent}/{len(channels)} "
-            "recovery notifications",
-            fg="green",
-        ))
+        click.echo(
+            click.style(
+                f"  {'│' if multi else '└─'} Sent {recovery_sent}/{len(channels)} "
+                "recovery notifications",
+                fg="green",
+            )
+        )

@@ -10,7 +10,7 @@ All detectors must inherit from BaseDetector and implement:
 import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 import numpy as np
 
@@ -36,16 +36,16 @@ class DetectionResult:
     timestamp: np.datetime64
     value: float
     is_anomaly: bool
-    processed_value: Optional[float] = None
-    confidence_lower: Optional[float] = None
-    confidence_upper: Optional[float] = None
-    detection_metadata: Optional[Dict[str, Any]] = None
+    processed_value: float | None = None
+    confidence_lower: float | None = None
+    confidence_upper: float | None = None
+    detection_metadata: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.processed_value is None:
             self.processed_value = self.value
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for database storage."""
         return {
             "timestamp": self.timestamp,
@@ -114,7 +114,7 @@ class BaseDetector(ABC):
         pass
 
     @abstractmethod
-    def detect(self, data: Dict[str, np.ndarray]) -> list[DetectionResult]:
+    def detect(self, data: dict[str, np.ndarray]) -> list[DetectionResult]:
         """
         Perform anomaly detection on metric data.
 
@@ -190,7 +190,7 @@ class BaseDetector(ABC):
         return json_dumps_sorted(non_default_params)
 
     @abstractmethod
-    def _get_non_default_params(self) -> Dict[str, Any]:
+    def _get_non_default_params(self) -> dict[str, Any]:
         """
         Get parameters that differ from defaults.
 
@@ -273,7 +273,7 @@ class BaseDetector(ABC):
 
         elif input_type == "changes":
             # Relative change
-            with np.errstate(divide='ignore', invalid='ignore'):
+            with np.errstate(divide="ignore", invalid="ignore"):
                 changes = np.diff(values) / values[:-1]
             # First point has no previous value
             return np.concatenate([[np.nan], changes])
@@ -285,7 +285,7 @@ class BaseDetector(ABC):
 
         elif input_type == "log_changes":
             # Logarithmic change (good for exponential growth)
-            with np.errstate(divide='ignore', invalid='ignore'):
+            with np.errstate(divide="ignore", invalid="ignore"):
                 log_changes = np.diff(np.log(values + 1))  # +1 to handle zeros
             return np.concatenate([[np.nan], log_changes])
 
@@ -325,8 +325,7 @@ class BaseDetector(ABC):
 
         else:
             raise ValueError(
-                f"Unknown smoothing method: {smoothing}. "
-                f"Supported methods: ema, sma"
+                f"Unknown smoothing method: {smoothing}. " f"Supported methods: ema, sma"
             )
 
     def _compute_ema(self, values: np.ndarray, alpha: float) -> np.ndarray:
@@ -354,9 +353,9 @@ class BaseDetector(ABC):
 
         for i in range(1, len(values)):
             if np.isnan(values[i]):
-                ema[i] = ema[i-1]  # Carry forward if missing
+                ema[i] = ema[i - 1]  # Carry forward if missing
             else:
-                ema[i] = alpha * values[i] + (1 - alpha) * ema[i-1]
+                ema[i] = alpha * values[i] + (1 - alpha) * ema[i - 1]
 
         return ema
 
@@ -423,7 +422,7 @@ class BaseDetector(ABC):
                 raise ValueError(f"weight_decay must be in (0, 1), got {weight_decay}")
 
             # Older points get less weight: decay^k for k in [window_size, 1]
-            weights = np.array([weight_decay ** k for k in range(window_size, 0, -1)])
+            weights = np.array([weight_decay**k for k in range(window_size, 0, -1)])
             return weights / weights.sum()
 
         elif window_weights == "linear":

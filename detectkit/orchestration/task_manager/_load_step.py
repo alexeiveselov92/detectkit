@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Dict, Optional
 
 import click
 
@@ -17,10 +16,10 @@ class _LoadStepMixin(_TaskManagerBase):
     def _run_load_step(
         self,
         config: MetricConfig,
-        from_date: Optional[datetime],
-        to_date: Optional[datetime],
+        from_date: datetime | None,
+        to_date: datetime | None,
         full_refresh: bool,
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """Execute the LOAD step end-to-end (resume → batch → save)."""
         loader = MetricLoader(
             config=config,
@@ -45,16 +44,13 @@ class _LoadStepMixin(_TaskManagerBase):
                 interval = config.get_interval()
                 actual_from = last_ts + timedelta(seconds=interval.seconds)
                 click.echo(
-                    f"  │ Resuming from last saved: "
-                    f"{last_ts.strftime('%Y-%m-%d %H:%M:%S')}"
+                    f"  │ Resuming from last saved: " f"{last_ts.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
             elif config.loading_start_time:
                 actual_from = datetime.strptime(
                     config.loading_start_time, "%Y-%m-%d %H:%M:%S"
                 )  # naive UTC by config convention
-                click.echo(
-                    f"  │ Starting fresh from: {config.loading_start_time}"
-                )
+                click.echo(f"  │ Starting fresh from: {config.loading_start_time}")
             else:
                 raise ValueError(
                     "No existing data and no loading_start_time configured. "
@@ -69,9 +65,9 @@ class _LoadStepMixin(_TaskManagerBase):
                 f"  │ Next interval at {actual_from.strftime('%Y-%m-%d %H:%M:%S')}, "
                 f"now {actual_to.strftime('%Y-%m-%d %H:%M:%S')}"
             )
-            click.echo(click.style(
-                "  └─ Nothing to load yet, waiting for next interval", fg="yellow"
-            ))
+            click.echo(
+                click.style("  └─ Nothing to load yet, waiting for next interval", fg="yellow")
+            )
             return {"points_loaded": 0}
 
         interval = config.get_interval()
@@ -84,9 +80,9 @@ class _LoadStepMixin(_TaskManagerBase):
                 f"  │ Next interval at {next_interval.strftime('%Y-%m-%d %H:%M:%S')}, "
                 f"now {actual_to.strftime('%Y-%m-%d %H:%M:%S')}"
             )
-            click.echo(click.style(
-                "  └─ Nothing to load yet, waiting for next interval", fg="yellow"
-            ))
+            click.echo(
+                click.style("  └─ Nothing to load yet, waiting for next interval", fg="yellow")
+            )
             return {"points_loaded": 0}
 
         # Snap actual_to back to the last complete interval boundary.
@@ -97,18 +93,12 @@ class _LoadStepMixin(_TaskManagerBase):
             f"  │ Loading from {actual_from.strftime('%Y-%m-%d %H:%M:%S')} "
             f"to {actual_to.strftime('%Y-%m-%d %H:%M:%S')}"
         )
-        click.echo(
-            f"  │ Total points: ~{total_points:,} | Batch size: {batch_size:,}"
-        )
+        click.echo(f"  │ Total points: ~{total_points:,} | Batch size: {batch_size:,}")
 
         if total_points <= batch_size:
             click.echo("  │ Loading in single batch...")
-            rows_inserted = loader.load_and_save(
-                from_date=actual_from, to_date=actual_to
-            )
-            click.echo(click.style(
-                f"  └─ Loaded {rows_inserted:,} datapoints", fg="green"
-            ))
+            rows_inserted = loader.load_and_save(from_date=actual_from, to_date=actual_to)
+            click.echo(click.style(f"  └─ Loaded {rows_inserted:,} datapoints", fg="green"))
             return {"points_loaded": rows_inserted}
 
         total_loaded = 0
@@ -132,7 +122,5 @@ class _LoadStepMixin(_TaskManagerBase):
             )
             current_from = batch_to
 
-        click.echo(click.style(
-            f"  └─ Loaded {total_loaded:,} datapoints", fg="green"
-        ))
+        click.echo(click.style(f"  └─ Loaded {total_loaded:,} datapoints", fg="green"))
         return {"points_loaded": total_loaded}

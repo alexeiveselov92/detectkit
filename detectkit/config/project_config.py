@@ -5,7 +5,6 @@ Defines configuration structure for detectkit_project.yml.
 """
 
 from pathlib import Path
-from typing import Dict, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -36,12 +35,8 @@ class ProjectTablesConfig(BaseModel):
         metrics: Default metrics configuration table name
     """
 
-    datapoints: str = Field(
-        default="_dtk_datapoints", description="Default datapoints table"
-    )
-    detections: str = Field(
-        default="_dtk_detections", description="Default detections table"
-    )
+    datapoints: str = Field(default="_dtk_datapoints", description="Default datapoints table")
+    detections: str = Field(default="_dtk_detections", description="Default detections table")
     tasks: str = Field(default="_dtk_tasks", description="Default tasks table")
     metrics: str = Field(default="_dtk_metrics", description="Default metrics config table")
 
@@ -69,6 +64,48 @@ class ProjectTimeoutsConfig(BaseModel):
         if v > 86400:  # 24 hours
             raise ValueError("Timeout cannot exceed 24 hours (86400 seconds)")
         return v
+
+
+class ProjectErrorAlertingConfig(BaseModel):
+    """
+    Project-level error alerting configuration.
+
+    Sent when ``TaskManager.run_metric`` raises any exception (including
+    DB connection errors that affect every metric in the run). Channels
+    are looked up by name in the channel profile, just like per-metric
+    alerts.
+
+    Behaviour:
+    - At most one alert per ``dtk run`` invocation. Subsequent metric
+      failures in the same run are suppressed (an in-memory flag), and
+      the run aborts after the first error alert is dispatched — there's
+      no point loading the rest if e.g. the DB is unreachable.
+    - No persistent cooldown between separate ``dtk run`` invocations.
+      Persisting state in the DB would not help when the DB itself is
+      down, and a local file would break the dbt-style stateless model.
+
+    Attributes:
+        enabled: Master switch for project error alerting.
+        channels: Channel names from the channel profile to dispatch to.
+        template: Custom message body. Supports ``{metric_name}``,
+            ``{error_type}``, ``{error_message}``, ``{description}``,
+            ``{description_line}``, ``{mentions}``, ``{mentions_line}``,
+            ``{status}``, ``{timestamp}``, ``{timezone}``.
+        mentions: Users/groups to mention in the alert.
+        timezone: Optional display timezone for ``{timestamp}``.
+    """
+
+    enabled: bool = Field(default=False, description="Enable project error alerting")
+    channels: list[str] = Field(
+        default_factory=list, description="Channel names to dispatch error alerts to"
+    )
+    template: str | None = Field(default=None, description="Custom error message template")
+    mentions: list[str] = Field(
+        default_factory=list, description="Users/groups to mention in error alerts"
+    )
+    timezone: str | None = Field(
+        default=None, description="Optional display timezone for {timestamp}"
+    )
 
 
 class ProjectConfig(BaseModel):
@@ -120,6 +157,10 @@ class ProjectConfig(BaseModel):
         default_factory=ProjectTimeoutsConfig, description="Operation timeouts"
     )
     default_profile: str = Field(..., description="Default database profile")
+    error_alerting: ProjectErrorAlertingConfig | None = Field(
+        default=None,
+        description="Project-level error alerting (DB outages, query failures, etc.)",
+    )
 
     @field_validator("name")
     @classmethod
@@ -158,7 +199,7 @@ class ProjectConfig(BaseModel):
         if not path.exists():
             raise FileNotFoundError(f"Project config file not found: {path}")
 
-        with open(path, "r") as f:
+        with open(path) as f:
             data = yaml.safe_load(f)
 
         if not data:

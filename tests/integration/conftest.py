@@ -9,7 +9,7 @@ is skipped when ``testcontainers`` or Docker is unavailable, which keeps
 from __future__ import annotations
 
 import socket
-from typing import Iterator
+from collections.abc import Iterator
 
 import pytest
 

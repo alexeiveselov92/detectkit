@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from detectkit.alerting.channels.base import BaseAlertChannel
 from detectkit.alerting.channels.factory import AlertChannelFactory
@@ -29,13 +28,16 @@ class _TaskManagerBase:
         self.db_manager = db_manager
         self.profiles_config = profiles_config
         self.project_config = project_config
+        # In-process flag: dispatch project-level error alert at most once
+        # per run. Abort propagation is signalled via result["abort_run"].
+        self._error_alert_sent_in_run = False
 
     def _load_recent_detections(
         self,
         metric_name: str,
         last_point: datetime,
         num_points: int,
-    ) -> List[DetectionRecord]:
+    ) -> list[DetectionRecord]:
         """Build :class:`DetectionRecord` rows for the last *num_points* timestamps.
 
         Emits one record *per detector per timestamp* so the orchestrator can
@@ -51,14 +53,11 @@ class _TaskManagerBase:
         if not results:
             return []
 
-        records: List[DetectionRecord] = []
+        records: list[DetectionRecord] = []
         # SQL returns timestamps DESC; iterate reversed so output is oldest→newest
         # (recovery code reads ``detections[-1]`` to find the latest point).
         for row in reversed(results):
-            metadata_list = (
-                row.get("detection_metadata_list")
-                or [None] * len(row["detector_ids"])
-            )
+            metadata_list = row.get("detection_metadata_list") or [None] * len(row["detector_ids"])
             for i in range(len(row["detector_ids"])):
                 is_anomaly = bool(row["is_anomaly_flags"][i])
                 metadata = _parse_detection_metadata(metadata_list[i])
@@ -86,22 +85,16 @@ class _TaskManagerBase:
 
         return records
 
-    def _create_alert_channels(
-        self, channel_names: List[str]
-    ) -> List[BaseAlertChannel]:
+    def _create_alert_channels(self, channel_names: list[str]) -> list[BaseAlertChannel]:
         """Resolve channel names against the loaded profiles config."""
         if not self.profiles_config:
             return []
 
-        channels: List[BaseAlertChannel] = []
+        channels: list[BaseAlertChannel] = []
         for channel_name in channel_names:
             try:
-                channel_config = self.profiles_config.get_alert_channel_config(
-                    channel_name
-                )
-                channels.append(
-                    AlertChannelFactory.create_from_config(channel_config)
-                )
+                channel_config = self.profiles_config.get_alert_channel_config(channel_name)
+                channels.append(AlertChannelFactory.create_from_config(channel_config))
             except (ValueError, KeyError, ImportError, TypeError) as exc:
                 # Config-level problems (missing channel, bad type, missing
                 # driver, wrong constructor args) — skip this channel but
@@ -113,7 +106,7 @@ class _TaskManagerBase:
 
         return channels
 
-    def get_metric_status(self, metric_name: str) -> Optional[Dict]:
+    def get_metric_status(self, metric_name: str) -> dict | None:
         """Quick health snapshot for *metric_name*."""
         # NOTE: check_lock requires (metric_name, detector_id, process_type);
         # this convenience wrapper uses the pipeline lock that run_metric takes.

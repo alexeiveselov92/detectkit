@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
-
 import numpy as np
 
 from detectkit.alerting.orchestrator._types import (
@@ -19,12 +17,12 @@ class _OrchestratorBase:
         metric_name: str,
         interval: Interval,
         alert_config_id: str,
-        conditions: Optional[AlertConditions] = None,
+        conditions: AlertConditions | None = None,
         timezone_display: str = "UTC",
         internal=None,  # InternalTablesManager
         alert_config=None,  # AlertConfig
-        description: Optional[str] = None,
-        mentions: Optional[List[str]] = None,
+        description: str | None = None,
+        mentions: list[str] | None = None,
     ):
         self.metric_name = metric_name
         self.interval = interval
@@ -38,9 +36,9 @@ class _OrchestratorBase:
 
     @staticmethod
     def _group_by_timestamp(
-        detections: List[DetectionRecord],
-    ) -> Dict[np.datetime64, List[DetectionRecord]]:
-        grouped: Dict[np.datetime64, List[DetectionRecord]] = {}
+        detections: list[DetectionRecord],
+    ) -> dict[np.datetime64, list[DetectionRecord]]:
+        grouped: dict[np.datetime64, list[DetectionRecord]] = {}
         for d in detections:
             grouped.setdefault(d.timestamp, []).append(d)
         return grouped

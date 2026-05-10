@@ -10,7 +10,7 @@ Examples:
 - Queue size should be >= 0 and <= 10000
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import numpy as np
 
@@ -47,8 +47,8 @@ class ManualBoundsDetector(BaseDetector):
 
     def __init__(
         self,
-        lower_bound: Optional[float] = None,
-        upper_bound: Optional[float] = None,
+        lower_bound: float | None = None,
+        upper_bound: float | None = None,
         input_type: str = "values",
     ):
         """
@@ -79,7 +79,7 @@ class ManualBoundsDetector(BaseDetector):
             if lower_bound >= upper_bound:
                 raise ValueError("lower_bound must be less than upper_bound")
 
-    def detect(self, data: Dict[str, np.ndarray]) -> list[DetectionResult]:
+    def detect(self, data: dict[str, np.ndarray]) -> list[DetectionResult]:
         """
         Perform threshold-based anomaly detection.
 
@@ -191,7 +191,7 @@ class ManualBoundsDetector(BaseDetector):
 
         return results
 
-    def _get_non_default_params(self) -> Dict[str, Any]:
+    def _get_non_default_params(self) -> dict[str, Any]:
         """
         Get parameters that differ from defaults.
 
@@ -200,7 +200,4 @@ class ManualBoundsDetector(BaseDetector):
         defaults = {
             "input_type": "values",
         }
-        return {
-            k: v for k, v in self.params.items()
-            if v is not None and v != defaults.get(k)
-        }
+        return {k: v for k, v in self.params.items() if v is not None and v != defaults.get(k)}

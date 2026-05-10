@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
@@ -18,7 +18,7 @@ class _DetectionsMixin(_InternalTablesBase):
         metric_name: str,
         detector_id: str,
         detector_name: str,
-        data: Dict[str, np.ndarray],
+        data: dict[str, np.ndarray],
         detector_params: str,
     ) -> int:
         """Persist a batch of detection results."""
@@ -37,20 +37,12 @@ class _DetectionsMixin(_InternalTablesBase):
             "detection_metadata": data["detection_metadata"],
             "created_at": np.full(num_rows, now_utc_naive(), dtype="datetime64[ms]"),
         }
-        full_table_name = self._manager.get_full_table_name(
-            TABLE_DETECTIONS, use_internal=True
-        )
-        return self._manager.insert_batch(
-            full_table_name, insert_data, conflict_strategy="ignore"
-        )
+        full_table_name = self._manager.get_full_table_name(TABLE_DETECTIONS, use_internal=True)
+        return self._manager.insert_batch(full_table_name, insert_data, conflict_strategy="ignore")
 
-    def get_last_detection_timestamp(
-        self, metric_name: str, detector_id: str
-    ) -> Optional[datetime]:
+    def get_last_detection_timestamp(self, metric_name: str, detector_id: str) -> datetime | None:
         """Return the most recent detection timestamp for the given detector."""
-        full_table_name = self._manager.get_full_table_name(
-            TABLE_DETECTIONS, use_internal=True
-        )
+        full_table_name = self._manager.get_full_table_name(TABLE_DETECTIONS, use_internal=True)
         query = f"""
         SELECT max(timestamp) AS last_ts
         FROM {full_table_name}
@@ -67,17 +59,15 @@ class _DetectionsMixin(_InternalTablesBase):
     def delete_detections(
         self,
         metric_name: str,
-        detector_id: Optional[str] = None,
-        from_timestamp: Optional[datetime] = None,
-        to_timestamp: Optional[datetime] = None,
+        detector_id: str | None = None,
+        from_timestamp: datetime | None = None,
+        to_timestamp: datetime | None = None,
     ) -> int:
         """Delete detection rows for the supplied filter set."""
-        full_table_name = self._manager.get_full_table_name(
-            TABLE_DETECTIONS, use_internal=True
-        )
+        full_table_name = self._manager.get_full_table_name(TABLE_DETECTIONS, use_internal=True)
 
         where_parts = ["metric_name = %(metric_name)s"]
-        params: Dict[str, Any] = {"metric_name": metric_name}
+        params: dict[str, Any] = {"metric_name": metric_name}
         if detector_id:
             where_parts.append("detector_id = %(detector_id)s")
             params["detector_id"] = detector_id
@@ -88,9 +78,7 @@ class _DetectionsMixin(_InternalTablesBase):
             where_parts.append("timestamp < %(to_timestamp)s")
             params["to_timestamp"] = to_timestamp
 
-        query = (
-            f"ALTER TABLE {full_table_name} DELETE WHERE {' AND '.join(where_parts)}"
-        )
+        query = f"ALTER TABLE {full_table_name} DELETE WHERE {' AND '.join(where_parts)}"
         self._manager.execute_query(query, params=params)
         return 0
 
@@ -99,18 +87,16 @@ class _DetectionsMixin(_InternalTablesBase):
         metric_name: str,
         last_point: datetime,
         num_points: int,
-        created_after: Optional[datetime] = None,
-    ) -> List[Dict]:
+        created_after: datetime | None = None,
+    ) -> list[dict]:
         """Return the latest *num_points* timestamps with all per-detector rows.
 
         The result groups rows per timestamp so callers can evaluate the
         consecutive-anomaly logic without re-fanning the data themselves.
         """
-        full_table_name = self._manager.get_full_table_name(
-            TABLE_DETECTIONS, use_internal=True
-        )
+        full_table_name = self._manager.get_full_table_name(TABLE_DETECTIONS, use_internal=True)
 
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "metric_name": metric_name,
             "last_point": last_point,
             "num_points": num_points,
@@ -129,9 +115,7 @@ class _DetectionsMixin(_InternalTablesBase):
         ORDER BY timestamp DESC
         LIMIT %(num_points)s
         """
-        timestamp_results = self._manager.execute_query(
-            timestamps_query, params=params
-        )
+        timestamp_results = self._manager.execute_query(timestamps_query, params=params)
         if not timestamp_results:
             return []
 
@@ -163,7 +147,7 @@ class _DetectionsMixin(_InternalTablesBase):
         if not detection_results:
             return []
 
-        grouped: Dict[str, Dict] = {}
+        grouped: dict[str, dict] = {}
         for row in detection_results:
             ts = row["timestamp"]
             if isinstance(ts, str):

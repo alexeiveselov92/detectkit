@@ -13,13 +13,7 @@ class _SchemaMixin(_InternalTablesBase):
         Idempotent: safe to call on every CLI invocation.
         """
         for table_name, model_factory in INTERNAL_TABLES.items():
-            full_table_name = self._manager.get_full_table_name(
-                table_name, use_internal=True
-            )
-            if not self._manager.table_exists(
-                table_name, schema=self._manager.internal_location
-            ):
+            full_table_name = self._manager.get_full_table_name(table_name, use_internal=True)
+            if not self._manager.table_exists(table_name, schema=self._manager.internal_location):
                 table_model = model_factory()
-                self._manager.create_table(
-                    full_table_name, table_model, if_not_exists=True
-                )
+                self._manager.create_table(full_table_name, table_model, if_not_exists=True)

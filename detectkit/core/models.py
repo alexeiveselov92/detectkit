@@ -5,7 +5,7 @@ Defines table schemas and column definitions for database abstraction.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -23,7 +23,7 @@ class ColumnDefinition:
     name: str
     type: str
     nullable: bool = False
-    default: Optional[Any] = None
+    default: Any | None = None
 
     def __post_init__(self):
         """Validate column definition."""
@@ -60,11 +60,11 @@ class TableModel:
         ... )
     """
 
-    columns: List[ColumnDefinition]
-    primary_key: List[str]
-    engine: Optional[str] = None
-    order_by: Optional[List[str]] = None
-    indexes: List[str] = field(default_factory=list)
+    columns: list[ColumnDefinition]
+    primary_key: list[str]
+    engine: str | None = None
+    order_by: list[str] | None = None
+    indexes: list[str] = field(default_factory=list)
 
     def __post_init__(self):
         """Validate table model."""
@@ -78,19 +78,15 @@ class TableModel:
         column_names = {col.name for col in self.columns}
         for pk_col in self.primary_key:
             if pk_col not in column_names:
-                raise ValueError(
-                    f"Primary key column '{pk_col}' not found in table columns"
-                )
+                raise ValueError(f"Primary key column '{pk_col}' not found in table columns")
 
         # Validate order_by columns exist (if specified)
         if self.order_by:
             for order_col in self.order_by:
                 if order_col not in column_names:
-                    raise ValueError(
-                        f"ORDER BY column '{order_col}' not found in table columns"
-                    )
+                    raise ValueError(f"ORDER BY column '{order_col}' not found in table columns")
 
-    def get_column(self, name: str) -> Optional[ColumnDefinition]:
+    def get_column(self, name: str) -> ColumnDefinition | None:
         """
         Get column definition by name.
 

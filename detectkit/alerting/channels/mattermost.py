@@ -4,8 +4,6 @@ Mattermost alert channel.
 Convenience wrapper around WebhookChannel for Mattermost.
 """
 
-from typing import Optional
-
 from detectkit.alerting.channels.webhook import WebhookChannel
 
 
@@ -35,7 +33,7 @@ class MattermostChannel(WebhookChannel):
         webhook_url: str,
         username: str = "detectk",
         icon_emoji: str = ":warning:",
-        channel: Optional[str] = None,
+        channel: str | None = None,
         timeout: int = 10,
     ):
         """Initialize Mattermost channel with webhook URL."""
@@ -49,5 +47,7 @@ class MattermostChannel(WebhookChannel):
 
     def __repr__(self) -> str:
         """String representation."""
-        url_preview = self.webhook_url[:30] + "..." if len(self.webhook_url) > 30 else self.webhook_url
+        url_preview = (
+            self.webhook_url[:30] + "..." if len(self.webhook_url) > 30 else self.webhook_url
+        )
         return f"MattermostChannel(url='{url_preview}', username='{self.username}')"

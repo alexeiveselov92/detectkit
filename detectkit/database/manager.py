@@ -14,7 +14,7 @@ The manager is database-agnostic and provides generic operations:
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
@@ -40,10 +40,8 @@ class BaseDatabaseManager(ABC):
 
     @abstractmethod
     def execute_query(
-        self,
-        query: str,
-        params: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        self, query: str, params: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """
         Execute SQL query and return results as list of dictionaries.
 
@@ -69,10 +67,7 @@ class BaseDatabaseManager(ABC):
 
     @abstractmethod
     def create_table(
-        self,
-        table_name: str,
-        table_model: TableModel,
-        if_not_exists: bool = True
+        self, table_name: str, table_model: TableModel, if_not_exists: bool = True
     ) -> None:
         """
         Create table from TableModel definition.
@@ -102,11 +97,7 @@ class BaseDatabaseManager(ABC):
         pass
 
     @abstractmethod
-    def table_exists(
-        self,
-        table_name: str,
-        schema: Optional[str] = None
-    ) -> bool:
+    def table_exists(self, table_name: str, schema: str | None = None) -> bool:
         """
         Check if table exists in database.
 
@@ -125,10 +116,7 @@ class BaseDatabaseManager(ABC):
 
     @abstractmethod
     def insert_batch(
-        self,
-        table_name: str,
-        data: Dict[str, np.ndarray],
-        conflict_strategy: str = "ignore"
+        self, table_name: str, data: dict[str, np.ndarray], conflict_strategy: str = "ignore"
     ) -> int:
         """
         Insert batch of data into table.
@@ -166,11 +154,8 @@ class BaseDatabaseManager(ABC):
 
     @abstractmethod
     def get_last_timestamp(
-        self,
-        table_name: str,
-        metric_name: str,
-        timestamp_column: str = "timestamp"
-    ) -> Optional[datetime]:
+        self, table_name: str, metric_name: str, timestamp_column: str = "timestamp"
+    ) -> datetime | None:
         """
         Get last timestamp for a specific metric in a table.
 
@@ -201,9 +186,9 @@ class BaseDatabaseManager(ABC):
         detector_id: str,
         process_type: str,
         status: str,
-        last_processed_timestamp: Optional[datetime] = None,
-        error_message: Optional[str] = None,
-        timeout_seconds: int = 3600
+        last_processed_timestamp: datetime | None = None,
+        error_message: str | None = None,
+        timeout_seconds: int = 3600,
     ) -> None:
         """
         Update or insert task status (for locking and idempotency).
@@ -247,10 +232,7 @@ class BaseDatabaseManager(ABC):
 
     @abstractmethod
     def upsert_record(
-        self,
-        table_name: str,
-        key_columns: Dict[str, Any],
-        data: Dict[str, np.ndarray]
+        self, table_name: str, key_columns: dict[str, Any], data: dict[str, np.ndarray]
     ) -> int:
         """
         Delete record by key columns, then insert new record.
@@ -331,11 +313,7 @@ class BaseDatabaseManager(ABC):
         """
         pass
 
-    def get_full_table_name(
-        self,
-        table_name: str,
-        use_internal: bool = True
-    ) -> str:
+    def get_full_table_name(self, table_name: str, use_internal: bool = True) -> str:
         """
         Get fully qualified table name.
 

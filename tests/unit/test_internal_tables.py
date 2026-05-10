@@ -1,7 +1,7 @@
 """Tests for InternalTablesManager."""
 
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -13,10 +13,6 @@ from detectkit.database.tables import (
     TABLE_DETECTIONS,
     TABLE_METRICS,
     TABLE_TASKS,
-    get_datapoints_table_model,
-    get_detections_table_model,
-    get_metrics_table_model,
-    get_tasks_table_model,
 )
 
 
@@ -50,9 +46,7 @@ class TestEnsureTables:
         assert mock_manager.create_table.call_count == 5
 
         # Verify correct table names
-        created_tables = [
-            call[0][0] for call in mock_manager.create_table.call_args_list
-        ]
+        created_tables = [call[0][0] for call in mock_manager.create_table.call_args_list]
         assert f"detectk_internal.{TABLE_DATAPOINTS}" in created_tables
         assert f"detectk_internal.{TABLE_DETECTIONS}" in created_tables
         assert f"detectk_internal.{TABLE_TASKS}" in created_tables
@@ -72,6 +66,7 @@ class TestEnsureTables:
 
     def test_partial_existing_tables(self, internal_manager, mock_manager):
         """Test when some tables exist and some don't."""
+
         # Mock: only datapoints exists
         def table_exists_side_effect(name, schema=None):
             return name == TABLE_DATAPOINTS
@@ -84,9 +79,7 @@ class TestEnsureTables:
         # Verify create_table called only for missing tables (detections, tasks, metrics, alert_states)
         assert mock_manager.create_table.call_count == 4
 
-        created_tables = [
-            call[0][0] for call in mock_manager.create_table.call_args_list
-        ]
+        created_tables = [call[0][0] for call in mock_manager.create_table.call_args_list]
         assert f"detectk_internal.{TABLE_DATAPOINTS}" not in created_tables
         assert f"detectk_internal.{TABLE_DETECTIONS}" in created_tables
         assert f"detectk_internal.{TABLE_TASKS}" in created_tables
@@ -102,13 +95,10 @@ class TestSaveDatapoints:
         # Prepare test data
         data = {
             "timestamp": np.array(
-                ["2024-01-01T00:00:00", "2024-01-01T00:10:00"],
-                dtype="datetime64[ms]"
+                ["2024-01-01T00:00:00", "2024-01-01T00:10:00"], dtype="datetime64[ms]"
             ),
             "value": np.array([0.5, 0.6], dtype=np.float64),
-            "seasonality_data": np.array(
-                ['{"hour": 0}', '{"hour": 0}'], dtype=object
-            ),
+            "seasonality_data": np.array(['{"hour": 0}', '{"hour": 0}'], dtype=object),
         }
 
         mock_manager.insert_batch.return_value = 2
@@ -162,9 +152,7 @@ class TestSaveDatapoints:
 
         mock_manager.insert_batch.return_value = 1
 
-        rows = internal_manager.save_datapoints(
-            "cpu_usage", data, 600, ["hour"]
-        )
+        rows = internal_manager.save_datapoints("cpu_usage", data, 600, ["hour"])
 
         assert rows == 1
         call_args = mock_manager.insert_batch.call_args[0][1]
@@ -212,7 +200,7 @@ class TestSaveDetections:
         assert np.all(insert_data["metric_name"] == "cpu_usage")
         assert np.all(insert_data["detector_id"] == "mad_abc123")
         assert np.all(insert_data["detector_params"] == '{"threshold": 3.0}')
-        assert insert_data["is_anomaly"][0] == True  # numpy bool == Python bool
+        assert insert_data["is_anomaly"][0]  # numpy bool == Python bool
 
 
 class TestGetLastDatapointTimestamp:
@@ -247,9 +235,7 @@ class TestTaskLocking:
         # Mock: no existing lock
         mock_manager.execute_query.return_value = []
 
-        success = internal_manager.acquire_lock(
-            "cpu_usage", "load", "load", timeout_seconds=3600
-        )
+        success = internal_manager.acquire_lock("cpu_usage", "load", "load", timeout_seconds=3600)
 
         assert success is True
 
@@ -324,9 +310,7 @@ class TestTaskLocking:
 
         assert status == expected_status
 
-    def test_check_lock_returns_none_when_not_locked(
-        self, internal_manager, mock_manager
-    ):
+    def test_check_lock_returns_none_when_not_locked(self, internal_manager, mock_manager):
         """Test checking lock when not locked."""
         mock_manager.execute_query.return_value = []
 
@@ -338,9 +322,7 @@ class TestTaskLocking:
         """Test updating task progress."""
         last_ts = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
 
-        internal_manager.update_task_progress(
-            "cpu_usage", "load", "load", last_ts
-        )
+        internal_manager.update_task_progress("cpu_usage", "load", "load", last_ts)
 
         mock_manager.upsert_task_status.assert_called_once_with(
             metric_name="cpu_usage",
@@ -382,7 +364,7 @@ class TestUpsertMetricConfig:
         result = internal_manager.upsert_metric_config(
             metric_config=mock_config,
             file_path="metrics/cpu_usage.yml",
-            table_name_override="_dtk_metrics"
+            table_name_override="_dtk_metrics",
         )
 
         # Verify upsert_record was called
@@ -426,8 +408,7 @@ class TestUpsertMetricConfig:
 
         # Call upsert_metric_config
         result = internal_manager.upsert_metric_config(
-            metric_config=mock_config,
-            file_path="metrics/api_requests.yml"
+            metric_config=mock_config, file_path="metrics/api_requests.yml"
         )
 
         # Verify upsert_record was called
@@ -458,8 +439,7 @@ class TestUpsertMetricConfig:
 
         # Call without table_name_override
         internal_manager.upsert_metric_config(
-            metric_config=mock_config,
-            file_path="metrics/test.yml"
+            metric_config=mock_config, file_path="metrics/test.yml"
         )
 
         # Verify default table name was used

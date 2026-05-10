@@ -23,7 +23,7 @@ Note: Z-Score is more sensitive to outliers than MAD because
 both mean and std are affected by extreme values.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import numpy as np
 
@@ -84,13 +84,13 @@ class ZScoreDetector(BaseDetector):
         threshold: float = 3.0,
         window_size: int = 100,
         min_samples: int = 30,
-        seasonality_components: Optional[List[Union[str, List[str]]]] = None,
+        seasonality_components: list[str | list[str]] | None = None,
         min_samples_per_group: int = 3,
         input_type: str = "values",
-        smoothing: Optional[str] = None,
+        smoothing: str | None = None,
         smoothing_alpha: float = 0.3,
         smoothing_window: int = 10,
-        window_weights: Optional[str] = None,
+        window_weights: str | None = None,
         weight_decay: float = 0.95,
     ):
         """
@@ -144,7 +144,7 @@ class ZScoreDetector(BaseDetector):
         if min_samples_per_group < 1:
             raise ValueError("min_samples_per_group must be at least 1")
 
-    def detect(self, data: Dict[str, np.ndarray]) -> list[DetectionResult]:
+    def detect(self, data: dict[str, np.ndarray]) -> list[DetectionResult]:
         """
         Perform Z-Score based anomaly detection with optional seasonality support.
 
@@ -190,14 +190,8 @@ class ZScoreDetector(BaseDetector):
         seasonality_columns = data.get("seasonality_columns", [])
         seasonality_data = data.get("seasonality_data", np.array([]))
 
-        if (
-            seasonality_components
-            and len(seasonality_columns) > 0
-            and len(seasonality_data) > 0
-        ):
-            seasonality_dict = parse_seasonality_data(
-                seasonality_data, seasonality_columns
-            )
+        if seasonality_components and len(seasonality_columns) > 0 and len(seasonality_data) > 0:
+            seasonality_dict = parse_seasonality_data(seasonality_data, seasonality_columns)
 
         results = []
         n_points = len(timestamps)
@@ -281,13 +275,15 @@ class ZScoreDetector(BaseDetector):
                     # Check if enough samples in group
                     if len(group_values) < min_samples_per_group:
                         # Insufficient data - skip this group (multiplier = 1.0)
-                        multipliers_applied.append({
-                            "group": group_cols,
-                            "mean_multiplier": 1.0,
-                            "std_multiplier": 1.0,
-                            "reason": "insufficient_group_data",
-                            "group_size": int(len(group_values)),
-                        })
+                        multipliers_applied.append(
+                            {
+                                "group": group_cols,
+                                "mean_multiplier": 1.0,
+                                "std_multiplier": 1.0,
+                                "reason": "insufficient_group_data",
+                                "group_size": int(len(group_values)),
+                            }
+                        )
                         continue
 
                     # Compute group statistics with weights
@@ -310,12 +306,14 @@ class ZScoreDetector(BaseDetector):
                     adjusted_mean *= mean_multiplier
                     adjusted_std *= std_multiplier
 
-                    multipliers_applied.append({
-                        "group": group_cols,
-                        "mean_multiplier": float(mean_multiplier),
-                        "std_multiplier": float(std_multiplier),
-                        "group_size": int(len(group_values)),
-                    })
+                    multipliers_applied.append(
+                        {
+                            "group": group_cols,
+                            "mean_multiplier": float(mean_multiplier),
+                            "std_multiplier": float(std_multiplier),
+                            "group_size": int(len(group_values)),
+                        }
+                    )
 
             # STEP 3: Build confidence interval with adjusted statistics
             if adjusted_std == 0:
@@ -388,7 +386,7 @@ class ZScoreDetector(BaseDetector):
 
         return results
 
-    def _get_non_default_params(self) -> Dict[str, Any]:
+    def _get_non_default_params(self) -> dict[str, Any]:
         """
         Get parameters that differ from defaults.
 
@@ -417,6 +415,7 @@ class ZScoreDetector(BaseDetector):
         }
 
         return {
-            k: v for k, v in self.params.items()
+            k: v
+            for k, v in self.params.items()
             if v != defaults.get(k) and k not in execution_params
         }

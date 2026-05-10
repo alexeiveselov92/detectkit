@@ -5,18 +5,20 @@ Implements BaseDatabaseManager for ClickHouse using universal methods.
 """
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
+
 from detectkit.utils.datetime_utils import now_utc_naive, to_naive_utc
 
 try:
     from clickhouse_driver import Client
+
     CLICKHOUSE_AVAILABLE = True
 except ImportError:
     CLICKHOUSE_AVAILABLE = False
 
-from detectkit.core.models import ColumnDefinition, TableModel
+from detectkit.core.models import TableModel
 from detectkit.database.manager import BaseDatabaseManager
 
 
@@ -44,7 +46,7 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         password: str = "",
         internal_database: str = "detectk_internal",
         data_database: str = "default",
-        settings: Optional[Dict[str, Any]] = None,
+        settings: dict[str, Any] | None = None,
     ):
         """Initialize ClickHouse manager."""
         if not CLICKHOUSE_AVAILABLE:
@@ -74,10 +76,8 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
             self._client.execute(f"CREATE DATABASE IF NOT EXISTS {db}")
 
     def execute_query(
-        self,
-        query: str,
-        params: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
+        self, query: str, params: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """
         Execute SQL query and return results as list of dictionaries.
 
@@ -100,16 +100,10 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         column_names = [col[0] for col in columns_with_types]
 
         # Convert to list of dicts
-        return [
-            dict(zip(column_names, row))
-            for row in rows
-        ]
+        return [dict(zip(column_names, row, strict=True)) for row in rows]
 
     def create_table(
-        self,
-        table_name: str,
-        table_model: TableModel,
-        if_not_exists: bool = True
+        self, table_name: str, table_model: TableModel, if_not_exists: bool = True
     ) -> None:
         """
         Create ClickHouse table from TableModel.
@@ -167,11 +161,7 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         else:
             return str(value)
 
-    def table_exists(
-        self,
-        table_name: str,
-        schema: Optional[str] = None
-    ) -> bool:
+    def table_exists(self, table_name: str, schema: str | None = None) -> bool:
         """
         Check if table exists in ClickHouse.
 
@@ -194,20 +184,14 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
             WHERE database = %(database)s
               AND name = %(table)s
             """
-            result = self.execute_query(
-                query,
-                {"database": db, "table": table_name}
-            )
+            result = self.execute_query(query, {"database": db, "table": table_name})
             if result:
                 return True
 
         return False
 
     def insert_batch(
-        self,
-        table_name: str,
-        data: Dict[str, np.ndarray],
-        conflict_strategy: str = "ignore"
+        self, table_name: str, data: dict[str, np.ndarray], conflict_strategy: str = "ignore"
     ) -> int:
         """
         Insert batch of data into ClickHouse table.
@@ -227,7 +211,7 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         lengths = [len(arr) for arr in data.values()]
         if len(set(lengths)) > 1:
             raise ValueError(
-                f"All arrays must have same length, got: {dict(zip(data.keys(), lengths))}"
+                f"All arrays must have same length, got: {dict(zip(data.keys(), lengths, strict=True))}"
             )
 
         num_rows = lengths[0]
@@ -262,25 +246,19 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         # Note: For ReplacingMergeTree, use conflict_strategy="replace"
 
         # Insert data
-        self._client.execute(
-            f"INSERT INTO {table_name} ({', '.join(column_names)}) VALUES",
-            rows
-        )
+        self._client.execute(f"INSERT INTO {table_name} ({', '.join(column_names)}) VALUES", rows)
 
         return num_rows
 
     def _convert_numpy_datetime(self, dt: np.datetime64) -> datetime:
         """Convert numpy datetime64 to Python datetime with UTC timezone."""
         # Convert to timestamp
-        timestamp = (dt - np.datetime64('1970-01-01T00:00:00')) / np.timedelta64(1, 's')
+        timestamp = (dt - np.datetime64("1970-01-01T00:00:00")) / np.timedelta64(1, "s")
         return datetime.fromtimestamp(timestamp, tz=timezone.utc)
 
     def get_last_timestamp(
-        self,
-        table_name: str,
-        metric_name: str,
-        timestamp_column: str = "timestamp"
-    ) -> Optional[datetime]:
+        self, table_name: str, metric_name: str, timestamp_column: str = "timestamp"
+    ) -> datetime | None:
         """
         Get last timestamp for a metric in a table.
 
@@ -324,9 +302,9 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         detector_id: str,
         process_type: str,
         status: str,
-        last_processed_timestamp: Optional[datetime] = None,
-        error_message: Optional[str] = None,
-        timeout_seconds: int = 3600
+        last_processed_timestamp: datetime | None = None,
+        error_message: str | None = None,
+        timeout_seconds: int = 3600,
     ) -> None:
         """
         Update or insert task status in ClickHouse.
@@ -364,7 +342,7 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
                 "metric_name": metric_name,
                 "detector_id": detector_id,
                 "process_type": process_type,
-            }
+            },
         )
 
         last_ts_naive = to_naive_utc(last_processed_timestamp)
@@ -377,7 +355,11 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
             "status": np.array([status]),
             "started_at": np.array([now], dtype="datetime64[ms]"),
             "updated_at": np.array([now], dtype="datetime64[ms]"),
-            "last_processed_timestamp": np.array([last_ts_naive], dtype="datetime64[ms]") if last_ts_naive else np.array([None]),
+            "last_processed_timestamp": (
+                np.array([last_ts_naive], dtype="datetime64[ms]")
+                if last_ts_naive
+                else np.array([None])
+            ),
             "error_message": np.array([error_message]),
             "timeout_seconds": np.array([timeout_seconds], dtype=np.int32),
             "last_alert_sent": np.array([None]),
@@ -385,17 +367,10 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
             "last_recovery_sent": np.array([None]),
         }
 
-        self.insert_batch(
-            full_table,
-            insert_data,
-            conflict_strategy="ignore"
-        )
+        self.insert_batch(full_table, insert_data, conflict_strategy="ignore")
 
     def upsert_record(
-        self,
-        table_name: str,
-        key_columns: Dict[str, Any],
-        data: Dict[str, np.ndarray]
+        self, table_name: str, key_columns: dict[str, Any], data: dict[str, np.ndarray]
     ) -> int:
         """
         Upsert record in ClickHouse using DELETE + INSERT pattern.
@@ -421,11 +396,7 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         self._client.execute(delete_query, key_columns)
 
         # Step 2: INSERT new record
-        return self.insert_batch(
-            table_name,
-            data,
-            conflict_strategy="ignore"
-        )
+        return self.insert_batch(table_name, data, conflict_strategy="ignore")
 
     @property
     def internal_location(self) -> str:

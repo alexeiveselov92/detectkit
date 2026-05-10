@@ -1,5 +1,13 @@
 """Utility functions for detectk."""
 
+from detectkit.utils.datetime_utils import (
+    now_utc,
+    now_utc_naive,
+    to_aware_utc,
+    to_naive_utc,
+)
+from detectkit.utils.env_interpolation import interpolate_env_vars
+from detectkit.utils.json_utils import json_dumps_sorted, json_loads
 from detectkit.utils.stats import (
     weighted_mad,
     weighted_mean,
@@ -7,14 +15,6 @@ from detectkit.utils.stats import (
     weighted_percentile,
     weighted_std,
 )
-from detectkit.utils.datetime_utils import (
-    now_utc,
-    now_utc_naive,
-    to_naive_utc,
-    to_aware_utc,
-)
-from detectkit.utils.env_interpolation import interpolate_env_vars
-from detectkit.utils.json_utils import json_dumps_sorted, json_loads
 
 __all__ = [
     "weighted_percentile",

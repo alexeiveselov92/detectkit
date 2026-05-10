@@ -5,7 +5,7 @@ Defines configuration structure for detectkit_project.yml.
 """
 
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -71,6 +71,50 @@ class ProjectTimeoutsConfig(BaseModel):
         return v
 
 
+class ProjectErrorAlertingConfig(BaseModel):
+    """
+    Project-level error alerting configuration.
+
+    Sent when ``TaskManager.run_metric`` raises any exception (including
+    DB connection errors that affect every metric in the run). Channels
+    are looked up by name in the channel profile, just like per-metric
+    alerts.
+
+    Behaviour:
+    - At most one alert per ``dtk run`` invocation. Subsequent metric
+      failures in the same run are suppressed (an in-memory flag), and
+      the run aborts after the first error alert is dispatched — there's
+      no point loading the rest if e.g. the DB is unreachable.
+    - No persistent cooldown between separate ``dtk run`` invocations.
+      Persisting state in the DB would not help when the DB itself is
+      down, and a local file would break the dbt-style stateless model.
+
+    Attributes:
+        enabled: Master switch for project error alerting.
+        channels: Channel names from the channel profile to dispatch to.
+        template: Custom message body. Supports ``{metric_name}``,
+            ``{error_type}``, ``{error_message}``, ``{description}``,
+            ``{description_line}``, ``{mentions}``, ``{mentions_line}``,
+            ``{status}``, ``{timestamp}``, ``{timezone}``.
+        mentions: Users/groups to mention in the alert.
+        timezone: Optional display timezone for ``{timestamp}``.
+    """
+
+    enabled: bool = Field(default=False, description="Enable project error alerting")
+    channels: List[str] = Field(
+        default_factory=list, description="Channel names to dispatch error alerts to"
+    )
+    template: Optional[str] = Field(
+        default=None, description="Custom error message template"
+    )
+    mentions: List[str] = Field(
+        default_factory=list, description="Users/groups to mention in error alerts"
+    )
+    timezone: Optional[str] = Field(
+        default=None, description="Optional display timezone for {timestamp}"
+    )
+
+
 class ProjectConfig(BaseModel):
     """
     Project configuration loaded from detectkit_project.yml.
@@ -120,6 +164,10 @@ class ProjectConfig(BaseModel):
         default_factory=ProjectTimeoutsConfig, description="Operation timeouts"
     )
     default_profile: str = Field(..., description="Default database profile")
+    error_alerting: Optional[ProjectErrorAlertingConfig] = Field(
+        default=None,
+        description="Project-level error alerting (DB outages, query failures, etc.)",
+    )
 
     @field_validator("name")
     @classmethod

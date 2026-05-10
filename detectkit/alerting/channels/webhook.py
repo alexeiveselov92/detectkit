@@ -189,6 +189,15 @@ class WebhookChannel(BaseAlertChannel):
             "{mentions_line}"
         )
 
+    def get_default_error_template(self) -> str:
+        """Default error body template (metric name lives in the title)."""
+        return (
+            "{description_line}"
+            "Time: {timestamp}\n"
+            "{error_type}: {error_message}"
+            "{mentions_line}"
+        )
+
     def __repr__(self) -> str:
         """String representation."""
         url_preview = self.webhook_url[:30] + "..." if len(self.webhook_url) > 30 else self.webhook_url

@@ -29,6 +29,9 @@ class _TaskManagerBase:
         self.db_manager = db_manager
         self.profiles_config = profiles_config
         self.project_config = project_config
+        # In-process flag: dispatch project-level error alert at most once
+        # per run. Abort propagation is signalled via result["abort_run"].
+        self._error_alert_sent_in_run = False
 
     def _load_recent_detections(
         self,

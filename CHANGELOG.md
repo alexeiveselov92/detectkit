@@ -5,6 +5,18 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-05-10
+
+### Fixed
+- **`dtk test-alert` no longer crashes with `AttributeError`.** The
+  command had been broken since v0.3.9 (when `alerting` became a list):
+  `create_mock_alert_data` still dereferenced
+  `metric_config.alerting.mentions` and raised
+  `AttributeError: 'list' object has no attribute 'mentions'` on every
+  invocation. Now it sources mentions from the specific
+  `AlertingConfig` under test — more correct anyway since different
+  alert routes can ping different teams.
+
 ## [0.5.1] - 2026-05-10
 
 ### Fixed
@@ -21,12 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   paths (with `metric_name="<startup>"`) and from `TaskManager`. The
   helper takes `profiles_config + project_config` directly so it does
   not need a TaskManager instance to run.
-- **`dtk test-alert` no longer crashes with `AttributeError`.** The
-  command had been broken since v0.3.9 (when `alerting` became a list):
-  `create_mock_alert_data` still dereferenced
-  `metric_config.alerting.mentions`. Now it sources mentions from the
-  specific `AlertingConfig` under test — more correct anyway since
-  different alert routes can ping different teams.
 
 ## [0.5.0] - 2026-05-10
 

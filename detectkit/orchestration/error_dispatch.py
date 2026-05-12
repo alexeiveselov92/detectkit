@@ -92,6 +92,7 @@ def dispatch_project_error_alert(
             error_message=str(exc),
             description=None,
             mentions=cfg.mentions,
+            project_name=getattr(project_config, "name", None),
         )
 
         click.echo(

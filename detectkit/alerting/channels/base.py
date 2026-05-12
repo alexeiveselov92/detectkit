@@ -32,6 +32,10 @@ class AlertData:
         consecutive_count: Number of consecutive anomalies
         is_recovery: True for recovery notifications
         is_no_data: True for missing-data alerts (no_data_alert)
+        project_name: Optional ``detectkit_project.yml`` name. Surfaces
+            as ``{project_name}`` in templates and as a ``[name] `` prefix
+            in the default error title. Lets multiple projects share the
+            same alert channel without ambiguity.
     """
 
     metric_name: str
@@ -53,6 +57,7 @@ class AlertData:
     error_message: str | None = None
     description: str | None = None
     mentions: list[str] = field(default_factory=list)
+    project_name: str | None = None
 
 
 class BaseAlertChannel(ABC):
@@ -188,6 +193,12 @@ class BaseAlertChannel(ABC):
         mentions_str = self.format_mentions(alert_data.mentions)
         mentions_line = f"\n{mentions_str}" if mentions_str else ""
 
+        # Project name + synth prefix for templates. Prefix is empty when
+        # project_name is None so default templates render cleanly for
+        # callers that don't set it.
+        project_name = alert_data.project_name or ""
+        project_name_prefix = f"[{alert_data.project_name}] " if alert_data.project_name else ""
+
         # Format message
         if alert_data.is_error:
             status = "ERROR"
@@ -201,6 +212,8 @@ class BaseAlertChannel(ABC):
         try:
             message = template.format(
                 metric_name=alert_data.metric_name,
+                project_name=project_name,
+                project_name_prefix=project_name_prefix,
                 timestamp=ts_str,
                 timezone=alert_data.timezone,
                 value=value_for_template,
@@ -282,7 +295,14 @@ class BaseAlertChannel(ABC):
         else:
             title_template = self.get_default_title_template()
 
-        return title_template.format(metric_name=alert_data.metric_name)
+        project_name = alert_data.project_name or ""
+        project_name_prefix = f"[{alert_data.project_name}] " if alert_data.project_name else ""
+
+        return title_template.format(
+            metric_name=alert_data.metric_name,
+            project_name=project_name,
+            project_name_prefix=project_name_prefix,
+        )
 
     def get_default_template(self) -> str:
         """
@@ -369,8 +389,14 @@ class BaseAlertChannel(ABC):
         )
 
     def get_default_error_title_template(self) -> str:
-        """Default title template for project-level error alerts."""
-        return "Pipeline error: {metric_name}"
+        """Default title template for project-level error alerts.
+
+        Includes the project name as a ``[name] `` prefix when set so
+        multiple detectkit projects routed to the same alert channel
+        stay distinguishable. The prefix collapses to an empty string
+        when ``AlertData.project_name`` is None.
+        """
+        return "{project_name_prefix}Pipeline error: {metric_name}"
 
     def __repr__(self) -> str:
         """String representation of channel."""

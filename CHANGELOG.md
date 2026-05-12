@@ -5,6 +5,22 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2026-05-12
+
+### Added
+- **Project name in error alerts.** When multiple detectkit projects
+  route `error_alerting` to the same Slack/Mattermost channel, the
+  generic `Pipeline error: <startup>` title made it impossible to tell
+  which project crashed (especially if both bots happened to share a
+  username). `AlertData` now carries `project_name`, automatically
+  populated from `detectkit_project.yml`'s `name` field by
+  `dispatch_project_error_alert`. The default error title becomes
+  `[project_name] Pipeline error: <metric>` when the project name is
+  known; collapses to the previous form when it isn't. New template
+  variables `{project_name}` and `{project_name_prefix}` are available
+  in custom `error_alerting.template` values (and in every other alert
+  template — just empty for callers that don't set it yet).
+
 ## [0.5.2] - 2026-05-10
 
 ### Fixed

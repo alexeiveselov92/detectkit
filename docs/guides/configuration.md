@@ -111,6 +111,11 @@ error_alerting:
 - `{error_type}` - Exception class name (e.g., `ConnectionRefusedError`)
 - `{error_message}` - Exception `str(exc)`
 - `{status}` - Always `"ERROR"`
+- `{project_name}` - Project `name` from `detectkit_project.yml`
+  (v0.5.3). Empty string when not set.
+- `{project_name_prefix}` - `"[<project_name>] "` when set, empty
+  otherwise. The default error title uses this so multi-project
+  channels stay distinguishable (`[kiss] Pipeline error: <startup>`).
 
 **Behaviour notes**:
 

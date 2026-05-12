@@ -125,6 +125,9 @@ class TestDispatchProjectErrorAlert:
         assert alert_data.error_type == "ConnectionResetError"
         assert "Connection reset by peer" in alert_data.error_message
         assert alert_data.detector_name == "pipeline"
+        # project_name is propagated from project_config.name so multi-project
+        # operators can tell which detectkit project crashed.
+        assert alert_data.project_name == "p"
         assert template is None  # no custom template configured
 
     def test_channel_send_exception_does_not_propagate(self, monkeypatch):

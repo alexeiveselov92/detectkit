@@ -840,11 +840,19 @@ Error: {error_type}: {error_message}
 {mentions_line}
 ```
 
+Title (webhook channels): `[{project_name}] Pipeline error: {metric_name}`
+when `project_name` is set in `detectkit_project.yml`, otherwise just
+`Pipeline error: {metric_name}` (backwards-compat). The bracketed prefix
+makes it obvious which project crashed when multiple detectkit instances
+share an alert channel.
+
 ### Template Variables
 
 | Variable | Description |
 |---|---|
-| `{metric_name}` | Name of the metric whose pipeline failed |
+| `{metric_name}` | Name of the metric whose pipeline failed (or `<startup>` for early failures) |
+| `{project_name}` | `detectkit_project.yml` `name` field, or empty string (v0.5.3) |
+| `{project_name_prefix}` | `"[<project_name>] "` when set, empty string otherwise (v0.5.3) |
 | `{error_type}` | Exception class name (e.g., `ConnectionRefusedError`) |
 | `{error_message}` | Exception `str(exc)` |
 | `{timestamp}` | When the alert was built (formatted in `{timezone}`) |
@@ -854,6 +862,25 @@ Error: {error_type}: {error_message}
 | `{description}` / `{description_line}` | Empty for error alerts (no metric context) |
 
 Webhook channels render error alerts in red (same as anomalies).
+
+### Custom Template with Project Name and Mentions
+
+```yaml
+# detectkit_project.yml
+name: kiss   # ← surfaces in error alert title as "[kiss] Pipeline error: ..."
+default_profile: prod
+
+error_alerting:
+  enabled: true
+  channels: [mattermost_oncall]
+  mentions: [oncall_engineer, here]   # critical alert — wake someone up
+  template: |
+    {project_name_prefix}🔥 pipeline crashed
+    Metric: {metric_name}
+    {error_type}: {error_message}
+    Time: {timestamp} ({timezone})
+    {mentions}
+```
 
 ### When to Use
 
@@ -1013,6 +1040,8 @@ alerting:
 | Variable | Description | Available in |
 |---|---|---|
 | `metric_name` | Metric name | all |
+| `project_name` | `detectkit_project.yml` `name`, empty if not set (v0.5.3) | all (currently populated by error alerts only) |
+| `project_name_prefix` | `"[<project_name>] "` if set, else empty (v0.5.3) | all (same) |
 | `timestamp` | Timestamp (formatted in `{timezone}`) | all |
 | `timezone` | Timezone display name | all |
 | `value` | Current metric value (numeric, or string `"no data"` for no-data) | all |

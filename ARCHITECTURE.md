@@ -434,6 +434,14 @@ class TaskManager:
         """Mark task as failed"""
 ```
 
+> **Implementation note (v0.6.0):** this logic lives in
+> `InternalTablesManager.acquire_lock` / `check_lock`. A `running` row older
+> than its `timeout_seconds` is treated as stale and overridden, so a run
+> killed without releasing its lock (e.g. DB restart mid-run) never blocks
+> future runs. `--force` skips the held-lock check but still acquires and
+> releases the lock, so it also clears a stuck row. `dtk unlock` clears a stuck
+> lock on demand.
+
 #### PipelineOrchestrator (`orchestration/pipeline.py`)
 
 **Responsibilities**:

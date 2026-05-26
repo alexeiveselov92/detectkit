@@ -182,5 +182,39 @@ def test_alert(metric_name: str, profile: str):
     run_test_alert(metric_name=metric_name, profile=profile)
 
 
+@cli.command()
+@click.option(
+    "--select",
+    "-s",
+    help="Selector for metrics to unlock (metric name, path, or tag)",
+    required=True,
+)
+@click.option(
+    "--profile",
+    help="Profile to use (default: from project config)",
+)
+def unlock(select: str, profile: str):
+    """
+    Clear stale pipeline locks for the selected metric(s).
+
+    Use this to recover from a run that died without releasing its lock
+    (e.g. the database restarted mid-run), which would otherwise make
+    subsequent runs fail with "Failed to acquire lock ... Use --force".
+
+    Locks also auto-expire after their timeout, so this is only needed to
+    clear a stuck lock immediately. Selector semantics match `dtk run`.
+
+    Examples:
+        # Unlock a single metric
+        dtk unlock --select cpu_usage
+
+        # Unlock everything matching a tag
+        dtk unlock --select "tag:critical"
+    """
+    from detectkit.cli.commands.unlock import run_unlock
+
+    run_unlock(select=select, profile=profile)
+
+
 if __name__ == "__main__":
     cli()

@@ -299,6 +299,18 @@ dtk run --select api_response_time --from "2024-01-01 00:00:00"
 dtk test-alert --metric api_response_time
 ```
 
+### Clear a Stuck Lock
+
+```bash
+# If a run was killed without releasing its lock (e.g. the database
+# restarted mid-run), later runs fail with "Failed to acquire lock".
+# Clear it immediately:
+dtk unlock --select api_response_time
+```
+
+Stuck locks also auto-expire after 1 hour, so the next normal run recovers on
+its own — `dtk unlock` just does it right away.
+
 ## Next Steps
 
 Now that you have a working metric:

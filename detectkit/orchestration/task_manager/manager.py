@@ -15,6 +15,12 @@ from detectkit.orchestration.task_manager._detect_step import _DetectStepMixin
 from detectkit.orchestration.task_manager._load_step import _LoadStepMixin
 from detectkit.orchestration.task_manager._types import PipelineStep, TaskStatus
 
+# Age (seconds) after which a 'running' pipeline lock is considered stale and
+# overridden — see acquire_lock / TECHNICAL_SPEC.md §13.1. A run whose
+# 'running' row is older than this is assumed to have died without releasing
+# the lock (e.g. the database restarted mid-run).
+PIPELINE_LOCK_TIMEOUT_SECONDS = 3600
+
 
 class TaskManager(_LoadStepMixin, _DetectStepMixin, _AlertStepMixin):
     """Drives the load → detect → alert pipeline for a single metric.
@@ -63,19 +69,23 @@ class TaskManager(_LoadStepMixin, _DetectStepMixin, _AlertStepMixin):
                     table_name_override=metrics_table_name,
                 )
 
-            if not force:
-                # TODO: surface the timeout via ProjectConfig.
-                lock_acquired = self.internal.acquire_lock(
-                    metric_name=metric_name,
-                    detector_id="pipeline",
-                    process_type="pipeline",
-                    timeout_seconds=3600,
+            # Acquire the pipeline lock. A stale 'running' row (older than the
+            # timeout) is auto-overridden inside acquire_lock; --force skips the
+            # held-lock check but still takes ownership so the lock is released
+            # on exit. Done outside the try/finally below so we never release a
+            # lock held by another (still-active) process.
+            lock_acquired = self.internal.acquire_lock(
+                metric_name=metric_name,
+                detector_id="pipeline",
+                process_type="pipeline",
+                timeout_seconds=PIPELINE_LOCK_TIMEOUT_SECONDS,
+                force=force,
+            )
+            if not lock_acquired:
+                raise RuntimeError(
+                    f"Failed to acquire lock for metric '{metric_name}'. "
+                    "Another task is running. Use --force to override."
                 )
-                if not lock_acquired:
-                    raise RuntimeError(
-                        f"Failed to acquire lock for metric '{metric_name}'. "
-                        "Another task is running. Use --force to override."
-                    )
 
             try:
                 if PipelineStep.LOAD in steps:
@@ -98,15 +108,17 @@ class TaskManager(_LoadStepMixin, _DetectStepMixin, _AlertStepMixin):
                     result["steps_completed"].append(PipelineStep.ALERT)
 
             finally:
-                if not force:
-                    status = "completed" if result["status"] == TaskStatus.SUCCESS else "failed"
-                    self.internal.release_lock(
-                        metric_name=metric_name,
-                        detector_id="pipeline",
-                        process_type="pipeline",
-                        status=status,
-                        error_message=result.get("error"),
-                    )
+                # Always release the lock we acquired — including forced runs,
+                # so a --force run heals a previously stuck 'running' row
+                # instead of leaving it behind.
+                status = "completed" if result["status"] == TaskStatus.SUCCESS else "failed"
+                self.internal.release_lock(
+                    metric_name=metric_name,
+                    detector_id="pipeline",
+                    process_type="pipeline",
+                    status=status,
+                    error_message=result.get("error"),
+                )
 
         except Exception as exc:
             # Surface the failure with type + message so the CLI/log shows

@@ -1,6 +1,6 @@
 """Tests for InternalTablesManager."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -331,6 +331,85 @@ class TestTaskLocking:
             status="running",
             last_processed_timestamp=last_ts,
         )
+
+    def test_check_lock_treats_stale_lock_as_released(self, internal_manager, mock_manager):
+        """A 'running' row older than its timeout_seconds is reported as free."""
+        stale_started = datetime.now(timezone.utc) - timedelta(seconds=7200)
+        mock_manager.execute_query.return_value = [
+            {"status": "running", "started_at": stale_started, "timeout_seconds": 3600}
+        ]
+
+        status = internal_manager.check_lock("cpu_usage", "load", "load")
+
+        assert status is None
+
+    def test_check_lock_keeps_active_lock(self, internal_manager, mock_manager):
+        """A recent 'running' row within its timeout is still reported as held."""
+        recent_started = datetime.now(timezone.utc) - timedelta(seconds=60)
+        row = {"status": "running", "started_at": recent_started, "timeout_seconds": 3600}
+        mock_manager.execute_query.return_value = [row]
+
+        status = internal_manager.check_lock("cpu_usage", "load", "load")
+
+        assert status == row
+
+    def test_check_lock_ignore_timeout_returns_stale_row(self, internal_manager, mock_manager):
+        """ignore_timeout=True returns even a stale running row (used by dtk unlock)."""
+        stale_started = datetime.now(timezone.utc) - timedelta(seconds=7200)
+        row = {"status": "running", "started_at": stale_started, "timeout_seconds": 3600}
+        mock_manager.execute_query.return_value = [row]
+
+        status = internal_manager.check_lock("cpu_usage", "load", "load", ignore_timeout=True)
+
+        assert status == row
+
+    def test_acquire_lock_overrides_stale_lock(self, internal_manager, mock_manager):
+        """A stale 'running' row must not block acquiring the lock."""
+        stale_started = datetime.now(timezone.utc) - timedelta(seconds=7200)
+        mock_manager.execute_query.return_value = [
+            {"status": "running", "started_at": stale_started, "timeout_seconds": 3600}
+        ]
+
+        success = internal_manager.acquire_lock("cpu_usage", "load", "load")
+
+        assert success is True
+        mock_manager.upsert_task_status.assert_called_once()
+
+    def test_acquire_lock_force_overrides_active_lock(self, internal_manager, mock_manager):
+        """force=True takes the lock even when an active (non-stale) one is held."""
+        recent_started = datetime.now(timezone.utc) - timedelta(seconds=60)
+        mock_manager.execute_query.return_value = [
+            {"status": "running", "started_at": recent_started, "timeout_seconds": 3600}
+        ]
+
+        success = internal_manager.acquire_lock("cpu_usage", "load", "load", force=True)
+
+        assert success is True
+        # force skips check_lock entirely and (re)writes the running row.
+        mock_manager.execute_query.assert_not_called()
+        mock_manager.upsert_task_status.assert_called_once()
+
+    def test_clear_lock_releases_held_lock(self, internal_manager, mock_manager):
+        """clear_lock marks a held (even stale) lock completed and returns True."""
+        stale_started = datetime.now(timezone.utc) - timedelta(seconds=7200)
+        mock_manager.execute_query.return_value = [
+            {"status": "running", "started_at": stale_started, "timeout_seconds": 3600}
+        ]
+
+        cleared = internal_manager.clear_lock("cpu_usage")
+
+        assert cleared is True
+        mock_manager.upsert_task_status.assert_called_once()
+        assert mock_manager.upsert_task_status.call_args[1]["status"] == "completed"
+
+    def test_clear_lock_noop_when_not_locked(self, internal_manager, mock_manager):
+        """clear_lock returns False and writes nothing when no lock is held."""
+        mock_manager.execute_query.return_value = []
+
+        cleared = internal_manager.clear_lock("cpu_usage")
+
+        assert cleared is False
+        mock_manager.upsert_task_status.assert_not_called()
 
 
 class TestUpsertMetricConfig:

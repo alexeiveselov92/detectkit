@@ -3,7 +3,16 @@
 ## Current Implementation Status
 
 ### Date: 2025-11-10
-### Last Updated: 2026-04-10 (v0.3.16 - suppress_until, timezone fix, recovery metadata fix)
+### Last Updated: 2026-05-26 (v0.6.0 - self-healing pipeline locks + `dtk unlock` command)
+
+> **v0.6.0 — Lock recovery.** A run killed without releasing its lock (most
+> commonly when **the database restarts mid-run**) used to leave a `running`
+> row in `_dtk_tasks` that blocked every later non-`--force` run with
+> `Failed to acquire lock` — spamming error alerts. Fixed: (1) `acquire_lock`
+> now honors `timeout_seconds`, so a stale `running` row is auto-overridden by
+> the next run; (2) `--force` now takes and releases the lock, so it clears the
+> stuck row too; (3) new `dtk unlock --select <selector>` clears a stuck lock
+> on demand. See CHANGELOG.md and TECHNICAL_SPEC.md §13.1 / §10.5.1.
 
 ## Summary
 
@@ -67,11 +76,12 @@ Complete pipeline (load → detect → alert) is **WORKING, TESTED, PUBLISHED, a
 ### 6. CLI ✅
 - `dtk init` - project initialization
 - `dtk run` - run metrics with selectors
-- `dtk test-alert` - send test alert with mock data (NEW!)
+- `dtk test-alert` - send test alert with mock data
+- `dtk unlock` - clear a stuck pipeline lock (NEW in v0.6.0!)
 - `--steps` - partial pipeline execution
 - `--full-refresh` - complete reload
 - `--from/--to` - date range filtering
-- `--force` - ignore locks
+- `--force` - ignore an existing lock (also clears it on exit)
 
 ## Optional Optimizations
 

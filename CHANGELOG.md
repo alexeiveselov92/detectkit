@@ -5,6 +5,33 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-05-26
+
+### Fixed
+- **Stuck pipeline locks now self-heal; `--force` clears them.** If a run was
+  killed without releasing its lock — most commonly when **the database
+  restarted mid-run** — the `running` row in `_dtk_tasks` was left behind, and
+  *every* subsequent non-`--force` run failed with `RuntimeError: Failed to
+  acquire lock ... Another task is running`. With `error_alerting` enabled this
+  produced a continuous stream of error alerts. Two gaps caused it, both now
+  closed:
+  - `acquire_lock` ignored `timeout_seconds` (the staleness check was an
+    unimplemented TODO). Now a `running` row older than its stored
+    `timeout_seconds` (default 1 hour for the pipeline lock) is treated as
+    stale and overridden, so the next normal run recovers automatically —
+    matching the `can_start_process` logic in TECHNICAL_SPEC.md §13.1.
+  - `--force` *bypassed* the lock but never *cleared* it: it skipped both
+    acquire and release, so a forced run left the stale row in place and the
+    spam continued. `--force` now takes ownership of the lock and releases it
+    on exit, so a forced run also heals a previously stuck lock.
+
+### Added
+- **`dtk unlock --select <selector>` command.** Clears a stuck pipeline lock
+  immediately instead of waiting for the timeout to expire. Reports per metric
+  whether a lock was cleared, accepts the same selectors as `dtk run` (name,
+  path, `tag:`), and marks the task `completed` so the next scheduled run
+  proceeds without `--force`. Does not run the pipeline.
+
 ## [0.5.3] - 2026-05-12
 
 ### Added

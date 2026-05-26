@@ -81,8 +81,10 @@
   - --steps (load, detect, alert)
   - --from, --to (date range)
   - --full-refresh (reload all)
-  - --force (ignore locks)
+  - --force (ignore an existing lock; also clears it on exit)
   - --profile (use specific profile)
+- `dtk unlock` - clear a stuck pipeline lock (v0.6.0)
+- Lock auto-heal: stale `running` rows expire via `timeout_seconds` (v0.6.0)
 
 ### Configuration System ✅
 - **MetricConfig** - full feature set:

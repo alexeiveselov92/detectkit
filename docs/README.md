@@ -259,6 +259,13 @@ dtk run --select cpu_usage --from "2024-01-01"
 dtk test-alert cpu_usage
 ```
 
+### Recovery
+
+```bash
+# Clear a stuck lock left by a crashed run (e.g. DB restarted mid-run)
+dtk unlock --select cpu_usage
+```
+
 [Full CLI Reference →](reference/cli.md)
 
 ## Configuration Files

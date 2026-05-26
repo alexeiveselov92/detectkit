@@ -260,6 +260,9 @@ dtk run --select cpu_usage --from 2024-01-01
 
 # Full refresh
 dtk run --select cpu_usage --full-refresh
+
+# Clear a stuck lock left by a crashed run (e.g. DB restarted mid-run)
+dtk unlock --select cpu_usage
 ```
 
 ## Documentation

@@ -17,7 +17,7 @@
 - **Project-level error alerts** — catch DB outages and pipeline crashes once per run
 - **Database agnostic** — ClickHouse, PostgreSQL, MySQL
 - **Idempotent** — resume from interruptions, no duplicate processing
-- **CLI** — `dtk init`, `dtk run --select`, tag-based selectors
+- **CLI** — `dtk init`, `dtk run --select`, `dtk unlock`, tag-based selectors
 
 ## Installation
 
@@ -46,6 +46,9 @@ dtk run --select cpu_usage
 dtk run --select tag:critical
 dtk run --select cpu_usage --steps load,detect
 dtk run --select cpu_usage --from 2024-01-01
+
+# Clear a stuck lock left by a crashed run (e.g. DB restarted mid-run)
+dtk unlock --select cpu_usage
 ```
 
 ### Metric Configuration

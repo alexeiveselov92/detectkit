@@ -118,6 +118,18 @@ dtk run --select cpu_usage --from 2024-01-01
 dtk run --select tag:critical
 ```
 
+### 5. Recover from a Stuck Lock
+
+If a run is killed without releasing its lock (e.g. the database restarts
+mid-run), later runs fail with `Failed to acquire lock`. Clear it immediately:
+
+```bash
+dtk unlock --select cpu_usage
+```
+
+A stuck lock also auto-expires after 1 hour, so the next normal run recovers on
+its own.
+
 ## Available Detectors
 
 ### Statistical Detectors

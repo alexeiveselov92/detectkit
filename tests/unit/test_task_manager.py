@@ -84,6 +84,7 @@ class TestTaskManager:
             detector_id="pipeline",
             process_type="pipeline",
             timeout_seconds=3600,
+            force=False,
         )
         internal_manager.release_lock.assert_called_once_with(
             metric_name="cpu_usage",
@@ -153,8 +154,9 @@ class TestTaskManager:
         internal_manager.release_lock.assert_not_called()
 
     def test_run_metric_with_force(self):
-        """Test running with force flag (ignore locks)."""
+        """Test running with force flag (ignore an existing lock)."""
         internal_manager = Mock()
+        internal_manager.acquire_lock.return_value = True
         db_manager = Mock()
 
         manager = TaskManager(
@@ -175,9 +177,23 @@ class TestTaskManager:
 
         assert result["status"] == TaskStatus.SUCCESS
 
-        # Verify lock was NOT acquired or released
-        internal_manager.acquire_lock.assert_not_called()
-        internal_manager.release_lock.assert_not_called()
+        # Force still takes the lock (force=True bypasses the held-lock check)
+        # AND releases it on exit, so a forced run heals a previously stuck
+        # 'running' row instead of leaving it behind.
+        internal_manager.acquire_lock.assert_called_once_with(
+            metric_name="cpu_usage",
+            detector_id="pipeline",
+            process_type="pipeline",
+            timeout_seconds=3600,
+            force=True,
+        )
+        internal_manager.release_lock.assert_called_once_with(
+            metric_name="cpu_usage",
+            detector_id="pipeline",
+            process_type="pipeline",
+            status="completed",
+            error_message=None,
+        )
 
     def test_run_metric_with_error(self):
         """Test error handling during pipeline execution."""

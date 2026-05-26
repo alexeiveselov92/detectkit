@@ -236,18 +236,25 @@ dtk run --select cpu_usage --full-refresh
 
 ##### `--force` (flag)
 
-Ignore task locks and run anyway.
+Ignore an existing task lock and run anyway.
 
 ```bash
 dtk run --select cpu_usage --force
 ```
 
 **Behavior**:
-- Bypasses task lock checks
+- Skips the held-lock check (runs even if another lock is marked `running`)
+- Still takes ownership of the lock for the duration of the run **and releases
+  it on exit** — so a `--force` run also clears a previously stuck lock
 - Allows concurrent runs (not recommended)
-- Use only if previous run crashed with lock held
 
 **Warning**: Can cause data corruption if multiple processes run simultaneously.
+
+> **Note:** You usually don't need `--force` to recover from a crash. A
+> `running` lock left behind by a dead process (e.g. the database restarted
+> mid-run) auto-expires after its timeout (1 hour) and is overridden by the
+> next normal run. To clear a stuck lock immediately, use
+> [`dtk unlock`](#dtk-unlock) instead of `--force`.
 
 ##### `--profile` (optional)
 
@@ -509,6 +516,72 @@ Sends a mock alert through all configured channels with fake data:
 
 ---
 
+### `dtk unlock`
+
+Clear a stuck pipeline lock for the selected metric(s).
+
+#### Syntax
+
+```bash
+dtk unlock --select <selector> [OPTIONS]
+```
+
+#### Options
+
+**`--select`, `-s`** (required)
+Metric selector — same semantics as `dtk run` (metric name, path pattern, or
+`tag:<name>`).
+
+**`--profile`** (optional)
+Profile to use (overrides project default).
+
+#### Examples
+
+```bash
+# Unlock a single metric
+dtk unlock --select cpu_usage
+
+# Unlock everything matching a tag
+dtk unlock --select "tag:critical"
+```
+
+#### When to use it
+
+Every `dtk run` records a `running` lock in `_dtk_tasks` while it works and
+clears it on exit. If a run is killed without releasing its lock — most
+commonly when **the database restarts mid-run** — the `running` row is left
+behind. Until it's cleared, every subsequent **non-`--force`** run fails with:
+
+```
+RuntimeError: Failed to acquire lock for metric '<name>'. Another task is
+running. Use --force to override.
+```
+
+Stuck locks **auto-expire** after their timeout (1 hour) — the next normal run
+treats the stale `running` row as released and overrides it, so the error
+clears itself. `dtk unlock` simply does this **immediately** instead of waiting
+for the timeout. It marks the task `completed`, so the next scheduled (cron)
+run proceeds normally without needing `--force`.
+
+#### Behavior
+
+- Reports, per metric, whether a lock was cleared or none was held
+- Clears even a not-yet-expired lock (use with the same care as `--force`)
+- Does **not** run the pipeline — only releases the lock
+
+#### Example Output
+
+```
+Project root: /path/to/project
+Found 1 metric(s) to unlock
+
+  ✓ cpu_usage: lock cleared
+
+Done. Cleared 1 lock(s) of 1 metric(s).
+```
+
+---
+
 ## Exit Codes
 
 | Code | Meaning |
@@ -588,7 +661,10 @@ dtk run --select cpu_usage --steps detect
 ### Emergency Operations
 
 ```bash
-# Force run if previous run crashed
+# Clear a stuck lock left by a crashed run (e.g. DB restarted mid-run)
+dtk unlock --select cpu_usage
+
+# Force run if previous run crashed (also clears the stuck lock on exit)
 dtk run --select cpu_usage --force
 
 # Full refresh if data is corrupted
@@ -716,6 +792,10 @@ dtk run --select my_metric --steps load,detect
 ps aux | grep dtk
 ```
 
+To recover from a *crashed* run (no live process), prefer `dtk unlock` — it
+clears the stale lock without running the pipeline concurrently. A stuck lock
+also auto-expires after 1 hour, so often no manual action is needed at all.
+
 ## Troubleshooting
 
 ### "Metric not found"
@@ -731,17 +811,22 @@ ls metrics/
 dtk run --select cpu_usage  # Not metrics/cpu_usage.yml
 ```
 
-### "Task is locked"
+### "Task is locked" / "Failed to acquire lock"
 
-**Cause**: Previous run is still in progress or crashed with lock held.
+**Cause**: Previous run is still in progress, or it crashed/was killed with the
+`running` lock held. The most common crash cause is the **database restarting
+mid-run**, which leaves a stale `running` row in `_dtk_tasks`.
 
 **Solution**:
 ```bash
-# Check if process is running
+# Check if a process is actually still running
 ps aux | grep dtk
 
-# If no process, force unlock
-dtk run --select cpu_usage --force
+# If no process is running, clear the stuck lock immediately:
+dtk unlock --select cpu_usage
+
+# (Or just wait — a stale lock auto-expires after 1 hour and the next
+#  normal run overrides it. --force also clears it on exit.)
 ```
 
 ### "Connection refused"

@@ -56,7 +56,8 @@ detectk_project.yml
 profiles.yml
 *.log
 .env
-
-# Personal Claude Code state (per-developer; not part of the repo)
-CLAUDE.md
-.claude/
+# Claude
+# Ignore local Claude state, but track shared project settings
+.claude/*
+!.claude/settings.json
+.claude/settings.local.json

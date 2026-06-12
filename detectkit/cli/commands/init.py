@@ -81,51 +81,47 @@ timeouts:
 
     (target_path / "detectkit_project.yml").write_text(project_config)
 
-    # Create profiles.yml
+    # Create profiles.yml (must validate against ProfilesConfig:
+    # connections live under a top-level 'profiles:' mapping)
     profiles_config = """# Database connection profiles
-# Copy this file to ~/.detectkit/profiles.yml for user-level config
 
-dev:
-  type: clickhouse
-  host: localhost
-  port: 9000
-  database: default
-  user: default
-  password: ""
+default_profile: dev
 
-  # ClickHouse specific settings
-  settings:
-    max_execution_time: 300
+profiles:
+  dev:
+    type: clickhouse
+    host: localhost
+    port: 9000
+    database: default
+    user: default
+    password: ""
 
-prod:
-  type: clickhouse
-  host: "{{ env_var('CLICKHOUSE_HOST') }}"
-  port: 9000
-  database: monitoring
-  user: "{{ env_var('CLICKHOUSE_USER') }}"
-  password: "{{ env_var('CLICKHOUSE_PASSWORD') }}"
+  prod:
+    type: clickhouse
+    host: "{{ env_var('CLICKHOUSE_HOST') }}"
+    port: 9000
+    database: monitoring
+    user: "{{ env_var('CLICKHOUSE_USER') }}"
+    password: "{{ env_var('CLICKHOUSE_PASSWORD') }}"
 
-  settings:
-    max_execution_time: 600
+  # Example PostgreSQL profile
+  # postgres_dev:
+  #   type: postgres
+  #   host: localhost
+  #   port: 5432
+  #   database: monitoring
+  #   user: postgres
+  #   password: postgres
+  #   schema: public
 
-# Example PostgreSQL profile
-# postgres_dev:
-#   type: postgres
-#   host: localhost
-#   port: 5432
-#   database: monitoring
-#   user: postgres
-#   password: postgres
-#   schema: public
-
-# Example MySQL profile
-# mysql_dev:
-#   type: mysql
-#   host: localhost
-#   port: 3306
-#   database: monitoring
-#   user: root
-#   password: root
+  # Example MySQL profile
+  # mysql_dev:
+  #   type: mysql
+  #   host: localhost
+  #   port: 3306
+  #   database: monitoring
+  #   user: root
+  #   password: root
 
 # Alert channels configuration
 alert_channels:
@@ -154,20 +150,22 @@ alert_channels:
 
     (target_path / "profiles.yml").write_text(profiles_config)
 
-    # Create example metric
+    # Create example metric (must validate against MetricConfig)
     example_metric = """# Example metric configuration
 name: example_cpu_usage
 description: CPU usage monitoring example
 
-# Data source
+# Data source. Built-in template variables:
+#   {{ dtk_start_time }} / {{ dtk_end_time }} - load window bounds
+#   {{ interval_seconds }} - metric interval in seconds
 query: |
   SELECT
-    timestamp,
-    cpu_usage as value
+    toStartOfInterval(event_time, INTERVAL {{ interval_seconds }} SECOND) AS timestamp,
+    avg(cpu_usage) AS value
   FROM system_metrics
-  WHERE metric_name = 'cpu_usage'
-    AND timestamp >= {{ from_date }}
-    AND timestamp < {{ to_date }}
+  WHERE event_time >= '{{ dtk_start_time }}'
+    AND event_time < '{{ dtk_end_time }}'
+  GROUP BY timestamp
   ORDER BY timestamp
 
 # Or use external SQL file:
@@ -176,28 +174,31 @@ query: |
 # Time interval between datapoints
 interval: 1min
 
-# Loading configuration
-loading:
-  fill_gaps: true
-  max_gap_fill: 10  # Fill up to 10 missing points
-
-  # Seasonality extraction
-  extract_seasonality:
-    - minute_of_hour
-    - hour_of_day
-    - day_of_week
+# Seasonality features extracted from timestamps (used by detectors
+# with seasonality_components)
+seasonality_columns:
+  - hour
+  - day_of_week
 
 # Anomaly detectors
 detectors:
+  - type: mad
+    params:
+      threshold: 3.0       # sigma-equivalents (MAD is scaled by 1.4826)
+      window_size: 1440    # 1 day of 1-min points
+      min_samples: 100
+      # Group statistics by seasonality (uses seasonality_columns):
+      # seasonality_components: ["hour"]
+      # For metrics with a gradual trend, enable recency weighting:
+      # window_weights: exponential
+      # half_life: "6h"
+      # detrend: linear
+
   - type: zscore
     params:
       threshold: 3.0
-      window_size: 100
-
-  - type: mad
-    params:
-      threshold: 3.0
-      window_size: 100
+      window_size: 1440
+      min_samples: 100
 
 # Alerting (optional)
 alerting:
@@ -208,8 +209,11 @@ alerting:
     - mattermost_alerts
 
   # Alert conditions
-  consecutive_anomalies: 3
-  alert_on_missing_data: false
+  min_detectors: 1            # detectors that must agree
+  direction: same             # same | any | up | down
+  consecutive_anomalies: 3    # adjacent anomalous points required
+  no_data_alert: false        # alert when the latest interval has no data
+  # alert_cooldown: "2h"      # recommended: suppress repeats of a persisting anomaly
 
 # Tags for selection
 tags:

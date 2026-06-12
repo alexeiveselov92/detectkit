@@ -21,9 +21,10 @@ class TestAlertConditions:
         """Test default alert conditions."""
         conditions = AlertConditions()
 
+        # Defaults mirror the pydantic AlertConfig defaults
         assert conditions.min_detectors == 1
-        assert conditions.direction == "any"
-        assert conditions.consecutive_anomalies == 1
+        assert conditions.direction == "same"
+        assert conditions.consecutive_anomalies == 3
 
     def test_custom_conditions(self):
         """Test custom alert conditions."""
@@ -114,11 +115,12 @@ class TestAlertOrchestrator:
         assert alert_data is None
 
     def test_should_alert_single_anomaly_default_conditions(self):
-        """Test alert with single anomaly and default conditions."""
+        """Test alert with a single anomalous point (consecutive=1)."""
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
             alert_config_id="test_config_id",
             interval=Interval("10min"),
+            conditions=AlertConditions(consecutive_anomalies=1),
         )
 
         detections = [
@@ -180,7 +182,7 @@ class TestAlertOrchestrator:
 
     def test_should_alert_multiple_detectors(self):
         """Test alert with multiple detectors."""
-        conditions = AlertConditions(min_detectors=2)
+        conditions = AlertConditions(min_detectors=2, consecutive_anomalies=1)
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
             alert_config_id="test_config_id",

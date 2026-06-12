@@ -4,14 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import numpy as np
-
 from detectkit.alerting.channels.base import AlertData
 from detectkit.alerting.orchestrator._base import _OrchestratorBase
 from detectkit.alerting.orchestrator._types import (
     DetectionRecord,
-    _direction_from_metadata,
-    _parse_detection_metadata,
+    hydrate_detection_records,
 )
 
 
@@ -71,27 +68,7 @@ class _RecoveryMixin(_OrchestratorBase):
             # No fresh detections at all → assume recovery.
             return True
 
-        records: list[DetectionRecord] = []
-        for det in recent_detections:
-            metadata_list = det.get("detection_metadata_list") or [None] * len(det["detector_ids"])
-            for i in range(len(det["detector_ids"])):
-                is_anomaly = det["is_anomaly_flags"][i]
-                metadata = _parse_detection_metadata(metadata_list[i])
-                records.append(
-                    DetectionRecord(
-                        timestamp=np.datetime64(det["timestamp"]),
-                        detector_name=det["detector_names"][i],
-                        detector_id=det["detector_ids"][i],
-                        detector_params=det["detector_params_list"][i],
-                        value=det["value"],
-                        is_anomaly=is_anomaly,
-                        confidence_lower=det["confidence_lowers"][i],
-                        confidence_upper=det["confidence_uppers"][i],
-                        direction=_direction_from_metadata(metadata, is_anomaly),
-                        severity=0.0,  # not used for the recovery check
-                        detection_metadata=metadata,
-                    )
-                )
+        records = hydrate_detection_records(recent_detections)
 
         detections_by_time = self._group_by_timestamp(records)
         timestamps_sorted = sorted(detections_by_time.keys(), reverse=True)
@@ -114,7 +91,14 @@ class _RecoveryMixin(_OrchestratorBase):
         return len(blocking) == 0
 
     def _get_alert_trigger_direction(self, last_alert_timestamp: datetime) -> str | None:
-        """Return the direction of the anomaly that triggered the last alert."""
+        """Return the direction of the anomaly that triggered the last alert.
+
+        Mirrors the quorum logic that fired the alert (``_quorum_at`` with
+        no locked direction) so recovery checks the SAME direction the
+        alert was raised for — not whichever anomalous detector happens to
+        sort first. Falls back to a simple majority when the quorum can no
+        longer be reconstructed.
+        """
         if not self.internal:
             return None
 
@@ -126,14 +110,27 @@ class _RecoveryMixin(_OrchestratorBase):
         if not trigger_detections:
             return None
 
-        det = trigger_detections[0]
-        metadata_list = det.get("detection_metadata_list") or [None] * len(det["detector_ids"])
-        for i in range(len(det["detector_ids"])):
-            if not det["is_anomaly_flags"][i]:
-                continue
-            direction = _direction_from_metadata(metadata_list[i], True)
-            if direction in ("up", "down"):
-                return direction
+        records = hydrate_detection_records(trigger_detections)
+        by_time = self._group_by_timestamp(records)
+        if not by_time:
+            return None
+        latest_ts = max(by_time.keys())
+        anomalies = [d for d in by_time[latest_ts] if d.is_anomaly]
+        if not anomalies:
+            return None
+
+        # _quorum_at lives in _DecisionMixin; both mixins are combined in
+        # AlertOrchestrator, so the call resolves at runtime.
+        _, direction = self._quorum_at(anomalies, None)
+        if direction in ("up", "down"):
+            return direction
+
+        ups = sum(1 for d in anomalies if d.direction == "up")
+        downs = sum(1 for d in anomalies if d.direction == "down")
+        if ups > downs:
+            return "up"
+        if downs > ups:
+            return "down"
         return None
 
     def _build_recovery_data(

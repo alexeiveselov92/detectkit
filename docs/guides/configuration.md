@@ -357,8 +357,8 @@ interval: 1min
 query: |
   SELECT timestamp, cpu_percent AS value
   FROM system_metrics
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   ORDER BY timestamp
 
 # Or use external SQL file
@@ -368,16 +368,15 @@ query: |
 query_columns:
   timestamp: timestamp
   metric: value
-  seasonality: ["hour_of_day"]
 
 # Data loading options
 loading_start_time: "2024-01-01 00:00:00"
 loading_batch_size: 1440         # Load 1 day at a time
 
-# Seasonality extraction
+# Seasonality extraction (auto-extracted from timestamps)
 seasonality_columns:
-  - name: hour_of_day
-    extract: hour               # hour, day, dow, month, etc.
+  - hour
+  - day_of_week
 
 # Detectors
 detectors:
@@ -434,14 +433,21 @@ Time interval between data points.
 #### `query` (string, optional)
 Inline SQL query to load data.
 
-**Required placeholders**:
-- `%(from_date)s` - Start of time range (inclusive)
-- `%(to_date)s` - End of time range (exclusive)
+**Built-in template variables** (Jinja2, substituted by detectkit for every
+loading batch):
+- `{{ dtk_start_time }}` - Start of time range (inclusive), rendered as `YYYY-MM-DD HH:MM:SS`
+- `{{ dtk_end_time }}` - End of time range (exclusive), same format
+- `{{ interval_seconds }}` - Metric interval in seconds
+
+Every query must constrain its time range using `{{ dtk_start_time }}` and
+`{{ dtk_end_time }}` — otherwise incremental and batched loading cannot
+work. The rendered values are plain datetime strings, so wrap them in
+quotes in SQL.
 
 **Required columns**:
 - Timestamp column (default name: `timestamp`)
 - Metric value column (default name: `value`)
-- Optional seasonality columns
+- Optional seasonality columns (declare them in `query_columns.seasonality`)
 
 **Example**:
 ```sql
@@ -450,8 +456,8 @@ SELECT
   AVG(response_time_ms) AS value,
   EXTRACT(HOUR FROM timestamp) AS hour_of_day
 FROM api_logs
-WHERE timestamp >= %(from_date)s
-  AND timestamp < %(to_date)s
+WHERE timestamp >= '{{ dtk_start_time }}'
+  AND timestamp < '{{ dtk_end_time }}'
 GROUP BY timestamp, hour_of_day
 ORDER BY timestamp
 ```
@@ -488,7 +494,11 @@ Start timestamp for initial data load (UTC).
 
 **Format**: `"YYYY-MM-DD HH:MM:SS"`
 
-If not specified, detectkit starts from the earliest available data.
+Used only when the metric has no saved datapoints yet. If it is not set and
+no `--from` date is passed on the command line, the initial load fails with
+an error — detectkit does not guess where your data begins. Once datapoints
+exist, subsequent runs resume from the last saved timestamp and this setting
+is ignored.
 
 **Example**:
 ```yaml
@@ -506,51 +516,67 @@ loading_batch_size: 2160  # 15 days of 10-min intervals
 
 ### Seasonality Extraction
 
-#### `seasonality_columns` (list, optional)
-Extract seasonality features from timestamp for seasonal detection.
+#### `seasonality_columns` (list of strings, optional)
+Seasonality features auto-extracted from the timestamp for seasonal detection.
 
-**Available extracts**:
+**Available features**:
 - `hour`: Hour of day (0-23)
-- `day`: Day of month (1-31)
-- `dow`: Day of week (1=Monday, 7=Sunday)
+- `day_of_week`: Day of week (0=Monday, 6=Sunday)
+- `day_of_month`: Day of month (1-31)
 - `month`: Month (1-12)
-- `quarter`: Quarter (1-4)
-- `year`: Year
+- `is_weekend`: Boolean (Saturday/Sunday)
+- `is_holiday`: Boolean (holiday calendar not implemented yet — always false)
 
 **Example**:
 ```yaml
 seasonality_columns:
-  - name: hour_of_day
-    extract: hour
-
-  - name: day_of_week
-    extract: dow
+  - hour
+  - day_of_week
 ```
 
-These columns are automatically added to query results and can be used in `seasonality_components` for detectors.
+These features are stored with each datapoint and can be referenced in detector `seasonality_components`.
+
+Alternatively, return custom seasonality columns directly from the query and declare them in `query_columns.seasonality` — query-provided columns take precedence over `seasonality_columns`.
 
 ### Detectors
 
 #### `detectors` (list, required)
 List of detector configurations. Each detector independently analyzes the metric.
 
-**General structure**:
+**Full parameter set** for the windowed statistical detectors (`mad`, `zscore`, `iqr` — they share one implementation and accept identical parameters):
+
 ```yaml
 detectors:
-  - type: detector_type        # mad, zscore, iqr, manual_bounds
+  - type: mad                     # mad, zscore, iqr, manual_bounds
     params:
-      # Algorithm parameters
-      threshold: 3.0
-      window_size: 100
+      # Algorithm parameters (all participate in the detector ID)
+      threshold: 3.0              # defaults: mad 3.0, zscore 3.0, iqr 1.5
+      window_size: 100            # trailing window in points (current point excluded)
+      min_samples: 30             # min valid points in window to run detection
+      seasonality_components:     # default: null
+        - "hour"                  # single component
+        - ["hour", "day_of_week"] # or combined grouping
+      min_samples_per_group: 10   # defaults: mad 10, zscore 3, iqr 4
+      input_type: values          # values | changes | absolute_changes | log_changes
+      smoothing: null             # null | ema | sma
+      smoothing_alpha: 0.3        # EMA factor (0, 1]
+      smoothing_window: 10        # SMA window in points
+      window_weights: null        # null (uniform) | exponential | linear
+      half_life: null             # for exponential weights: age at which a point's
+                                  # weight halves; int = points or duration string ("3d")
+                                  # (default when unset: window_size / 20)
+      detrend: null               # null | linear (robust in-window detrending)
 
-      # Execution parameters
-      start_time: "2024-01-01 00:00:00"
-      batch_size: 500
-
-      # Seasonality parameters
-      seasonality_components:
-        - "hour_of_day"
+      # Execution parameters (not part of the detector ID)
+      start_time: "2024-01-01 00:00:00"   # when detection starts
+      batch_size: 500                     # detection batch size
 ```
+
+Notes:
+- MAD is scaled by the normal-consistency constant (1.4826), so `threshold` is expressed in σ-equivalents for all three detectors; `threshold: 3.0` ≈ 3-sigma.
+- Every algorithm parameter (non-default values) participates in the detector ID hash. Changing one creates a new detector ID, and detections for that detector recompute from scratch on the next run.
+- `weight_decay` (float in (0, 1)) is a deprecated alias for `half_life`; the two are mutually exclusive.
+- Parameters are validated when the detector is constructed at the start of the detect step — invalid `input_type`, `smoothing`, `window_weights`, `detrend` or `half_life` values fail fast for that run with a clear error (not at config load).
 
 See [Detectors Guide](detectors.md) for detailed detector documentation.
 
@@ -569,12 +595,13 @@ alerting:
     - slack_critical
 
   # Anomaly filtering
-  min_detectors: 1               # Min detectors that must agree (default: 1)
+  min_detectors: 1               # Detectors that must satisfy the quorum per point (default: 1)
   direction: "same"              # "same", "any", "up", "down" (default: "same")
-  consecutive_anomalies: 3       # Consecutive anomalies to trigger (default: 3)
+  consecutive_anomalies: 3       # Consecutive quorum points to trigger (default: 3)
 
   # Alert cooldown - Prevent spam from persistent anomalies
-  alert_cooldown: "30min"        # Minimum time between alerts (default: null)
+  alert_cooldown: "30min"        # Minimum time between alerts
+                                 # (default: null = re-alert on EVERY run!)
   cooldown_reset_on_recovery: true  # Reset cooldown when metric recovers (default: true)
 
   # Recovery notifications
@@ -589,25 +616,39 @@ alerting:
   template_no_data: null         # Custom no-data message template
 
   # Custom templates
-  template_single: null          # Custom single anomaly template
-  template_consecutive: null     # Custom consecutive anomalies template
+  template_single: null          # Used when consecutive_count <= 1
+  template_consecutive: null     # Used for streaks (falls back to template_single)
 ```
 
-**Alert filtering options**:
+**Alert filtering options** (see the [Alerting Guide](alerting.md#alert-filtering) for the full contract):
 
-- **`min_detectors`**: How many detectors must agree
-  - `1` = Any detector triggers alert
-  - `2` = At least 2 detectors must agree
+- **`min_detectors`**: How many detectors must satisfy the direction
+  policy at every point in the consecutive chain
+  - `1` = One qualifying detector is enough
+  - `2` = At least 2 detectors must qualify at each point
 
-- **`direction`**: Required anomaly direction
-  - `"same"` = All detectors must agree on direction (all above or all below)
-  - `"any"` = Any direction is acceptable
-  - `"up"` = Only alert on values above confidence interval
-  - `"down"` = Only alert on values below confidence interval
+- **`direction`**: Which anomalies count toward the quorum
+  - `"same"` (default) = At least `min_detectors` detectors must agree
+    on ONE direction at the latest point (up and down counted
+    separately — disagreement is not consensus). The winning direction
+    is locked for the whole consecutive chain.
+  - `"any"` = Every anomaly counts regardless of direction (1 up + 1
+    down satisfies `min_detectors: 2`)
+  - `"up"` = Only anomalies above the confidence interval count;
+    "down" anomalies are ignored (they neither help nor block)
+  - `"down"` = Only anomalies below the confidence interval count
 
-- **`consecutive_anomalies`**: Consecutive points required
+- **`consecutive_anomalies`**: Consecutive quorum points required
   - `1` = Alert on first anomaly
   - `3` = Alert after 3 consecutive anomalies (reduces false positives)
+  - Points must be exactly one metric interval apart — a gap in the
+    detection grid breaks the chain
+
+- **`alert_cooldown`**: Minimum time between alerts (e.g., `"2h"`, `1800`)
+  - `null` (default) = no cooldown: a persisting anomaly re-alerts on
+    every `dtk run`. Set a cooldown for production metrics.
+  - No-data alerts and anomaly alerts share the same cooldown state per
+    alert config block.
 
 - **`notify_on_recovery`**: Send notification when metric returns to normal
   - `false` = No recovery notifications (default)
@@ -682,8 +723,8 @@ query: |
     timestamp,
     error_count AS value
   FROM logs
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   ORDER BY timestamp
 
 detectors:
@@ -705,6 +746,7 @@ name: website_traffic
 interval: 10min
 query_file: sql/traffic.sql
 
+# The query itself returns the seasonality columns
 query_columns:
   timestamp: period_time
   metric: visitor_count
@@ -714,12 +756,6 @@ query_columns:
 
 loading_start_time: "2024-01-01 00:00:00"
 loading_batch_size: 2160  # 15 days
-
-seasonality_columns:
-  - name: hour_of_day
-    extract: hour
-  - name: day_of_week
-    extract: dow
 
 detectors:
   - type: mad
@@ -731,6 +767,8 @@ detectors:
       seasonality_components:
         - ["hour_of_day", "day_of_week"]
       min_samples_per_group: 10
+      window_weights: exponential  # favor recent data...
+      half_life: "3d"              # ...so gradual trends don't cause alert spam
 
 alerting:
   enabled: true
@@ -750,8 +788,8 @@ interval: 30s
 query: |
   SELECT timestamp, cpu_percent AS value
   FROM system_metrics
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   ORDER BY timestamp
 
 detectors:

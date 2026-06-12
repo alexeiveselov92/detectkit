@@ -95,12 +95,17 @@ class EmailChannel(BaseAlertChannel):
         self.subject_template = subject_template
         self.template = template
 
-    def send(self, alert_data: AlertData) -> None:
+    def send(self, alert_data: AlertData, template: str | None = None) -> bool:
         """
         Send alert via email.
 
         Args:
             alert_data: Alert information to send
+            template: Per-call template override (falls back to the
+                channel-level template, then the built-in default)
+
+        Returns:
+            True when the email was handed to the SMTP server
 
         Raises:
             smtplib.SMTPException: If email sending fails
@@ -108,7 +113,7 @@ class EmailChannel(BaseAlertChannel):
         Example:
             >>> channel.send(alert_data)
         """
-        message_body = self.format_message(alert_data, self.template)
+        message_body = self.format_message(alert_data, template or self.template)
 
         # Create email message
         msg = MIMEMultipart("alternative")
@@ -137,6 +142,8 @@ class EmailChannel(BaseAlertChannel):
 
         except smtplib.SMTPException as e:
             raise smtplib.SMTPException(f"Failed to send email alert: {e}") from e
+
+        return True
 
     def format_mentions(self, mentions: list[str]) -> str:
         """

@@ -87,14 +87,16 @@ Edit `metrics/api_response_time.yml`:
 name: api_response_time
 interval: 5min
 
-# SQL query to load data
+# SQL query to load data.
+# Built-in template variables: {{ dtk_start_time }}, {{ dtk_end_time }}
+# (rendered as 'YYYY-MM-DD HH:MM:SS' strings) and {{ interval_seconds }}.
 query: |
   SELECT
     timestamp,
     AVG(response_time_ms) AS value
   FROM api_logs
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -116,8 +118,9 @@ alerting:
   enabled: true
   channels:
     - mattermost_ops
-  consecutive_anomalies: 3  # Fixed: was consecutive_threshold
-  alert_cooldown: "30min"   # v0.3.0: Prevent alert spam
+  consecutive_anomalies: 3  # Require 3 anomalies in a row
+  alert_cooldown: "30min"   # Recommended: without it a persisting
+                            # anomaly re-alerts on every run
 ```
 
 ## Step 4: Configure Alert Channel
@@ -197,8 +200,8 @@ query: |
     toStartOfMinute(timestamp) AS timestamp,
     countIf(status >= 500) / count() AS value
   FROM http_requests
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -219,8 +222,8 @@ query: |
     timestamp,
     avg_cpu_percent AS value
   FROM system_metrics
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   ORDER BY timestamp
 
 detectors:
@@ -241,8 +244,8 @@ query: |
     toDate(timestamp) AS timestamp,
     uniqExact(user_id) AS value
   FROM user_events
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -296,7 +299,7 @@ dtk run --select api_response_time --from "2024-01-01 00:00:00"
 
 ```bash
 # Preview alert message without real anomalies
-dtk test-alert --metric api_response_time
+dtk test-alert api_response_time
 ```
 
 ### Clear a Stuck Lock
@@ -316,9 +319,10 @@ its own — `dtk unlock` just does it right away.
 Now that you have a working metric:
 
 1. **Add seasonality** - [MAD Detector with Seasonality](../reference/detectors/mad.md#with-seasonality-single-component)
-2. **Configure multiple detectors** - [Detectors Guide](../guides/detectors.md)
-3. **Set up multiple channels** - [Alerting Guide](../guides/alerting.md)
-4. **Explore examples** - [Examples](../examples/)
+2. **Handle trending metrics** - `window_weights: exponential` + `half_life`, or `detrend: linear` ([Detectors Guide](../guides/detectors.md))
+3. **Configure multiple detectors** - [Detectors Guide](../guides/detectors.md)
+4. **Set up multiple channels** - [Alerting Guide](../guides/alerting.md)
+5. **Explore examples** - [Examples](../examples/)
 
 ## Troubleshooting
 

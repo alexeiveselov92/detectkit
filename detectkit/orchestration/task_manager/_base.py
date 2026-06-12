@@ -6,11 +6,7 @@ from datetime import datetime
 
 from detectkit.alerting.channels.base import BaseAlertChannel
 from detectkit.alerting.channels.factory import AlertChannelFactory
-from detectkit.alerting.orchestrator import (
-    DetectionRecord,
-    _direction_from_metadata,
-    _parse_detection_metadata,
-)
+from detectkit.alerting.orchestrator import DetectionRecord, hydrate_detection_records
 from detectkit.database.internal_tables import InternalTablesManager
 
 
@@ -53,37 +49,7 @@ class _TaskManagerBase:
         if not results:
             return []
 
-        records: list[DetectionRecord] = []
-        # SQL returns timestamps DESC; iterate reversed so output is oldest→newest
-        # (recovery code reads ``detections[-1]`` to find the latest point).
-        for row in reversed(results):
-            metadata_list = row.get("detection_metadata_list") or [None] * len(row["detector_ids"])
-            for i in range(len(row["detector_ids"])):
-                is_anomaly = bool(row["is_anomaly_flags"][i])
-                metadata = _parse_detection_metadata(metadata_list[i])
-                direction = _direction_from_metadata(metadata, is_anomaly)
-                try:
-                    severity = float(metadata.get("severity", 0.0) or 0.0)
-                except (TypeError, ValueError):
-                    severity = 0.0
-
-                records.append(
-                    DetectionRecord(
-                        timestamp=row["timestamp"],
-                        detector_name=row["detector_names"][i],
-                        detector_id=row["detector_ids"][i],
-                        detector_params=row["detector_params_list"][i],
-                        value=row["value"],
-                        is_anomaly=is_anomaly,
-                        confidence_lower=row["confidence_lowers"][i],
-                        confidence_upper=row["confidence_uppers"][i],
-                        direction=direction,
-                        severity=severity,
-                        detection_metadata=metadata,
-                    )
-                )
-
-        return records
+        return hydrate_detection_records(results)
 
     def _create_alert_channels(self, channel_names: list[str]) -> list[BaseAlertChannel]:
         """Resolve channel names against the loaded profiles config."""

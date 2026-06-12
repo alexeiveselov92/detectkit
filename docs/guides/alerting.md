@@ -21,24 +21,38 @@ detectkit's alerting system:
    └─> Detects anomalies in recent data
 
 2. Alert Step
-   ├─> Load N most recent detection results
-   ├─> Check if conditions met:
-   │   ├─> Consecutive anomalies ≥ threshold
-   │   ├─> Direction matches (if specified)
-   │   └─> Min detectors agree (if multiple)
+   ├─> Load the most recent detection results
+   ├─> Per timestamp: check the quorum —
+   │   at least min_detectors anomalies matching the direction policy
+   ├─> Require consecutive_anomalies quorum points,
+   │   each exactly one interval apart (a grid gap breaks the chain)
    └─> Send alert through configured channels
 ```
 
 ### Key Concepts
 
-**Consecutive Anomalies**: Requires N consecutive points to be anomalous before alerting.
+**Quorum**: at a given timestamp, the set of anomalous detections that
+match the `direction` policy. A timestamp counts toward an alert only
+when at least `min_detectors` detections qualify. See
+[Alert Filtering](#alert-filtering) for the exact rules per direction.
 
-**Example** with `consecutive_anomalies: 3`:
+**Consecutive Anomalies**: the latest `consecutive_anomalies` timestamps
+must each satisfy the quorum AND be exactly one metric interval apart.
+
+**Example** with `consecutive_anomalies: 3` (10-min interval):
 ```
-Point 1: Anomaly ✓
-Point 2: Anomaly ✓
-Point 3: Anomaly ✓  → Alert sent!
-Point 4: Normal  ✗  → Reset counter
+10:00 Quorum ✓
+10:10 Quorum ✓
+10:20 Quorum ✓  → Alert sent!
+10:30 Normal ✗  → chain reset
+```
+
+A gap in the detection grid (missing detection row) breaks the chain:
+```
+10:00 Quorum ✓
+10:10 (no detection row)
+10:20 Quorum ✓
+10:30 Quorum ✓  → only 2 consecutive points, no alert
 ```
 
 **Recent Data Only**: Alerts check only the most recent points, not historical data.
@@ -65,9 +79,10 @@ alerting:
 ```
 
 This uses defaults:
-- `consecutive_anomalies: 3` - Requires 3 consecutive anomalies
-- `min_detectors: 1` - Any detector can trigger
-- `direction: "same"` - All detectors must agree on direction
+- `consecutive_anomalies: 3` - Requires 3 consecutive anomalous points
+- `min_detectors: 1` - One detector is enough
+- `direction: "same"` - The detectors forming the quorum must agree on one direction
+- `alert_cooldown: null` - No cooldown: a persisting anomaly re-alerts on every `dtk run` (set a cooldown for production metrics)
 
 ### Complete Configuration
 
@@ -83,16 +98,19 @@ alerting:
     - email_team
 
   # Filtering
-  min_detectors: 1               # Min detectors that must agree
+  min_detectors: 1               # Detectors that must satisfy the quorum per point
   direction: "same"              # "same", "any", "up", "down"
-  consecutive_anomalies: 3       # Consecutive points required
+  consecutive_anomalies: 3       # Consecutive quorum points required
+
+  # Cooldown (default null = re-alert on EVERY run while anomaly persists)
+  alert_cooldown: "2h"
 
   # Special alerts
   no_data_alert: false           # Alert on missing data
 
   # Custom templates
-  template_single: null          # Custom template file
-  template_consecutive: null     # Custom template file
+  template_single: null          # Used when consecutive_count <= 1
+  template_consecutive: null     # Used for streaks; each falls back to the other
 ```
 
 ## Alert Channels
@@ -243,9 +261,18 @@ Each config is evaluated and sent independently. Single dict format (backward-co
 
 ## Alert Filtering
 
+The three conditions combine into one contract:
+
+1. At every timestamp, detections from all detectors are grouped together.
+2. A timestamp satisfies the **quorum** when at least `min_detectors`
+   anomalies match the `direction` policy.
+3. An alert fires when the latest `consecutive_anomalies` timestamps each
+   satisfy the quorum AND sit on a contiguous interval grid (each point
+   exactly one metric interval after the previous — gaps break the chain).
+
 ### Consecutive Anomalies
 
-Require N consecutive anomalous points before alerting.
+Require N consecutive quorum-satisfying points before alerting.
 
 ```yaml
 alerting:
@@ -254,32 +281,51 @@ alerting:
   consecutive_anomalies: 5   # Alert after 5 consecutive (conservative)
 ```
 
+The points must be **grid-adjacent**: a missing detection row between two
+anomalies (e.g. a day without runs, or a detector `start_time` boundary)
+breaks the chain — anomalies separated by gaps are never counted as
+consecutive.
+
 **Use cases**:
 - `1` - Critical metrics (errors should be 0)
 - `3` - Standard (good balance)
 - `5+` - Noisy metrics or high false-positive cost
 
-### Direction Matching
+### Direction Policy
 
-Control which anomaly directions trigger alerts.
+Controls which anomalies count toward the quorum.
 
 ```yaml
 alerting:
-  direction: "any"    # Alert on any anomaly (above or below)
-  direction: "same"   # All detectors must agree on direction
-  direction: "up"     # Only alert when value is above bounds
-  direction: "down"   # Only alert when value is below bounds
+  direction: "same"   # Quorum must agree on ONE direction (default)
+  direction: "any"    # Every anomaly counts, regardless of direction
+  direction: "up"     # Only anomalies above the interval count
+  direction: "down"   # Only anomalies below the interval count
 ```
 
+- **`"up"` / `"down"`**: only anomalies in that direction count toward
+  `min_detectors`. Detectors firing the other way are ignored — they
+  neither help nor block the quorum.
+- **`"any"`**: every anomaly counts; one up-anomaly plus one
+  down-anomaly together satisfy `min_detectors: 2`.
+- **`"same"`** (default): at the latest point, at least `min_detectors`
+  detectors must agree on ONE direction. Up- and down-anomalies are
+  counted separately — disagreement is not consensus. If both directions
+  independently reach quorum, the side with more detectors wins; ties go
+  to the more severe side. The winning direction is then **locked for
+  the whole consecutive chain**: every older point must satisfy the
+  quorum in that same direction.
+
 **Use cases**:
-- `"any"` - Most metrics (any deviation matters)
-- `"same"` - Multiple detectors (reduce false positives)
+- `"same"` - Multiple detectors (reduce false positives, default)
+- `"any"` - Most single-detector metrics (any deviation matters)
 - `"up"` - CPU usage, error rates (high is bad, low is good)
 - `"down"` - Cache hit rate, uptime (low is bad, high is good)
 
 ### Multiple Detector Agreement
 
-With multiple detectors, control how many must agree:
+`min_detectors` is how many detectors must satisfy the direction policy
+at **every** point in the consecutive chain:
 
 ```yaml
 detectors:
@@ -291,13 +337,36 @@ detectors:
       threshold: 3.0
 
 alerting:
-  min_detectors: 1  # Any detector triggers alert
-  min_detectors: 2  # Both detectors must agree
+  min_detectors: 1  # One qualifying detector per point is enough
+  min_detectors: 2  # Both detectors must qualify at each point
 ```
 
 **Use cases**:
 - `1` - High recall (catch more anomalies, some false positives)
 - `N` (all) - High precision (fewer false positives, may miss some)
+
+### Worked Examples
+
+Two detectors A and B, `min_detectors: 2`, both anomalous at the latest
+point:
+
+| `direction` | A says | B says | Result |
+|---|---|---|---|
+| `same` | up | down | **No alert** — disagreement is not consensus |
+| `same` | up | up | Quorum met; direction "up" locked for the chain |
+| `up` | up | down | **No quorum** — only one "up" anomaly, needs 2 ups |
+| `up` | up | up | Quorum met |
+| `down` | up | up | **No quorum** — "up" anomalies are ignored, never blocking |
+| `any` | up | down | Quorum met — every anomaly counts |
+
+### Alert Payload
+
+The message is built from the **highest-severity** detection of the
+latest quorum (ties broken by detector name, so the choice is
+deterministic): value, confidence interval and timestamp come from that
+record. For multi-detector alerts, `{detector_name}` renders as
+`"N detectors"`, `{severity}` is the maximum across the quorum, and
+per-detector metadata is included.
 
 ### Combined Filtering Example
 
@@ -311,19 +380,23 @@ detectors:
       threshold: 2.5
 
 alerting:
-  min_detectors: 2         # Both must agree
-  direction: "same"         # Must agree on direction
-  consecutive_anomalies: 3  # 3 consecutive points
+  min_detectors: 2          # Both must qualify at each point
+  direction: "same"         # ...and agree on one direction
+  consecutive_anomalies: 3  # ...for 3 grid-adjacent points
 ```
 
 This creates a **very conservative** alert:
-- Both detectors must detect anomaly
-- Both must say "above" or both say "below"
-- Must persist for 3 consecutive points
+- Both detectors must report an anomaly
+- Both must fire in the same direction (both "up" or both "down")
+- That must hold for 3 consecutive, gap-free points
 
 ## Alert Cooldown (Spam Prevention)
 
-**New in v0.3.0** - Prevent alert fatigue from persistent anomalies with cooldown periods.
+Prevent alert fatigue from persistent anomalies with cooldown periods.
+
+**Default is `null` — no cooldown.** Without a cooldown, a persisting
+anomaly re-alerts on **every** `dtk run` for as long as the conditions
+hold. Set `alert_cooldown` (e.g. `"2h"`) for production metrics.
 
 ### The Problem: Alert Spam
 
@@ -351,10 +424,15 @@ alerting:
     - mattermost_ops
   consecutive_anomalies: 3
 
-  # NEW: Cooldown configuration
+  # Cooldown configuration
   alert_cooldown: "30min"              # Minimum 30 minutes between alerts
   cooldown_reset_on_recovery: true     # Reset timer when metric recovers
 ```
+
+Cooldown state is stored per alert config block (in the
+`_dtk_alert_states` table). Within one block, **no-data alerts and
+anomaly alerts share the same cooldown state**: either kind of alert
+starts the cooldown for both.
 
 ### Cooldown Behavior
 
@@ -563,8 +641,13 @@ alerting:
 Recovery notification is sent when **all** of the following are true:
 
 1. A previous anomaly alert was sent for this metric
-2. The metric has returned to normal (consecutive anomalies below threshold)
+2. The metric has returned to normal (no blocking anomalies at the latest point)
 3. A recovery notification has not already been sent for this incident
+
+Recovery is **direction-aware**: only anomalies matching the alert's
+direction block recovery. For example, after a "down" alert a fresh "up"
+anomaly does not prevent the recovery notification — the original alert
+condition no longer holds.
 
 ```
 Timeline with notify_on_recovery: true and consecutive_anomalies: 3:
@@ -630,8 +713,8 @@ query: |
     timestamp,
     quantile(0.95)(response_time_ms) as value
   FROM http_requests
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -672,17 +755,17 @@ alerting:
 2. **Enable recovery notifications**: `notify_on_recovery: true` is recommended for critical metrics
 3. **Tune cooldown duration**: Match to your team's response time (15min - 1hour typical)
 4. **Adjust for interval**: Faster intervals need longer cooldowns
-5. **Monitor alert frequency**: Track via `_dtk_tasks.alert_count` in database
+5. **Monitor alert frequency**: Track via `_dtk_alert_states.alert_count` in database
 6. **Use strict mode sparingly**: Only for very noisy experimental metrics
 
-> **Note**: When upgrading from a previous version, the `last_recovery_sent` column must be added manually to the `_dtk_tasks` table:
-> ```sql
-> ALTER TABLE _dtk_tasks ADD COLUMN last_recovery_sent Nullable(DateTime64(3, 'UTC'));
-> ```
+> **Note**: Alert state (last alert/recovery timestamps, alert counter)
+> lives in the `_dtk_alert_states` table, keyed by metric and alert
+> config block. The table is created automatically — no manual migration
+> needed.
 
 ### Disabling Cooldown
 
-Omit `alert_cooldown` or set to `null`:
+Omit `alert_cooldown` or set to `null` (this is the default):
 
 ```yaml
 alerting:
@@ -690,10 +773,12 @@ alerting:
   channels:
     - mattermost_ops
   consecutive_anomalies: 3
-  # No alert_cooldown = alert every time conditions met
+  # No alert_cooldown = alert on EVERY run while conditions hold
 ```
 
-**Warning**: Without cooldown, you may receive many duplicate alerts for persistent anomalies.
+**Warning**: Without a cooldown, a persistent anomaly fires a duplicate
+alert on every `dtk run` (e.g. every cron tick). Setting `alert_cooldown`
+is recommended for production metrics.
 
 ## Missing Data Alerts (v0.5.0)
 
@@ -721,7 +806,8 @@ At the alert step, after the regular anomaly check, detectkit:
 `min_detectors` and `consecutive_anomalies` **do not apply** to no-data
 — missing data is a single binary metric-level signal, not a
 per-detector vote. The check honours `alert_cooldown` and
-`suppress_until` like anomaly alerts.
+`suppress_until` like anomaly alerts; no-data and anomaly alerts share
+the same cooldown state within an alert config block.
 
 ### Configuration
 
@@ -995,16 +1081,13 @@ Override default alert message format.
 ### Default Template
 
 ```
-⚠️ Anomaly Detected: {metric_name}
-
-Value: {value}
-Expected: {confidence_lower} - {confidence_upper}
-Severity: {severity}
-Direction: {direction}
+Anomaly detected in metric: {metric_name}
+{description_line}Time: {timestamp}
+Value: {value} | CI: {confidence_interval}
+Direction: {direction} | Severity: {severity:.2f} | Consecutive: {consecutive_count}
 Detector: {detector_name}
-
-Timestamp: {timestamp} ({timezone})
-Consecutive: {consecutive_count} points
+Parameters: {detector_params}
+{mentions_line}
 ```
 
 ### Creating Custom Template
@@ -1048,9 +1131,9 @@ alerting:
 | `value_display` | NaN-safe string version — always renders, falls back to `"no data"` | all (v0.5.0) |
 | `confidence_lower` / `confidence_upper` | Bounds of confidence interval | anomaly, recovery |
 | `confidence_interval` | Formatted as `[lower, upper]` or `"N/A"` | all |
-| `detector_name` | Detector that triggered (e.g., `"MADDetector:threshold=3.0"`) | anomaly, recovery |
-| `severity` | Severity score (how far from bounds) | anomaly |
-| `direction` | `"above"` or `"below"` | anomaly |
+| `detector_name` | Detector that triggered (e.g., `"MADDetector:threshold=3.0"`); `"N detectors"` when several detectors formed the quorum | anomaly, recovery |
+| `severity` | Severity score; max across the quorum for multi-detector alerts | anomaly |
+| `direction` | `"up"` or `"down"` | anomaly |
 | `consecutive_count` | Number of consecutive anomalies | anomaly |
 | `status` | `"ANOMALY"`, `"RECOVERED"`, `"NO_DATA"`, or `"ERROR"` | all (v0.5.0 added NO_DATA / ERROR) |
 | `error_type` / `error_message` | Exception details | error only (v0.5.0) |
@@ -1065,11 +1148,14 @@ alerting:
 
 ### Template Types
 
-- **`template_single`** - Used for first anomaly in sequence
-- **`template_consecutive`** - Used for consecutive anomalies (default: same as single)
+- **`template_single`** - Used when the alert has `consecutive_count` ≤ 1
+  (i.e. `consecutive_anomalies: 1` configs)
+- **`template_consecutive`** - Used for streaks (`consecutive_count` > 1)
+- `template_single` and `template_consecutive` fall back to each other
+  when only one is set
 - **`template_recovery`** - Used for recovery notifications
-- **`template_no_data`** - Used for no-data alerts (v0.5.0)
-- **`error_alerting.template`** - Used for project-level pipeline errors (v0.5.0, in `detectkit_project.yml`)
+- **`template_no_data`** - Used for no-data alerts
+- **`error_alerting.template`** - Used for project-level pipeline errors (in `detectkit_project.yml`)
 
 ## Testing Alerts
 
@@ -1079,22 +1165,18 @@ Test alert configuration without waiting for real anomalies.
 
 ```bash
 cd my_project
-dtk test-alert --metric api_response_time
+dtk test-alert api_response_time
 ```
 
 This sends a mock alert through configured channels with fake data:
 
 ```
-⚠️ Anomaly Detected: api_response_time
-
-Value: 0.8532
-Expected: 0.4521 - 0.6234
-Severity: 4.52
-Direction: above
+Anomaly detected in metric: api_response_time
+Time: 2026-06-12 14:30:00
+Value: 0.8532 | CI: [0.4521, 0.6234]
+Direction: above | Severity: 4.52 | Consecutive: 3
 Detector: MADDetector:threshold=3.0
-
-Timestamp: 2024-03-15 14:30:00 UTC
-Consecutive: 3 points
+Parameters: {"threshold": 3.0, "window_size": 8640}
 ```
 
 **Use cases**:
@@ -1161,14 +1243,13 @@ alerting:
 name: office_occupancy
 
 seasonality_columns:
-  - name: hour
-    extract: hour
+  - hour
 
 detectors:
   - type: mad
     params:
       threshold: 3.0
-      # Only anomalies during 9-18 hours will be meaningful
+      # Per-hour statistics make 9-18h anomalies meaningful
       seasonality_components:
         - "hour"
 
@@ -1197,7 +1278,7 @@ alerting:
 dtk run --select my_metric --steps detect
 
 # Test alert channel
-dtk test-alert --metric my_metric
+dtk test-alert my_metric
 ```
 
 ### Alerts Not Reaching Channel
@@ -1300,7 +1381,7 @@ alerting:
 
 ```bash
 # Always test before deploying
-dtk test-alert --metric new_metric
+dtk test-alert new_metric
 ```
 
 ### 5. Monitor Alert Volume

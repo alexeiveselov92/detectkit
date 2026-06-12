@@ -3,6 +3,8 @@
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
+import numpy as np
+
 from detectkit.config.metric_config import MetricConfig
 from detectkit.orchestration.task_manager import PipelineStep, TaskManager, TaskStatus
 
@@ -220,13 +222,14 @@ class TestTaskManager:
         assert "Database connection error" in result["error"]
         assert result["steps_completed"] == []
 
-        # Verify lock was released even on error (with new API signature)
+        # The lock must be released with the FAILED status and the error
+        # message so _dtk_tasks reflects what actually happened.
         internal_manager.release_lock.assert_called_once_with(
             metric_name="cpu_usage",
             detector_id="pipeline",
             process_type="pipeline",
-            status="completed",
-            error_message=None,
+            status="failed",
+            error_message="Exception: Database connection error",
         )
 
     def test_run_load_step(self):
@@ -457,5 +460,10 @@ class TestLoadRecentDetections:
             num_points=2,
         )
 
-        assert [r.timestamp for r in records] == [older, newer]
+        # Hydration normalizes timestamps to naive-UTC datetime64[ms]
+        expected = [
+            np.datetime64(older.replace(tzinfo=None), "ms"),
+            np.datetime64(newer.replace(tzinfo=None), "ms"),
+        ]
+        assert [r.timestamp for r in records] == expected
         assert records[-1].value == 15.0  # newest is last (recovery contract)

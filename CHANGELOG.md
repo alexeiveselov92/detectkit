@@ -5,6 +5,125 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-06-12
+
+Major detector and alerting overhaul. Detector IDs change for many configs
+(see Migration below) — affected detectors recompute detections on the next
+run, which is safe and intended.
+
+### Added
+- **`half_life` parameter for recency weighting** (mad/zscore/iqr). With
+  `window_weights: exponential`, a point's weight halves every `half_life`
+  points — accepts an int (points) or a duration string (`"3d"`, `"12h"`,
+  converted via the metric's grid step). Defaults to `window_size / 20`.
+  Replaces `weight_decay` (still accepted, deprecated: decay `d` ≡
+  half_life `ln(0.5)/ln(d)` points; the old default 0.95 ≈ 13.5 points was
+  so aggressive that detectors adapted to real incidents within hours).
+- **`detrend: linear` parameter** (mad/zscore/iqr). Estimates a robust
+  linear trend over the window (split-median slope) and projects window
+  points to the current point before computing statistics, so a gradually
+  trending metric no longer drifts out of its own confidence interval while
+  sharp deviations from the trend are still caught. In the reference
+  trend-spam simulation (60-day window, daily seasonality, −15% gradual
+  decline over 30 days): 1557 false "below" alerts → 26 with
+  `half_life: "3d"`, → 19 combined with `detrend: linear`; a sharp −40%
+  incident is still caught at every point.
+- **Time-aware weighting.** Weights now depend on a point's age on the time
+  grid, not its position among valid points: data gaps no longer compress
+  the decay, and seasonality-group statistics share the same recency horizon
+  as global statistics (the horizon mismatch was the main reason weighting
+  "barely helped" trending metrics before).
+- **`ess` metadata field** (Kish effective sample size) on weighted
+  detections and **`trend_slope_per_point`** on detrended ones.
+- New test suites: weighted statistics, shared windowed-detector behavior
+  (weights, detrend, validation, hashing), multi-detector decision matrix,
+  channel send contract (+89 tests).
+
+### Changed
+- **MAD threshold is now in σ-equivalents.** MAD is scaled by the
+  normal-consistency constant 1.4826, so `threshold: 3.0` genuinely means
+  ~3-sigma (≈0.27% false positives on Gaussian noise) like Z-Score. Raw
+  3×MAD was only ≈2σ and fired on ~4.3% of perfectly normal points — the
+  main source of baseline alert noise. MAD severity is in σ-equivalents too.
+- **Multi-detector alert contract is now direction-aware and deterministic**
+  (`min_detectors` × `direction` × `consecutive_anomalies`):
+  - `up`/`down`: only anomalies in that direction count toward the quorum;
+  - `any`: every anomaly counts regardless of direction;
+  - `same`: at least `min_detectors` detectors must agree on ONE direction
+    at the latest point (an up + a down detector is no longer "consensus");
+    the winning direction locks for the whole consecutive chain.
+  - Consecutive points must be exactly one interval apart — detection gaps
+    no longer count as "consecutive".
+  - The alert payload comes from the highest-severity quorum record (ties
+    broken by detector name) instead of arbitrary SQL ordering.
+- **Every result-affecting detector parameter now feeds the detector ID**
+  (`seasonality_components`, `min_samples_per_group`, `smoothing_alpha`,
+  `smoothing_window`, `window_weights`, `half_life`, `weight_decay`,
+  `detrend`). Previously tuning e.g. `weight_decay` silently mixed old and
+  new detection regimes under one ID.
+- **Severity is now one convention for all windowed detectors**: distance
+  beyond the violated bound in spread units (σ-equivalents for MAD and
+  Z-Score, IQR units for IQR; 0 = at the bound). Z-Score previously
+  reported the point's |z| (≥ threshold at the bound), which made
+  cross-detector severities incomparable in multi-detector alerts.
+- MAD/Z-Score/IQR collapsed into one shared `WindowedStatDetector`
+  template (~1250 duplicated lines removed); behavior is identical across
+  the three for windowing, preprocessing, weighting, detrending and
+  seasonality.
+- Detector parameters are fully validated at construction: bad
+  `input_type`, `smoothing`, `window_weights`, `detrend`, `half_life`
+  values fail fast with a clear error instead of mid-detection.
+- `template_single` is now actually used (alerts with
+  `consecutive_count ≤ 1`); `template_consecutive` covers streaks; each
+  falls back to the other when unset.
+- `AlertConditions` dataclass defaults (direct API) now match the YAML
+  defaults: `direction="same"`, `consecutive_anomalies=3`.
+- Internal version is unified: `pyproject.toml` reads
+  `detectkit.__version__`; `dtk --version` reports the real version
+  (was hardcoded `0.1.0` while `__init__` said `0.5.3` and pyproject
+  `0.6.0`).
+
+### Fixed
+- **Telegram and Email channels could never deliver an alert** through the
+  orchestrator: their `send()` signatures didn't accept the template
+  argument, so every dispatch raised `TypeError` (and was swallowed as a
+  failed channel). Both now follow the channel contract and return success.
+- **Failed runs were recorded as `status='completed'`** with no error
+  message in `_dtk_tasks`; they are now recorded as `failed` with the error.
+- **Query-provided seasonality shifted onto wrong timestamps** whenever gap
+  filling inserted rows mid-range (padding was appended at the end); it is
+  now realigned by timestamp.
+- **Seasonality grouping silently became a no-op** when seasonality data
+  arrived as numpy unicode strings with orjson installed (`json_loads`
+  rejected `numpy.str_`, the error was swallowed, and the group mask matched
+  the whole window). Parsing now coerces string types.
+- EMA smoothing no longer poisons the whole series when it starts with NaN.
+- `get_context_size()` now includes the smoothing warm-up, so batched
+  detection with smoothing is deterministic across batch boundaries.
+- `weighted_percentile` uses the midpoint (Hazen) convention — with uniform
+  weights the median now matches `np.median` exactly (the old interpolation
+  was biased).
+- `weighted_std(ddof=1)` no longer explodes when the effective sample size
+  is ≤ 1.
+- IQR seasonality multipliers can no longer produce an inverted interval.
+- Two alert channels of the same type no longer collapse into one dispatch
+  result entry.
+
+### Migration
+- Detector IDs change for ALL mad/zscore/iqr detectors: the shared
+  implementation carries an algorithm-version tag (`@v2`: σ-equivalent MAD,
+  Hazen-midpoint weighted percentiles, unified severity), and additionally
+  any non-default `seasonality_components`, `min_samples_per_group`,
+  smoothing or weighting parameters now feed the hash. Affected detectors
+  recompute from scratch on the next run (rows under old IDs remain;
+  `--full-refresh` purges them).
+- MAD users: intervals widen ×1.4826 by design. If you raised `threshold`
+  to fight noise, try lowering it back toward 3.0.
+- `direction: same` with `min_detectors ≥ 2` now requires true directional
+  consensus and may alert less than the old (buggy) behavior.
+- Persisting anomalies still re-alert on every run unless `alert_cooldown`
+  is set — recommended for production metrics (e.g. `alert_cooldown: "2h"`).
+
 ## [0.6.0] - 2026-05-26
 
 ### Fixed

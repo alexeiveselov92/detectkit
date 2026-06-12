@@ -11,6 +11,7 @@
 
 - **Pure numpy arrays** — no pandas dependency in core logic
 - **Statistical detectors** — Z-Score, MAD, IQR, Manual Bounds
+- **Trend & seasonality handling** — seasonality grouping, recency weighting (`half_life`), robust linear detrending for slowly drifting metrics
 - **Multi-channel alerting** — Mattermost, Slack, Telegram, Email, Webhook
 - **@mentions** — tag users/groups in alerts, each channel formats natively
 - **Alert lifecycle** — consecutive anomalies, cooldown, recovery notifications, no-data alerts
@@ -63,14 +64,16 @@ query: |
     toStartOfInterval(timestamp, INTERVAL 5 MINUTE) AS timestamp,
     countIf(status_code >= 500) / count() * 100 AS value
   FROM http_requests
-  WHERE timestamp >= %(from_date)s AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}' AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp ORDER BY timestamp
 
 detectors:
   - type: mad
     params:
-      threshold: 3.0
-      window_size: 2016    # 7 days
+      threshold: 3.0                 # in sigma-equivalents
+      window_size: 2016              # 7 days of 5-min points
+      window_weights: exponential    # optional: favor recent data
+      half_life: "1d"                # weight halves every day of age
 
 alerting:
   enabled: true

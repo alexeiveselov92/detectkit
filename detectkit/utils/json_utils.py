@@ -26,9 +26,17 @@ def json_dumps_sorted(obj: Any) -> str:
 
 
 def json_loads(value: str | bytes) -> Any:
-    """Parse a JSON document, preferring orjson for speed."""
+    """Parse a JSON document, preferring orjson for speed.
+
+    Accepts str subclasses such as ``numpy.str_`` (orjson requires exact
+    ``str``/``bytes`` types, so subclasses are coerced first).
+    """
     if _HAS_ORJSON:
+        if not isinstance(value, (bytes, bytearray, memoryview)) and type(value) is not str:
+            value = str(value)
         return orjson.loads(value)
-    if isinstance(value, bytes):
-        value = value.decode("utf-8")
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        value = bytes(value).decode("utf-8")
+    elif type(value) is not str:
+        value = str(value)
     return json.loads(value)

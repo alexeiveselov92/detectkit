@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "detectkit"
-version = "0.6.0"
+dynamic = ["version"]
 description = "Metric monitoring with automatic anomaly detection"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -80,6 +80,9 @@ Homepage = "https://github.com/alexeiveselov92/detectkit"
 Documentation = "https://github.com/alexeiveselov92/detectkit"
 Repository = "https://github.com/alexeiveselov92/detectkit"
 Issues = "https://github.com/alexeiveselov92/detectkit/issues"
+
+[tool.setuptools.dynamic]
+version = {attr = "detectkit.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["."]

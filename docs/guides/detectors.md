@@ -72,10 +72,14 @@ Examples:
 detectors:
   - type: mad
     params:
-      threshold: 3.0        # 3 MAD units (similar to 3-sigma)
+      threshold: 3.0        # In sigma-equivalents (MAD scaled by 1.4826)
       window_size: 100      # Historical window size
       min_samples: 30       # Warm-up period
 ```
+
+**Threshold is in σ-equivalents**: MAD is multiplied by the normal-consistency
+constant 1.4826, so `threshold: 3.0` corresponds to 3-sigma on Gaussian noise
+(~0.27% false positives), exactly like Z-Score.
 
 **Tuning threshold**:
 - `threshold: 2.0` - More sensitive (more anomalies)
@@ -98,12 +102,11 @@ detectors:
 
 **Configuration**:
 ```yaml
-# Extract seasonality features
+# Extract seasonality features from timestamps (built-in names:
+# hour, day_of_week, day_of_month, month, is_weekend, is_holiday)
 seasonality_columns:
-  - name: hour_of_day
-    extract: hour
-  - name: day_of_week
-    extract: dow
+  - hour
+  - day_of_week
 
 detectors:
   - type: mad
@@ -114,15 +117,20 @@ detectors:
 
       # Apply seasonality grouping
       seasonality_components:
-        - "hour_of_day"      # Different intervals per hour
+        - "hour"             # Different intervals per hour
         # OR combine multiple:
-        # - ["hour_of_day", "day_of_week"]  # Different per hour+day combo
+        # - ["hour", "day_of_week"]  # Different per hour+day combo
 ```
 
 **Seasonality components**:
-- **Single**: `["hour_of_day"]` - One group per hour (24 groups)
-- **Multiple separate**: `["hour", "dow"]` - Two separate adjustments
-- **Combined**: `[["hour", "dow"]]` - One group per hour+day combo (168 groups)
+- **Single**: `["hour"]` - One group per hour (24 groups)
+- **Multiple separate**: `["hour", "day_of_week"]` - Two separate adjustments
+- **Combined**: `[["hour", "day_of_week"]]` - One group per hour+day combo (168 groups)
+
+Component names must match the metric's seasonality feature names: the
+built-in `seasonality_columns` names shown above, or custom column names
+(e.g. `hour_of_day`) — the latter only when your query returns them and
+they are declared in `query_columns.seasonality`.
 
 **Window size recommendations**:
 - Hourly data: 672-2016 (1-3 weeks)
@@ -148,7 +156,6 @@ Rule: `window_size` should contain multiple full cycles of your seasonality.
 **Disadvantages**:
 - Sensitive to outliers (can produce false positives)
 - Assumes normal distribution
-- No seasonality support yet
 
 **Configuration**:
 ```yaml
@@ -169,7 +176,6 @@ detectors:
 **When to avoid**:
 - Skewed distributions (use MAD or IQR)
 - Data with outliers (use MAD or IQR)
-- Seasonal patterns (use MAD with seasonality)
 
 [Full Z-Score Reference →](../reference/detectors/zscore.md)
 
@@ -189,7 +195,6 @@ detectors:
 
 **Disadvantages**:
 - Less sensitive than MAD
-- No seasonality support yet
 - Slightly slower than Z-Score
 
 **Configuration**:
@@ -315,9 +320,15 @@ detectors:
 
 alerting:
   enabled: true
-  min_detectors: 2  # Both must agree to trigger alert
-  direction: "same"  # Both must agree on direction (above/below)
+  min_detectors: 2   # Both must agree to trigger alert
+  direction: "same"  # Both must agree on ONE direction (up or down)
 ```
+
+With `direction: "same"`, at least `min_detectors` detectors must agree on a
+single direction at the latest point — one detector firing "up" and another
+firing "down" is disagreement, not consensus. Other policies: `"up"` / `"down"`
+(only that direction counts) and `"any"` (every anomaly counts regardless of
+direction). See the [Alerting Guide](alerting.md) for the full contract.
 
 ## Common Patterns
 
@@ -328,10 +339,8 @@ name: website_visitors
 interval: 10min
 
 seasonality_columns:
-  - name: hour
-    extract: hour
-  - name: dow
-    extract: dow
+  - hour
+  - day_of_week
 
 detectors:
   - type: mad
@@ -340,7 +349,7 @@ detectors:
       window_size: 4320    # 30 days
       min_samples: 1000
       seasonality_components:
-        - ["hour", "dow"]
+        - ["hour", "day_of_week"]
 ```
 
 **Why**: Traffic varies by hour and day of week. Seasonality ensures different thresholds for peak vs off-peak times.
@@ -462,7 +471,7 @@ detectors:
 - ❌ Long warm-up period
 - ✅ Very reliable statistics
 
-**Recommended**: 20-40% of `window_size`
+**Recommended**: 10-30% of `window_size`
 
 ## Performance Comparison
 
@@ -498,7 +507,9 @@ All detectors are fast enough for production use. Choose based on accuracy needs
 
 **Solutions**:
 - Increase `threshold` parameter
-- Add `seasonality_components` (MAD only)
+- Add `seasonality_components` (works with MAD, Z-Score and IQR)
+- For trending metrics: add `window_weights: exponential` and/or `detrend: linear`
+  (see [Handling Metrics with Trends](#handling-metrics-with-trends))
 - Try different detector (e.g., MAD instead of Z-Score)
 - Increase `consecutive_anomalies` in alerting config
 
@@ -519,158 +530,157 @@ All detectors are fast enough for production use. Choose based on accuracy needs
 **Cause**: Seasonality not configured correctly.
 
 **Checklist**:
-1. ✅ `seasonality_columns` extracts features
-2. ✅ `query_columns.seasonality` lists column names
-3. ✅ `seasonality_components` uses those column names
-4. ✅ Enough data per group (`min_samples_per_group`)
+1. ✅ Seasonality features exist — either built-in `seasonality_columns`
+   (allowed names: `hour`, `day_of_week`, `day_of_month`, `month`,
+   `is_weekend`, `is_holiday`) or custom columns returned by the query and
+   declared in `query_columns.seasonality`
+2. ✅ `seasonality_components` uses exactly those feature names
+3. ✅ Enough data per group (`min_samples_per_group`)
 
-**Example**:
+**Example (built-in extraction)**:
 ```yaml
-# Extract features
+# Extract features from timestamps
 seasonality_columns:
-  - name: hour_of_day    # Must match below
-    extract: hour
-
-# Tell query about columns
-query_columns:
-  seasonality:
-    - hour_of_day        # Must match above
+  - hour             # Feature is named "hour" — must match below
 
 # Use in detector
 detectors:
   - type: mad
     params:
       seasonality_components:
-        - "hour_of_day"  # Must match above
+        - "hour"     # Must match above
 ```
 
-## Advanced Detector Features (v0.2.0+)
+Custom feature names (e.g. `hour_of_day`) only work when your query returns
+such a column and it is declared in `query_columns.seasonality` — they are
+not valid in the built-in `seasonality_columns` list.
 
-**New in v0.2.0** - All statistical detectors support preprocessing, smoothing, and value weighting.
+## Advanced Detector Features
+
+MAD, Z-Score and IQR share one windowed implementation, so every parameter
+below behaves identically across the three. Manual Bounds supports only
+`input_type` (it has no window, so smoothing, weighting and detrending do not
+apply).
+
+The full shared parameter set:
+
+```yaml
+detectors:
+  - type: mad                  # same params for zscore and iqr
+    params:
+      threshold: 3.0           # detector-specific default (mad 3.0, zscore 3.0, iqr 1.5)
+      window_size: 100         # trailing window in points (current point excluded)
+      min_samples: 30          # min valid points in window before detection starts
+      seasonality_components: null   # e.g. ["hour"] or [["hour", "day_of_week"]]
+      min_samples_per_group: 10      # mad 10, zscore 3, iqr 4 (iqr floor: 4)
+      input_type: values       # values | changes | absolute_changes | log_changes
+      smoothing: null          # null | ema | sma
+      smoothing_alpha: 0.3     # EMA factor, 0 < alpha <= 1
+      smoothing_window: 10     # SMA window in points
+      window_weights: null     # null (uniform) | exponential | linear
+      half_life: null          # exponential half-life: int points or "3d"/"12h"; default window_size/20
+      weight_decay: null       # DEPRECATED alias for half_life
+      detrend: null            # null | linear
+```
+
+All parameters are validated when the detector is constructed at the start
+of the `detect` step — a typo like `input_type: "diff"` fails fast on the
+first run with a clear error instead of being silently ignored. (Validation
+happens per run, not when the YAML config is loaded.)
 
 ### Input Preprocessing
 
-Transform input values before detection to detect on changes rather than absolute values.
+Transform input values before detection to detect on changes rather than
+absolute values.
 
 #### Available Transformations
 
-**`input_type: "raw"`** (default) - Use values as-is:
-```yaml
-detectors:
-  - type: mad
-    params:
-      input_type: "raw"  # Default
-      threshold: 3.5
-```
+**`input_type: "values"`** (default) — use values as-is.
 
-**`input_type: "diff"`** - Detect on differences between consecutive points:
+**`input_type: "absolute_changes"`** — detect on differences between
+consecutive points, `v[t] - v[t-1]`:
 ```yaml
 detectors:
   - type: mad
     params:
-      input_type: "diff"
+      input_type: "absolute_changes"
       threshold: 3.0
 ```
 
-**Example:**
 ```
-Original values: [100, 102, 105, 150, 152]
-After diff:      [2,   3,   45,  2]
-                           ↑ Anomaly detected (spike in change)
+Original values:        [100, 102, 105, 150, 152]
+After absolute_changes: [NaN, 2,   3,   45,  2]
+                                       ↑ Anomaly detected (spike in change)
 ```
 
-**`input_type: "pct_change"`** - Detect on percentage changes:
+**`input_type: "changes"`** — detect on relative changes,
+`(v[t] - v[t-1]) / v[t-1]`:
 ```yaml
 detectors:
   - type: mad
     params:
-      input_type: "pct_change"
+      input_type: "changes"
       threshold: 3.0
 ```
 
-**Example:**
 ```
 Original values: [100, 102, 105, 200, 202]
-After pct_change: [2%,  2.9%, 90%, 1%]
-                          ↑ Anomaly detected (90% jump)
+After changes:   [NaN, 0.02, 0.029, 0.90, 0.01]
+                                    ↑ Anomaly detected (90% jump)
 ```
+
+**`input_type: "log_changes"`** — detect on log-scaled changes,
+`log(v[t] + 1) - log(v[t-1] + 1)` (a log1p-style difference). Good for
+exponential growth: for large values it behaves like a symmetric version of
+`changes` (a +100% jump and the −50% drop back have roughly equal
+magnitude), though the `+1` shift makes it only approximately symmetric for
+percentage moves, especially at small values. Tolerates zeros — values just
+need to be greater than −1.
 
 #### When to Use Each Type
 
-**Use `"raw"`** (default):
+**Use `"values"`** (default):
 - Absolute values matter (CPU %, memory usage, latency)
 - Thresholds are meaningful (>500ms is bad regardless of trend)
 - Baseline is stable
 
-**Use `"diff"`**:
+**Use `"absolute_changes"`**:
 - Changes matter more than absolute values
 - Sudden jumps/drops are anomalies
-- Examples: Error counts increasing rapidly, queue depth changes
+- Examples: error counts increasing rapidly, queue depth changes
 
-**Use `"pct_change"`**:
+**Use `"changes"` or `"log_changes"`**:
 - Relative changes matter (revenue, traffic, conversions)
-- Different baselines (10 vs 10,000 - both can have 50% spike)
+- Different baselines (10 vs 10,000 — both can have a 50% spike)
 - Growth rates, ratios, percentages
 
-#### Complete Example
-
-**Scenario**: Detect abnormal revenue growth
-
-```yaml
-name: daily_revenue_growth
-description: Daily revenue percentage change monitoring
-interval: "1day"
-
-query: |
-  SELECT
-    date AS timestamp,
-    SUM(amount) AS value
-  FROM sales
-  WHERE date >= %(from_date)s
-    AND date < %(to_date)s
-  GROUP BY date
-  ORDER BY date
-
-detectors:
-  - type: mad
-    params:
-      input_type: "pct_change"  # Detect on % growth
-      threshold: 3.5
-      window_size: 90           # 90 days baseline
-
-alerting:
-  enabled: true
-  channels:
-    - slack_finance
-  consecutive_anomalies: 2
-```
-
-**What it detects:**
-```
-Day 1: $10,000 revenue
-Day 2: $10,200 revenue → +2% growth (normal)
-Day 3: $10,300 revenue → +1% growth (normal)
-Day 4: $18,000 revenue → +75% growth → ANOMALY DETECTED
-```
+The first point has no previous value, so change transformations mark it as
+NaN; the detection context automatically includes one extra point to
+compensate.
 
 ### Value Smoothing
 
-Reduce noise with moving average before detection.
+Reduce noise with a moving average before detection. Smoothing is applied
+first, then the `input_type` transformation.
 
+**Simple moving average (SMA):**
 ```yaml
 detectors:
   - type: mad
     params:
-      smoothing_window: 5  # 5-point moving average
+      smoothing: "sma"
+      smoothing_window: 5   # 5-point moving average
       threshold: 3.0
 ```
 
-**How it works:**
-
-```
-Original values: [10, 12, 50, 11, 9, 10, 11]  # 50 is noise spike
-After smoothing:  [10, 12, 18.4, 18.4, 18, 10, 11]
-                              ↑ Spike smoothed out
+**Exponential moving average (EMA):**
+```yaml
+detectors:
+  - type: mad
+    params:
+      smoothing: "ema"
+      smoothing_alpha: 0.3  # higher = less smoothing
+      threshold: 3.0
 ```
 
 **When to use:**
@@ -678,52 +688,115 @@ After smoothing:  [10, 12, 18.4, 18.4, 18, 10, 11]
 - Single-point spikes that aren't real issues
 - Reduce false positives from measurement errors
 
-**Typical values:**
-- `smoothing_window: 3` - Light smoothing
-- `smoothing_window: 5` - Standard smoothing
-- `smoothing_window: 7-10` - Heavy smoothing
+**Typical SMA values:**
+- `smoothing_window: 3` — light smoothing
+- `smoothing_window: 5` — standard smoothing
+- `smoothing_window: 7-10` — heavy smoothing
 
-**Trade-off**: Reduces noise but also reduces sensitivity to short-lived anomalies.
+**Trade-off**: reduces noise but also reduces sensitivity to short-lived
+anomalies.
 
-### Recent Value Weighting
+### Window Weighting
 
-Weight recent values more heavily in calculations.
+By default every point in the window contributes equally. With
+`window_weights` recent points contribute more, so the confidence interval
+adapts faster to a shifting baseline.
 
 ```yaml
 detectors:
   - type: mad
     params:
-      recent_weight: 0.7  # 70% weight to recent 20% of window
-      window_size: 100
+      window_size: 8640
+      window_weights: exponential
+      half_life: "3d"     # weight halves every 3 days of data
 ```
 
-**How it works:**
+**Methods:**
+- `window_weights: exponential` — `w(age) = 0.5^(age / half_life)`.
+  `half_life` is the age at which a point's weight halves: an integer means
+  points, a duration string (`"3d"`, `"12h"`) is converted using the metric's
+  data grid step. Default when unset: `window_size / 20`.
+- `window_weights: linear` — weight decreases linearly with age:
+  `w(age) = (window_size + 1 - age) / window_size`.
 
-Without weighting (default `recent_weight: 0.0`):
+**Weights are time-aware**: a point's weight depends on its age on the time
+grid (age 1 = the previous point), not on its position among valid points.
+Data gaps therefore don't compress the decay, and seasonality groups share
+the same recency horizon as the global statistics.
+
+`min_samples` always counts raw valid points, regardless of weighting.
+
+**Deprecated**: `weight_decay` (a per-point multiplier in (0, 1)) is a legacy
+alias for `half_life` — decay `d` is equivalent to
+`half_life = ln(0.5)/ln(d)` points (e.g. 0.95 ≈ 13.5 points). It is mutually
+exclusive with `half_life`; prefer `half_life`.
+
+### Detrending
+
+`detrend: linear` estimates a robust linear trend over the window
+(split-median slope, outlier-resistant) and projects every window point to the
+current point along that trend before computing statistics. A gradual drift
+therefore no longer pulls the metric out of its own confidence interval,
+while sharp deviations from the trend are still caught.
+
+```yaml
+detectors:
+  - type: mad
+    params:
+      window_size: 8640
+      detrend: linear
 ```
-All 100 points contribute equally to median/std calculation
+
+### Handling Metrics with Trends
+
+A metric with a gradual trend (e.g. slowly declining sessions) drifts out of
+a uniform-window confidence interval — the window median lags behind the
+current level, and every point starts to look "below the interval". The
+result is alert spam on perfectly expected behavior.
+
+Two shared parameters address this directly: `window_weights` (the interval
+follows the recent level) and `detrend` (the in-window trend is removed
+before statistics).
+
+**Recommended recipe for trending metrics:**
+
+```yaml
+seasonality_columns:
+  - hour                       # built-in hour-of-day feature
+
+detectors:
+  - type: mad
+    params:
+      window_size: 8640        # 60 days of 10-min points
+      min_samples: 1000
+      seasonality_components: ["hour"]
+      window_weights: exponential
+      half_life: "3d"          # adapt to the new normal over ~3 days
+      detrend: linear          # optional: also remove in-window trend
 ```
 
-With weighting (`recent_weight: 0.7`):
-```
-Oldest 80 points:  30% of total weight
-Recent 20 points:  70% of total weight
-→ Recent data influences threshold more
-```
+**Measured effect** (simulation: 60-day window, 10-min interval, daily
+seasonality, −15% gradual decline over 30 days, hour-of-day grouping,
+threshold 3; false "below" alerts out of 4320 points):
 
-**When to use:**
-- Metrics with trends or changing baselines
-- Faster adaptation to new "normal" levels
-- Seasonal metrics that shift over time
+| Configuration | False alerts |
+|---------------|--------------|
+| Uniform window (pre-0.7.0 unscaled MAD) | 1557 |
+| Uniform window (scaled MAD) | 238 |
+| `window_weights: exponential` + `half_life: "3d"` | 26 (≈ noise floor) |
+| `detrend: linear` | 54 |
+| Both combined | 19 |
 
-**When NOT to use:**
-- Stable baselines (wastes computation)
-- Want to detect return to old baseline as anomaly
+A sharp −40% incident was caught on 18/18 anomalous points in **all**
+configurations — recency weighting and detrending suppress trend-induced
+false positives without losing real incidents.
 
-**Typical values:**
-- `recent_weight: 0.0` - No weighting (default)
-- `recent_weight: 0.5` - Moderate weighting
-- `recent_weight: 0.7` - Aggressive weighting
+**Trade-off**: a shorter `half_life` adapts faster but also "accepts" a real
+sustained degradation as the new normal sooner — alerts still fire during
+roughly the first `half_life` of an incident. Avoid very short half-lives
+(the legacy `weight_decay: 0.95` default ≈ 13.5 points, ~2 hours at 10-min
+intervals, chased real incidents within hours while barely helping the
+trend — that's why it was redesigned).
 
 ### Combining Features
 
@@ -739,21 +812,23 @@ query: |
     timestamp,
     error_count / total_requests * 100 AS value
   FROM api_metrics
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   ORDER BY timestamp
 
 detectors:
   - type: mad
     params:
-      # Detect on percentage changes (not absolute error rate)
-      input_type: "pct_change"
+      # Detect on relative changes (not absolute error rate)
+      input_type: "changes"
 
       # Smooth out noise from low-traffic periods
+      smoothing: "sma"
       smoothing_window: 3
 
       # Weight recent data more (baseline shifts over time)
-      recent_weight: 0.6
+      window_weights: exponential
+      half_life: "12h"
 
       # Standard MAD parameters
       threshold: 3.5
@@ -769,51 +844,65 @@ alerting:
 ```
 
 **This configuration:**
-1. Converts error rate to percentage changes (10% → 15% is 50% increase)
+1. Converts error rate to relative changes (10% → 15% is a 50% increase)
 2. Applies 3-point smoothing to reduce noise
-3. Weights recent 20% of window at 60% (adapts to new baselines faster)
+3. Halves a point's weight every 12 hours (adapts to new baselines faster)
 4. Uses MAD detector with 3.5 threshold
 5. Alerts only after 2 consecutive anomalies
 6. Prevents spam with 15-minute cooldown
 
 ### Feature Compatibility
 
-All preprocessing features work with all statistical detectors:
-
 | Feature | MAD | Z-Score | IQR | Manual Bounds |
 |---------|-----|---------|-----|---------------|
 | `input_type` | ✅ | ✅ | ✅ | ✅ |
-| `smoothing_window` | ✅ | ✅ | ✅ | ✅ |
-| `recent_weight` | ✅ | ✅ | ✅ | ❌ (N/A) |
+| `smoothing` / `smoothing_alpha` / `smoothing_window` | ✅ | ✅ | ✅ | ❌ (N/A) |
+| `window_weights` / `half_life` | ✅ | ✅ | ✅ | ❌ (N/A) |
+| `detrend` | ✅ | ✅ | ✅ | ❌ (N/A) |
+| `seasonality_components` | ✅ | ✅ | ✅ | ❌ (N/A) |
 
-**Note**: Manual Bounds detector doesn't use `recent_weight` because it uses fixed thresholds, not calculated statistics.
+**Note**: Manual Bounds uses fixed thresholds with no historical window, so
+window-based features don't apply.
 
-### Performance Considerations
+### Detector Identity and Recomputation
 
-- **`input_type: "diff"` or `"pct_change"`**: Minimal overhead (~5%)
-- **`smoothing_window`**: Adds ~10-20% overhead (rolling window calculation)
-- **`recent_weight`**: Adds ~15-25% overhead (weighted statistics)
+Every parameter that affects detection results (threshold, window_size,
+min_samples, seasonality_components, min_samples_per_group, input_type,
+smoothing settings, window_weights, half_life/weight_decay, detrend) is
+hashed into the `detector_id` — only non-default values participate.
 
-All preprocessing is vectorized using numpy, so overhead is minimal even for large datasets.
+Changing any of these parameters produces a new `detector_id`, and detections
+for that detector are recomputed from scratch on the next run. Old rows
+remain in `_dtk_detections` under the previous id; use
+`dtk run --full-refresh` to purge them.
+
+Execution parameters (`start_time`, `batch_size`) don't affect results and
+are not hashed.
 
 ### Debugging Preprocessed Detections
 
-Detection metadata includes preprocessing information:
+Detection metadata records what the detector "saw":
 
 ```python
 {
-  "preprocessing": {
-    "input_type": "pct_change",
-    "smoothing": "ma3",  # 3-point moving average
-    "recent_weight": 0.7
+  "preprocessing": {            # present when smoothing or non-default input_type is used
+    "input_type": "changes",
+    "smoothing": "sma",
+    "smoothed_value": 2.4       # only when smoothing is enabled
   },
-  "global_median": 2.5,  # Statistics on preprocessed values
-  "adjusted_median": 2.3,
+  "global_median": 2.5,         # statistics on preprocessed values
+  "adjusted_median": 2.3,       # after seasonality multipliers
+  "ess": 41.2,                  # effective sample size (Kish) — when weighting is on
+  "trend_slope_per_point": -0.0021,  # when detrend is on
   ...
 }
 ```
 
-This helps understand what the detector "saw" after preprocessing.
+- `ess` — the Kish effective sample size of the weighted window. With heavy
+  weighting it can be much smaller than the raw point count; if it gets very
+  low, the statistics are dominated by a handful of recent points.
+- `trend_slope_per_point` — the estimated robust trend slope per grid point
+  used by `detrend: linear`.
 
 ## See Also
 

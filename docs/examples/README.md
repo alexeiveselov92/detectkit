@@ -23,13 +23,13 @@ This directory contains practical examples for common monitoring scenarios.
 - [Gaming Metrics with Complex Seasonality](#example-10-gaming-metrics-with-complex-seasonality) - Multi-dimensional seasonality
 - [Multi-Detector Strategy](#example-11-multi-detector-strategy) - Combining multiple detectors
 
-### New Features (v0.2.0+ → v0.5.0)
-- **[No-Data Alerts (v0.5.0)](#example-12-no-data-alerts-v050)** - Fire when the latest interval has no datapoint
-- **[Project-Level Error Alerting (v0.5.0)](#example-13-project-level-error-alerting-v050)** - Catch DB outages and pipeline crashes at the project level
-- **[Mentions Example](mentions-example.yml)** - @mention users/groups in alerts across all channels (v0.3.8)
-- **[Alert Cooldown Example](alert-cooldown-example.yml)** - Prevent spam with alert cooldown (v0.3.0)
+### Alerting & Preprocessing Features
+- **[No-Data Alerts](#example-12-no-data-alerts)** - Fire when the latest interval has no datapoint
+- **[Project-Level Error Alerting](#example-13-project-level-error-alerting)** - Catch DB outages and pipeline crashes at the project level
+- **[Mentions Example](mentions-example.yml)** - @mention users/groups in alerts across all channels
+- **[Alert Cooldown Example](alert-cooldown-example.yml)** - Prevent spam with alert cooldown
 - **[Recovery Notifications Example](recovery-notification-example.yml)** - "All clear" messages when metric stabilizes
-- **[Detector Preprocessing Example](detector-preprocessing-example.yml)** - Advanced preprocessing features (v0.2.0)
+- **[Detector Preprocessing Example](detector-preprocessing-example.yml)** - input_type, smoothing, window weighting, detrending
 
 ---
 
@@ -48,8 +48,8 @@ query: |
     toStartOfInterval(timestamp, INTERVAL 30 SECOND) AS timestamp,
     AVG(cpu_percent) AS value
   FROM system_metrics
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -99,8 +99,8 @@ query: |
     toStartOfMinute(timestamp) AS timestamp,
     (used_memory_bytes / total_memory_bytes) * 100 AS value
   FROM system_metrics
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -142,8 +142,8 @@ query: |
     toStartOfInterval(timestamp, INTERVAL 5 MINUTE) AS timestamp,
     (used_space_bytes / total_space_bytes) * 100 AS value
   FROM storage_metrics
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -183,8 +183,8 @@ query: |
     toStartOfMinute(timestamp) AS timestamp,
     quantile(0.95)(response_time_ms) AS value
   FROM http_requests
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -232,8 +232,8 @@ query: |
     toStartOfMinute(timestamp) AS timestamp,
     countIf(status_code >= 500) / count() AS value
   FROM http_requests
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -275,24 +275,16 @@ query: |
     toStartOfMinute(timestamp) AS timestamp,
     count() AS value
   FROM http_requests
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
-# Extract seasonality features
+# Extract seasonality features from timestamps (built-in)
+# Available: hour, day_of_week, day_of_month, month, is_weekend
 seasonality_columns:
-  - name: hour_of_day
-    extract: hour
-  - name: day_of_week
-    extract: dow
-
-query_columns:
-  timestamp: timestamp
-  metric: value
-  seasonality:
-    - hour_of_day
-    - day_of_week
+  - hour
+  - day_of_week
 
 detectors:
   - type: mad
@@ -301,7 +293,7 @@ detectors:
       window_size: 10080  # 1 week of 1-min data
       min_samples: 500
       seasonality_components:
-        - ["hour_of_day", "day_of_week"]
+        - ["hour", "day_of_week"]
       min_samples_per_group: 10
 
 alerting:
@@ -335,8 +327,8 @@ query: |
     toDate(timestamp) AS timestamp,
     uniqExact(user_id) AS value
   FROM user_events
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -378,16 +370,15 @@ query: |
     toDate(timestamp) AS timestamp,
     SUM(amount_usd) AS value
   FROM transactions
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
     AND status = 'completed'
   GROUP BY timestamp
   ORDER BY timestamp
 
-# Extract day of week for seasonality
+# Extract day of week from timestamps (built-in)
 seasonality_columns:
-  - name: day_of_week
-    extract: dow
+  - day_of_week
 
 detectors:
   - type: mad
@@ -430,15 +421,14 @@ query: |
     toStartOfHour(timestamp) AS timestamp,
     countIf(action = 'signup') / countIf(action = 'visit') AS value
   FROM user_events
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
-# Extract hour for seasonality
+# Extract hour of day from timestamps (built-in)
 seasonality_columns:
-  - name: hour_of_day
-    extract: hour
+  - hour
 
 detectors:
   - type: mad
@@ -447,7 +437,7 @@ detectors:
       window_size: 672  # 4 weeks
       min_samples: 100
       seasonality_components:
-        - "hour_of_day"
+        - "hour"
 
 alerting:
   enabled: true
@@ -471,6 +461,8 @@ interval: 10min
 
 query_file: sql/group_assigned.sql
 
+# Seasonality columns come from the query itself (query_columns.seasonality),
+# so no timestamp-based extraction (seasonality_columns) is needed.
 query_columns:
   timestamp: period_time
   metric: group_assigned_users_pct
@@ -480,12 +472,6 @@ query_columns:
 
 loading_start_time: "2024-01-01 00:00:00"
 loading_batch_size: 2160  # 15 days
-
-seasonality_columns:
-  - name: offset_10minutes
-    extract: null  # Already in query
-  - name: league_day
-    extract: null  # Already in query
 
 detectors:
   - type: mad
@@ -531,8 +517,8 @@ query: |
     toStartOfInterval(timestamp, INTERVAL 30 SECOND) AS timestamp,
     AVG(latency_ms) AS value
   FROM critical_service_logs
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -561,7 +547,7 @@ alerting:
   channels:
     - slack_critical
   min_detectors: 2        # Require 2 detectors to agree
-  direction: "same"        # Must agree on direction
+  direction: "same"       # ...on the SAME direction (up or down)
   consecutive_anomalies: 3
 ```
 
@@ -572,14 +558,24 @@ alerting:
 - Hard limit for SLA compliance
 - Requiring 2 to agree reduces false positives
 
-**Alert logic**:
-- Manual bounds violation → Alert (immediate)
-- MAD + Z-Score both detect → Alert (high confidence)
-- Only Z-Score detects → No alert (might be noise)
+**Alert logic** (`min_detectors: 2`, `direction: "same"`, `consecutive_anomalies: 3`):
+- MAD + Z-Score both detect "up" → counts toward the alert (high confidence)
+- Manual bounds + any statistical detector agree on direction → counts too
+- Only Z-Score detects → no alert (might be noise)
+- One detector says "up" while another says "down" → no alert
+  (disagreement is not consensus)
+- The 2-detector quorum must hold at each of the last 3 consecutive
+  points (exactly one interval apart — a gap breaks the chain)
+
+Note: with `min_detectors: 2`, a manual-bounds violation alone never
+alerts — it is one vote in the quorum. If the hard limit must page
+immediately on its own, monitor it as a separate metric (or a separate
+alerting entry with `min_detectors: 1`, `consecutive_anomalies: 1` —
+but then any single detector can trigger that entry).
 
 ---
 
-## Example 12: No-Data Alerts (v0.5.0)
+## Example 12: No-Data Alerts
 
 Fire an alert when a metric stops producing data — e.g., the source
 ETL hung and no rows arrive for the latest interval.
@@ -597,8 +593,8 @@ query: |
     toStartOfHour(timestamp) AS timestamp,
     SUM(amount_usd) AS value
   FROM transactions
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
     AND status = 'completed'
   GROUP BY timestamp
   ORDER BY timestamp
@@ -618,7 +614,7 @@ alerting:
   consecutive_anomalies: 2
   direction: "down"
 
-  # No-data alert (v0.5.0) — fires if the previous full hour has no row
+  # No-data alert — fires if the previous full hour has no row
   no_data_alert: true
   template_no_data: |
     🟠 hourly_revenue stopped reporting
@@ -637,7 +633,8 @@ alerting:
 - Custom `template_no_data` makes the on-call action obvious — they
   don't need to guess what "no data" means
 - `alert_cooldown: "1hour"` ensures only one no-data alert per cron
-  tick, even if the ETL stays broken
+  tick, even if the ETL stays broken (anomaly and no-data alerts share
+  the same cooldown state per alerting block)
 
 ### When NOT to Use
 
@@ -646,7 +643,7 @@ alerting:
 
 ---
 
-## Example 13: Project-Level Error Alerting (v0.5.0)
+## Example 13: Project-Level Error Alerting
 
 Catch failures at the **project** level — DB outages, query timeouts,
 lock failures — that affect every metric in the run.
@@ -663,7 +660,7 @@ paths:
   sql: sql
   templates: templates
 
-# v0.5.0: catch pipeline crashes (one alert per dtk run, then abort)
+# Catch pipeline crashes (one alert per dtk run, then abort)
 error_alerting:
   enabled: true
   channels:
@@ -720,25 +717,29 @@ alert_channels:
 | System Resources | Manual + Z-Score | No | 2-3 | up |
 | API Latency | Manual + IQR | Optional | 3 | up |
 | Error Rates | Manual | No | 1 | up |
-| Traffic/Throughput | MAD | Yes (hour/dow) | 3 | any |
+| Traffic/Throughput | MAD | Yes (hour + day_of_week) | 3 | any |
 | User Engagement | MAD | Optional | 2-3 | down |
-| Revenue | MAD | Yes (dow) | 2 | down |
+| Revenue | MAD | Yes (day_of_week) | 2 | down |
 | Conversion Rate | MAD | Yes (hour) | 3 | down |
 
 ## Alerting Feature Comparison
 
 | Feature | Config | Effect |
 |---------|--------|--------|
-| Basic alert | `consecutive_anomalies: 3` | Alert after 3 consecutive anomalies |
-| Cooldown | `alert_cooldown: "30min"` | No more than 1 alert per 30 min |
+| Basic alert | `consecutive_anomalies: 3` | Alert after 3 consecutive anomalies (default: 3; gaps in the grid break the chain) |
+| Detector quorum | `min_detectors: 2` | Require 2 detectors per the `direction` policy (default: 1) |
+| Direction policy | `direction: "same"` | `same` (default): quorum must agree on one direction; `any`: every anomaly counts; `up`/`down`: only that direction counts |
+| Cooldown | `alert_cooldown: "30min"` | No more than 1 alert per 30 min (default: none — a persisting anomaly re-alerts on every `dtk run`) |
 | Cooldown reset | `cooldown_reset_on_recovery: true` | Cooldown resets when metric normalizes |
 | Recovery notify | `notify_on_recovery: true` | "All clear" sent once per incident |
 | Custom recovery | `template_recovery: "..."` | Custom message text for recovery |
+| Single-anomaly template | `template_single: "..."` | Used when the alert has no streak (consecutive count ≤ 1); falls back to `template_consecutive` |
+| Streak template | `template_consecutive: "..."` | Used for consecutive-anomaly alerts |
 | Mentions | `mentions: ["oncall", "here"]` | @mention users/groups in alerts |
 | Suppress | `suppress_until: "2026-04-11 18:00:00"` | Pause alerts until UTC time |
-| **No-data alert (v0.5.0)** | `no_data_alert: true` | Fire when latest interval has no row |
-| **No-data template (v0.5.0)** | `template_no_data: "..."` | Custom no-data message body |
-| **Project errors (v0.5.0)** | `error_alerting:` in `detectkit_project.yml` | Catch pipeline crashes (DB outage etc.) |
+| No-data alert | `no_data_alert: true` | Fire when latest interval has no row |
+| No-data template | `template_no_data: "..."` | Custom no-data message body |
+| Project errors | `error_alerting:` in `detectkit_project.yml` | Catch pipeline crashes (DB outage etc.) |
 
 ## See Also
 

@@ -157,8 +157,16 @@ class _AlertStepMixin(_TaskManagerBase):
             )
             return 0
 
-        if template is None:
-            template = alerting_config.template_consecutive
+        if template is None and not getattr(alert_data, "is_no_data", False):
+            # template_single covers single-point anomaly alerts,
+            # template_consecutive covers streaks; each falls back to the
+            # other when unset. No-data alerts keep template=None so the
+            # channel's dedicated no-data default applies.
+            consecutive_count = getattr(alert_data, "consecutive_count", 0) or 0
+            if consecutive_count <= 1:
+                template = alerting_config.template_single or alerting_config.template_consecutive
+            else:
+                template = alerting_config.template_consecutive or alerting_config.template_single
 
         results = orchestrator.send_alerts(alert_data, channels, template=template)
         sent = sum(1 for ok in results.values() if ok)

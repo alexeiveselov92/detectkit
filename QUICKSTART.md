@@ -1,332 +1,235 @@
 # detectkit Quick Start
 
 Quick guide to get started with detectkit for anomaly detection and alerting.
+The full version of this guide lives in
+[docs/getting-started/quickstart.md](docs/getting-started/quickstart.md).
 
 ## Installation
 
 ```bash
-# Install from source (for now)
-git clone https://github.com/alexeiveselov92/detectkit.git
-cd detectkit
-pip install -e .
+pip install detectkit
 
-# Install with ClickHouse support
-pip install -e ".[clickhouse]"
+# With a database driver
+pip install detectkit[clickhouse]   # ClickHouse
+pip install detectkit[postgres]     # PostgreSQL
+pip install detectkit[mysql]        # MySQL
+pip install detectkit[all-db]       # All databases
 ```
 
-## Quick Start
+See the [Installation Guide](docs/getting-started/installation.md) for details.
 
-### 1. Initialize Project
+## Step 1: Initialize Project
 
 ```bash
-dtk init my_monitoring_project
-cd my_monitoring_project
+dtk init my_monitoring
+cd my_monitoring
 ```
 
 This creates:
+
 ```
-my_monitoring_project/
+my_monitoring/
 ├── detectkit_project.yml   # Project configuration
-├── profiles.yml            # Database & alert channel configs
+├── profiles.yml            # Database connections & alert channels
 ├── metrics/                # Metric definitions
-│   └── example_cpu_usage.yml
 └── sql/                    # SQL queries (optional)
 ```
 
-### 2. Configure Database Connection
+## Step 2: Configure Database Connection
 
 Edit `profiles.yml`:
 
 ```yaml
-dev:
-  type: clickhouse
-  host: localhost
-  port: 9000
-  user: default
-  password: ""
+default_profile: prod
 
-  internal_database: detectkit_internal  # For _dtk_* tables
-  data_database: default                 # Your metrics data
+profiles:
+  prod:
+    type: clickhouse
+    host: localhost
+    port: 9000
+    user: default
+    password: "{{ env_var('CLICKHOUSE_PASSWORD') }}"
+
+    internal_database: detectkit_internal  # For _dtk_* tables
+    data_database: default                 # Your metrics data
 
 alert_channels:
-  mattermost_alerts:
+  mattermost_ops:
     type: mattermost
     webhook_url: "{{ env_var('MATTERMOST_WEBHOOK_URL') }}"
     username: detectkit
 ```
 
-Set environment variable:
+Both `${VAR}` and `{{ env_var('VAR') }}` environment variable syntaxes are
+supported, so secrets stay out of YAML:
+
 ```bash
 export MATTERMOST_WEBHOOK_URL="https://mattermost.example.com/hooks/xxx"
 ```
 
-### 3. Create Metric Configuration
+## Step 3: Create Your First Metric
 
-Create `metrics/cpu_usage.yml`:
+Create `metrics/api_response_time.yml`:
 
 ```yaml
-name: cpu_usage
-description: Monitor CPU usage anomalies
+name: api_response_time
+interval: 5min
 
-# SQL query
+# Built-in template variables: {{ dtk_start_time }}, {{ dtk_end_time }}
+# (rendered as 'YYYY-MM-DD HH:MM:SS' strings) and {{ interval_seconds }}.
 query: |
   SELECT
     timestamp,
-    cpu_usage as value
-  FROM system.metrics
-  WHERE metric_name = 'cpu_usage'
-    AND timestamp >= {from_date}
-    AND timestamp < {to_date}
+    AVG(response_time_ms) AS value
+  FROM api_logs
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
+  GROUP BY timestamp
   ORDER BY timestamp
 
-# Time interval
-interval: 1min
-
-# Anomaly detectors
 detectors:
-  - type: zscore
-    params:
-      threshold: 3.0
-      window_size: 100
-
   - type: mad
     params:
-      threshold: 3.0
+      threshold: 3.0        # in sigma-equivalents
+      window_size: 288      # 1 day of 5-min points
+      min_samples: 50
 
-# Alerting
 alerting:
   enabled: true
   channels:
-    - mattermost_alerts
-  consecutive_anomalies: 3
-  alert_cooldown: "30min"  # v0.3.0: Prevent alert spam
+    - mattermost_ops
+  consecutive_anomalies: 3  # Require 3 anomalies in a row
+  alert_cooldown: "30min"   # Recommended: without it a persisting
+                            # anomaly re-alerts on every run
 ```
 
-### 4. Run Pipeline
+## Step 4: Run the Pipeline
 
 ```bash
-# Run full pipeline (load + detect + alert)
-dtk run --select cpu_usage
+# Full pipeline (load + detect + alert)
+dtk run --select api_response_time
 
-# Run only specific steps
-dtk run --select cpu_usage --steps load,detect
+# Partial pipeline
+dtk run --select api_response_time --steps load,detect
 
-# Load data from specific date
-dtk run --select cpu_usage --from 2024-01-01
+# Load data from a specific date
+dtk run --select api_response_time --from "2024-01-01"
 
-# Run all metrics with tag
+# Run all metrics with a tag
 dtk run --select tag:critical
+
+# Delete all data and reload from scratch
+dtk run --select api_response_time --full-refresh
 ```
 
-### 5. Recover from a Stuck Lock
+## Step 5: Test Alerts and Recover from Locks
+
+```bash
+# Preview the alert message without real anomalies
+dtk test-alert api_response_time
+```
 
 If a run is killed without releasing its lock (e.g. the database restarts
 mid-run), later runs fail with `Failed to acquire lock`. Clear it immediately:
 
 ```bash
-dtk unlock --select cpu_usage
+dtk unlock --select api_response_time
 ```
 
-A stuck lock also auto-expires after 1 hour, so the next normal run recovers on
-its own.
+A stuck lock also auto-expires after 1 hour, so the next normal run recovers
+on its own.
+
+## Step 6: Explore Results
+
+Loaded data is stored in `_dtk_datapoints`, detections in `_dtk_detections`:
+
+```sql
+SELECT timestamp, value, confidence_lower, confidence_upper
+FROM detectkit_internal._dtk_detections
+WHERE metric_name = 'api_response_time'
+  AND is_anomaly = true
+ORDER BY timestamp DESC;
+```
 
 ## Available Detectors
 
-### Statistical Detectors
-
-**Z-Score Detector**
 ```yaml
-- type: zscore
-  params:
-    threshold: 3.0        # Standard deviations
-    window_size: 100      # Rolling window
-    min_samples: 30       # Minimum samples needed
+detectors:
+  - type: zscore            # mean/std interval
+    params:
+      threshold: 3.0        # standard deviations
+      window_size: 100      # trailing window in points
+      min_samples: 30
+
+  - type: mad               # robust median/MAD interval
+    params:
+      threshold: 3.0        # sigma-equivalents (MAD scaled by 1.4826)
+      window_size: 100
+
+  - type: iqr               # quartile-based interval
+    params:
+      threshold: 1.5        # IQR multiples
+      window_size: 100
+
+  - type: manual_bounds     # fixed thresholds
+    params:
+      lower_bound: 0
+      upper_bound: 100
 ```
 
-**MAD (Median Absolute Deviation)**
-```yaml
-- type: mad
-  params:
-    threshold: 3.0        # MAD multiples
-    window_size: 100
-    min_samples: 30
-```
-
-**IQR (Interquartile Range)**
-```yaml
-- type: iqr
-  params:
-    threshold: 1.5        # IQR multiples
-    window_size: 100
-    min_samples: 30
-```
-
-**Manual Bounds**
-```yaml
-- type: manual_bounds
-  params:
-    lower_bound: 0
-    upper_bound: 100
-```
-
-## Alert Channels
-
-### Mattermost
+For metrics with a gradual trend, add recency weighting and/or detrending so
+the slow drift itself is not flagged:
 
 ```yaml
-mattermost_alerts:
-  type: mattermost
-  webhook_url: "{{ env_var('MATTERMOST_WEBHOOK_URL') }}"
-  username: detectkit
-  icon_url: https://example.com/icon.png
+seasonality_columns:
+  - hour                     # extracted automatically from timestamps
+
+detectors:
+  - type: mad
+    params:
+      window_size: 8640      # 60 days of 10-min points
+      seasonality_components: ["hour"]
+      window_weights: exponential
+      half_life: "3d"        # adapt to the new normal over ~3 days
+      detrend: linear        # optional: remove in-window linear trend
 ```
 
-### Slack
+See the [Detectors Guide](docs/guides/detectors.md) for all parameters.
 
-```yaml
-slack_alerts:
-  type: slack
-  webhook_url: "{{ env_var('SLACK_WEBHOOK_URL') }}"
-  channel: "#alerts"
-  username: detectkit
-```
-
-### Generic Webhook
-
-```yaml
-webhook_alerts:
-  type: webhook
-  url: "{{ env_var('WEBHOOK_URL') }}"
-  method: POST
-  headers:
-    Authorization: "Bearer {{ env_var('API_TOKEN') }}"
-```
-
-## Python API
-
-You can also use detectkit directly in Python:
-
-```python
-from detectkit.config.metric_config import MetricConfig
-from detectkit.config.profile import ProfilesConfig
-from detectkit.database.internal_tables import InternalTablesManager
-from detectkit.orchestration.task_manager import TaskManager, PipelineStep
-
-# Load configurations
-profiles_config = ProfilesConfig.from_yaml("profiles.yml")
-metric_config = MetricConfig.from_yaml_file("metrics/cpu_usage.yml")
-
-# Create managers
-db_manager = profiles_config.create_manager()
-internal_manager = InternalTablesManager(db_manager)
-internal_manager.initialize_tables()
-
-# Create task manager
-task_manager = TaskManager(
-    internal_manager=internal_manager,
-    db_manager=db_manager,
-    profiles_config=profiles_config,
-)
-
-# Run pipeline
-result = task_manager.run_metric(
-    config=metric_config,
-    steps=[PipelineStep.LOAD, PipelineStep.DETECT, PipelineStep.ALERT],
-)
-
-print(f"Status: {result['status']}")
-print(f"Datapoints: {result['datapoints_loaded']}")
-print(f"Anomalies: {result['anomalies_detected']}")
-print(f"Alerts: {result['alerts_sent']}")
-```
-
-## Environment Variables
-
-detectkit supports environment variable interpolation in configs:
-
-```yaml
-# Both formats supported
-webhook_url: "${MATTERMOST_WEBHOOK_URL}"
-webhook_url: "{{ env_var('MATTERMOST_WEBHOOK_URL') }}"
-```
-
-Common variables:
-- `MATTERMOST_WEBHOOK_URL` - Mattermost webhook
-- `SLACK_WEBHOOK_URL` - Slack webhook
-- `CLICKHOUSE_HOST` - Database host
-- `CLICKHOUSE_USER` - Database user
-- `CLICKHOUSE_PASSWORD` - Database password
-
-## Testing
+## Scheduling
 
 ```bash
-# Run all tests
-pytest tests/
-
-# Run with coverage
-pytest tests/ --cov=detectkit --cov-report=html
-
-# Test specific module
-pytest tests/unit/test_detectors.py -v
+# Crontab: run every 10 minutes
+*/10 * * * * cd /path/to/project && dtk run --select tag:critical
 ```
 
 ## What's Next?
 
-1. **Add more metrics**: Create `.yml` files in `metrics/` directory
-2. **Configure alerts**: Add more channels in `profiles.yml`
-3. **Schedule runs**: Use cron to run `dtk run` periodically
-4. **Monitor**: Check internal tables `_dtk_datapoints`, `_dtk_detections`, `_dtk_tasks`
-
-## Example: Production Setup
-
-```yaml
-# profiles.yml
-prod:
-  type: clickhouse
-  host: "{{ env_var('CLICKHOUSE_HOST') }}"
-  port: 9000
-  user: "{{ env_var('CLICKHOUSE_USER') }}"
-  password: "{{ env_var('CLICKHOUSE_PASSWORD') }}"
-  internal_database: detectkit_prod
-  data_database: analytics
-
-alert_channels:
-  mattermost_critical:
-    type: mattermost
-    webhook_url: "{{ env_var('MATTERMOST_CRITICAL_WEBHOOK') }}"
-    username: detectkit-prod
-
-  slack_warnings:
-    type: slack
-    webhook_url: "{{ env_var('SLACK_WEBHOOK') }}"
-    channel: "#monitoring-warnings"
-```
-
-```bash
-# Crontab: run every 10 minutes
-*/10 * * * * cd /path/to/project && dtk run --select tag:critical --profile prod
-```
+1. **Add more metrics**: create `.yml` files in `metrics/`
+2. **Add seasonality**: [MAD Detector with Seasonality](docs/reference/detectors/mad.md#with-seasonality-single-component)
+3. **Configure alerts**: [Alerting Guide](docs/guides/alerting.md)
+4. **Full configuration reference**: [Configuration Guide](docs/guides/configuration.md)
+5. **CLI reference**: [CLI Reference](docs/reference/cli.md)
 
 ## Troubleshooting
 
-**"Connection refused" error:**
-- Check that ClickHouse is running: `docker ps`
-- Verify connection: `clickhouse-client --host localhost --port 9000`
+**"Connection refused"** — check the database is running and `profiles.yml`
+connection settings are correct.
 
-**"Profile not found" error:**
-- Check `profiles.yml` exists in project root
-- Verify profile name matches `--profile` argument
+**"Profile not found"** — check `profiles.yml` exists in the project root and
+the profile name matches `default_profile` or the `--profile` argument.
 
-**"No metrics found" error:**
-- Check metrics exist in `metrics/` directory
-- Verify metric name or tag selector
+**"No metrics found"** — check metric files exist in `metrics/` and the
+selector matches (metric name without `.yml`, path pattern, or `tag:<name>`).
 
-**Alerts not sending:**
-- Verify webhook URL is correct
-- Check environment variables are set
-- Look for error messages in output
+**"Failed to acquire lock"** — a previous run crashed with the lock held; run
+`dtk unlock --select <metric>` (or wait — locks auto-expire after 1 hour).
+
+**Alerts not sending** — verify webhook URLs, environment variables, and try
+`dtk test-alert <metric>`.
 
 ## Documentation
 
+- Full docs: [docs/](docs/README.md)
 - GitHub: https://github.com/alexeiveselov92/detectkit
 - Issues: https://github.com/alexeiveselov92/detectkit/issues

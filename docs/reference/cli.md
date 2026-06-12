@@ -18,7 +18,7 @@ dtk --help                      # Show help
 
 ### `--version`
 
-Show detectkit version:
+Show the installed detectkit package version:
 
 ```bash
 dtk --version
@@ -26,7 +26,7 @@ dtk --version
 
 Output:
 ```
-dtk, version 0.1.0
+detectkit, version x.y.z
 ```
 
 ### `--help`
@@ -592,7 +592,27 @@ Done. Cleared 1 lock(s) of 1 metric(s).
 
 ## Environment Variables
 
-Currently, detectkit does not use environment variables. All configuration is in YAML files.
+The CLI itself defines no special environment variables, but configuration
+files support environment-variable interpolation so secrets stay out of YAML.
+Both `${VAR}` and `{{ env_var('VAR') }}` syntaxes are supported:
+
+```yaml
+# profiles.yml
+profiles:
+  prod:
+    type: clickhouse
+    host: "{{ env_var('CLICKHOUSE_HOST') }}"
+    port: 9000
+    password: "${CLICKHOUSE_PASSWORD}"
+
+alert_channels:
+  mattermost_ops:
+    type: mattermost
+    webhook_url: "{{ env_var('MATTERMOST_WEBHOOK_URL') }}"
+```
+
+Unresolved placeholders (variable not set) are kept as-is, so missing
+variables surface as configuration errors instead of empty strings.
 
 ## Common Workflows
 

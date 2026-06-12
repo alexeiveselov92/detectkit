@@ -107,6 +107,16 @@ class TaskManager(_LoadStepMixin, _DetectStepMixin, _AlertStepMixin):
                     result["alerts_sent"] = alert_result["alerts_sent"]
                     result["steps_completed"].append(PipelineStep.ALERT)
 
+            except BaseException as exc:
+                # Mark the failure BEFORE the finally block releases the
+                # lock, so the _dtk_tasks row records status='failed' with
+                # the error message (not a bogus 'completed'). BaseException
+                # on purpose: Ctrl+C / SystemExit must also leave a 'failed'
+                # row, then keep propagating past the outer handler.
+                result["status"] = TaskStatus.FAILED
+                result["error"] = f"{type(exc).__name__}: {exc}"
+                raise
+
             finally:
                 # Always release the lock we acquired — including forced runs,
                 # so a --force run heals a previously stuck 'running' row
@@ -125,7 +135,8 @@ class TaskManager(_LoadStepMixin, _DetectStepMixin, _AlertStepMixin):
             # which class of error happened (DB connection, validation,
             # channel HTTP, etc.) without having to grep the traceback.
             result["status"] = TaskStatus.FAILED
-            result["error"] = f"{type(exc).__name__}: {exc}"
+            if not result.get("error"):
+                result["error"] = f"{type(exc).__name__}: {exc}"
             click.echo(
                 click.style(
                     f"  ✗ Pipeline failed for '{metric_name}': {result['error']}",

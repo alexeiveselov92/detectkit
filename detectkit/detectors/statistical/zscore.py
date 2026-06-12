@@ -5,417 +5,70 @@ Z-Score is a classical statistical method for outlier detection that:
 - Uses mean as measure of center
 - Uses standard deviation as measure of spread
 - Assumes approximately normal distribution
-- Supports seasonality grouping for adaptive thresholds
 
 Formula:
 - mean_val = mean(values)
-- std_val = std(values)
-- z_score = (value - mean_val) / std_val
+- std_val = std(values)  (Bessel-corrected, ddof=1)
 - lower_bound = mean_val - threshold × std_val
 - upper_bound = mean_val + threshold × std_val
 
-With seasonality:
-- Computes global statistics (entire window)
-- Computes group statistics (seasonality subset)
-- Applies multipliers: adjusted_stat = global_stat × group_multiplier
+Note: Z-Score is more sensitive to outliers than MAD because both mean
+and std are affected by extreme values.
 
-Note: Z-Score is more sensitive to outliers than MAD because
-both mean and std are affected by extreme values.
+Windowing, recency weighting (half_life), detrending and seasonality
+grouping are shared with MAD and IQR — see
+:class:`detectkit.detectors.statistical._windowed.WindowedStatDetector`.
 """
-
-from typing import Any
 
 import numpy as np
 
-from detectkit.detectors.base import BaseDetector, DetectionResult
-from detectkit.detectors.seasonality import (
-    create_seasonality_mask,
-    parse_seasonality_data,
-)
+from detectkit.detectors.statistical._windowed import WindowedStatDetector
+from detectkit.utils.stats import weighted_mean, weighted_std
 
 
-class ZScoreDetector(BaseDetector):
+class ZScoreDetector(WindowedStatDetector):
     """
-    Z-Score detector for anomaly detection with seasonality support.
+    Z-Score detector.
 
     Detects anomalies by comparing values against confidence intervals
-    based on mean and standard deviation (Z-Score method).
+    based on mean and standard deviation.
 
-    Parameters:
-        threshold (float): Number of standard deviations from mean (default: 3.0)
-            - 3.0 is standard (99.7% of normal data within ±3σ)
-            - Higher = less sensitive (fewer anomalies)
-            - Lower = more sensitive (more anomalies)
+    Detector-specific parameters:
+        threshold (float): Number of standard deviations from mean
+            (default: 3.0 — 99.7% of normal data within ±3σ)
+        min_samples (int): default 30, must be at least 2
+        min_samples_per_group (int): default 3
 
-        window_size (int): Historical window size in points (default: 100)
-            - Uses last N points to compute statistics
-            - Larger = more stable but less responsive
-            - Smaller = more responsive but less stable
-
-        min_samples (int): Minimum samples required for detection (default: 30)
-            - Skip detection if window has fewer valid points
-            - Ensures statistical reliability
-
-        seasonality_components (list, optional): List of seasonality groupings
-            - Single component: ["hour_of_day"]
-            - Multiple separate: ["hour_of_day", "day_of_week"]
-            - Combined group: [["hour_of_day", "day_of_week"]]
-            - Enables adaptive confidence intervals per seasonality pattern
-
-        min_samples_per_group (int): Minimum samples per seasonality group (default: 3)
-            - Groups with fewer samples use global statistics
+    All other parameters (window_size, seasonality_components, input_type,
+    smoothing, window_weights/half_life, detrend) are shared — see
+    WindowedStatDetector.
 
     Example:
-        >>> # Without seasonality
         >>> detector = ZScoreDetector(threshold=3.0, window_size=100)
-        >>> results = detector.detect(data)
-
-        >>> # With seasonality
-        >>> detector = ZScoreDetector(
-        ...     threshold=3.0,
-        ...     window_size=2016,
-        ...     seasonality_components=["hour_of_day", "day_of_week"]
-        ... )
         >>> results = detector.detect(data)
     """
 
-    def __init__(
-        self,
-        threshold: float = 3.0,
-        window_size: int = 100,
-        min_samples: int = 30,
-        seasonality_components: list[str | list[str]] | None = None,
-        min_samples_per_group: int = 3,
-        input_type: str = "values",
-        smoothing: str | None = None,
-        smoothing_alpha: float = 0.3,
-        smoothing_window: int = 10,
-        window_weights: str | None = None,
-        weight_decay: float = 0.95,
-    ):
-        """
-        Initialize Z-Score detector with parameters.
+    THRESHOLD_DEFAULT = 3.0
+    MIN_SAMPLES_FLOOR = 2
+    MIN_SAMPLES_PER_GROUP_DEFAULT = 3
+    MIN_SAMPLES_PER_GROUP_FLOOR = 1
+    STATS = (("mean", "center"), ("std", "spread"))
 
-        Args:
-            threshold: Number of standard deviations from mean
-            window_size: Historical window size in points
-            min_samples: Minimum total samples required
-            seasonality_components: Optional list of seasonality groups
-            min_samples_per_group: Minimum samples per seasonality group
-            input_type: Input transformation (values, changes, absolute_changes, log_changes)
-            smoothing: Smoothing method (None, ema, sma)
-            smoothing_alpha: EMA smoothing factor (0 < alpha <= 1)
-            smoothing_window: SMA window size
-            window_weights: Weighting method (None, exponential, linear)
-            weight_decay: Decay factor for exponential weights (0 < decay < 1)
-        """
-        super().__init__(
-            threshold=threshold,
-            window_size=window_size,
-            min_samples=min_samples,
-            seasonality_components=seasonality_components,
-            min_samples_per_group=min_samples_per_group,
-            input_type=input_type,
-            smoothing=smoothing,
-            smoothing_alpha=smoothing_alpha,
-            smoothing_window=smoothing_window,
-            window_weights=window_weights,
-            weight_decay=weight_decay,
+    def _compute_stats(self, values: np.ndarray, weights: np.ndarray) -> dict[str, float]:
+        mean = weighted_mean(values, weights)
+        return {"mean": mean, "std": weighted_std(values, weights, center=mean, ddof=1)}
+
+    def _build_interval(self, stats: dict[str, float], threshold: float) -> tuple[float, float]:
+        if stats["std"] == 0:
+            # All values identical — any deviation is anomalous
+            return stats["mean"] - 1e-10, stats["mean"] + 1e-10
+        return (
+            stats["mean"] - threshold * stats["std"],
+            stats["mean"] + threshold * stats["std"],
         )
 
-    def _validate_params(self):
-        """Validate detector parameters."""
-        threshold = self.params.get("threshold")
-        if threshold is None or threshold <= 0:
-            raise ValueError("threshold must be positive")
-
-        window_size = self.params.get("window_size")
-        if window_size is None or window_size < 1:
-            raise ValueError("window_size must be at least 1")
-
-        min_samples = self.params.get("min_samples")
-        if min_samples is None or min_samples < 2:
-            raise ValueError("min_samples must be at least 2")
-
-        if min_samples > window_size:
-            raise ValueError("min_samples cannot exceed window_size")
-
-        min_samples_per_group = self.params.get("min_samples_per_group", 3)
-        if min_samples_per_group < 1:
-            raise ValueError("min_samples_per_group must be at least 1")
-
-    def detect(self, data: dict[str, np.ndarray]) -> list[DetectionResult]:
-        """
-        Perform Z-Score based anomaly detection with optional seasonality support.
-
-        For each point, uses historical window to compute:
-        1. Global mean and std (entire window)
-        2. If seasonality configured: group mean and std (seasonality subset)
-        3. Apply multipliers: adjusted = global × (group / global)
-        4. Build confidence interval: [mean - threshold×std, mean + threshold×std]
-        5. Detect anomaly if value outside interval
-
-        Args:
-            data: Dictionary with keys:
-                - timestamp: np.array of datetime64[ms]
-                - value: np.array of float64 (may contain NaN)
-                - seasonality_data: np.array of JSON strings (optional)
-                - seasonality_columns: list of column names (optional)
-
-        Returns:
-            List of DetectionResult for each point
-
-        Notes:
-            - NaN values are skipped (marked as non-anomalous)
-            - First min_samples-1 points are skipped (insufficient history)
-            - Uses Bessel's correction (ddof=1) for std calculation
-            - Seasonality grouping creates adaptive confidence intervals
-        """
-        timestamps = data["timestamp"]
-        values = data["value"]  # ORIGINAL values (always kept)
-        threshold = self.params["threshold"]
-        window_size = self.params["window_size"]
-        min_samples = self.params["min_samples"]
-
-        # Seasonality parameters
-        seasonality_components = self.params.get("seasonality_components")
-        min_samples_per_group = self.params.get("min_samples_per_group", 3)
-
-        # STEP 0: Preprocessing (smoothing + input_type transformation)
-        smoothed_values = self._apply_smoothing(values)
-        processed_values = self._preprocess_input(smoothed_values)
-
-        # Parse seasonality data if available
-        seasonality_dict = {}
-        seasonality_columns = data.get("seasonality_columns", [])
-        seasonality_data = data.get("seasonality_data", np.array([]))
-
-        if seasonality_components and len(seasonality_columns) > 0 and len(seasonality_data) > 0:
-            seasonality_dict = parse_seasonality_data(seasonality_data, seasonality_columns)
-
-        results = []
-        n_points = len(timestamps)
-
-        for i in range(n_points):
-            current_val = values[i]  # ORIGINAL value
-            current_processed = processed_values[i]  # PROCESSED value
-            current_ts = timestamps[i]
-
-            # Skip NaN values (in processed)
-            if np.isnan(current_processed):
-                results.append(
-                    DetectionResult(
-                        timestamp=current_ts,
-                        value=current_val,
-                        processed_value=current_processed,
-                        is_anomaly=False,
-                        detection_metadata={"reason": "missing_data"},
-                    )
-                )
-                continue
-
-            # Get historical window (not including current point)
-            window_start = max(0, i - window_size)
-            window_processed = processed_values[window_start:i]
-
-            # Filter out NaN values from window
-            valid_mask = ~np.isnan(window_processed)
-            window_valid = window_processed[valid_mask]
-
-            # Check if we have enough samples
-            if len(window_valid) < min_samples:
-                results.append(
-                    DetectionResult(
-                        timestamp=current_ts,
-                        value=current_val,
-                        processed_value=current_processed,
-                        is_anomaly=False,
-                        detection_metadata={
-                            "reason": "insufficient_data",
-                            "window_size": int(len(window_valid)),
-                            "min_samples": min_samples,
-                        },
-                    )
-                )
-                continue
-
-            # Compute weights for window (if specified)
-            weights = self._compute_weights(len(window_valid))
-
-            # STEP 1: Compute GLOBAL statistics (entire window)
-            # Use weighted statistics if weights are not uniform
-            from detectkit.utils import weighted_mean, weighted_std
-
-            global_mean = weighted_mean(window_valid, weights)
-            global_std = weighted_std(window_valid, weights, center=global_mean, ddof=1)
-
-            # Initialize adjusted statistics
-            adjusted_mean = global_mean
-            adjusted_std = global_std
-
-            # STEP 2: Apply seasonality adjustments
-            multipliers_applied = []
-
-            if seasonality_components and seasonality_dict:
-                for group in seasonality_components:
-                    # Convert single string to list
-                    group_cols = [group] if isinstance(group, str) else group
-
-                    # Create mask for this seasonality group
-                    season_mask = create_seasonality_mask(
-                        seasonality_dict, window_start, i, group_cols
-                    )
-
-                    # Apply mask to window (only valid values + seasonality match)
-                    # Both valid_mask and season_mask are same size as window_processed
-                    combined_mask = valid_mask & season_mask
-
-                    group_values = window_processed[combined_mask]
-
-                    # Check if enough samples in group
-                    if len(group_values) < min_samples_per_group:
-                        # Insufficient data - skip this group (multiplier = 1.0)
-                        multipliers_applied.append(
-                            {
-                                "group": group_cols,
-                                "mean_multiplier": 1.0,
-                                "std_multiplier": 1.0,
-                                "reason": "insufficient_group_data",
-                                "group_size": int(len(group_values)),
-                            }
-                        )
-                        continue
-
-                    # Compute group statistics with weights
-                    group_weights = self._compute_weights(len(group_values))
-                    group_mean = weighted_mean(group_values, group_weights)
-                    group_std = weighted_std(group_values, group_weights, center=group_mean, ddof=1)
-
-                    # Calculate multipliers (avoid division by zero)
-                    if global_mean != 0:
-                        mean_multiplier = group_mean / global_mean
-                    else:
-                        mean_multiplier = 1.0
-
-                    if global_std > 0:
-                        std_multiplier = group_std / global_std
-                    else:
-                        std_multiplier = 1.0
-
-                    # Apply multipliers
-                    adjusted_mean *= mean_multiplier
-                    adjusted_std *= std_multiplier
-
-                    multipliers_applied.append(
-                        {
-                            "group": group_cols,
-                            "mean_multiplier": float(mean_multiplier),
-                            "std_multiplier": float(std_multiplier),
-                            "group_size": int(len(group_values)),
-                        }
-                    )
-
-            # STEP 3: Build confidence interval with adjusted statistics
-            if adjusted_std == 0:
-                # All values identical - use small epsilon
-                confidence_lower = adjusted_mean - 1e-10
-                confidence_upper = adjusted_mean + 1e-10
-            else:
-                confidence_lower = adjusted_mean - threshold * adjusted_std
-                confidence_upper = adjusted_mean + threshold * adjusted_std
-
-            # STEP 4: Check if current PROCESSED value is anomalous
-            is_anomaly = (current_processed < confidence_lower) or (
-                current_processed > confidence_upper
-            )
-
-            # STEP 5: Compute metadata
-            metadata = {
-                "global_mean": float(global_mean),
-                "global_std": float(global_std),
-                "adjusted_mean": float(adjusted_mean),
-                "adjusted_std": float(adjusted_std),
-                "window_size": int(len(window_valid)),
-            }
-
-            # Add preprocessing info if used
-            if self.params.get("smoothing") or self.params.get("input_type") != "values":
-                metadata["preprocessing"] = {
-                    "input_type": self.params.get("input_type", "values"),
-                    "smoothing": self.params.get("smoothing"),
-                }
-                if self.params.get("smoothing"):
-                    metadata["preprocessing"]["smoothed_value"] = float(smoothed_values[i])
-
-            if seasonality_components and multipliers_applied:
-                metadata["seasonality_groups"] = multipliers_applied
-
-            if is_anomaly:
-                if current_processed < confidence_lower:
-                    direction = "below"
-                    distance = confidence_lower - current_processed
-                else:
-                    direction = "above"
-                    distance = current_processed - confidence_upper
-
-                # Severity: how many adjusted std away
-                if adjusted_std > 0:
-                    z_score = abs((current_processed - adjusted_mean) / adjusted_std)
-                else:
-                    z_score = float("inf")
-
-                metadata.update(
-                    {
-                        "direction": direction,
-                        "severity": float(z_score),
-                        "distance": float(distance),
-                    }
-                )
-
-            results.append(
-                DetectionResult(
-                    timestamp=current_ts,
-                    value=current_val,  # ORIGINAL value
-                    processed_value=current_processed,  # PROCESSED value
-                    is_anomaly=is_anomaly,
-                    confidence_lower=float(confidence_lower),
-                    confidence_upper=float(confidence_upper),
-                    detection_metadata=metadata,
-                )
-            )
-
-        return results
-
-    def _get_non_default_params(self) -> dict[str, Any]:
-        """
-        Get parameters that differ from defaults.
-
-        Excludes execution parameters (seasonality_components, min_samples_per_group)
-        from detector ID hash.
-        """
-        defaults = {
-            "threshold": 3.0,
-            "window_size": 100,
-            "min_samples": 30,
-            "min_samples_per_group": 3,
-            "input_type": "values",
-            "smoothing": None,
-            "smoothing_alpha": 0.3,
-            "smoothing_window": 10,
-            "window_weights": None,
-            "weight_decay": 0.95,
-        }
-        # Execution parameters that don't affect detector ID
-        execution_params = {
-            "seasonality_components",
-            "min_samples_per_group",
-            "smoothing_alpha",  # Only affects smoothing, not algorithm
-            "smoothing_window",  # Only affects smoothing, not algorithm
-            "weight_decay",  # Only affects weighting, not algorithm
-        }
-
-        return {
-            k: v
-            for k, v in self.params.items()
-            if v != defaults.get(k) and k not in execution_params
-        }
+    def _severity(self, current: float, stats: dict[str, float], distance: float) -> float:
+        # Distance beyond the bound in σ units — the same "0 at the bound"
+        # convention as MAD/IQR, so the alert layer can compare severities
+        # across detectors when picking the alert payload.
+        return distance / stats["std"] if stats["std"] > 0 else float("inf")

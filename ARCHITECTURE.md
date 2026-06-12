@@ -263,47 +263,87 @@ db.insert_batch(table, data, conflict_strategy="ignore")
 **Interface**:
 ```python
 class BaseDetector(ABC):
-    DEFAULT_PARAMS = {}  # overridden in subclasses
+    def __init__(self, **params):
+        self.params = params
+        self._validate_params()  # fail fast on bad config
 
     @abstractmethod
-    def detect(self, data: MetricData, start_idx: int) -> DetectionData:
+    def _validate_params(self):
+        """Validate parameters at construction time"""
+
+    @abstractmethod
+    def detect(self, data: dict[str, np.ndarray]) -> list[DetectionResult]:
         """
-        Run detection on data starting from start_idx
-
-        Args:
-            data: Full metric data (including history)
-            start_idx: Index of first point to detect
-
-        Returns:
-            DetectionData for points [start_idx:]
+        Run detection. `data` contains "timestamp", "value" and optionally
+        "seasonality_data"/"seasonality_columns" arrays (full batch
+        including the historical context window).
         """
 
-    def get_id(self) -> str:
+    @abstractmethod
+    def _get_non_default_params(self) -> dict[str, Any]:
+        """Params that differ from defaults — every parameter that changes
+        detection output participates in the detector ID"""
+
+    def get_detector_id(self) -> str:
         """Generate detector ID from class name + non-default params"""
         non_default = self._get_non_default_params()
         sorted_params = sorted(non_default.items())
-        hash_input = f"{self.__class__.__name__}:{sorted_params}"
-        return hashlib.sha256(hash_input.encode()).hexdigest()[:16]
+        hash_string = self.__class__.__name__ + str(sorted_params)
+        return hashlib.sha256(hash_string.encode()).hexdigest()[:16]
+
+    def get_context_size(self) -> int:
+        """Historical points needed before the first detected point
+        (window_size + smoothing warm-up + 1 for change-based input_type)"""
 ```
+
+Shared preprocessing helpers (`_preprocess_input` for `input_type`,
+`_apply_smoothing` for EMA/SMA) also live in `BaseDetector`.
 
 #### Statistical Detectors (`detectors/statistical/`)
 
+**Template Method design** (`_windowed.py`): MAD, Z-Score and IQR share one
+implementation, `WindowedStatDetector`, which owns the whole per-point
+pipeline — preprocessing (smoothing + `input_type` transform), trailing
+window slice (current point excluded) with NaN filtering, optional
+time-aware recency weighting, optional robust linear detrending, global
+statistics + per-seasonality-group multipliers, confidence interval and
+metadata. Subclasses only define:
+- `THRESHOLD_DEFAULT`, `MIN_SAMPLES_FLOOR`, `MIN_SAMPLES_PER_GROUP_DEFAULT` class attributes
+- `STATS`: ordered `(name, kind)` statistic spec (`kind` in `{"center", "spread"}`)
+- `_compute_stats(values, weights)` — e.g. median/MAD, mean/std, q1/q3/IQR
+- `_build_interval(stats, threshold)` — the confidence-interval formula
+- `_severity(current, stats, distance)` — the severity formula
+
+All windowing, weighting, detrending and seasonality logic therefore
+behaves identically across the three detectors. `ManualBoundsDetector` is
+separate (stateless, no window).
+
 **Core Algorithm** (MAD example):
 
-1. **Compute weights** (optional):
+1. **Compute weights** (optional, time-aware — weight depends on a point's
+   age on the time grid, so data gaps don't compress the decay):
    ```python
-   if weighting == 'exponential':
-       weights = decay ** np.arange(window_size)[::-1]
-       weights /= weights.sum()
+   ages = np.arange(1, window_size + 1)  # 1 = previous point
+
+   if window_weights == 'exponential':
+       # half_life: points (int) or duration string ("3d"), converted
+       # via the data grid step; default = window_size / 20
+       weights = 0.5 ** (ages / half_life_points)
+   elif window_weights == 'linear':
+       weights = (window_size + 1 - ages) / window_size
    ```
 
-2. **Global statistics**:
+2. **Detrend** (optional, `detrend: linear`): estimate a robust slope over
+   the window (split-median) and project every window point to the current
+   point along that trend before computing statistics.
+
+3. **Global statistics**:
    ```python
    global_median = weighted_median(window_values, weights)
    global_mad = weighted_mad(window_values, weights, global_median)
    ```
 
-3. **Seasonality adjustments**:
+4. **Seasonality adjustments**:
    ```python
    for component in seasonality_components:
        # Create boolean mask
@@ -322,10 +362,10 @@ class BaseDetector(ABC):
        spread_mult *= comp_mad / global_mad
    ```
 
-4. **Adjusted bounds**:
+5. **Adjusted bounds**:
    ```python
    adjusted_center = global_median * center_mult
-   adjusted_spread = global_mad * spread_mult
+   adjusted_spread = global_mad * spread_mult   # MAD scaled by 1.4826 (σ-equivalent)
    lower = adjusted_center - threshold * adjusted_spread
    upper = adjusted_center + threshold * adjusted_spread
    ```
@@ -477,13 +517,15 @@ for metric_config in selected_metrics:
 
 ## Design Patterns
 
-### 1. Strategy Pattern - Detectors
+### 1. Strategy + Template Method - Detectors
 
-Different detection algorithms implement `BaseDetector` interface:
-- `MADDetector` - Median Absolute Deviation (robust to outliers)
-- `MeanStdDetector` - Mean and Standard Deviation (classic Z-score)
+Different detection algorithms implement the `BaseDetector` interface.
+The three windowed statistical detectors extend `WindowedStatDetector`
+(template method: shared pipeline, detector-specific statistics):
+- `MADDetector` - Median Absolute Deviation, scaled by 1.4826 to σ-equivalents (robust to outliers)
+- `ZScoreDetector` - Mean and Standard Deviation (classic Z-score)
 - `IQRDetector` - Interquartile Range (percentile-based)
-- `ManualBoundsDetector` - User-defined static thresholds
+- `ManualBoundsDetector` - User-defined static thresholds (extends `BaseDetector` directly)
 
 ### 2. Template Method - Database Managers
 
@@ -495,19 +537,20 @@ Different detection algorithms implement `BaseDetector` interface:
 ### 3. Factory Pattern - Detector Registry
 
 ```python
-class DetectorRegistry:
-    _detectors = {
-        'statistical_mad': MADDetector,
-        'statistical_mean_std': MeanStdDetector,
-        'statistical_iqr': IQRDetector,
+class DetectorFactory:
+    DETECTOR_TYPES = {
+        'mad': MADDetector,
+        'zscore': ZScoreDetector,
+        'iqr': IQRDetector,
         'manual_bounds': ManualBoundsDetector,
+        'manual': ManualBoundsDetector,  # alias
     }
 
     @classmethod
-    def create(cls, name: str, params: Dict) -> BaseDetector:
-        detector_class = cls._detectors.get(name)
+    def create(cls, detector_type: str, params: Dict) -> BaseDetector:
+        detector_class = cls.DETECTOR_TYPES.get(detector_type)
         if not detector_class:
-            raise ValueError(f"Unknown detector: {name}")
+            raise ValueError(f"Unknown detector: {detector_type}")
         return detector_class(**params)
 ```
 

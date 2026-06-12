@@ -69,12 +69,17 @@ class TelegramChannel(BaseAlertChannel):
         self.disable_notification = disable_notification
         self.template = template
 
-    def send(self, alert_data: AlertData) -> None:
+    def send(self, alert_data: AlertData, template: str | None = None) -> bool:
         """
         Send alert to Telegram.
 
         Args:
             alert_data: Alert information to send
+            template: Per-call template override (falls back to the
+                channel-level template, then the built-in default)
+
+        Returns:
+            True when the message was accepted by the Telegram API
 
         Raises:
             requests.RequestException: If request fails
@@ -83,7 +88,7 @@ class TelegramChannel(BaseAlertChannel):
         Example:
             >>> channel.send(alert_data)
         """
-        message = self.format_message(alert_data, self.template)
+        message = self.format_message(alert_data, template or self.template)
 
         # Telegram Bot API URL
         url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
@@ -102,6 +107,8 @@ class TelegramChannel(BaseAlertChannel):
             response.raise_for_status()
         except requests.RequestException as e:
             raise requests.RequestException(f"Failed to send Telegram alert: {e}") from e
+
+        return True
 
     def format_mentions(self, mentions: list[str]) -> str:
         """

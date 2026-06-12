@@ -8,9 +8,11 @@ Provides dbt-like commands:
 
 import click
 
+from detectkit import __version__
+
 
 @click.group()
-@click.version_option(version="0.1.0", prog_name="detectkit")
+@click.version_option(version=__version__, prog_name="detectkit")
 def cli():
     """
     detectkit - Metric monitoring with automatic anomaly detection.

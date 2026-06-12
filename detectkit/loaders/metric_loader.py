@@ -216,26 +216,27 @@ class MetricLoader:
 
         # Fill gaps if needed
         if fill_gaps:
+            original_timestamps = timestamp_array
             timestamp_array, value_array = self._fill_gaps(
                 timestamp_array, value_array, from_date, to_date, interval_seconds
             )
 
-            # If we have seasonality from query, we need to fill gaps in it too
+            # Realign query-provided seasonality to the gap-filled grid.
+            # Gap rows can appear ANYWHERE in the range and _fill_gaps also
+            # re-sorts rows onto the grid, so each original JSON payload
+            # must follow its own timestamp — unconditionally (equal
+            # lengths do not imply equal ordering).
             if seasonality_from_query is not None:
-                # For gap-filled rows, seasonality will be extracted from timestamp
-                # This is a simplified approach - we just use empty JSON for gaps
-                # In production, you might want to interpolate or use timestamp-based features
-                original_length = len(seasonality_from_query)
-                new_length = len(timestamp_array)
-                if new_length > original_length:
-                    # We have gaps - pad with empty JSON
-                    empty_json = json_dumps_sorted({})
-                    seasonality_from_query = np.pad(
-                        seasonality_from_query,
-                        (0, new_length - original_length),
-                        mode="constant",
-                        constant_values=empty_json,
-                    )
+                empty_json = json_dumps_sorted({})
+                aligned = np.full(len(timestamp_array), empty_json, dtype=object)
+                positions = np.searchsorted(timestamp_array, original_timestamps)
+                in_range = positions < len(timestamp_array)
+                matched = np.zeros(len(original_timestamps), dtype=bool)
+                matched[in_range] = (
+                    timestamp_array[positions[in_range]] == original_timestamps[in_range]
+                )
+                aligned[positions[matched]] = seasonality_from_query[matched]
+                seasonality_from_query = aligned
 
         # Determine final seasonality data and columns
         if seasonality_from_query is not None:

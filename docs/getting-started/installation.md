@@ -63,7 +63,7 @@ pip install detectkit[mysql]
 Or install driver manually:
 
 ```bash
-pip install mysql-connector-python
+pip install pymysql
 ```
 
 **Supported versions**: MySQL 8.0+
@@ -74,6 +74,8 @@ Install drivers for all databases you'll use:
 
 ```bash
 pip install detectkit[clickhouse,postgres,mysql]
+# or the shorthand:
+pip install detectkit[all-db]
 ```
 
 ## Advanced Detectors (Optional)
@@ -86,7 +88,7 @@ Time-series forecasting with Facebook Prophet:
 pip install detectkit[prophet]
 ```
 
-**Note**: Prophet has heavy dependencies (pystan, fbprophet). Only install if needed.
+**Note**: Prophet has heavy dependencies (compiled Stan backend). Only install if needed.
 
 ### TimesFM Detector
 
@@ -96,7 +98,7 @@ Google's TimesFM model for time-series:
 pip install detectkit[timesfm]
 ```
 
-**Note**: Requires TensorFlow dependencies.
+**Note**: Pulls in heavy ML dependencies. Only install if needed.
 
 ### All Advanced Detectors
 
@@ -147,10 +149,10 @@ Check that detectkit is installed correctly:
 dtk --version
 ```
 
-Expected output:
+This prints the installed package version:
 
 ```
-dtk, version 0.3.0
+detectkit, version x.y.z
 ```
 
 ## Upgrading

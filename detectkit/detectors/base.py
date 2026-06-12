@@ -89,6 +89,12 @@ class BaseDetector(ABC):
         ...         return {k: v for k, v in self.params.items() if v != defaults.get(k)}
     """
 
+    # Bump when the detection algorithm changes for the SAME parameters
+    # (e.g. a statistics convention change): the version feeds the detector
+    # ID, so existing detections recompute instead of silently mixing two
+    # regimes under one ID.
+    ALGORITHM_VERSION: int = 1
+
     def __init__(self, **params):
         """
         Initialize detector with parameters.
@@ -168,7 +174,8 @@ class BaseDetector(ABC):
         """
         non_default_params = self._get_non_default_params()
         sorted_params = sorted(non_default_params.items())
-        hash_string = self.__class__.__name__ + str(sorted_params)
+        version_tag = f"@v{self.ALGORITHM_VERSION}" if self.ALGORITHM_VERSION != 1 else ""
+        hash_string = self.__class__.__name__ + version_tag + str(sorted_params)
         return hashlib.sha256(hash_string.encode()).hexdigest()[:16]
 
     def get_detector_params(self) -> str:
@@ -342,16 +349,27 @@ class BaseDetector(ABC):
             Smoothed values
 
         Formula:
-            ema[0] = values[0]
+            ema[first_valid] = values[first_valid]
             ema[t] = alpha * values[t] + (1 - alpha) * ema[t-1]
+
+        Leading NaN values stay NaN (the EMA starts at the first valid
+        point); later NaN values carry the previous EMA forward.
         """
         if not (0 < alpha <= 1):
             raise ValueError(f"alpha must be in (0, 1], got {alpha}")
 
-        ema = np.zeros_like(values, dtype=float)
-        ema[0] = values[0]
+        values = np.asarray(values, dtype=float)
+        ema = np.full_like(values, np.nan, dtype=float)
+        if values.size == 0:
+            return ema
 
-        for i in range(1, len(values)):
+        valid_indices = np.flatnonzero(~np.isnan(values))
+        if valid_indices.size == 0:
+            return ema
+
+        first = valid_indices[0]
+        ema[first] = values[first]
+        for i in range(first + 1, len(values)):
             if np.isnan(values[i]):
                 ema[i] = ema[i - 1]  # Carry forward if missing
             else:
@@ -394,44 +412,3 @@ class BaseDetector(ABC):
         with np.errstate(invalid="ignore", divide="ignore"):
             sma = np.where(window_counts > 0, window_sums / window_counts, np.nan)
         return sma
-
-    def _compute_weights(self, window_size: int) -> np.ndarray:
-        """
-        Compute weights for points in window.
-
-        Args:
-            window_size: Size of the window
-
-        Returns:
-            Array of weights (normalized to sum to 1)
-
-        Supported window_weights methods:
-            - None: Uniform weights (all points equal)
-            - "exponential": Exponential decay (recent points have more weight)
-            - "linear": Linear increase (recent points have more weight)
-        """
-        window_weights = self.params.get("window_weights")
-
-        if window_weights is None:
-            # Uniform weights
-            return np.ones(window_size) / window_size
-
-        elif window_weights == "exponential":
-            weight_decay = self.params.get("weight_decay", 0.95)
-            if not (0 < weight_decay < 1):
-                raise ValueError(f"weight_decay must be in (0, 1), got {weight_decay}")
-
-            # Older points get less weight: decay^k for k in [window_size, 1]
-            weights = np.array([weight_decay**k for k in range(window_size, 0, -1)])
-            return weights / weights.sum()
-
-        elif window_weights == "linear":
-            # Linear increase: 1, 2, 3, ..., window_size
-            weights = np.arange(1, window_size + 1, dtype=float)
-            return weights / weights.sum()
-
-        else:
-            raise ValueError(
-                f"Unknown window_weights method: {window_weights}. "
-                f"Supported methods: exponential, linear"
-            )

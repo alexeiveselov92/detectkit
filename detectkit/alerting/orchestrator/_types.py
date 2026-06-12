@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import numpy as np
 
+from detectkit.utils.datetime_utils import to_naive_utc
 from detectkit.utils.json_utils import json_loads
 
 
@@ -58,11 +60,15 @@ def _direction_from_metadata(metadata: Any, is_anomaly: bool) -> str:
 
 @dataclass
 class AlertConditions:
-    """Conditions that turn a sequence of detections into an alert."""
+    """Conditions that turn a sequence of detections into an alert.
+
+    Defaults mirror :class:`detectkit.config.metric_config.AlertConfig`
+    so direct API users get the same behavior as YAML users.
+    """
 
     min_detectors: int = 1
-    direction: str = "any"  # "any", "same", "up", "down"
-    consecutive_anomalies: int = 1
+    direction: str = "same"  # "any", "same", "up", "down"
+    consecutive_anomalies: int = 3
 
 
 @dataclass
@@ -80,3 +86,45 @@ class DetectionRecord:
     direction: str  # "up", "down", "none"
     severity: float
     detection_metadata: dict
+
+
+def hydrate_detection_records(rows: list[dict]) -> list[DetectionRecord]:
+    """Build :class:`DetectionRecord` rows from ``get_recent_detections`` output.
+
+    Emits one record *per detector per timestamp* (the orchestrator counts
+    records to evaluate ``min_detectors``). Input rows are timestamp-DESC as
+    returned by SQL; output is oldest→newest. Timestamps are normalized to
+    ``datetime64[ms]`` so grid-adjacency arithmetic is well-defined.
+    """
+    records: list[DetectionRecord] = []
+    for row in reversed(rows):
+        raw_ts = row["timestamp"]
+        if isinstance(raw_ts, datetime):
+            raw_ts = to_naive_utc(raw_ts)
+        timestamp = np.datetime64(raw_ts, "ms")
+        metadata_list = row.get("detection_metadata_list") or [None] * len(row["detector_ids"])
+        for i in range(len(row["detector_ids"])):
+            is_anomaly = bool(row["is_anomaly_flags"][i])
+            metadata = _parse_detection_metadata(metadata_list[i])
+            try:
+                severity = float(metadata.get("severity", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                severity = 0.0
+
+            records.append(
+                DetectionRecord(
+                    timestamp=timestamp,
+                    detector_name=row["detector_names"][i],
+                    detector_id=row["detector_ids"][i],
+                    detector_params=row["detector_params_list"][i],
+                    value=row["value"],
+                    is_anomaly=is_anomaly,
+                    confidence_lower=row["confidence_lowers"][i],
+                    confidence_upper=row["confidence_uppers"][i],
+                    direction=_direction_from_metadata(metadata, is_anomaly),
+                    severity=severity,
+                    detection_metadata=metadata,
+                )
+            )
+
+    return records

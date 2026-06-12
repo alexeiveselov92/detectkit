@@ -27,8 +27,8 @@ query: |
     toStartOfInterval(timestamp, INTERVAL 5 MINUTE) AS timestamp,
     countIf(status_code >= 500) / count() AS value
   FROM http_requests
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -64,8 +64,8 @@ query: |
     toStartOfInterval(timestamp, INTERVAL 5 MINUTE) AS timestamp,
     countIf(status_code >= 500) / count() * 100 AS value
   FROM http_requests
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -160,8 +160,8 @@ query: |
     toStartOfMinute(timestamp) AS timestamp,
     countIf(status = 'ok') / count() * 100 AS value
   FROM payment_healthchecks
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -175,7 +175,7 @@ alerting:
   timezone: "UTC"
 
   channels:
-    - pagerduty_oncall
+    - mattermost_oncall
     - slack_incidents
     - email_sre_team
 
@@ -185,7 +185,9 @@ alerting:
   alert_cooldown: "5min"
   cooldown_reset_on_recovery: true
 
-  # Recovery notification is critical for SLA tracking
+  # Recovery notification is critical for SLA tracking.
+  # Recovery is direction-aware: with direction: "down" only fresh "down"
+  # anomalies block the recovery — an unrelated "up" spike does not.
   notify_on_recovery: true
 
   # Mention SRE lead for critical outages

@@ -71,13 +71,13 @@ detectors:
       window_size: 288  # 2 days of 10-min intervals
 ```
 
-#### `min_samples` (int, default: 30)
+#### `min_samples` (int, default: 30, minimum: 2)
 Minimum valid samples required before detection starts.
 
 - Ensures statistical reliability (rule of thumb: ≥30 for normal approximation)
 - Points before this threshold are marked as "insufficient_data"
 - Should be significantly smaller than `window_size`
-- **Typical**: 20-40% of `window_size`
+- **Typical**: 10-30% of `window_size`
 
 **Example:**
 ```yaml
@@ -87,7 +87,48 @@ detectors:
       min_samples: 50  # Wait for 50 valid samples
 ```
 
+#### `seasonality_components` (list, optional)
+Seasonality groupings for adaptive intervals — works exactly like MAD's
+(global statistics adjusted by per-group multipliers). Single components
+(`"hour"`), multiple separate components, or combined components
+(`["hour", "day_of_week"]`) are supported. Names must match the metric's
+built-in `seasonality_columns` features or custom columns declared in
+`query_columns.seasonality`.
+
+**Example:**
+```yaml
+detectors:
+  - type: zscore
+    params:
+      seasonality_components:
+        - "hour"
+```
+
+#### `min_samples_per_group` (int, default: 3)
+Minimum samples required in each seasonality group for applying multipliers.
+Groups below this threshold fall back to global statistics.
+
+### Shared Parameters (Preprocessing, Weighting, Detrending)
+
+These parameters are shared by MAD, Z-Score and IQR and behave identically.
+See the [Detectors Guide](../../guides/detectors.md#advanced-detector-features)
+for detailed explanations and recipes.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `input_type` | str | `"values"` | `"values"`, `"changes"`, `"absolute_changes"` or `"log_changes"` |
+| `smoothing` | str/null | `null` | `null`, `"ema"` or `"sma"` — applied before `input_type` |
+| `smoothing_alpha` | float | `0.3` | EMA factor, 0 < alpha ≤ 1 |
+| `smoothing_window` | int | `10` | SMA window in points |
+| `window_weights` | str/null | `null` | `null` (uniform), `"exponential"` or `"linear"` recency weighting |
+| `half_life` | int/str/null | `null` | Exponential half-life: int points or duration string (`"3d"`, `"12h"`). Default when unset: `window_size / 20` |
+| `weight_decay` | float/null | `null` | **Deprecated** alias for `half_life` (per-point multiplier in (0, 1)); mutually exclusive with `half_life` |
+| `detrend` | str/null | `null` | `null` or `"linear"` — robust in-window detrending |
+
 ### Execution Parameters
+
+Execution parameters control how detection runs; they don't affect results
+and are **not** part of the detector ID hash.
 
 #### `start_time` (string, optional)
 Start detecting anomalies from this timestamp. Data before is used only for building history.
@@ -115,8 +156,13 @@ detectors:
       batch_size: 1440  # Process 10 days at a time (10-min intervals)
 ```
 
-#### `seasonality_components` (list, optional)
-⚠️ **Not yet implemented** - Seasonality support planned for future versions.
+### Detector Identity
+
+All result-affecting parameters (everything except `start_time` and
+`batch_size`) are hashed into the `detector_id` (non-default values only).
+Changing any of them creates a new detector ID and detections are recomputed
+from scratch on the next run; old rows stay under the previous ID
+(`--full-refresh` purges them).
 
 ## Configuration Examples
 
@@ -203,7 +249,6 @@ detectors:
 ### ⚠️ Consider Alternatives:
 - **Data with outliers** → MAD detector (more robust)
 - **Skewed distributions** → IQR or MAD detector
-- **Seasonal patterns** → MAD detector with seasonality (Z-Score doesn't support yet)
 - **Known bounds** → Manual Bounds for strict thresholds
 - **Heavy tails** → MAD or IQR detector
 
@@ -219,7 +264,6 @@ detectors:
 ### ❌ Disadvantages:
 - **Sensitive to outliers** - Mean and std affected by extreme values
 - **Assumes normality** - May produce false positives on skewed data
-- **No seasonality** - Doesn't adapt to time-based patterns yet
 - **Biased by history** - Outliers in window affect future detection
 
 ## Performance Characteristics
@@ -235,30 +279,39 @@ Each detection result includes metadata:
 
 ```python
 {
-    "mean": 0.5234,              # Mean of entire window
-    "std": 0.0421,               # Standard deviation of window
+    "global_mean": 0.5234,       # Mean of entire window
+    "global_std": 0.0421,        # Std of entire window
+    "adjusted_mean": 0.5301,     # After seasonality adjustment
+    "adjusted_std": 0.0398,      # After seasonality adjustment
     "window_size": 288,          # Actual valid samples used
+    "ess": 96.4,                 # Effective sample size (Kish) — when window_weights is set
+    "trend_slope_per_point": 0.0001,  # Estimated trend slope — when detrend is set
 
     # Only for anomalies:
     "direction": "above",        # "above" or "below"
-    "severity": 4.12,            # Z-score (number of std away)
+    "severity": 1.12,            # σ beyond the violated bound (0 = at the bound)
     "distance": 0.1732           # Absolute distance from bound
 }
 ```
 
 ### Severity Calculation
 
-Severity represents the Z-score (how many standard deviations away from mean):
+Severity is the distance beyond the violated bound, in standard deviations
+(using the seasonality-adjusted statistics and the preprocessed value):
 
 ```python
-severity = abs(value - mean) / std
+severity = distance / adjusted_std
+# where distance = how far the value sits outside [lower, upper]
 ```
 
-**Interpretation**:
-- `severity < 3.0` → Within 99.7% confidence (not anomalous with default threshold)
-- `severity ≥ 3.0` → Outside 99.7% confidence (anomalous with default threshold)
-- `severity ≥ 4.0` → Highly anomalous (99.99% confidence)
-- `severity ≥ 5.0` → Extremely anomalous (99.9999% confidence)
+This is the same "0 at the bound" convention as MAD (σ-equivalents) and IQR
+(IQR units), so the alert layer can compare severities across detectors when
+several fire at once.
+
+**Interpretation** (with `threshold: 3.0`):
+- `severity ≈ 0` → Barely outside the 3σ interval
+- `severity ≥ 1.0` → 4σ+ from the mean — strong anomaly
+- `severity ≥ 2.0` → 5σ+ from the mean — extreme anomaly
 
 ## Edge Cases
 

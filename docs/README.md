@@ -32,7 +32,7 @@ cd my_monitoring
 cat > metrics/cpu_usage.yml <<EOF
 name: cpu_usage
 interval: 1min
-query: "SELECT timestamp, cpu_percent AS value FROM system_metrics WHERE timestamp >= %(from_date)s AND timestamp < %(to_date)s ORDER BY timestamp"
+query: "SELECT timestamp, cpu_percent AS value FROM system_metrics WHERE timestamp >= '{{ dtk_start_time }}' AND timestamp < '{{ dtk_end_time }}' ORDER BY timestamp"
 
 detectors:
   - type: mad
@@ -87,6 +87,10 @@ Multiple detector types for different data patterns:
 - **IQR** - Excellent for skewed distributions
 - **Manual Bounds** - Simple threshold-based detection
 
+All windowed detectors (MAD, Z-Score, IQR) also support recency weighting
+(`window_weights` + `half_life`) and robust linear detrending (`detrend`)
+for metrics with a gradual trend.
+
 [Learn more →](guides/detectors.md)
 
 ### 📅 Seasonality Support
@@ -95,16 +99,14 @@ Handle time-based patterns automatically:
 
 ```yaml
 seasonality_columns:
-  - name: hour_of_day
-    extract: hour
-  - name: day_of_week
-    extract: dow
+  - hour
+  - day_of_week
 
 detectors:
   - type: mad
     params:
       seasonality_components:
-        - ["hour_of_day", "day_of_week"]
+        - ["hour", "day_of_week"]
 ```
 
 [Learn more →](reference/detectors/mad.md#with-seasonality-single-component)
@@ -135,7 +137,7 @@ alerting:
 - **Batch processing** - Handle large datasets efficiently
 - **Incremental loading** - Only load new data
 - **Idempotent operations** - Safe to re-run
-- **Fast detectors** - 1,400-3,000 points/second
+- **Vectorized detectors** - numpy-based core, no pandas
 
 ### 🗄️ Database Support
 
@@ -338,13 +340,6 @@ alerting:
 
 ## Performance
 
-Approximate detection speeds (including I/O):
-
-- **Manual Bounds**: ~3,000 points/second
-- **Z-Score**: ~1,800 points/second
-- **MAD**: ~1,500 points/second
-- **IQR**: ~1,400 points/second
-
 All detectors are fast enough for production use. Choose based on accuracy, not performance.
 
 ## Best Practices
@@ -367,17 +362,30 @@ If your metric varies by hour/day/week:
 
 ```yaml
 seasonality_columns:
-  - name: hour_of_day
-    extract: hour
+  - hour
 
 detectors:
   - type: mad
     params:
       seasonality_components:
-        - "hour_of_day"
+        - "hour"
 ```
 
-### 3. Use Consecutive Anomalies
+### 3. Handle Trending Metrics
+
+If your metric has a gradual trend (slow growth or decline), use recency
+weighting and/or detrending so the drift itself is not flagged:
+
+```yaml
+detectors:
+  - type: mad
+    params:
+      window_weights: exponential
+      half_life: "3d"     # weight halves every 3 days of age
+      detrend: linear     # optional: remove in-window linear trend
+```
+
+### 4. Use Consecutive Anomalies
 
 Reduce false positives:
 
@@ -386,17 +394,17 @@ alerting:
   consecutive_anomalies: 3  # Wait for confirmation
 ```
 
-### 4. Filter by Direction
+### 5. Filter by Direction
 
 Only alert on meaningful changes:
 
 ```yaml
 alerting:
-  direction: "up"  # Only alert on increases (e.g., errors, latency)
-  direction: "down"  # Only alert on decreases (e.g., users, revenue)
+  direction: "up"    # Only alert on increases (e.g., errors, latency)
+  # direction: "down"  # Or only on decreases (e.g., users, revenue)
 ```
 
-### 5. Test Before Production
+### 6. Test Before Production
 
 ```bash
 # Test query
@@ -441,24 +449,6 @@ Solutions:
 - **Issues**: https://github.com/alexeiveselov92/detectkit/issues
 - **PyPI**: https://pypi.org/project/detectkit/
 
-## Project Status
-
-**Version**: 0.3.0
-
-**Status**: Production-ready
-
-- ✅ Core features implemented
-- ✅ 291/311 tests passing
-- ✅ Published to PyPI
-- ✅ Tested in production
-
-### What's New in v0.3.0
-
-🎯 **Alert Cooldown** - Prevent alert spam from persistent anomalies
-- Configure minimum time between alerts
-- Automatic recovery detection
-- Stops duplicate alerts during long-running issues
-
 ## License
 
 MIT License - see LICENSE file for details.
@@ -474,16 +464,6 @@ Contributions welcome! Please:
 ## Changelog
 
 See [CHANGELOG.md](../CHANGELOG.md) for complete version history.
-
-### Recent Releases
-
-- **[0.3.0]** (2025-11-10) - Alert cooldown system, spam prevention
-- **[0.2.8]** (2025-11-10) - Fix incomplete interval detection
-- **[0.2.7]** (2025-11-10) - Add _dtk_metrics table
-- **[0.2.0]** (2025-11-06) - Detector preprocessing and value weighting
-- **[0.1.0]** (2025-11-03) - Initial release
-
-[Full changelog →](../CHANGELOG.md)
 
 ---
 

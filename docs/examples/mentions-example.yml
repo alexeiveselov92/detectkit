@@ -7,8 +7,8 @@
 # Platform-specific formatting:
 #   Mattermost: @username, @here, @channel, @all
 #   Slack:      @username (display only), <!here>, <!channel>, <@USER_ID>
-#   Telegram:   @username
-#   Email:      Rendered as "CC: user1, user2" (no actual mention syntax)
+#   Telegram:   @username (broadcast keywords rendered as plain text)
+#   Email:      Rendered as "CC: user1, user2" (broadcast keywords ignored)
 #
 # Features demonstrated:
 # - mentions: List of users/groups to mention
@@ -28,8 +28,8 @@ query: |
     toStartOfInterval(timestamp, INTERVAL 5 MINUTE) AS timestamp,
     countIf(status_code >= 500) / count() * 100 AS value
   FROM http_requests
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -67,8 +67,8 @@ query: |
     toStartOfMinute(timestamp) AS timestamp,
     countIf(status = 'ok') / count() * 100 AS value
   FROM payment_healthchecks
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -109,8 +109,8 @@ query: |
     toStartOfMinute(timestamp) AS timestamp,
     max(replication_lag_seconds) AS value
   FROM db_metrics
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -168,8 +168,8 @@ query: |
     toStartOfInterval(timestamp, INTERVAL 5 MINUTE) AS timestamp,
     quantile(0.99)(response_time_ms) AS value
   FROM http_requests
-  WHERE timestamp >= %(from_date)s
-    AND timestamp < %(to_date)s
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
   GROUP BY timestamp
   ORDER BY timestamp
 
@@ -205,5 +205,4 @@ alerting:
 #   "here"     — Mattermost: @here     | Slack: <!here>
 #   "channel"  — Mattermost: @channel  | Slack: <!channel>
 #   "all"      — Mattermost: @all      | Slack: <!everyone>
-#   "everyone" — Mattermost: @everyone | Slack: <!everyone>
 # ---------------------------------------------------------------------------

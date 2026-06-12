@@ -58,6 +58,13 @@ class _DispatchMixin(_OrchestratorBase):
         results: dict[str, bool] = {}
         for channel in channels:
             channel_name = channel.__class__.__name__
+            # Two channels of the same type must not collapse into one
+            # result entry (that would undercount sends).
+            if channel_name in results:
+                suffix = 2
+                while f"{channel_name}#{suffix}" in results:
+                    suffix += 1
+                channel_name = f"{channel_name}#{suffix}"
             try:
                 results[channel_name] = bool(channel.send(alert_data, template))
             except Exception as exc:

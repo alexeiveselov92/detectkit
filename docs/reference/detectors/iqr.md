@@ -75,13 +75,13 @@ detectors:
       window_size: 288  # 2 days of 10-min intervals
 ```
 
-#### `min_samples` (int, default: 30)
+#### `min_samples` (int, default: 30, minimum: 4)
 Minimum valid samples required before detection starts.
 
 - Ensures statistical reliability for quartile calculation
 - Points before this threshold are marked as "insufficient_data"
 - Must be at least 4 (minimum for quartiles)
-- **Typical**: 20-40% of `window_size`
+- **Typical**: 10-30% of `window_size`
 
 **Example:**
 ```yaml
@@ -91,7 +91,48 @@ detectors:
       min_samples: 50  # Wait for 50 valid samples
 ```
 
+#### `seasonality_components` (list, optional)
+Seasonality groupings for adaptive intervals — works exactly like MAD's
+(global statistics adjusted by per-group multipliers). Single components
+(`"hour"`), multiple separate components, or combined components
+(`["hour", "day_of_week"]`) are supported. Names must match the metric's
+built-in `seasonality_columns` features or custom columns declared in
+`query_columns.seasonality`.
+
+**Example:**
+```yaml
+detectors:
+  - type: iqr
+    params:
+      seasonality_components:
+        - "hour"
+```
+
+#### `min_samples_per_group` (int, default: 4, minimum: 4)
+Minimum samples required in each seasonality group for applying multipliers.
+Groups below this threshold fall back to global statistics.
+
+### Shared Parameters (Preprocessing, Weighting, Detrending)
+
+These parameters are shared by MAD, Z-Score and IQR and behave identically.
+See the [Detectors Guide](../../guides/detectors.md#advanced-detector-features)
+for detailed explanations and recipes.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `input_type` | str | `"values"` | `"values"`, `"changes"`, `"absolute_changes"` or `"log_changes"` |
+| `smoothing` | str/null | `null` | `null`, `"ema"` or `"sma"` — applied before `input_type` |
+| `smoothing_alpha` | float | `0.3` | EMA factor, 0 < alpha ≤ 1 |
+| `smoothing_window` | int | `10` | SMA window in points |
+| `window_weights` | str/null | `null` | `null` (uniform), `"exponential"` or `"linear"` recency weighting |
+| `half_life` | int/str/null | `null` | Exponential half-life: int points or duration string (`"3d"`, `"12h"`). Default when unset: `window_size / 20` |
+| `weight_decay` | float/null | `null` | **Deprecated** alias for `half_life` (per-point multiplier in (0, 1)); mutually exclusive with `half_life` |
+| `detrend` | str/null | `null` | `null` or `"linear"` — robust in-window detrending |
+
 ### Execution Parameters
+
+Execution parameters control how detection runs; they don't affect results
+and are **not** part of the detector ID hash.
 
 #### `start_time` (string, optional)
 Start detecting anomalies from this timestamp. Data before is used only for building history.
@@ -119,8 +160,13 @@ detectors:
       batch_size: 1440  # Process 10 days at a time (10-min intervals)
 ```
 
-#### `seasonality_components` (list, optional)
-⚠️ **Not yet implemented** - Seasonality support planned for future versions.
+### Detector Identity
+
+All result-affecting parameters (everything except `start_time` and
+`batch_size`) are hashed into the `detector_id` (non-default values only).
+Changing any of them creates a new detector ID and detections are recomputed
+from scratch on the next run; old rows stay under the previous ID
+(`--full-refresh` purges them).
 
 ## Configuration Examples
 
@@ -209,7 +255,6 @@ detectors:
 
 ### ⚠️ Consider Alternatives:
 - **Normally distributed data** → Z-Score (more sensitive)
-- **Seasonal patterns** → MAD detector with seasonality (IQR doesn't support yet)
 - **Symmetric distributions** → MAD may be slightly better
 - **Known bounds** → Manual Bounds for strict thresholds
 
@@ -224,7 +269,6 @@ detectors:
 
 ### ❌ Disadvantages:
 - **Less sensitive than MAD** - Quartiles span 50% of data
-- **No seasonality** - Doesn't adapt to time-based patterns yet
 - **May be too permissive** - 1.5×IQR allows ~1% false positives in normal data
 - **Slower than MAD** - Percentile calculation slightly more expensive
 
@@ -241,14 +285,19 @@ Each detection result includes metadata:
 
 ```python
 {
-    "q1": 0.4234,                # 25th percentile of window
-    "q3": 0.6123,                # 75th percentile of window
-    "iqr": 0.1889,               # Q3 - Q1
+    "global_q1": 0.4234,         # 25th percentile of window
+    "global_q3": 0.6123,         # 75th percentile of window
+    "global_iqr": 0.1889,        # Q3 - Q1
+    "adjusted_q1": 0.4301,       # After seasonality adjustment
+    "adjusted_q3": 0.6087,       # After seasonality adjustment
+    "adjusted_iqr": 0.1786,      # After seasonality adjustment
     "window_size": 288,          # Actual valid samples used
+    "ess": 102.5,                # Effective sample size (Kish) — when window_weights is set
+    "trend_slope_per_point": 0.0003,  # Estimated trend slope — when detrend is set
 
     # Only for anomalies:
     "direction": "above",        # "above" or "below"
-    "severity": 2.34,            # How many IQR units away
+    "severity": 2.34,            # How many (adjusted) IQR units beyond the fence
     "distance": 0.4421           # Absolute distance from bound
 }
 ```
@@ -278,6 +327,12 @@ When Q1 = Q3 (all values in same quartile range):
 - Confidence interval becomes: `[Q1 - ε, Q3 + ε]` where ε = 1e-10
 - Any value outside the Q1-Q3 range is considered anomalous
 - This typically happens with discrete/categorical metrics
+
+### Inverted Bounds Under Seasonality
+
+Seasonality multipliers are applied per statistic (Q1, Q3, IQR separately)
+and can in rare degenerate cases produce `lower > upper`. Bounds are
+automatically normalized (swapped) so the interval is always valid.
 
 ### Small Windows
 
@@ -330,7 +385,6 @@ Q3 = np.percentile(data, 75)
 - **Similarity**: Both robust to outliers
 - **Difference**: IQR uses Q1/Q3 (25%/75%), MAD uses median (50%)
 - **Robustness**: MAD ~37% breakdown point, IQR ~25% breakdown point
-- **Seasonality**: MAD supports it, IQR doesn't yet
 - **Skewness**: IQR naturally creates asymmetric bounds
 
 ### IQR vs Z-Score:

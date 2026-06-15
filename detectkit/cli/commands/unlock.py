@@ -8,6 +8,7 @@ auto-expires after its timeout, but this command clears it immediately.
 
 import click
 
+from detectkit.cli._output import echo_done, echo_error, echo_noop, echo_tree
 from detectkit.cli.commands.run import find_project_root, select_metrics
 from detectkit.config.profile import ProfilesConfig
 from detectkit.database.internal_tables import InternalTablesManager
@@ -83,23 +84,13 @@ def run_unlock(select: str, profile: str | None):
         try:
             was_locked = internal_manager.clear_lock(metric_name)
         except Exception as e:
-            click.echo(
-                click.style(f"  ✗ {metric_name}: error clearing lock: {e}", fg="red"),
-                err=True,
-            )
+            echo_error(metric_name, f"error clearing lock: {e}")
             continue
 
         if was_locked:
             cleared += 1
-            click.echo(click.style(f"  ✓ {metric_name}: lock cleared", fg="green"))
+            echo_tree(metric_name, ["lock cleared"])
         else:
-            click.echo(f"  • {metric_name}: no active lock")
+            echo_noop(metric_name, "no active lock")
 
-    click.echo()
-    click.echo(
-        click.style(
-            f"Done. Cleared {cleared} lock(s) of {len(metrics)} metric(s).",
-            fg="cyan",
-            bold=True,
-        )
-    )
+    echo_done(f"Cleared {cleared} lock(s) of {len(metrics)} metric(s).")

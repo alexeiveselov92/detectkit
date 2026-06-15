@@ -577,7 +577,8 @@ run proceeds normally without needing `--force`.
 Project root: /path/to/project
 Found 1 metric(s) to unlock
 
-  ✓ cpu_usage: lock cleared
+  ┌─ cpu_usage
+  └─ lock cleared
 
 Done. Cleared 1 lock(s) of 1 metric(s).
 ```
@@ -673,11 +674,11 @@ DRY-RUN — nothing will be deleted. Use --execute to apply.
 
 Found 1 metric(s) to inspect
 
-  cpu_usage:
-    detector a1b2c3d4e5f6a7b8: would delete 4,320 detection row(s)
-    alert_config 9f8e7d6c5b4a3210: would delete stale alert state
+  ┌─ cpu_usage
+  │   detector a1b2c3d4e5f6a7b8: would delete 4,320 detection row(s)
+  └─ alert_config 9f8e7d6c5b4a3210: would delete stale alert state
 
-Would delete 1 orphaned detector group(s) and 1 orphaned alert-state row(s).
+Done. Would remove 1 detector group(s) and 1 alert-state row(s).
 Re-run with --execute to apply.
 ```
 

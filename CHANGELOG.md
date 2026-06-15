@@ -5,6 +5,16 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-06-15
+
+### Changed
+- **Unified CLI output style.** `dtk clean` and `dtk unlock` now render in the
+  same tree layout (`┌─ / │ / └─`) as the `dtk run` pipeline steps, instead of
+  each command's own ad-hoc formatting. Per-metric findings appear as child
+  lines under a cyan metric header; metrics with nothing to do show a single
+  `•` line; per-metric errors use `✗`; each run ends with a cyan-bold
+  `Done. …` summary. Shared helpers live in `detectkit/cli/_output.py`.
+
 ## [0.8.1] - 2026-06-15
 
 ### Fixed

@@ -27,6 +27,7 @@ from pathlib import Path
 
 import click
 
+from detectkit.cli._output import echo_done, echo_error, echo_noop, echo_tree
 from detectkit.cli.commands.run import find_project_root, select_metrics
 from detectkit.config.metric_config import MetricConfig
 from detectkit.config.profile import ProfilesConfig
@@ -112,6 +113,8 @@ def _clean_drift(
     total_det_groups = 0
     total_alert_rows = 0
 
+    verb = "deleting" if execute else "would delete"
+
     for _, config in metrics:
         metric_name = config.name
         try:
@@ -120,7 +123,7 @@ def _clean_drift(
             db_detectors = internal_manager.list_detector_ids(metric_name)
             db_alerts = internal_manager.list_alert_config_ids(metric_name)
         except Exception as e:
-            click.echo(click.style(f"  ✗ {metric_name}: error inspecting: {e}", fg="red"), err=True)
+            echo_error(metric_name, f"error inspecting: {e}")
             continue
 
         orphan_detectors = {
@@ -129,55 +132,42 @@ def _clean_drift(
         orphan_alerts = [a for a in db_alerts if a not in valid_alerts]
 
         if not orphan_detectors and not orphan_alerts:
-            click.echo(f"  • {metric_name}: nothing stale")
+            echo_noop(metric_name, "nothing stale")
             continue
 
-        click.echo(click.style(f"  {metric_name}:", bold=True))
+        children = [
+            f"detector {det_id}: {verb} {count:,} detection row(s)"
+            for det_id, count in sorted(orphan_detectors.items())
+        ] + [
+            f"alert_config {alert_id}: {verb} stale alert state"
+            for alert_id in sorted(orphan_alerts)
+        ]
 
         # An empty valid set means EVERY stored row is "orphaned" — usually a
         # config mid-edit, not an intent to wipe the metric. Flag it loudly.
+        warnings = []
         if orphan_detectors and not valid_detectors:
-            click.echo(
-                click.style(
-                    "    ⚠ config defines no detectors — ALL detections below would be removed",
-                    fg="yellow",
-                    bold=True,
-                )
-            )
+            warnings.append("config defines no detectors — ALL detections below would be removed")
         if orphan_alerts and not valid_alerts:
-            click.echo(
-                click.style(
-                    "    ⚠ config defines no alerting — ALL alert states below would be removed",
-                    fg="yellow",
-                    bold=True,
-                )
-            )
+            warnings.append("config defines no alerting — ALL alert states below would be removed")
 
-        for det_id, count in sorted(orphan_detectors.items()):
-            total_det_groups += 1
-            verb = "deleting" if execute else "would delete"
-            click.echo(f"    detector {det_id}: {verb} {count:,} detection row(s)")
-            if execute:
+        echo_tree(metric_name, children, warnings=warnings)
+
+        if execute:
+            for det_id in orphan_detectors:
                 internal_manager.delete_detections(
                     metric_name=metric_name, detector_id=det_id, mutations_sync=True
                 )
-
-        for alert_id in sorted(orphan_alerts):
-            total_alert_rows += 1
-            verb = "deleting" if execute else "would delete"
-            click.echo(f"    alert_config {alert_id}: {verb} stale alert state")
-            if execute:
+            for alert_id in orphan_alerts:
                 internal_manager.delete_alert_state(metric_name, alert_id)
 
-    click.echo()
-    prefix = "Deleted" if execute else "Would delete"
-    click.echo(
-        click.style(
-            f"{prefix} {total_det_groups} orphaned detector group(s) "
-            f"and {total_alert_rows} orphaned alert-state row(s).",
-            fg="cyan",
-            bold=True,
-        )
+        total_det_groups += len(orphan_detectors)
+        total_alert_rows += len(orphan_alerts)
+
+    verb_done = "Removed" if execute else "Would remove"
+    echo_done(
+        f"{verb_done} {total_det_groups} detector group(s) "
+        f"and {total_alert_rows} alert-state row(s)."
     )
     if not execute and (total_det_groups or total_alert_rows):
         click.echo("Re-run with --execute to apply.")
@@ -222,15 +212,10 @@ def _clean_orphaned_metrics(
         try:
             counts = internal_manager.count_metric_rows(name)
         except Exception as e:
-            click.echo(click.style(f"  ✗ {name}: error counting rows: {e}", fg="red"), err=True)
+            echo_error(name, f"error counting rows: {e}")
             continue
-        total = sum(counts.values())
-        verb = "deleting" if execute else "would delete"
-        detail = ", ".join(f"{table}={count:,}" for table, count in counts.items() if count)
-        click.echo(
-            click.style(f"  {name}: {verb} {total:,} row(s)", bold=True)
-            + (f"  [{detail}]" if detail else "")
-        )
+        children = [f"{table}: {count:,} row(s)" for table, count in counts.items() if count]
+        echo_tree(name, children or ["(no rows)"])
 
     if not execute:
         click.echo()
@@ -264,16 +249,10 @@ def _clean_orphaned_metrics(
         try:
             internal_manager.purge_metric(name)
             purged += 1
-            click.echo(click.style(f"  ✓ {name}: purged", fg="green"))
         except Exception as e:
-            click.echo(click.style(f"  ✗ {name}: error purging: {e}", fg="red"), err=True)
+            echo_error(name, f"error purging: {e}")
 
-    click.echo()
-    click.echo(
-        click.style(
-            f"Done. Purged {purged} of {len(orphans)} orphaned metric(s).", fg="cyan", bold=True
-        )
-    )
+    echo_done(f"Purged {purged} of {len(orphans)} orphaned metric(s).")
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────

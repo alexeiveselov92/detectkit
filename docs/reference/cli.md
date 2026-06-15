@@ -10,6 +10,8 @@ The `dtk` CLI provides dbt-like commands for managing metric monitoring:
 dtk init <project>              # Initialize new project
 dtk run --select <selector>     # Run metric pipeline
 dtk test-alert <metric>         # Test alert channels
+dtk unlock --select <selector>  # Clear a stuck pipeline lock
+dtk clean --select <selector>   # Prune data that no longer matches configs
 dtk --version                   # Show version
 dtk --help                      # Show help
 ```
@@ -582,6 +584,105 @@ Done. Cleared 1 lock(s) of 1 metric(s).
 
 ---
 
+### `dtk clean`
+
+Remove internal data that no longer matches the project's YAML configs.
+
+Editing metrics over time leaves stale rows behind in the internal tables.
+`dtk clean` finds and removes that drift. **Both modes default to a dry-run**
+that only reports what would be deleted; pass `--execute` to actually delete.
+
+#### Syntax
+
+```bash
+dtk clean --select <selector> [--execute] [OPTIONS]   # drift mode
+dtk clean --orphaned-metrics [--execute] [OPTIONS]    # GC mode
+```
+
+#### Options
+
+##### `--select`, `-s` (drift mode)
+
+Metric selector — same semantics as `dtk run`. For each selected
+(still-existing) metric, removes:
+
+- `_dtk_detections` rows whose `detector_id` is no longer produced by the
+  config — i.e. you changed a detector parameter or `seasonality_components`
+  (which changes the detector's hash), or removed a detector;
+- `_dtk_alert_states` rows whose `alert_config_id` is no longer produced —
+  i.e. you changed an alerting block's functional params (channels,
+  `min_detectors`, `consecutive_anomalies`, cooldown) or removed the block.
+
+Datapoints are **not** touched — they are keyed only by `(metric, timestamp)`
+and are never orphaned by a parameter edit. Use `dtk run --full-refresh` to
+reload those.
+
+##### `--orphaned-metrics` (GC mode)
+
+Deletes **all** rows, across every internal table, for metric names present in
+the database but no longer defined by any YAML in the project (a renamed or
+deleted metric). Operates over the whole project (ignores `--select`).
+
+##### `--execute` (flag)
+
+Actually delete. Without it, the command only reports (dry-run).
+
+##### `--yes`, `-y` (flag)
+
+Skip the confirmation prompt for `--orphaned-metrics --execute`.
+
+##### `--profile` (optional)
+
+Profile to use (overrides project default).
+
+#### Examples
+
+```bash
+# See what stale detector/alert data a metric has accumulated (dry-run)
+dtk clean --select cpu_usage
+
+# ...then actually delete it
+dtk clean --select cpu_usage --execute
+
+# Clean drift across everything matching a tag
+dtk clean --select "tag:critical" --execute
+
+# List metrics in the DB that no longer exist in the project
+dtk clean --orphaned-metrics
+
+# Purge them (asks for confirmation unless -y)
+dtk clean --orphaned-metrics --execute
+```
+
+#### Safety
+
+- Dry-run by default; nothing is deleted without `--execute`.
+- `--orphaned-metrics --execute` asks for confirmation (skip with `--yes`), and
+  **refuses** to run if the project defines no metrics or its configs fail to
+  parse — so a wrong directory or a duplicate-name error can't wipe valid data.
+- In drift mode, if a metric's config defines no detectors/alerting at all (so
+  *every* stored row counts as orphaned), the command prints a loud warning
+  before deleting.
+- Deletes are synchronous ClickHouse mutations and idempotent — safe to re-run.
+
+#### Example Output
+
+```
+Project root: /path/to/project
+DRY-RUN — nothing will be deleted. Use --execute to apply.
+
+Found 1 metric(s) to inspect
+
+  cpu_usage:
+    detector a1b2c3d4e5f6a7b8: would delete 4,320 detection row(s)
+    alert_config 9f8e7d6c5b4a3210: would delete stale alert state
+
+Would delete 1 orphaned detector group(s) and 1 orphaned alert-state row(s).
+Re-run with --execute to apply.
+```
+
+---
+
 ## Exit Codes
 
 | Code | Meaning |
@@ -663,6 +764,10 @@ dtk run --select cpu_usage --steps detect --full-refresh
 
 # Query changed → reload data
 dtk run --select cpu_usage --full-refresh
+
+# Detector/alert params changed → prune the now-orphaned old results
+dtk clean --select cpu_usage            # preview
+dtk clean --select cpu_usage --execute
 ```
 
 ### Testing and Debugging

@@ -314,6 +314,20 @@ dtk unlock --select api_response_time
 Stuck locks also auto-expire after 1 hour, so the next normal run recovers on
 its own — `dtk unlock` just does it right away.
 
+### Prune Stale Data After Editing Configs
+
+```bash
+# Editing a metric's detectors/alerting leaves the old results behind.
+# Preview what no longer matches the config (dry-run), then delete it:
+dtk clean --select api_response_time
+dtk clean --select api_response_time --execute
+
+# Renamed or deleted a metric? Purge everything left under the old name:
+dtk clean --orphaned-metrics --execute
+```
+
+See the [CLI Reference](../reference/cli.md#dtk-clean) for both modes.
+
 ## Next Steps
 
 Now that you have a working metric:

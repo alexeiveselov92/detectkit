@@ -218,5 +218,69 @@ def unlock(select: str, profile: str):
     run_unlock(select=select, profile=profile)
 
 
+@cli.command()
+@click.option(
+    "--select",
+    "-s",
+    help="Selector for metrics whose stale detector/alert data to prune (name, path, or tag)",
+)
+@click.option(
+    "--orphaned-metrics",
+    is_flag=True,
+    help="Purge all data for metrics no longer present in the project (renamed/deleted YAML)",
+)
+@click.option(
+    "--execute",
+    is_flag=True,
+    help="Actually delete (default: dry-run, only report what would be removed)",
+)
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    help="Skip the confirmation prompt (for --orphaned-metrics --execute)",
+)
+@click.option(
+    "--profile",
+    help="Profile to use (default: from project config)",
+)
+def clean(select: str, orphaned_metrics: bool, execute: bool, yes: bool, profile: str):
+    """
+    Remove internal data that no longer matches the project's YAML configs.
+
+    Over time, editing metrics on production leaves stale rows behind: changing
+    a detector parameter (or removing a detector) orphans its old results in
+    _dtk_detections, changing an alerting block orphans its state in
+    _dtk_alert_states, and renaming/deleting a metric orphans everything under
+    its old name. This command finds and removes that drift.
+
+    Both modes default to a dry-run; pass --execute to actually delete.
+    Selector semantics match `dtk run`.
+
+    Examples:
+        # Prune stale detector/alert data for one metric (dry-run)
+        dtk clean --select cpu_usage
+
+        # ...and actually delete it
+        dtk clean --select cpu_usage --execute
+
+        # Prune everything matching a tag
+        dtk clean --select "tag:critical" --execute
+
+        # Purge metrics that no longer exist in the project
+        dtk clean --orphaned-metrics
+        dtk clean --orphaned-metrics --execute
+    """
+    from detectkit.cli.commands.clean import run_clean
+
+    run_clean(
+        select=select,
+        orphaned_metrics=orphaned_metrics,
+        execute=execute,
+        yes=yes,
+        profile=profile,
+    )
+
+
 if __name__ == "__main__":
     cli()

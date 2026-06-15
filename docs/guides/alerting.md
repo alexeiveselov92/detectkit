@@ -259,6 +259,14 @@ alerting:
 
 Each config is evaluated and sent independently. Single dict format (backward-compatible) continues to work.
 
+> **Changed or removed an alert config?** Each block's cooldown/recovery state
+> in `_dtk_alert_states` is keyed by a hash of its functional fields (channels,
+> `min_detectors`, `consecutive_anomalies`, `direction`, cooldown), so editing
+> those fields or removing a block leaves the old state row behind. Run
+> [`dtk clean --select <metric>`](../reference/cli.md#dtk-clean) to prune it.
+> (Disabling a block with `enabled: false` keeps its state — the hash is
+> unchanged — so a temporarily-paused alert is never treated as orphaned.)
+
 ## Alert Filtering
 
 The three conditions combine into one contract:

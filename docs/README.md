@@ -268,6 +268,17 @@ dtk test-alert cpu_usage
 dtk unlock --select cpu_usage
 ```
 
+### Cleanup After Editing Configs
+
+```bash
+# Prune detector/alert data orphaned by a config change (dry-run by default)
+dtk clean --select cpu_usage
+dtk clean --select cpu_usage --execute
+
+# Purge data for metrics no longer defined in the project
+dtk clean --orphaned-metrics --execute
+```
+
 [Full CLI Reference →](reference/cli.md)
 
 ## Configuration Files

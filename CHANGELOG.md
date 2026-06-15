@@ -5,6 +5,36 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-06-15
+
+### Added
+- **`dtk clean` command** — prune internal data that no longer matches the
+  project's YAML configs, the rows left behind when metrics are edited on
+  production. Two modes, both dry-run by default (`--execute` to apply):
+  - `dtk clean --select <selector>` removes `_dtk_detections` rows whose
+    `detector_id` is no longer produced by the config (a detector parameter or
+    `seasonality_components` changed, or the detector was removed) and
+    `_dtk_alert_states` rows whose `alert_config_id` is no longer produced (an
+    alerting block's functional fields changed, or the block was removed).
+    Valid hashes are recomputed with the same functions the pipeline uses, so
+    pruning stays in lockstep with detection/alerting. Datapoints are not
+    touched (they are keyed only by timestamp).
+  - `dtk clean --orphaned-metrics` purges all rows, across every internal
+    table, for metric names present in the database but no longer defined by
+    any YAML in the project (a renamed or deleted metric). Asks for
+    confirmation (skip with `--yes`) and refuses to run when the project
+    defines no metrics or its configs fail to parse, so a wrong directory or a
+    duplicate-name error can't wipe valid data.
+- Internal-tables helpers backing the command: `list_detector_ids`,
+  `list_alert_config_ids` / `delete_alert_state`, and a maintenance mixin
+  (`list_known_metric_names`, `count_metric_rows`, `purge_metric`).
+  `delete_detections` gained an opt-in `mutations_sync` parameter.
+- New test suite `test_clean.py` (+23 tests).
+
+### Documentation
+- CLI reference gains a full `dtk clean` section; the configuration, detectors,
+  and alerting guides note how config edits orphan data and link to the command.
+
 ## [0.7.0] - 2026-06-12
 
 Major detector and alerting overhaul. Detector IDs change for many configs

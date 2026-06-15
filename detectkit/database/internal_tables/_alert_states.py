@@ -113,6 +113,37 @@ class _AlertStatesMixin(_InternalTablesBase):
         }
         self._manager.insert_batch(full_table_name, insert_data, conflict_strategy="ignore")
 
+    def list_alert_config_ids(self, metric_name: str) -> list[str]:
+        """Return every ``alert_config_id`` with stored state for a metric.
+
+        Used by ``dtk clean`` to find alert-state rows left behind after an
+        alerting block was removed or its functional params changed (see
+        ``make_alert_config_id``).
+        """
+        full_table_name = self._manager.get_full_table_name(TABLE_ALERT_STATES, use_internal=True)
+        query = f"""
+        SELECT DISTINCT alert_config_id
+        FROM {full_table_name}
+        WHERE metric_name = %(metric_name)s
+        """
+        result = self._manager.execute_query(query, {"metric_name": metric_name})
+        return [row["alert_config_id"] for row in result if row.get("alert_config_id")]
+
+    def delete_alert_state(self, metric_name: str, alert_config_id: str) -> int:
+        """Delete the alert-state row for a single ``(metric, alert_config)``."""
+        full_table_name = self._manager.get_full_table_name(TABLE_ALERT_STATES, use_internal=True)
+        query = f"""
+        ALTER TABLE {full_table_name}
+        DELETE WHERE metric_name = %(metric_name)s
+          AND alert_config_id = %(alert_config_id)s
+        SETTINGS mutations_sync = 1
+        """
+        self._manager.execute_query(
+            query,
+            params={"metric_name": metric_name, "alert_config_id": alert_config_id},
+        )
+        return 0
+
     def get_last_alert_timestamp(
         self,
         metric_name: str,

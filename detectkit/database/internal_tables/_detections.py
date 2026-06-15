@@ -62,8 +62,16 @@ class _DetectionsMixin(_InternalTablesBase):
         detector_id: str | None = None,
         from_timestamp: datetime | None = None,
         to_timestamp: datetime | None = None,
+        mutations_sync: bool = False,
     ) -> int:
-        """Delete detection rows for the supplied filter set."""
+        """Delete detection rows for the supplied filter set.
+
+        ``mutations_sync=True`` waits for the ClickHouse mutation to finish
+        before returning (``SETTINGS mutations_sync = 1``); the default keeps
+        the async behaviour used by the ``--full-refresh`` hot path. The
+        ``dtk clean`` command passes ``True`` so a follow-up dry-run reflects
+        the deletion immediately.
+        """
         full_table_name = self._manager.get_full_table_name(TABLE_DETECTIONS, use_internal=True)
 
         where_parts = ["metric_name = %(metric_name)s"]
@@ -79,8 +87,26 @@ class _DetectionsMixin(_InternalTablesBase):
             params["to_timestamp"] = to_timestamp
 
         query = f"ALTER TABLE {full_table_name} DELETE WHERE {' AND '.join(where_parts)}"
+        if mutations_sync:
+            query += " SETTINGS mutations_sync = 1"
         self._manager.execute_query(query, params=params)
         return 0
+
+    def list_detector_ids(self, metric_name: str) -> dict[str, int]:
+        """Return ``{detector_id: row_count}`` for every detector stored for a metric.
+
+        Used by ``dtk clean`` to spot detector results left behind after a
+        config change altered the detector hash (see ``get_detector_id``).
+        """
+        full_table_name = self._manager.get_full_table_name(TABLE_DETECTIONS, use_internal=True)
+        query = f"""
+        SELECT detector_id, count() AS cnt
+        FROM {full_table_name}
+        WHERE metric_name = %(metric_name)s
+        GROUP BY detector_id
+        """
+        result = self._manager.execute_query(query, {"metric_name": metric_name})
+        return {row["detector_id"]: int(row["cnt"]) for row in result if row.get("detector_id")}
 
     def get_recent_detections(
         self,

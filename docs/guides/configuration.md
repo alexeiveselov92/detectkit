@@ -399,6 +399,17 @@ tables:
   detections: _dtk_detections_cpu
 ```
 
+> **Editing a metric after it already has data?** A detector's identity is a
+> hash of its parameters, and each alerting block's state is keyed by a hash of
+> its functional fields. So changing a detector parameter (or
+> `seasonality_components`), removing a detector, or changing/removing an
+> alerting block leaves the old rows behind in `_dtk_detections` /
+> `_dtk_alert_states` — the pipeline simply stops writing to them. Run
+> [`dtk clean --select <metric>`](../reference/cli.md#dtk-clean) to preview and
+> prune that orphaned data. Renamed or deleted the metric entirely? Use
+> `dtk clean --orphaned-metrics`. (Datapoints are *not* orphaned by a parameter
+> edit — they are keyed only by timestamp; use `--full-refresh` to reload those.)
+
 ### Metric Identification
 
 #### `name` (string, required)

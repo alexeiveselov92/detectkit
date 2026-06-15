@@ -435,6 +435,14 @@ detectors:
 
 ## Tuning Tips
 
+> **After retuning a live metric:** a detector's identity is a hash of its
+> parameters, so detections written under the old parameters stay in
+> `_dtk_detections` as orphaned rows once you change a param (or remove the
+> detector). Run [`dtk clean --select <metric>`](../reference/cli.md#dtk-clean)
+> to prune them (preview first, then `--execute`). To *recompute* detections
+> for the new parameters over history instead, use
+> `dtk run --select <metric> --steps detect --full-refresh`.
+
 ### Window Size
 
 **Too small** (< 50 points):

@@ -353,8 +353,21 @@ def select_metrics(selector: str, project_root: Path) -> list[tuple[Path, Metric
         metric_paths = find_metrics_by_tag(metrics_dir, tag)
     # Path pattern selector
     elif "*" in selector or "/" in selector:
-        pattern = selector if selector.startswith("metrics/") else f"metrics/{selector}"
-        metric_paths = list(project_root.glob(pattern))
+        if selector == "*":
+            # "all metrics" — search recursively so nested metrics are included
+            # (mirrors validate_project_metrics); a plain glob of "metrics/*"
+            # would only see the top level.
+            metric_paths = [p for sub in ("**/*.yml", "**/*.yaml") for p in metrics_dir.glob(sub)]
+        else:
+            pattern = selector if selector.startswith("metrics/") else f"metrics/{selector}"
+            # Keep only metric files: a bare glob also matches the `.gitkeep`
+            # stub created by `dtk init`, any other non-YAML files, and
+            # directories — all of which would crash the YAML parser.
+            metric_paths = [
+                p
+                for p in project_root.glob(pattern)
+                if p.is_file() and p.suffix in (".yml", ".yaml")
+            ]
     # Metric name selector
     else:
         # First try filename-based search in root (backward compatibility)

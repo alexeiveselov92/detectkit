@@ -5,6 +5,18 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-06-15
+
+### Fixed
+- **`--select "*"` (and other glob selectors) no longer crash on `.gitkeep` or
+  non-YAML files.** The glob branch of metric selection passed raw `glob()`
+  results — including the `.gitkeep` stub `dtk init` creates, stray files, and
+  directories — straight to the YAML parser, so `dtk run/unlock/clean --select "*"`
+  failed with `Empty metric config file: .../metrics/.gitkeep`. Glob results are
+  now filtered to `.yml`/`.yaml` files. Additionally, `--select "*"` now resolves
+  **recursively** so metrics in subdirectories are included (previously it
+  expanded to a non-recursive `metrics/*` and silently skipped them).
+
 ## [0.8.0] - 2026-06-15
 
 ### Added

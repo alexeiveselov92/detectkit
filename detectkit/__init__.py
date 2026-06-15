@@ -4,7 +4,7 @@ detectk - Anomaly Detection for Time-Series Metrics
 A Python library for data analysts and engineers to monitor metrics with automatic anomaly detection.
 """
 
-__version__ = "0.8.0"
+__version__ = "0.8.1"
 
 from detectkit.core.interval import Interval
 from detectkit.core.models import ColumnDefinition, TableModel

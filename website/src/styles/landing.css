@@ -111,7 +111,8 @@
   grid-template-columns: 1fr 1.05fr;
   gap: 48px;
   align-items: center;
-  padding: 48px 0 52px;
+  /* vertical only — keep the .wrap 24px side gutter (critical on mobile) */
+  padding-block: 48px 52px;
 }
 /* grid/flex children default to min-width:auto, which lets the wide code block
    blow past the track and overflow the page on narrow screens — pin it to 0 so
@@ -254,7 +255,7 @@
 
 /* ---------- generic sections ---------- */
 .section {
-  padding: 64px 0;
+  padding-block: 64px;
   border-top: 1px solid var(--border);
 }
 .eyebrow {
@@ -611,7 +612,7 @@
 /* ---------- footer ---------- */
 .footer {
   border-top: 1px solid var(--border);
-  padding: 48px 0 64px;
+  padding-block: 48px 64px;
 }
 .footer-grid {
   display: grid;
@@ -744,7 +745,7 @@
   .hero {
     grid-template-columns: 1fr;
     gap: 32px;
-    padding: 48px 0;
+    padding-block: 48px;
   }
   .hero .cta-row {
     flex-direction: column;
@@ -772,7 +773,7 @@
 }
 @media (max-width: 520px) {
   .section {
-    padding: 48px 0;
+    padding-block: 48px;
   }
   .hero h1 {
     font-size: 32px;
@@ -781,7 +782,12 @@
     grid-template-columns: 1fr;
   }
   .footer-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px 18px;
+  }
+  /* brand block spans the full row; the link columns sit two-up below it */
+  .footer-grid > div:first-child {
+    grid-column: 1 / -1;
   }
   .cta-band {
     padding: 44px 24px;

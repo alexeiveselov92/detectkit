@@ -55,7 +55,31 @@ detectors:
       upper_bound: 100.0  # Values above 100 are anomalies
 ```
 
-### No Execution Parameters
+#### `input_type` (str, default: `"values"`)
+Input transformation applied before the bounds comparison. Bounds are
+checked against the **transformed** value, not the raw metric.
+
+- `values` - raw value (no transformation)
+- `changes` - relative change `(v[t] - v[t-1]) / v[t-1]`
+- `absolute_changes` - absolute change `v[t] - v[t-1]`
+- `log_changes` - log change `log(v[t]) - log(v[t-1])`
+
+For the change-based types the first point has no predecessor, so it is
+NaN and skipped (no anomaly, no alert). `input_type` is part of the
+`detector_id` hash — changing it creates a new detector and recomputes
+detections.
+
+**Example:**
+```yaml
+# Alert when the value jumps more than 20% above the previous point
+detectors:
+  - type: manual_bounds
+    params:
+      input_type: changes
+      upper_bound: 0.2
+```
+
+### Algorithm Parameters Not Used
 
 Manual Bounds detector does not use:
 - `window_size` - No historical window needed
@@ -63,7 +87,11 @@ Manual Bounds detector does not use:
 - `threshold` - Bounds are explicit
 - `seasonality_components` - No seasonality support
 
-However, you can still use:
+### Execution Parameters
+
+`start_time` and `batch_size` are execution-level parameters (placed under
+`params:`) common to all detectors — they control *where* detection starts
+and *how much* data is processed per batch, not the algorithm itself:
 - `start_time` - Start detecting from this timestamp (optional)
 - `batch_size` - Process data in batches (optional)
 
@@ -204,7 +232,7 @@ detectors:
 
 ## Performance Characteristics
 
-- **Speed**: ~3,000 points/second (including I/O)
+- **Speed**: O(1) work per point — the lightest detector (a single bounds comparison)
 - **Memory**: O(1) - No historical data stored
 - **CPU**: Minimal (simple comparison)
 - **Fastest detector** - No statistical calculations
@@ -215,6 +243,9 @@ Each detection result includes metadata:
 
 ```python
 {
+    # Only when input_type != "values":
+    "preprocessing": {"input_type": "changes"},
+
     # Only for anomalies:
     "direction": "above",         # "above" or "below"
     "distance": 15.32,            # Absolute distance from bound
@@ -281,17 +312,21 @@ Validation will fail: `At least one of lower_bound or upper_bound must be specif
 
 ### Negative Infinity / Positive Infinity
 
-Not supported - use `None` instead:
+Not supported - use `null` (`None`) instead:
 
 ```yaml
 # WRONG:
 lower_bound: -inf
 upper_bound: inf
 
-# CORRECT:
+# CORRECT (no lower limit, only an upper bound):
 lower_bound: null    # No lower limit
-upper_bound: null    # Error: at least one bound required
+upper_bound: 100.0   # Alert when value exceeds 100
 ```
+
+Setting **both** to `null` is invalid — at least one bound is required
+(validation fails with `At least one of lower_bound or upper_bound must be
+specified`).
 
 ## Comparison with Other Detectors
 

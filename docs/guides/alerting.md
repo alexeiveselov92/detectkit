@@ -7,7 +7,7 @@ This guide explains how to configure and customize alerting in detectkit.
 detectkit's alerting system:
 - ✅ Checks only recent data (not historical)
 - ✅ Requires consecutive anomalies (reduces false positives)
-- ✅ Supports multiple channels (Mattermost, Slack, Telegram, Email)
+- ✅ Supports multiple channels (Mattermost, Slack, Telegram, Email, generic webhook)
 - ✅ Filters by detector agreement and direction
 - ✅ Customizable templates
 - ✅ @mentions for users and groups (channel-agnostic)
@@ -198,7 +198,7 @@ alert_channels:
     type: email
     smtp_host: "smtp.gmail.com"
     smtp_port: 587
-    smtp_user: "your_email@gmail.com"
+    smtp_username: "your_email@gmail.com"
     smtp_password: "your_app_password"
     from_email: "alerts@example.com"
     to_emails:
@@ -217,9 +217,38 @@ alerting:
 - `smtp_port` (required) - SMTP port (587 for TLS, 465 for SSL)
 - `from_email` (required) - Sender email
 - `to_emails` (required) - List of recipients
-- `smtp_user` (optional) - SMTP authentication username
+- `smtp_username` (optional) - SMTP authentication username
 - `smtp_password` (optional) - SMTP authentication password
 - `use_tls` (default: `true`) - Use TLS encryption
+
+### Generic Webhook
+
+For any endpoint that accepts a Mattermost/Slack-compatible JSON payload —
+use `extra_headers` to add custom authentication (e.g. an `Authorization`
+header):
+
+```yaml
+# In profiles.yml
+alert_channels:
+  custom_webhook:
+    type: webhook
+    webhook_url: "https://custom.example.com/webhook"
+    extra_headers:
+      Authorization: "Bearer your_token"
+
+# In metric config
+alerting:
+  channels:
+    - custom_webhook
+```
+
+**Parameters**:
+- `webhook_url` (required) - Target webhook URL
+- `username` (default: `"detectk"`) - Bot display name
+- `icon_emoji` (default: `":warning:"`) - Bot icon
+- `channel` (optional) - Target channel (Slack/Mattermost)
+- `timeout` (default: `10`) - HTTP timeout in seconds
+- `extra_headers` (optional) - Additional HTTP headers for custom auth
 
 ### Multiple Channels
 
@@ -261,7 +290,8 @@ Each config is evaluated and sent independently. Single dict format (backward-co
 
 > **Changed or removed an alert config?** Each block's cooldown/recovery state
 > in `_dtk_alert_states` is keyed by a hash of its functional fields (channels,
-> `min_detectors`, `consecutive_anomalies`, `direction`, cooldown), so editing
+> `min_detectors`, `consecutive_anomalies`, `direction`, `alert_cooldown`,
+> `cooldown_reset_on_recovery`), so editing
 > those fields or removing a block leaves the old state row behind. Run
 > [`dtk clean --select <metric>`](../reference/cli.md#dtk-clean) to prune it.
 > (Disabling a block with `enabled: false` keeps its state — the hash is
@@ -1161,7 +1191,7 @@ alerting:
 | `detector_count` | Observed number of detectors that agreed (the quorum size that fired) | anomaly |
 | `min_detectors` | Configured quorum threshold the alert fired on (the rule) | anomaly, recovery |
 | `severity` | Severity score; max across the quorum for multi-detector alerts | anomaly |
-| `direction` | Observed/locked anomaly direction: `"up"` or `"down"` | anomaly |
+| `direction` | Observed/locked anomaly direction: `"up"` or `"down"`; also `"mixed"` for an `any`-policy quorum spanning both up and down, and `"none"` for no-data/recovery | anomaly |
 | `direction_policy` | Configured direction rule: `"same"`, `"any"`, `"up"`, `"down"` | anomaly, recovery |
 | `consecutive_count` | Observed number of consecutive anomalies | anomaly |
 | `consecutive_required` | Configured consecutive threshold the alert fired on (the rule) | anomaly, recovery |
@@ -1169,6 +1199,11 @@ alerting:
 | `error_type` / `error_message` | Exception details | error only (v0.5.0) |
 | `description` / `description_line` | Metric description | all |
 | `mentions` / `mentions_line` | Formatted mentions | all |
+
+All variables are always substitutable in every alert kind — the
+"Available in" column marks where a value is *meaningful*, not where the
+placeholder is valid. Using a variable outside its listed kinds renders a
+neutral fallback rather than raising a `KeyError`.
 
 > **Format-spec safety**: if a template uses `{value:.2f}` (or any
 > numeric format spec) on a no-data or error alert where there's no

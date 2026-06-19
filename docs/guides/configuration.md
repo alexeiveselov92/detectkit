@@ -18,55 +18,70 @@ File: `detectkit_project.yml`
 
 ```yaml
 # Project name
-project_name: my_monitoring
+name: my_monitoring
+
+# Project version (optional)
+version: "1.0"
 
 # Paths
 paths:
-  metrics_dir: metrics        # Directory with metric YAML files
-  sql_dir: sql                # Directory with SQL query files
-  templates_dir: templates    # Directory with custom alert templates
+  metrics: metrics            # Directory with metric YAML files
+  sql: sql                    # Directory with SQL query files
+  templates: templates        # Directory with custom alert templates
 
 # Default profile
 default_profile: prod
 
 # Default table names (can be overridden per metric)
-default_tables:
+tables:
   datapoints: _dtk_datapoints
   detections: _dtk_detections
   tasks: _dtk_tasks
+  metrics: _dtk_metrics
 
-# Default timeouts
+# Default timeouts (seconds)
 timeouts:
-  query_timeout: 300          # SQL query timeout (seconds)
-  lock_timeout: 3600          # Task lock timeout (seconds)
+  load: 3600                  # Data loading timeout
+  detect: 7200                # Detection timeout
+  alert: 300                  # Alerting timeout
 ```
+
+> **Note**: `dtk run` currently resolves metric files from the literal
+> `<project>/metrics` directory regardless of the `paths.metrics` override —
+> the override is not yet honoured for metric discovery.
 
 ### Available Options
 
-#### `project_name` (string, required)
+#### `name` (string, required)
 Project identifier used in logs and task management.
+
+#### `version` (string, optional)
+Project version label (default: `"1.0"`). Purely informational.
 
 #### `paths` (object, optional)
 Directory paths relative to project root.
 
-- **`metrics_dir`** (default: `"metrics"`) - Where metric YAML files are located
-- **`sql_dir`** (default: `"sql"`) - Where SQL query files are located
-- **`templates_dir`** (default: `"templates"`) - Where custom alert templates are located
+- **`metrics`** (default: `"metrics"`) - Where metric YAML files are located
+- **`sql`** (default: `"sql"`) - Where SQL query files are located
+- **`templates`** (default: `"templates"`) - Where custom alert templates are located
 
 #### `default_profile` (string, required)
 Name of the default database profile to use (from `profiles.yml`).
 
-#### `default_tables` (object, optional)
+#### `tables` (object, optional)
 Default names for internal tables:
 
 - **`datapoints`** (default: `"_dtk_datapoints"`) - Stores loaded metric data
 - **`detections`** (default: `"_dtk_detections"`) - Stores detection results
 - **`tasks`** (default: `"_dtk_tasks"`) - Stores task execution state
+- **`metrics`** (default: `"_dtk_metrics"`) - Stores metric configuration state
 
 #### `timeouts` (object, optional)
+Operation timeouts in seconds:
 
-- **`query_timeout`** (default: `300`) - SQL query execution timeout in seconds
-- **`lock_timeout`** (default: `3600`) - How long to hold task locks before expiring
+- **`load`** (default: `3600`) - Data loading timeout
+- **`detect`** (default: `7200`) - Detection timeout
+- **`alert`** (default: `300`) - Alerting timeout
 
 #### `error_alerting` (object, optional)
 
@@ -158,6 +173,12 @@ alert_channels:
 
 ### Database Profiles
 
+> **Only ClickHouse is implemented today.** PostgreSQL and MySQL profiles
+> validate at config load, but `create_manager()` raises
+> `NotImplementedError("... coming soon")` for them
+> (`detectkit/config/profile.py:152,154`). ClickHouse is the only supported
+> backend for running the pipeline.
+
 #### ClickHouse Profile
 
 ```yaml
@@ -195,6 +216,10 @@ profiles:
 
 #### PostgreSQL Profile
 
+> **Not yet implemented.** This profile shape is accepted by the config
+> loader, but running it raises `NotImplementedError("PostgreSQL support
+> coming soon")`. Use ClickHouse for now.
+
 ```yaml
 profiles:
   prod:
@@ -203,32 +228,29 @@ profiles:
     port: 5432
     user: postgres
     password: "your_password"
-    database: analytics
 
     # Schema locations
     internal_schema: detectkit  # For _dtk_* tables
     data_schema: public         # For data queries
-
-    # Connection pool settings
-    pool_size: 5
-    max_overflow: 10
 ```
 
 **Required fields**:
 - `type`: Must be `"postgres"`
 - `host`: PostgreSQL server hostname
 - `port`: PostgreSQL port (default: 5432)
-- `database`: Database name
 - `internal_schema`: Schema for _dtk_* tables
 - `data_schema`: Schema for data queries
 
 **Optional fields**:
-- `user`: Username (default: `"postgres"`)
-- `password`: Password
-- `pool_size`: Connection pool size
-- `max_overflow`: Max connections above pool_size
+- `user`: Username (default: `"default"`)
+- `password`: Password (default: empty string)
+- `settings`: Dict of database-specific settings
 
 #### MySQL Profile
+
+> **Not yet implemented.** This profile shape is accepted by the config
+> loader, but running it raises `NotImplementedError("MySQL support coming
+> soon")`. Use ClickHouse for now.
 
 ```yaml
 profiles:
@@ -238,24 +260,23 @@ profiles:
     port: 3306
     user: root
     password: "your_password"
-    database: analytics
 
-    # Schema locations
+    # Database locations
     internal_database: detectkit
     data_database: analytics
-
-    # Connection settings
-    charset: utf8mb4
-    autocommit: true
 ```
 
 **Required fields**:
 - `type`: Must be `"mysql"`
 - `host`: MySQL server hostname
 - `port`: MySQL port (default: 3306)
-- `database`: Database name
 - `internal_database`: Database for _dtk_* tables
 - `data_database`: Database for data queries
+
+**Optional fields**:
+- `user`: Username (default: `"default"`)
+- `password`: Password (default: empty string)
+- `settings`: Dict of database-specific settings
 
 ### Alert Channels
 
@@ -304,12 +325,18 @@ alert_channels:
     type: telegram
     bot_token: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
     chat_id: "-1001234567890"
+    parse_mode: "Markdown"      # "Markdown", "HTML", or null (default: "Markdown")
+    disable_notification: false # Send silently without notification (default: false)
 ```
 
 **Required fields**:
 - `type`: Must be `"telegram"`
 - `bot_token`: Telegram bot API token
 - `chat_id`: Target chat/channel ID
+
+**Optional fields**:
+- `parse_mode` (default: `"Markdown"`) - Message formatting: `"Markdown"`, `"HTML"`, or `null`
+- `disable_notification` (default: `false`) - Send the message silently, without a notification sound
 
 #### Email Channel
 
@@ -319,7 +346,7 @@ alert_channels:
     type: email
     smtp_host: "smtp.gmail.com"
     smtp_port: 587
-    smtp_user: "your_email@gmail.com"
+    smtp_username: "your_email@gmail.com"
     smtp_password: "your_app_password"
     from_email: "alerts@example.com"
     to_emails:
@@ -336,9 +363,41 @@ alert_channels:
 - `to_emails`: List of recipient email addresses
 
 **Optional fields**:
-- `smtp_user`: SMTP authentication username
+- `smtp_username`: SMTP authentication username (the channel only logs in when both `smtp_username` and `smtp_password` are set)
 - `smtp_password`: SMTP authentication password
 - `use_tls` (default: `true`) - Use TLS encryption
+- `subject_template` (default: `"⚠ Alert: {metric_name}"`) - Email subject, supports `{metric_name}`
+- `template`: Custom message body template (falls back to the built-in default)
+
+#### Generic Webhook Channel
+
+Sends alerts to any endpoint that accepts a JSON payload (Mattermost/Slack
+attachments format). Use this for custom webhook receivers or when you need
+extra HTTP headers (e.g., bearer auth).
+
+```yaml
+alert_channels:
+  custom_hook:
+    type: webhook
+    webhook_url: "https://custom.example.com/webhook"
+    username: "detectk"           # Bot display name (default: "detectk")
+    icon_emoji: ":warning:"       # Bot icon (default: ":warning:")
+    channel: "#alerts"            # Target channel (optional, Slack/Mattermost)
+    timeout: 10                    # Request timeout in seconds (default: 10)
+    extra_headers:                 # Additional HTTP headers (optional)
+      Authorization: "Bearer token"
+```
+
+**Required fields**:
+- `type`: Must be `"webhook"`
+- `webhook_url`: Endpoint URL to POST the JSON payload to
+
+**Optional fields**:
+- `username` (default: `"detectk"`) - Bot display name
+- `icon_emoji` (default: `":warning:"`) - Bot icon
+- `channel` - Override the receiver's default channel
+- `timeout` (default: `10`) - HTTP request timeout
+- `extra_headers`: Dict of additional HTTP headers to send
 
 ## Metric Configuration
 
@@ -349,6 +408,10 @@ Files: `metrics/*.yml`
 ```yaml
 # Metric identification
 name: cpu_usage
+description: |                   # Optional: multi-line, surfaces as {description}
+  CPU usage monitoring metric.
+  Tracks system load over time.
+tags: [critical, infrastructure] # Optional: drives `dtk run --select tag:critical`
 profile: prod                   # Optional: override default_profile
 enabled: true                   # Optional: disable metric
 
@@ -419,6 +482,17 @@ Unique metric identifier. Used in:
 - Logs and alerts
 
 Must be unique across all metrics in the project.
+
+#### `description` (string, optional)
+Free-form description of the metric. Supports multi-line text (use a YAML
+block scalar `|`). Surfaced in alert templates as the `{description}` and
+`{description_line}` variables.
+
+#### `tags` (list of strings, optional)
+Labels for selecting metrics on the command line. Run all metrics carrying a
+tag with `dtk run --select tag:<tag>` (e.g., `dtk run --select tag:critical`).
+Tags allow alphanumeric characters, underscores, and dashes; duplicates are
+rejected.
 
 #### `profile` (string, optional)
 Database profile to use for this metric. Overrides `default_profile` from project config.
@@ -630,6 +704,29 @@ alerting:
   template_single: null          # Used when consecutive_count <= 1
   template_consecutive: null     # Used for streaks (falls back to template_single)
 ```
+
+##### Multiple alerting blocks
+
+`alerting:` also accepts a **list** of blocks. Each block is dispatched
+independently and carries its own cooldown and alert state, so you can route
+the same metric to different channels with different rules (e.g., a noisy
+warning stream plus a strict on-call page).
+
+```yaml
+alerting:
+  - enabled: true
+    channels: [slack_ops]
+    consecutive_anomalies: 1     # warn early
+    alert_cooldown: "15min"
+  - enabled: true
+    channels: [telegram_oncall]
+    min_detectors: 2             # page only on a stronger signal
+    consecutive_anomalies: 3
+    alert_cooldown: "2h"
+```
+
+The single-dict form shown above is still supported and is treated as a
+list of one block. See the [Alerting Guide](alerting.md) for full details.
 
 **Alert filtering options** (see the [Alerting Guide](alerting.md#alert-filtering) for the full contract):
 

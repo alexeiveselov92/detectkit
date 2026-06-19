@@ -101,6 +101,11 @@ constant 1.4826, so `threshold: 3.0` corresponds to 3-sigma on Gaussian noise
 - Gaming metrics (tournament schedules)
 
 **Configuration**:
+
+> `seasonality_columns:` is a top-level metric key (a sibling of `detectors:`),
+> not a detector param. It extracts the features; `seasonality_components`
+> inside a detector's `params:` then groups on them.
+
 ```yaml
 # Extract seasonality features from timestamps (built-in names:
 # hour, day_of_week, day_of_month, month, is_weekend, is_holiday)
@@ -481,6 +486,10 @@ detectors:
 
 **Recommended**: 10-30% of `window_size`
 
+**Per-detector floors** (a value below the floor raises `ValueError`):
+- Z-Score: `min_samples` >= 2
+- IQR: `min_samples` >= 4, `min_samples_per_group` >= 4 (quartiles need 4 points)
+
 ## Performance Comparison
 
 Approximate speeds (including I/O):
@@ -493,7 +502,12 @@ Approximate speeds (including I/O):
 | MAD (with seasonality) | ~1,450 | Minimal seasonality penalty |
 | IQR | ~1,400 | Percentile calculation |
 
-All detectors are fast enough for production use. Choose based on accuracy needs, not performance.
+These rates describe incremental runs — the normal path, where each run scores
+only the handful of new points and stays cheap. Detection runs a per-point loop,
+so a large historical backfill costs roughly O(points × window_size) and can be
+slow (recomputing every point against a long window). Pick a detector for
+accuracy; size backfills with the per-point loop in mind, not the steady-state
+rate.
 
 ## Troubleshooting
 
@@ -845,7 +859,7 @@ detectors:
 alerting:
   enabled: true
   channels:
-    - pagerduty_oncall
+    - slack_oncall
   consecutive_anomalies: 2
   alert_cooldown: "15min"
   cooldown_reset_on_recovery: true

@@ -219,7 +219,7 @@ query: "SELECT timestamp, cpu_percent FROM system_metrics"
 detectors:
   - type: zscore
     params:
-      threshold: 4.0      # Less sensitive (99.99% confidence)
+      threshold: 4.0      # Less sensitive (~99.99% confidence)
       window_size: 1440   # 1 day of 1-min data
       min_samples: 100
 ```
@@ -286,7 +286,19 @@ Each detection result includes metadata:
     "window_size": 288,          # Actual valid samples used
     "ess": 96.4,                 # Effective sample size (Kish) — when window_weights is set
     "trend_slope_per_point": 0.0001,  # Estimated trend slope — when detrend is set
-
+    "preprocessing": {           # Only when smoothing or non-default input_type is set
+        "input_type": "values",
+        "smoothing": "ema",
+        "smoothed_value": 0.5288  # Only when smoothing is set
+    },
+    "seasonality_groups": [      # Applied adjustments — when seasonality_components is set
+        {
+            "group": ["hour"],
+            "mean_multiplier": 1.013,
+            "std_multiplier": 0.945,
+            "group_size": 12
+        }
+    ],
     # Only for anomalies:
     "direction": "above",        # "above" or "below"
     "severity": 1.12,            # σ beyond the violated bound (0 = at the bound)
@@ -294,10 +306,15 @@ Each detection result includes metadata:
 }
 ```
 
+For NaN / gap-filled points (or values that become NaN after preprocessing),
+detection is skipped with `is_anomaly=False` and
+`detection_metadata = {"reason": "missing_data"}`.
+
 ### Severity Calculation
 
 Severity is the distance beyond the violated bound, in standard deviations
-(using the seasonality-adjusted statistics and the preprocessed value):
+(dividing by `adjusted_std`, not `global_std`, and using the preprocessed
+value):
 
 ```python
 severity = distance / adjusted_std
@@ -324,9 +341,18 @@ When all values in the window are identical (`std = 0`):
 
 ### Small Windows
 
-With `window_size < min_samples`:
-- Detection is skipped until enough data is collected
-- Results are marked with `"reason": "insufficient_data"`
+With `min_samples > window_size`:
+- The detector **raises `ValueError`** at construction
+  (`"min_samples cannot exceed window_size"`) — the metric fails to load
+  rather than running with an unsatisfiable threshold.
+
+### Insufficient Data (warm-up / after gaps)
+
+When the trailing window holds fewer than `min_samples` valid (non-NaN)
+points — during warm-up or after data gaps:
+- Detection is skipped for that point (`is_anomaly=False`)
+- Results are marked with `"reason": "insufficient_data"` (plus the current
+  valid `window_size` and the configured `min_samples`)
 - Ensures statistical reliability (central limit theorem requires ≥30 samples)
 
 ## Comparison with Other Detectors

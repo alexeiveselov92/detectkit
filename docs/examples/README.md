@@ -26,6 +26,7 @@ This directory contains practical examples for common monitoring scenarios.
 ### Alerting & Preprocessing Features
 - **[No-Data Alerts](#example-12-no-data-alerts)** - Fire when the latest interval has no datapoint
 - **[Project-Level Error Alerting](#example-13-project-level-error-alerting)** - Catch DB outages and pipeline crashes at the project level
+- **[Multiple Alerting Blocks](#multiple-alerting-blocks)** - Route one metric to several independent alert blocks
 - **[Mentions Example](mentions-example.yml)** - @mention users/groups in alerts across all channels
 - **[Alert Cooldown Example](alert-cooldown-example.yml)** - Prevent spam with alert cooldown
 - **[Recovery Notifications Example](recovery-notification-example.yml)** - "All clear" messages when metric stabilizes
@@ -560,9 +561,11 @@ alerting:
 
 **Alert logic** (`min_detectors: 2`, `direction: "same"`, `consecutive_anomalies: 3`):
 - MAD + Z-Score both detect "up" → counts toward the alert (high confidence)
-- Manual bounds + any statistical detector agree on direction → counts too
+- Manual bounds fires "up" + a statistical detector fires "up" → both vote
+  "up", so the quorum is met (the votes must point the SAME way)
 - Only Z-Score detects → no alert (might be noise)
-- One detector says "up" while another says "down" → no alert
+- One detector says "up" while another says "down" → no alert: they are two
+  anomalies in opposite directions, not two votes for one direction
   (disagreement is not consensus)
 - The 2-detector quorum must hold at each of the last 3 consecutive
   points (exactly one interval apart — a gap breaks the chain)
@@ -710,6 +713,57 @@ alert_channels:
 
 ---
 
+## Multiple Alerting Blocks
+
+Route the **same** metric to several destinations with different rules by
+giving `alerting:` as a YAML **list** instead of a single block. Each block
+is fully independent — its own channels, conditions, templates, cooldown,
+and alert/recovery/cooldown state.
+
+```yaml
+name: api_latency_p95
+interval: 5min
+
+query: |
+  SELECT timestamp, quantile(0.95)(response_time_ms) AS value
+  FROM api_requests
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
+  GROUP BY timestamp
+  ORDER BY timestamp
+
+detectors:
+  - type: mad
+    params: {threshold: 3.0, window_size: 288, min_samples: 100}
+  - type: zscore
+    params: {threshold: 2.5, window_size: 288, min_samples: 100}
+
+# alerting as a list of independent blocks
+alerting:
+  # Route 1: page on-call fast — any single detector, short streak, tight cooldown
+  - channels: [slack_oncall]
+    min_detectors: 1
+    direction: "up"
+    consecutive_anomalies: 2
+    alert_cooldown: "10min"
+    mentions: ["oncall", "here"]
+
+  # Route 2: calmer team summary — require both detectors to agree, longer streak
+  - channels: [mattermost_team]
+    min_detectors: 2
+    direction: "same"
+    consecutive_anomalies: 5
+    alert_cooldown: "1hour"
+    notify_on_recovery: true
+```
+
+Each block keeps its own channels, conditions, templates, cooldown, and
+alert/recovery state — they fire and recover independently. See the full
+config in **[multi-alert-routing-example.yml](multi-alert-routing-example.yml)**
+and the [Alerting Guide](../guides/alerting.md) for routing details.
+
+---
+
 ## Common Patterns Summary
 
 | Use Case | Detector | Seasonality | Consecutive | Direction |
@@ -739,6 +793,8 @@ alert_channels:
 | Suppress | `suppress_until: "2026-04-11 18:00:00"` | Pause alerts until UTC time |
 | No-data alert | `no_data_alert: true` | Fire when latest interval has no row |
 | No-data template | `template_no_data: "..."` | Custom no-data message body |
+| Multiple alert routes | `alerting:` as a YAML list | Each block independent (channels/conditions/templates/cooldown/state) |
+| Rule-aware template vars (v0.9+) | `{expected_range}`, `{min_detectors}`, `{direction_policy}`, `{consecutive_required}`, `{detector_count}` | Surface the rule the alert fired with (the default message is now alert-centric) |
 | Project errors | `error_alerting:` in `detectkit_project.yml` | Catch pipeline crashes (DB outage etc.) |
 
 ## See Also

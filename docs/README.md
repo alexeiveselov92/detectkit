@@ -26,6 +26,9 @@ pip install detectkit[clickhouse]
 dtk init my_monitoring
 cd my_monitoring
 
+# (Optional) Set up Claude Code context for working with detectkit
+dtk init-claude
+
 # Edit profiles.yml (add database connection)
 
 # Create metric config
@@ -119,6 +122,7 @@ Send alerts to multiple platforms:
 - **Slack** - Team notifications
 - **Telegram** - Mobile alerts
 - **Email** - Traditional notifications
+- **Webhook** - Generic HTTP endpoint
 
 ```yaml
 alerting:
@@ -126,8 +130,33 @@ alerting:
     - mattermost_ops
     - slack_critical
     - email_oncall
-  consecutive_anomalies: 3  # Require confirmation
+  min_detectors: 1            # Quorum: detectors that must agree per point
+  consecutive_anomalies: 3    # Require confirmation
   direction: "up"             # Only alert on increases
+  alert_cooldown: "2h"        # Recommended: without it a persisting anomaly re-alerts every run
+  notify_on_recovery: true    # Send a follow-up when the metric recovers
+  no_data_alert: false        # Alert when expected data is missing
+  # suppress_until: "2026-07-01"  # Mute this config until a date
+  mentions:                   # Users/groups to @-mention
+    - "@oncall"
+```
+
+Define multiple independent blocks by giving `alerting:` a list — each block
+has its own channels and conditions, and keeps independent cooldown/recovery
+state:
+
+```yaml
+alerting:
+  - enabled: true
+    channels:
+      - mattermost_ops
+    consecutive_anomalies: 3
+
+  - enabled: true
+    channels:
+      - slack_critical
+    consecutive_anomalies: 1   # More sensitive for this channel
+    direction: "up"            # Only upward anomalies
 ```
 
 [Learn more →](guides/alerting.md)
@@ -137,15 +166,19 @@ alerting:
 - **Batch processing** - Handle large datasets efficiently
 - **Incremental loading** - Only load new data
 - **Idempotent operations** - Safe to re-run
-- **Vectorized detectors** - numpy-based core, no pandas
+- **numpy-based detectors** - numpy core, no pandas (windowed detectors use a
+  per-point loop — fine incrementally, slower for large backfills)
 
 ### 🗄️ Database Support
 
 Works with your existing data warehouse:
 
-- **ClickHouse** (recommended)
-- **PostgreSQL**
-- **MySQL**
+- **ClickHouse** - the only supported backend today
+- **PostgreSQL** - planned, not yet implemented
+- **MySQL** - planned, not yet implemented
+
+> **Note:** ClickHouse is currently the only working backend. Selecting
+> `postgres` or `mysql` raises `NotImplementedError` ("coming soon").
 
 ## Architecture
 
@@ -279,6 +312,15 @@ dtk clean --select cpu_usage --execute
 dtk clean --orphaned-metrics --execute
 ```
 
+### Claude Code Context
+
+```bash
+# Scaffold AI-assistant context (CLAUDE.md, rules, skills) so Claude Code
+# can help create metrics, tune detectors and run the pipeline. The content
+# ships with detectkit and is idempotent — re-run it after upgrading.
+dtk init-claude
+```
+
 [Full CLI Reference →](reference/cli.md)
 
 ## Configuration Files
@@ -290,11 +332,20 @@ detectkit uses three main configuration files:
 Project-level settings:
 
 ```yaml
-project_name: my_monitoring
+name: my_monitoring
+version: '1.0'
+
 default_profile: prod
-paths:
-  metrics_dir: metrics
-  sql_dir: sql
+
+tables:
+  datapoints: _dtk_datapoints
+  detections: _dtk_detections
+  tasks: _dtk_tasks
+
+timeouts:
+  load: 1800      # 30 minutes
+  detect: 3600    # 1 hour
+  alert: 300      # 5 minutes
 ```
 
 ### 2. `profiles.yml`
@@ -351,7 +402,10 @@ alerting:
 
 ## Performance
 
-All detectors are fast enough for production use. Choose based on accuracy, not performance.
+Detectors are fast enough for routine incremental runs, so choose primarily on
+accuracy. Note that the windowed detectors (MAD, Z-Score, IQR) use a per-point
+loop, which is fine incrementally but can be slow for large historical
+backfills over big windows.
 
 ## Best Practices
 

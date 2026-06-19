@@ -21,13 +21,17 @@ This creates the following structure:
 
 ```
 my_monitoring/
-├── detectkit_project.yml   # Project configuration
-├── profiles.yml            # Database connections
-├── metrics/                # Metric definitions
-│   └── .gitkeep
-└── sql/                    # SQL queries
+├── detectkit_project.yml      # Project configuration
+├── profiles.yml               # Database connections
+├── README.md                  # Project readme with quick commands
+├── metrics/                   # Metric definitions
+│   └── example_cpu_usage.yml  # Working starter metric (mad + zscore, alerting)
+└── sql/                       # SQL queries
     └── .gitkeep
 ```
+
+`metrics/example_cpu_usage.yml` is a complete, runnable example — use it as a
+template for your own metrics.
 
 > **Tip — set up an AI assistant.** If you use [Claude
 > Code](https://claude.com/claude-code), run `dtk init-claude` in this folder.
@@ -65,7 +69,19 @@ profiles:
       max_execution_time: 600
 ```
 
+> **Warning.** The auto-generated `profiles.yml` ships with a placeholder
+> `dev` profile that only sets `database: default`. Before running you **must**
+> set `internal_database` (for `_dtk_*` tables) and `data_database` (where your
+> source tables live) on the ClickHouse profile — otherwise the run fails with
+> `internal_database must be set for ClickHouse`.
+
 ### PostgreSQL Example
+
+> **Not yet implemented.** PostgreSQL and MySQL are planned but not wired up
+> yet — selecting `type: postgres` or `type: mysql` raises
+> `PostgreSQL support coming soon` / `MySQL support coming soon`. **ClickHouse
+> is the only supported backend today.** The example below shows the intended
+> shape for when it lands.
 
 ```yaml
 profiles:
@@ -154,15 +170,28 @@ Run the metric for the first time:
 dtk run --select api_response_time
 ```
 
-Expected output:
+Output looks like this — a header with the project root and the metric count,
+then a per-metric block (config file + steps) and the load → detect → alert
+pipeline rendered as a tree, ending in a success line:
 
 ```
-[2024-03-15 10:00:00] Running metric: api_response_time
-[2024-03-15 10:00:01] ✓ Load step completed: 288 points loaded
-[2024-03-15 10:00:02] ✓ Detect step completed: 12 anomalies found
-[2024-03-15 10:00:03] ✓ Alert step completed: 1 alert sent
-[2024-03-15 10:00:03] ✓ Task completed successfully
+Project root: /path/to/my_monitoring
+Found 1 metric(s) to process
+
+Processing metric: api_response_time
+  Config file: metrics/api_response_time.yml
+  Steps: load, detect, alert
+
+  ┌─ LOAD
+  │   ... (load progress)
+  └─ ... (detect / alert progress)
+
+✓ Pipeline completed successfully
 ```
+
+The per-step detail lines are emitted by the pipeline itself, so the exact
+middle of the tree depends on how much data was loaded and how many anomalies
+were found.
 
 ## Step 6: Explore Results
 
@@ -299,9 +328,24 @@ dtk run --select api_response_time --full-refresh
 ### Historical Backfill
 
 ```bash
-# Load data from specific date
+# Load data from a specific date
 dtk run --select api_response_time --from "2024-01-01 00:00:00"
+
+# Bounded backfill: pair --from with --to to load a closed window
+dtk run --select api_response_time --from "2024-01-01" --to "2024-02-01"
 ```
+
+### Exclude and Force
+
+```bash
+# Run everything except a subset
+dtk run --select "*" --exclude "metrics/staging/*"
+
+# Ignore a stuck lock left by a crashed run
+dtk run --select api_response_time --force
+```
+
+See the [CLI Reference](../reference/cli.md#dtk-run) for the full flag list.
 
 ### Test Alert
 
@@ -344,7 +388,8 @@ Now that you have a working metric:
 2. **Handle trending metrics** - `window_weights: exponential` + `half_life`, or `detrend: linear` ([Detectors Guide](../guides/detectors.md))
 3. **Configure multiple detectors** - [Detectors Guide](../guides/detectors.md)
 4. **Set up multiple channels** - [Alerting Guide](../guides/alerting.md)
-5. **Explore examples** - [Examples](../examples/)
+5. **Fan out to independent alert rules** - `alerting:` can be a *list* of alert blocks, each with its own channels, conditions and template ([Alerting Guide](../guides/alerting.md#multiple-alert-configurations))
+6. **Explore examples** - [Examples](../examples/)
 
 ## Troubleshooting
 

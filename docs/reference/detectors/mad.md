@@ -314,6 +314,8 @@ detectors:
 - **CPU**: Lightweight (median calculation only)
 - **Seasonality impact**: Minimal performance penalty
 
+Detection runs a per-point window loop, so large initial backfills are the slow path; incremental runs only score the few new points and are cheap.
+
 ## Detection Metadata
 
 Each detection result includes metadata:
@@ -337,7 +339,7 @@ Each detection result includes metadata:
     ],
     # Only for anomalies:
     "direction": "above",           # "above" or "below"
-    "severity": 4.52,               # σ-equivalents beyond the bound (distance / (1.4826 × MAD))
+    "severity": 4.52,               # σ-equivalents beyond the bound (distance / (1.4826 × adjusted_mad); equals global_mad only when no seasonality multiplier applies)
     "distance": 0.2298              # Absolute distance from bound
 }
 ```

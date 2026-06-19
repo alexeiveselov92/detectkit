@@ -6,7 +6,7 @@ This guide covers installing detectkit and its dependencies.
 
 - **Python**: 3.10 or higher
 - **pip**: Latest version recommended
-- **Database**: ClickHouse, PostgreSQL, or MySQL (at least one required)
+- **Database**: ClickHouse (the only supported backend today; PostgreSQL and MySQL are planned but not yet implemented)
 
 ## Basic Installation
 
@@ -42,6 +42,10 @@ pip install clickhouse-driver
 
 ### PostgreSQL
 
+> **Not yet implemented.** PostgreSQL support is planned. The extra and driver
+> install fine, but creating a connection raises `NotImplementedError`
+> ("PostgreSQL support coming soon"). Use ClickHouse for now.
+
 ```bash
 pip install detectkit[postgres]
 ```
@@ -52,9 +56,13 @@ Or install driver manually:
 pip install psycopg2-binary
 ```
 
-**Supported versions**: PostgreSQL 12+
+**Planned versions**: PostgreSQL 12+
 
 ### MySQL
+
+> **Not yet implemented.** MySQL support is planned. The extra and driver
+> install fine, but creating a connection raises `NotImplementedError`
+> ("MySQL support coming soon"). Use ClickHouse for now.
 
 ```bash
 pip install detectkit[mysql]
@@ -66,7 +74,7 @@ Or install driver manually:
 pip install pymysql
 ```
 
-**Supported versions**: MySQL 8.0+
+**Planned versions**: MySQL 8.0+
 
 ### Multiple Databases
 
@@ -102,6 +110,17 @@ pip install detectkit[timesfm]
 
 ### All Advanced Detectors
 
+Install both Prophet and TimesFM (no database drivers):
+
+```bash
+pip install detectkit[advanced-detectors]
+```
+
+### Everything
+
+The `[all]` extra installs **everything** — all database drivers plus
+Prophet and TimesFM, not just the advanced detectors:
+
 ```bash
 pip install detectkit[all]
 ```
@@ -132,13 +151,30 @@ pip install -e .[dev]
 
 This installs:
 - detectkit in editable mode
-- All database drivers
-- Development tools (pytest, black, ruff)
+- Development tooling only (pytest, pytest-cov, pytest-mock, requests-mock, black, mypy, ruff)
+
+The `dev` extra does **not** include any database drivers. For the full
+suite, add the DB extras you need (and Docker-backed integration tests):
+
+```bash
+pip install -e ".[dev,all-db]"          # tooling + all DB drivers
+pip install -e ".[dev,all-db,integration]"  # also pulls testcontainers for integration tests
+```
 
 ### 4. Run Tests
 
+Unit tests (no external services required):
+
 ```bash
-pytest
+python -m pytest tests/unit
+```
+
+Integration tests need the `integration` extra (testcontainers) and a
+running Docker daemon:
+
+```bash
+pip install -e ".[integration]"
+python -m pytest tests/integration
 ```
 
 ## Verifying Installation
@@ -154,6 +190,17 @@ This prints the installed package version:
 ```
 detectkit, version x.y.z
 ```
+
+### Optional: AI Onboarding
+
+If you use Claude Code, `dtk init-claude` drops detectkit context (rules and
+skills) into your project so the assistant understands the project layout:
+
+```bash
+dtk init-claude
+```
+
+Re-run it after upgrading detectkit to refresh the shipped context.
 
 ## Upgrading
 
@@ -245,6 +292,7 @@ After installation:
 1. [Quickstart Guide](quickstart.md) - Create your first metric
 2. [Configuration Guide](../guides/configuration.md) - Learn configuration options
 3. [CLI Reference](../reference/cli.md) - Explore CLI commands
+4. Run `dtk init-claude` for optional Claude Code onboarding (re-run after upgrades)
 
 ## Getting Help
 

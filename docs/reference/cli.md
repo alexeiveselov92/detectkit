@@ -80,11 +80,13 @@ dtk init analytics --target-dir /opt/projects
 
 ```
 my_monitoring/
-├── detectkit_project.yml   # Project configuration
-├── profiles.yml            # Database connections & alert channels
-├── metrics/                # Metric definitions
-│   └── .gitkeep
-└── sql/                    # SQL query files
+├── detectkit_project.yml      # Project configuration
+├── profiles.yml               # Database connections & alert channels
+├── README.md                  # Getting-started notes for the project
+├── metrics/                   # Metric definitions
+│   ├── .gitkeep
+│   └── example_cpu_usage.yml  # Example metric to copy/edit
+└── sql/                       # SQL query files
     └── .gitkeep
 ```
 
@@ -283,16 +285,18 @@ dtk run --select cpu_usage --from "2024-01-01" --to "2024-02-01"
 
 ##### `--full-refresh` (flag)
 
-Delete all existing data and reload from scratch.
+Delete existing data and reload from scratch.
 
 ```bash
 dtk run --select cpu_usage --full-refresh
 ```
 
-**Behavior**:
-1. Deletes all data from `_dtk_datapoints`
-2. Deletes all detections from `_dtk_detections`
-3. Reloads data from `loading_start_time` or `--from`
+**Behavior** (delete/reload is **range-scoped** to `--from`/`--to`):
+1. Deletes `_dtk_datapoints` and `_dtk_detections` rows in the `[--from, --to)`
+   window — and **all** history only when neither `--from` nor `--to` is given
+   (detect uses `--to` or now as the upper bound when `--to` is omitted)
+2. Reloads data from `--from` (or `loading_start_time` when no `--from`) up to
+   `--to` (or now)
 
 **Use cases**:
 - Fixing corrupted data
@@ -507,21 +511,27 @@ dtk run --select cpu_usage --force
 
 #### Output
 
-Typical output:
+Each run renders as a load → detect → alert tree per metric:
 ```
-[2024-03-15 10:00:00] Running metric: cpu_usage
-[2024-03-15 10:00:01] ✓ Load step completed: 1440 points loaded
-[2024-03-15 10:00:02] ✓ Detect step completed: 5 anomalies found
-[2024-03-15 10:00:03] ✓ Alert step completed: 1 alert sent
-[2024-03-15 10:00:03] ✓ Task completed successfully
+Project root: /path/to/project
+Found 1 metric(s) to process
+
+Processing metric: cpu_usage
+  Config file: metrics/cpu_usage.yml
+  Steps: load, detect, alert
+
+  ┌─ LOAD
+  │ Resuming from last saved: 2024-03-15 09:50:00
+  │ Loading from 2024-03-15 10:00:00 to 2024-03-15 10:00:00
+  │ Total points: ~1,440 | Batch size: 2,160
+  │ Loading in single batch...
+  └─ Loaded 1,440 datapoints
+
+✓ Pipeline completed successfully
 ```
 
-With errors:
-```
-[2024-03-15 10:00:00] Running metric: cpu_usage
-[2024-03-15 10:00:01] ✗ Load step failed: Connection refused
-[2024-03-15 10:00:01] ✗ Task failed
-```
+On failure the tree ends with a red `✗ Failed: …` line instead of
+`✓ Pipeline completed successfully`.
 
 ---
 
@@ -577,11 +587,22 @@ Sends a mock alert through all configured channels with fake data:
 #### Example Output
 
 ```
-[2024-03-15 10:00:00] Loading metric configuration: cpu_usage
-[2024-03-15 10:00:01] Sending test alert to channel: mattermost_ops
-[2024-03-15 10:00:02] ✓ Alert sent successfully
-[2024-03-15 10:00:02] ✓ Test alert completed
+📨 Sending test alert for metric: cpu_usage
+   Timezone: UTC
+   Channels: mattermost_ops
+
+   → Sending to mattermost_ops... ✓ SUCCESS
+
+✓ Sent test alert to 1/1 channels
+
+💡 Check your configured channels to verify message formatting
+   Mock data used: value=0.8532, confidence=[0.4521, 0.6234], severity=4.52
 ```
+
+When the metric defines **multiple** enabled alerting blocks (the list form),
+each block is tested independently: its `Timezone`/`Channels` are printed under
+a `[config i/N]` header, followed by a combined `Total: x/y channels across N
+alert configs` line.
 
 ---
 
@@ -634,7 +655,8 @@ run proceeds normally without needing `--force`.
 
 #### Behavior
 
-- Reports, per metric, whether a lock was cleared or none was held
+- Reports, per metric, whether a lock was cleared (`lock cleared`) or none was
+  held (`• <name>: no active lock`)
 - Clears even a not-yet-expired lock (use with the same care as `--force`)
 - Does **not** run the pipeline — only releases the lock
 
@@ -755,9 +777,12 @@ Re-run with --execute to apply.
 
 | Code | Meaning |
 |------|---------|
-| 0 | Success |
-| 1 | General error (configuration, database, etc.) |
-| 2 | Command-line argument error |
+| 0 | Normal completion — **including** most user-facing errors (bad project dir, missing `profiles.yml`, config/DB connection failures), which print an error message and return |
+| 2 | Click argument error (e.g. a missing required option or an invalid `--steps`/`--from` value) |
+
+> **Note:** detectkit does not currently exit non-zero on configuration or
+> database errors — it reports them and returns `0`. Don't gate a scheduler on
+> the exit code alone; check the logged output.
 
 ## Environment Variables
 

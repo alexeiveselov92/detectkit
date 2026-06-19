@@ -1,0 +1,81 @@
+# Example: Multiple Alert Routes (list form of `alerting:`)
+#
+# A single metric can have MORE THAN ONE alerting block. Provide `alerting:`
+# as a YAML list — each block is fully independent: its own channels,
+# conditions (min_detectors / direction / consecutive_anomalies), templates,
+# cooldown, and alert/recovery/cooldown state.
+#
+# This is the idiomatic way to route the SAME metric differently for
+# different audiences/severities, e.g.:
+#   - a fast, low-bar page to the on-call channel
+#   - a calmer, higher-confidence summary to a team channel
+#
+# Backward-compatible: a single `alerting:` dict still works (it is just a
+# one-element list under the hood).
+
+name: api_latency_p95
+description: API latency 95th percentile, routed to two independent alert blocks
+interval: "5min"
+
+# Load latency data from database
+query: |
+  SELECT
+    timestamp,
+    quantile(0.95)(response_time_ms) as value
+  FROM api_requests
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
+  GROUP BY timestamp
+  ORDER BY timestamp
+
+# Loading configuration
+loading_start_time: "2025-01-01 00:00:00"
+loading_batch_size: 2880  # 10 days of 5-min intervals
+
+# Two detectors so the second block can require a quorum
+detectors:
+  - type: mad
+    params:
+      threshold: 3.0    # in sigma-equivalents (~3-sigma)
+      window_size: 288  # 24 hours of data
+      min_samples: 100
+
+  - type: zscore
+    params:
+      threshold: 2.5
+      window_size: 288
+      min_samples: 100
+
+# Multiple alerting blocks — a YAML list. Each entry is an independent
+# AlertConfig with its own channels, conditions, cooldown, and state.
+alerting:
+  # Route 1: page on-call fast — any single detector, short streak, tight cooldown
+  - enabled: true
+    channels:
+      - slack_oncall
+    min_detectors: 1
+    direction: "up"            # only page on latency spikes
+    consecutive_anomalies: 2
+    alert_cooldown: "10min"
+    mentions: ["oncall", "here"]
+    template_consecutive: |
+      🔴 {metric_name} latency spike
+      Quorum {detector_count}/{min_detectors} · consecutive {consecutive_count}/{consecutive_required}
+      Latest: {value_display} | Expected: {expected_range} @ {timestamp}
+      {mentions}
+
+  # Route 2: calmer team summary — require both detectors to agree, longer streak
+  - enabled: true
+    channels:
+      - mattermost_team
+    min_detectors: 2
+    direction: "same"          # both detectors must agree on one direction
+    consecutive_anomalies: 5
+    alert_cooldown: "1hour"
+    notify_on_recovery: true   # team also gets the "all clear"
+
+# Tags for filtering
+tags:
+  - production
+  - api
+  - critical

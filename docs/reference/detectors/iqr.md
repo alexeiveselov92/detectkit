@@ -96,8 +96,9 @@ Seasonality groupings for adaptive intervals — works exactly like MAD's
 (global statistics adjusted by per-group multipliers). Single components
 (`"hour"`), multiple separate components, or combined components
 (`["hour", "day_of_week"]`) are supported. Names must match the metric's
-built-in `seasonality_columns` features or custom columns declared in
-`query_columns.seasonality`.
+built-in `seasonality_columns` features (`hour`, `day_of_week`,
+`day_of_month`, `month`, `is_weekend`, `is_holiday`) or custom columns
+declared in `query_columns.seasonality`.
 
 **Example:**
 ```yaml
@@ -269,7 +270,7 @@ detectors:
 
 ### ❌ Disadvantages:
 - **Less sensitive than MAD** - Quartiles span 50% of data
-- **May be too permissive** - 1.5×IQR allows ~1% false positives in normal data
+- **May be too permissive** - 1.5×IQR captures ~99.3% of normal data, leaving ~0.7% false positives
 - **Slower than MAD** - Percentile calculation slightly more expensive
 
 ## Performance Characteristics
@@ -298,26 +299,29 @@ Each detection result includes metadata:
     # Only for anomalies:
     "direction": "above",        # "above" or "below"
     "severity": 2.34,            # How many (adjusted) IQR units beyond the fence
-    "distance": 0.4421           # Absolute distance from bound
+    "distance": 0.4421           # Absolute distance beyond the violated fence (>= 0)
 }
 ```
 
 ### Severity Calculation
 
-Severity represents how many IQR units away from the bound:
+Severity is the distance *beyond* the violated fence, in (adjusted) IQR
+units. It starts at 0 *at* the bound (not measured from the center), using
+the seasonality-adjusted statistics and the preprocessed value:
 
 ```python
-if value < lower_bound:
-    severity = (lower_bound - value) / IQR
-else:
-    severity = (value - upper_bound) / IQR
+severity = distance / adjusted_iqr
+# where distance = how far the value sits outside [lower_fence, upper_fence]
 ```
 
-**Interpretation**:
-- `severity < 1.5` → Within standard bounds (not anomalous with default threshold)
-- `severity ≥ 1.5` → Outside standard bounds (anomalous with default threshold)
-- `severity ≥ 3.0` → Extreme outlier
-- `severity ≥ 5.0` → Very extreme outlier
+This is the same "0 at the bound" convention as MAD (σ-equivalents) and
+Z-Score, so the alert layer can compare severities across detectors when
+several fire at once.
+
+**Interpretation** (with `threshold: 1.5`):
+- `severity ≈ 0` → Just outside the fence
+- `severity ≥ 1.0` → One full IQR beyond the fence — strong anomaly
+- `severity ≥ 2.0` → Two+ IQR beyond the fence — extreme anomaly
 
 ## Edge Cases
 
@@ -372,12 +376,19 @@ Points outside fences = outliers
 
 ### Percentile Calculation
 
-Uses linear interpolation (numpy default):
+Quartiles are computed with
+`detectkit.utils.stats.weighted_percentile`, which uses the midpoint
+(Hazen) convention and supports recency weights:
 
 ```python
-Q1 = np.percentile(data, 25)  # Linear interpolation
-Q3 = np.percentile(data, 75)
+Q1 = weighted_percentile(data, weights, 25)
+Q3 = weighted_percentile(data, weights, 75)
 ```
+
+With uniform weights this reproduces `np.median` exactly (and gives
+quartiles consistent with it); when `window_weights` is set, the recency
+weights enter Q1/Q3 directly. It is **not** `np.percentile` linear
+interpolation.
 
 ## Comparison with MAD and Z-Score
 

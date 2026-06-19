@@ -26,10 +26,14 @@ version — **read the relevant one on demand** instead of guessing:
 | Choosing/tuning detectors, preprocessing, trends, seasonality | `.claude/rules/detectkit/detectors.md` |
 | Alert rules (quorum/direction/consecutive), cooldown, recovery, templates | `.claude/rules/detectkit/alerting.md` |
 
-### Scaffold a new metric
+### Set up & scaffold (skills)
 
-To create a new metric, use the **`dtk-new-metric`** skill — it walks the
-config out to a YAML file that validates and is ready to run.
+- **First-time setup** — use the **`dtk-setup-project`** skill to configure the
+  database connection in `profiles.yml` (the `dtk init` placeholder ships example
+  values that need your real connection details) and, optionally, a first alert
+  channel.
+- **A new metric** — use the **`dtk-new-metric`** skill; it walks the config out
+  to a YAML file that validates and is ready to run.
 
 ### Gotchas that bite (keep these in mind)
 

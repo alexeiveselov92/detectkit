@@ -160,6 +160,7 @@ class TestInitScaffolding:
         from detectkit.cli.commands.init import run_init
         from detectkit.config.metric_config import MetricConfig
         from detectkit.config.profile import ProfilesConfig
+        from detectkit.config.project_config import ProjectConfig
         from detectkit.detectors.factory import DetectorFactory
 
         run_init("scaffold", str(tmp_path))
@@ -169,7 +170,33 @@ class TestInitScaffolding:
         for d in mc.detectors:
             DetectorFactory.create_from_config({"type": d.type, "params": d.params})
 
+        # The generated project config must validate AND use the real nested
+        # `paths:` mapping. Check the raw structure too: a flat metrics_path/
+        # sql_path would be silently dropped and ProjectConfig.paths.metrics
+        # would still read "metrics" from its default, hiding the regression.
+        project_path = tmp_path / "scaffold/detectkit_project.yml"
+        raw_project = yaml.safe_load(project_path.read_text())
+        assert "paths" in raw_project and "metrics_path" not in raw_project
+        project = ProjectConfig.from_yaml_file(project_path)
+        assert project.default_profile == "dev"
+        assert project.paths.metrics == "metrics"
+
         profiles = yaml.safe_load((tmp_path / "scaffold/profiles.yml").read_text())
         pc = ProfilesConfig(**profiles)
         assert pc.default_profile == "dev"
         assert "dev" in pc.profiles and "prod" in pc.profiles
+
+        # The dev profile must be runnable: ClickHouse resolves both locations
+        # (regression guard — the old template set an ignored `database:` key,
+        # so internal_database/data_database stayed None and the first run
+        # raised "internal_database must be set for ClickHouse").
+        dev = pc.get_profile("dev")
+        assert dev.get_internal_location() == "detectkit"
+        assert dev.get_data_location() == "default"
+
+        # The shipped alert channel must actually construct (regression guard —
+        # the old template passed `icon_url`, which the Mattermost channel
+        # rejects with "Invalid parameters for mattermost channel").
+        from detectkit.alerting.channels.factory import AlertChannelFactory
+
+        AlertChannelFactory.create_from_config(pc.get_alert_channel_config("mattermost_alerts"))

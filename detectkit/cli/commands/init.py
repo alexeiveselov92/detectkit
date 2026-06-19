@@ -59,11 +59,14 @@ def run_init(project_name: str, target_dir: str):
 name: {project_name_clean}
 version: '1.0'
 
-# Paths
-metrics_path: metrics
-sql_path: sql
+# Directory paths. These are the real config keys (nested under `paths:`);
+# a flat `metrics_path:` / `sql_path:` is not a recognized field and is ignored.
+paths:
+  metrics: metrics
+  sql: sql
+  templates: templates
 
-# Default profile to use
+# Default profile to use (must exist in profiles.yml)
 default_profile: dev
 
 # Default table names (can be overridden in metrics)
@@ -81,70 +84,98 @@ timeouts:
 
     (target_path / "detectkit_project.yml").write_text(project_config)
 
-    # Create profiles.yml (must validate against ProfilesConfig:
-    # connections live under a top-level 'profiles:' mapping)
+    # Create profiles.yml (must validate against ProfilesConfig: connections
+    # live under a top-level 'profiles:' mapping). ClickHouse needs BOTH
+    # `internal_database` (for the _dtk_* tables) and `data_database` (where the
+    # metric queries read from) — there is no `database:` field, so the dev
+    # profile below is runnable as-is against a local ClickHouse.
     profiles_config = """# Database connection profiles
 
 default_profile: dev
 
 profiles:
+  # Local dev — runnable against a local ClickHouse once the databases exist.
+  # ClickHouse needs BOTH locations (there is no `database:` field):
+  #   internal_database -> where detectkit's own _dtk_* tables live
+  #   data_database     -> where your metric source tables live
   dev:
     type: clickhouse
     host: localhost
-    port: 9000
-    database: default
+    port: 9000            # native protocol (not the 8123 HTTP port)
     user: default
     password: ""
+    internal_database: detectkit   # _dtk_* tables (create this database once)
+    data_database: default         # your source data lives here
 
+  # Production — keep secrets in env vars, never commit credentials.
   prod:
     type: clickhouse
     host: "{{ env_var('CLICKHOUSE_HOST') }}"
     port: 9000
-    database: monitoring
     user: "{{ env_var('CLICKHOUSE_USER') }}"
     password: "{{ env_var('CLICKHOUSE_PASSWORD') }}"
+    internal_database: detectkit   # _dtk_* tables
+    data_database: monitoring      # your source data
 
-  # Example PostgreSQL profile
+  # Example PostgreSQL profile (uses internal_schema / data_schema)
   # postgres_dev:
   #   type: postgres
   #   host: localhost
   #   port: 5432
-  #   database: monitoring
   #   user: postgres
   #   password: postgres
-  #   schema: public
+  #   internal_schema: detectkit
+  #   data_schema: public
 
   # Example MySQL profile
   # mysql_dev:
   #   type: mysql
   #   host: localhost
   #   port: 3306
-  #   database: monitoring
   #   user: root
   #   password: root
+  #   internal_database: detectkit
+  #   data_database: analytics
 
-# Alert channels configuration
+# Alert channels (referenced by name from a metric's alerting.channels)
 alert_channels:
-  # Mattermost channel
+  # Mattermost. Supported keys: webhook_url, username, icon_emoji, channel,
+  # timeout. NOTE: there is no `icon_url` param — use `icon_emoji`.
   mattermost_alerts:
     type: mattermost
     webhook_url: "{{ env_var('MATTERMOST_WEBHOOK_URL') }}"
     username: detectkit
-    icon_url: https://example.com/detectkit-icon.png
+    icon_emoji: ":warning:"
 
-  # Slack channel example
+  # Slack example (same fields as mattermost)
   # slack_alerts:
   #   type: slack
   #   webhook_url: "{{ env_var('SLACK_WEBHOOK_URL') }}"
   #   channel: "#alerts"
   #   username: detectkit
 
-  # Generic webhook example
+  # Telegram example (required: bot_token, chat_id)
+  # telegram_alerts:
+  #   type: telegram
+  #   bot_token: "{{ env_var('TELEGRAM_BOT_TOKEN') }}"
+  #   chat_id: "{{ env_var('TELEGRAM_CHAT_ID') }}"
+
+  # Email example (required: smtp_host, smtp_port, from_email, to_emails)
+  # email_alerts:
+  #   type: email
+  #   smtp_host: smtp.gmail.com
+  #   smtp_port: 587
+  #   from_email: alerts@example.com
+  #   to_emails:
+  #     - team@example.com
+  #   smtp_username: "{{ env_var('SMTP_USERNAME') }}"
+  #   smtp_password: "{{ env_var('SMTP_PASSWORD') }}"
+
+  # Generic webhook example (required: webhook_url; optional extra_headers)
   # webhook_alerts:
   #   type: webhook
-  #   url: "{{ env_var('WEBHOOK_URL') }}"
-  #   method: POST
-  #   headers:
+  #   webhook_url: "{{ env_var('WEBHOOK_URL') }}"
+  #   extra_headers:
   #     Authorization: "Bearer {{ env_var('WEBHOOK_TOKEN') }}"
 """
 

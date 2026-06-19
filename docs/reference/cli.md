@@ -125,6 +125,8 @@ Folder holding your detectkit project(s) to set up.
     │   ├── detectors.md
     │   └── alerting.md
     └── skills/
+        ├── dtk-setup-project/      # skill: configure profiles.yml (DB + channels)
+        │   └── SKILL.md
         └── dtk-new-metric/         # skill: scaffold a validated metric YAML
             └── SKILL.md
 ```
@@ -152,7 +154,9 @@ dtk init-claude --target-dir /opt/monitoring
 ```
 
 After running, open the folder in Claude Code and ask it about your metrics,
-alerts or configs — or invoke the `dtk-new-metric` skill to scaffold a metric.
+alerts or configs. Two skills come with it: **`dtk-setup-project`** (configure
+`profiles.yml` — the database connection and a first alert channel — so runs
+work end to end) and **`dtk-new-metric`** (scaffold a validated metric YAML).
 
 ---
 

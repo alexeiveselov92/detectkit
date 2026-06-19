@@ -23,6 +23,11 @@ tell the user to run `dtk init <name>` first, or ask which project directory to
 use. Note the `paths.metrics_dir` (default `metrics/`) — that's where the file
 goes.
 
+If the project exists but `profiles.yml` hasn't been configured yet (still the
+`dtk init` placeholder, or a run fails with `internal_database must be set`),
+the database connection comes first — use the **`dtk-setup-project`** skill, then
+come back here.
+
 ## Step 1 — Name and file path
 
 - Ask for / confirm the metric `name`: lowercase snake_case, descriptive

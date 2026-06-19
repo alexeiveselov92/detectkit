@@ -177,14 +177,23 @@ alert_channels:
 alert_channels:
   webhook_alerts:
     type: webhook
-    url: "{{ env_var('WEBHOOK_URL') }}"
-    method: POST
-    headers:
+    webhook_url: "{{ env_var('WEBHOOK_URL') }}"   # required
+    extra_headers:                                # optional
       Authorization: "Bearer {{ env_var('WEBHOOK_TOKEN') }}"
 ```
 
 ## Notes
 
+- **First-run setup:** the `profiles.yml` that `dtk init` writes is a
+  placeholder — its `dev` profile points `internal_database` / `data_database`
+  at example values (`detectkit` / `default`) on `localhost`. Edit the host,
+  credentials and both database names to match your environment before running
+  (the **`dtk-setup-project`** skill walks this). There is no `database:` field —
+  ClickHouse needs both `internal_database` and `data_database`, or the run
+  raises `internal_database must be set for ClickHouse`.
+- `dtk run` (without `--profile`) uses the `default_profile` declared in
+  **`profiles.yml`**; the `default_profile` in `detectkit_project.yml` is not
+  read at runtime — keep them in sync to avoid confusion.
 - `internal_database`/`internal_schema` should be separate from your data
   location so the `_dtk_*` tables don't clutter analytics schemas.
 - Profiles can be overridden per run (`dtk run --profile staging`) and per

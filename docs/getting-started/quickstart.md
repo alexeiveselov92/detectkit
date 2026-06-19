@@ -35,13 +35,20 @@ template for your own metrics.
 
 > **Tip — set up an AI assistant.** If you use [Claude
 > Code](https://claude.com/claude-code), run `dtk init-claude` in this folder.
-> It writes a `CLAUDE.md` and `.claude/rules/detectkit/` reference plus a
-> `dtk-new-metric` skill, so the assistant can help you write metrics, tune
-> detectors and configure alerts out of the box. Re-run it after upgrading
-> detectkit to refresh the context. See
+> It writes a `CLAUDE.md` and `.claude/rules/detectkit/` reference plus two
+> skills — **`dtk-setup-project`** (walk through `profiles.yml` interactively)
+> and **`dtk-new-metric`** (scaffold a metric) — so the assistant can do the
+> setup below for you and help you write metrics, tune detectors and configure
+> alerts. Re-run it after upgrading detectkit to refresh the context. See
 > [`dtk init-claude`](../reference/cli.md#dtk-init-claude).
 
 ## Step 2: Configure Database Connection
+
+> **Shortcut — let the assistant do it.** If you ran `dtk init-claude` (see the
+> tip above), just ask Claude Code to run the **`dtk-setup-project`** skill. It
+> asks for your connection details, branches on the database type, fills in the
+> profile fields below for you, and verifies the result. The manual steps below
+> are the same thing by hand.
 
 Edit `profiles.yml` to add your database connection:
 
@@ -69,11 +76,14 @@ profiles:
       max_execution_time: 600
 ```
 
-> **Warning.** The auto-generated `profiles.yml` ships with a placeholder
-> `dev` profile that only sets `database: default`. Before running you **must**
-> set `internal_database` (for `_dtk_*` tables) and `data_database` (where your
-> source tables live) on the ClickHouse profile — otherwise the run fails with
-> `internal_database must be set for ClickHouse`.
+> **Edit before running.** The auto-generated `profiles.yml` ships a `dev`
+> profile with **example** values — `host: localhost` and the two required
+> ClickHouse locations `internal_database: detectkit` (for the `_dtk_*` tables)
+> and `data_database: default` (where your source tables live). Change the host,
+> port, credentials and both database names to match your environment. (There is
+> no `database:` field — ClickHouse needs both `internal_database` and
+> `data_database`, or the run fails with `internal_database must be set for
+> ClickHouse`.)
 
 ### PostgreSQL Example
 

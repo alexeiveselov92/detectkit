@@ -5,6 +5,32 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **`dtk init` now scaffolds a runnable, schema-correct project.** The generated
+  configs carried keys the loader silently ignores or the channels reject:
+  - `profiles.yml` set `database:` on each profile — not a real field, so
+    `internal_database` / `data_database` stayed unset and the first `dtk run`
+    aborted with `internal_database must be set for ClickHouse`. The `dev`
+    profile now sets both locations and is runnable against a local ClickHouse.
+  - the `mattermost_alerts` channel set `icon_url`, which the Mattermost channel
+    rejects (`Invalid parameters for mattermost channel`) the moment it is built
+    (e.g. on `dtk test-alert`); replaced with the supported `icon_emoji`.
+  - `detectkit_project.yml` used flat `metrics_path:` / `sql_path:` keys instead
+    of the nested `paths:` mapping the model expects (silently dropped).
+  - the commented generic-webhook example used `url` / `method` / `headers`
+    instead of the real `webhook_url` / `extra_headers` (also corrected in the
+    `dtk init-claude` project rules).
+
+### Added
+- **`dtk-setup-project` skill** shipped by `dtk init-claude`: an interactive,
+  database-type-aware setup that gathers your real connection details, points
+  the profile at your database, optionally configures a first alert channel, and
+  verifies with a non-destructive `--steps load` run. The quickstart's
+  "Configure Database Connection" step and the `dtk init-claude` reference now
+  point to it.
+
 ## [0.10.0] - 2026-06-19
 
 ### Added

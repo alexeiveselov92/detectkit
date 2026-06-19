@@ -88,9 +88,18 @@ pip install detectkit[all-db]
 
 ## Advanced Detectors (Optional)
 
-### Prophet Detector
+> **Not yet implemented.** The `prophet` and `timesfm` extras install the
+> underlying libraries, but detectkit does **not** ship Prophet or TimesFM
+> detector classes yet — the only detector `type:`s that exist today are the
+> statistical detectors (`mad`, `zscore`, `iqr`) and `manual_bounds`. These
+> extras are placeholders for planned detectors; installing them adds the
+> dependencies but no new detector. Track progress in the changelog before
+> relying on them.
 
-Time-series forecasting with Facebook Prophet:
+### Prophet Detector (planned)
+
+Time-series forecasting with Facebook Prophet (extra reserved; detector not yet
+available):
 
 ```bash
 pip install detectkit[prophet]
@@ -98,9 +107,10 @@ pip install detectkit[prophet]
 
 **Note**: Prophet has heavy dependencies (compiled Stan backend). Only install if needed.
 
-### TimesFM Detector
+### TimesFM Detector (planned)
 
-Google's TimesFM model for time-series:
+Google's TimesFM model for time-series (extra reserved; detector not yet
+available):
 
 ```bash
 pip install detectkit[timesfm]

@@ -183,32 +183,25 @@ Works with your existing data warehouse:
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     detectkit CLI                        │
-│                       (dtk run)                          │
-└──────────────┬──────────────────────────────────────────┘
-               │
-               ▼
-┌──────────────────────────────────────────────────────────┐
-│                  Pipeline Orchestration                   │
-│  ┌────────┐      ┌────────┐      ┌─────────┐            │
-│  │  Load  │  →   │ Detect │  →   │  Alert  │            │
-│  └────────┘      └────────┘      └─────────┘            │
-└──────────────────────────────────────────────────────────┘
-               │                │              │
-               ▼                ▼              ▼
-┌──────────────────┐  ┌──────────────┐  ┌──────────────┐
-│   Data Source    │  │  Detectors   │  │   Channels   │
-│   (ClickHouse)   │  │  (MAD, etc)  │  │  (Mattermost)│
-└──────────────────┘  └──────────────┘  └──────────────┘
-               │                │
-               ▼                ▼
-┌──────────────────────────────────────┐
-│         Internal Tables              │
-│  • _dtk_datapoints (loaded data)     │
-│  • _dtk_detections (anomalies)       │
-│  • _dtk_tasks (execution state)      │
-└──────────────────────────────────────┘
+   dtk run
+      │
+      ▼
+   ┌──────────────────────────────────────────────────┐
+   │  Pipeline orchestration                          │
+   │  load  →  detect  →  alert                       │
+   └──────────────────────────────────────────────────┘
+      │
+      ├─▶  Data source   ClickHouse query, gap-filled to the grid
+      ├─▶  Detectors     MAD · Z-Score · IQR · manual_bounds
+      └─▶  Channels      Mattermost · Slack · Telegram · Email · Webhook
+      │
+      ▼
+   ┌──────────────────────────────────────────────────┐
+   │  Internal tables (ClickHouse)                    │
+   │    _dtk_datapoints   loaded points               │
+   │    _dtk_detections   detection results           │
+   │    _dtk_tasks        run / lock state            │
+   └──────────────────────────────────────────────────┘
 ```
 
 ## Use Cases

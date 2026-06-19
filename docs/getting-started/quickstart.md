@@ -388,7 +388,7 @@ Now that you have a working metric:
 2. **Handle trending metrics** - `window_weights: exponential` + `half_life`, or `detrend: linear` ([Detectors Guide](../guides/detectors.md))
 3. **Configure multiple detectors** - [Detectors Guide](../guides/detectors.md)
 4. **Set up multiple channels** - [Alerting Guide](../guides/alerting.md)
-5. **Fan out to independent alert rules** - `alerting:` can be a *list* of alert blocks, each with its own channels, conditions and template ([Alerting Guide](../guides/alerting.md#multiple-alert-configurations))
+5. **Fan out to independent alert rules** - `alerting:` can be a *list* of alert blocks, each with its own channels, conditions and template ([Multiple alert blocks](../guides/alerting-multiple-blocks.md#multiple-alert-configurations))
 6. **Explore examples** - [Examples](../examples/)
 
 ## Troubleshooting

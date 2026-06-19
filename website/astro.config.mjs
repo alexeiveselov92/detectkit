@@ -48,9 +48,27 @@ export default defineConfig({
         {
           label: 'Guides',
           items: [
-            { label: 'Configuration', link: '/guides/configuration/' },
+            {
+              label: 'Configuration',
+              items: [
+                { label: 'Overview & project', link: '/guides/configuration/' },
+                { label: 'Profiles', link: '/guides/configuration-profiles/' },
+                { label: 'Metrics', link: '/guides/configuration-metrics/' },
+              ],
+            },
             { label: 'Detectors', link: '/guides/detectors/' },
-            { label: 'Alerting', link: '/guides/alerting/' },
+            {
+              label: 'Alerting',
+              items: [
+                { label: 'How it works', link: '/guides/alerting/' },
+                { label: 'Channels', link: '/guides/alerting-channels/' },
+                { label: 'Multiple alert blocks', link: '/guides/alerting-multiple-blocks/' },
+                { label: 'Cooldown & recovery', link: '/guides/alerting-cooldown-recovery/' },
+                { label: 'No-data & errors', link: '/guides/alerting-no-data-errors/' },
+                { label: 'Templates & mentions', link: '/guides/alerting-templates-mentions/' },
+                { label: 'Patterns', link: '/guides/alerting-patterns/' },
+              ],
+            },
           ],
         },
         {

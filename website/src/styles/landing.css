@@ -9,6 +9,7 @@
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  overflow-x: clip; /* guard against any child overflowing the viewport on mobile */
 }
 .landing * {
   box-sizing: border-box;
@@ -36,10 +37,19 @@
   border-bottom: 1px solid var(--border);
 }
 .nav {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
   height: 64px;
+}
+/* nav-panel is transparent on desktop: its children join the flex row directly. */
+.nav-panel {
+  display: contents;
+}
+/* hamburger toggle — hidden on desktop, shown via the mobile media query */
+.hamburger {
+  display: none;
 }
 .brand {
   display: flex;
@@ -101,7 +111,13 @@
   grid-template-columns: 1fr 1.05fr;
   gap: 48px;
   align-items: center;
-  padding: 76px 0 64px;
+  padding: 48px 0 52px;
+}
+/* grid/flex children default to min-width:auto, which lets the wide code block
+   blow past the track and overflow the page on narrow screens — pin it to 0 so
+   the terminal scrolls internally instead. */
+.hero > * {
+  min-width: 0;
 }
 .badge {
   display: inline-flex;
@@ -176,6 +192,7 @@
   border: 1px solid var(--term-border);
   border-radius: 14px;
   overflow: hidden;
+  min-width: 0;
   box-shadow: 0 24px 60px -30px rgba(27, 25, 22, 0.55);
 }
 .term-bar {
@@ -208,6 +225,16 @@
 .term .ln {
   white-space: pre;
   min-height: 1.2em;
+}
+/* Hero config block: denser type so the full metric YAML fits the card, and a
+   viewport-relative max-height so the hero never overflows the screen — on
+   short viewports the card scrolls internally instead of pushing the page. */
+.term .body.code {
+  font-size: 10px;
+  line-height: 1.5;
+  padding: 18px 20px;
+  max-height: min(58vh, 460px);
+  overflow-y: auto;
 }
 .code .c {
   color: #7c766a;
@@ -312,40 +339,109 @@
   line-height: 1.5;
 }
 
-/* ---------- alert mock (Slack style) ---------- */
+/* ---------- alert mock + per-platform selector ---------- */
 .alert-wrap {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 30px;
 }
-.slack-msg {
+
+/* CSS-only platform tabs: hidden radios drive label tabs + panel visibility. */
+.platform-demo {
+  position: relative;
+}
+.pf-radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.pf-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.pf-tabs label {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 15px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+.pf-tabs label:hover {
+  color: var(--ink);
+  border-color: #d8d1c2;
+}
+#pf-slack:checked ~ .pf-tabs label[for='pf-slack'],
+#pf-mattermost:checked ~ .pf-tabs label[for='pf-mattermost'],
+#pf-telegram:checked ~ .pf-tabs label[for='pf-telegram'],
+#pf-email:checked ~ .pf-tabs label[for='pf-email'] {
+  color: var(--surface);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+/* keyboard focus ring on the active tab */
+#pf-slack:focus-visible ~ .pf-tabs label[for='pf-slack'],
+#pf-mattermost:focus-visible ~ .pf-tabs label[for='pf-mattermost'],
+#pf-telegram:focus-visible ~ .pf-tabs label[for='pf-telegram'],
+#pf-email:focus-visible ~ .pf-tabs label[for='pf-email'] {
+  outline: 2px solid var(--clay);
+  outline-offset: 2px;
+}
+.pf-note {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 62ch;
+  margin: 0 0 22px;
+}
+.pf-panel {
+  display: none;
+}
+#pf-slack:checked ~ .pf-panels .pf-slack-panel,
+#pf-mattermost:checked ~ .pf-panels .pf-mm-panel,
+#pf-telegram:checked ~ .pf-panels .pf-tg-panel,
+#pf-email:checked ~ .pf-panels .pf-email-panel {
+  display: block;
+}
+
+/* Slack / Mattermost — shared Slack-compatible webhook attachment. */
+.chat-msg {
   display: flex;
   gap: 12px;
   max-width: 640px;
 }
-.slack-av {
+.chat-av {
   width: 36px;
   height: 36px;
   border-radius: 8px;
   flex: none;
 }
-.slack-body {
+.chat-body {
   flex: 1;
   min-width: 0;
 }
-.slack-head {
+.chat-head {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
 }
-.slack-name {
+.chat-name {
   font-weight: 700;
   font-size: 15px;
   color: #1d1c1d;
 }
-.slack-app {
+.chat-tag {
   font-size: 10px;
   font-weight: 700;
   background: #e8e8e8;
@@ -354,7 +450,7 @@
   border-radius: 3px;
   letter-spacing: 0.03em;
 }
-.slack-time {
+.chat-time {
   font-size: 12px;
   color: #616061;
 }
@@ -388,6 +484,87 @@
   white-space: pre-wrap;
   word-break: break-word;
   font-family: var(--sans);
+}
+
+/* Telegram — plain message bubble, no color bar, title lives in the text. */
+.tg-msg {
+  display: flex;
+  gap: 10px;
+  max-width: 560px;
+}
+.tg-av {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex: none;
+}
+.tg-bubble {
+  background: #fff;
+  border-radius: 4px 12px 12px 12px;
+  padding: 8px 12px 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  min-width: 0;
+}
+.tg-name {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: #3390ec;
+  margin-bottom: 2px;
+}
+.tg-text {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #1d1c1d;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--sans);
+}
+.tg-meta {
+  font-size: 11px;
+  color: #8a949e;
+  text-align: right;
+  margin-top: 2px;
+}
+
+/* Email — subject + plain-text body; mentions become a CC line. */
+.email-card {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  overflow: hidden;
+  max-width: 640px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+.email-head {
+  padding: 14px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ececec;
+}
+.email-row {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #4a4a4a;
+}
+.email-k {
+  flex: none;
+  width: 56px;
+  color: #8a8a8a;
+  font-weight: 600;
+}
+.email-subject {
+  font-weight: 700;
+  color: #1d1c1d;
+}
+.email-body {
+  padding: 16px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #1d1c1d;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--mono);
 }
 
 /* ---------- CTA band ---------- */
@@ -487,10 +664,94 @@
 
 /* ---------- responsive ---------- */
 @media (max-width: 880px) {
+  /* ----- mobile nav: brand + hamburger, links/CTA collapse into a panel ----- */
+  .hamburger {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    margin-left: auto;
+    width: 42px;
+    height: 42px;
+    padding: 10px;
+    margin-right: -10px;
+    cursor: pointer;
+  }
+  .hamburger span {
+    display: block;
+    width: 100%;
+    height: 2px;
+    background: var(--ink);
+    border-radius: 2px;
+    transition:
+      transform 0.2s ease,
+      opacity 0.15s ease;
+  }
+  .nav-toggle:checked ~ .hamburger span:nth-child(1) {
+    transform: translateY(7px) rotate(45deg);
+  }
+  .nav-toggle:checked ~ .hamburger span:nth-child(2) {
+    opacity: 0;
+  }
+  .nav-toggle:checked ~ .hamburger span:nth-child(3) {
+    transform: translateY(-7px) rotate(-45deg);
+  }
+
+  .nav-panel {
+    display: none; /* overrides display:contents from the desktop rule */
+    position: absolute;
+    top: 64px;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px 24px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 18px 40px -24px rgba(27, 25, 22, 0.5);
+  }
+  .nav-toggle:checked ~ .nav-panel {
+    display: flex;
+  }
+  .nav-links {
+    flex-direction: column;
+    gap: 0;
+    margin-left: 0;
+  }
+  .nav-links a {
+    padding: 11px 0;
+    font-size: 16px;
+  }
+  .nav-right {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    margin-left: 0;
+    margin-top: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .nav-right .ghost-link {
+    font-size: 16px;
+  }
+  .nav-right .pip {
+    text-align: center;
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+
+  /* ----- hero / sections collapse to one column ----- */
   .hero {
     grid-template-columns: 1fr;
     gap: 32px;
     padding: 48px 0;
+  }
+  .hero .cta-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .hero .cta-row .btn {
+    text-align: center;
   }
   .features {
     grid-template-columns: 1fr;
@@ -508,18 +769,33 @@
   .footer-grid {
     grid-template-columns: 1fr 1fr;
   }
-  .nav-links {
-    display: none;
-  }
 }
 @media (max-width: 520px) {
+  .section {
+    padding: 48px 0;
+  }
+  .hero h1 {
+    font-size: 32px;
+  }
   .det-grid {
     grid-template-columns: 1fr;
   }
   .footer-grid {
     grid-template-columns: 1fr;
   }
-  .nav-right .ghost-link {
-    display: none;
+  .cta-band {
+    padding: 44px 24px;
+  }
+  .cta-band .cta-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cta-band .btn,
+  .cta-band .pip {
+    text-align: center;
+  }
+  .footer .legal {
+    flex-direction: column;
+    gap: 6px;
   }
 }

@@ -102,8 +102,10 @@ const claudeLines = [
 ];
 const claudeHtml = claudeLines.map((l) => `<div class="ln">${l}</div>`).join('');
 
-// ---- alert mock body (verbatim from the channels' default templates) ----
-const alertBody = [
+// ---- alert mock bodies (verbatim from each channel's default template) ----
+// Shared evidence block (rule + latest point) — identical across channels.
+const alertTitle = '⚠ Alert: api_error_rate';
+const alertRule = [
   'Quorum 1/1 · direction above (policy same) · consecutive 3/3',
   'Rule: min_detectors=1 · direction=same · consecutive=3',
   '',
@@ -113,8 +115,15 @@ const alertBody = [
   '· Severity: 3.40',
   'Detectors: mad',
   'Parameters: {"threshold": 3.0, "window_size": 2016, "window_weights": "exponential", "half_life": "1d"}',
-  '@oncall_engineer @here',
-].join('\n');
+];
+// Slack / Mattermost: webhook attachment — the metric name is the attachment
+// title, so the body omits it. `here` ships as <!here> but renders as @here.
+const bodyWebhook = [...alertRule, '@oncall_engineer @here'].join('\n');
+// Telegram: a plain Bot API message — the title line lives inside the text.
+const bodyTelegram = [alertTitle, ...alertRule, '@oncall_engineer @here'].join('\n');
+// Email: the subject carries the title (the body repeats it); broadcast `here`
+// is dropped and named mentions become a CC line.
+const bodyEmail = [alertTitle, ...alertRule, 'CC: oncall_engineer'].join('\n');
 ---
 
 <!doctype html>
@@ -146,15 +155,21 @@ const alertBody = [
           <Logo size={30} />
           <span>detectkit</span>
         </a>
-        <div class="nav-links">
-          <a href={docsHref}>Docs</a>
-          <a href="/guides/detectors/">Detectors</a>
-          <a href="/guides/alerting/">Alerting</a>
-          <a href="/changelog/">Changelog</a>
-        </div>
-        <div class="nav-right">
-          <a class="ghost-link" href={repo}>GitHub</a>
-          <a class="pip" href={pypi}>pip install detectkit</a>
+        <input type="checkbox" id="nav-toggle" class="nav-toggle" hidden />
+        <label for="nav-toggle" class="hamburger" aria-label="Toggle navigation">
+          <span></span><span></span><span></span>
+        </label>
+        <div class="nav-panel">
+          <div class="nav-links">
+            <a href={docsHref}>Docs</a>
+            <a href="/guides/detectors/">Detectors</a>
+            <a href="/guides/alerting/">Alerting</a>
+            <a href="/changelog/">Changelog</a>
+          </div>
+          <div class="nav-right">
+            <a class="ghost-link" href={repo}>GitHub</a>
+            <a class="pip" href={pypi}>pip install detectkit</a>
+          </div>
         </div>
       </nav>
     </header>
@@ -282,21 +297,88 @@ const alertBody = [
         Direction-aware multi-detector quorum, cooldown, recovery and no-data alerts — posted to
         chat with the alert and its rule up top, anomaly evidence below.
       </p>
-      <div class="alert-wrap">
-        <div class="slack-msg">
-          <Logo size={36} class="slack-av" />
-          <div class="slack-body">
-            <div class="slack-head">
-              <span class="slack-name">detectk</span>
-              <span class="slack-app">APP</span>
-              <span class="slack-time">12:04</span>
-            </div>
-            <div class="attachment">
-              <div class="bar"></div>
-              <div class="content">
-                <div class="title">⚠ Alert: api_error_rate</div>
-                <div class="text" set:html={alertBody}></div>
+      <div class="alert-wrap platform-demo">
+        <input class="pf-radio" type="radio" name="platform" id="pf-slack" checked />
+        <input class="pf-radio" type="radio" name="platform" id="pf-mattermost" />
+        <input class="pf-radio" type="radio" name="platform" id="pf-telegram" />
+        <input class="pf-radio" type="radio" name="platform" id="pf-email" />
+        <div class="pf-tabs">
+          <label for="pf-slack">Slack</label>
+          <label for="pf-mattermost">Mattermost</label>
+          <label for="pf-telegram">Telegram</label>
+          <label for="pf-email">Email</label>
+        </div>
+        <p class="pf-note">
+          The same alert, posted by detectk to each channel — rendered exactly as that channel
+          formats it. The title placement, color and @mentions differ per platform.
+        </p>
+        <div class="pf-panels">
+          <!-- Slack: webhook attachment, red bar, metric name in the title -->
+          <div class="pf-panel pf-slack-panel">
+            <div class="chat-msg">
+              <Logo size={36} class="chat-av" />
+              <div class="chat-body">
+                <div class="chat-head">
+                  <span class="chat-name">detectk</span>
+                  <span class="chat-tag">APP</span>
+                  <span class="chat-time">12:04</span>
+                </div>
+                <div class="attachment">
+                  <div class="bar"></div>
+                  <div class="content">
+                    <div class="title">{alertTitle}</div>
+                    <div class="text" set:html={bodyWebhook}></div>
+                  </div>
+                </div>
               </div>
+            </div>
+          </div>
+          <!-- Mattermost: same Slack-compatible attachment; BOT tag -->
+          <div class="pf-panel pf-mm-panel">
+            <div class="chat-msg">
+              <Logo size={36} class="chat-av" />
+              <div class="chat-body">
+                <div class="chat-head">
+                  <span class="chat-name">detectk</span>
+                  <span class="chat-tag">BOT</span>
+                  <span class="chat-time">12:04</span>
+                </div>
+                <div class="attachment">
+                  <div class="bar"></div>
+                  <div class="content">
+                    <div class="title">{alertTitle}</div>
+                    <div class="text" set:html={bodyWebhook}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Telegram: plain Bot API message, title inside the text, no color bar -->
+          <div class="pf-panel pf-tg-panel">
+            <div class="tg-msg">
+              <Logo size={34} class="tg-av" />
+              <div class="tg-bubble">
+                <div class="tg-name">detectk_bot</div>
+                <div class="tg-text" set:html={bodyTelegram}></div>
+                <div class="tg-meta">12:04</div>
+              </div>
+            </div>
+          </div>
+          <!-- Email: subject + plain-text body; mentions become a CC line -->
+          <div class="pf-panel pf-email-panel">
+            <div class="email-card">
+              <div class="email-head">
+                <div class="email-row">
+                  <span class="email-k">From</span><span>detectk &lt;alerts@detectk.dev&gt;</span>
+                </div>
+                <div class="email-row">
+                  <span class="email-k">To</span><span>oncall@team.example</span>
+                </div>
+                <div class="email-row">
+                  <span class="email-k">Subject</span><span class="email-subject">{alertTitle}</span>
+                </div>
+              </div>
+              <div class="email-body" set:html={bodyEmail}></div>
             </div>
           </div>
         </div>

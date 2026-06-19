@@ -58,14 +58,6 @@ profiles.yml
 .env
 *.zip
 
-# Historical / internal design docs — kept locally, not published.
-# Superseded by docs/ and CHANGELOG.md; the originals are in Russian.
-init_plan.md
-TECHNICAL_SPEC.md
-GRAFANA_DASHBOARD.md
-PROGRESS.md
-TODO.md
-
 # Per-developer Claude Code state. CLAUDE.md is tracked (top level) and the
 # repo's own dev rules are tracked; local settings/skills/etc. are not.
 .claude/*

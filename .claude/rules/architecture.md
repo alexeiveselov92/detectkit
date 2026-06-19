@@ -269,3 +269,16 @@ lock (so it also clears a stuck row). `dtk unlock` clears a held lock on demand;
    `WindowedStatDetector`; a new statistical detector implements only
    `_compute_stats` / `_build_interval` / `_severity` + class defaults. Keep it
    this way.
+
+## Roadmap & known gaps
+
+- **Vectorize `WindowedStatDetector.detect()`** — points are scored in a Python
+  loop. Fine for incremental runs, slow for large historical backfills; numpy
+  rolling-window operations are the main performance opportunity.
+- **PostgreSQL / MySQL backends** — scaffolded (profiles validate) but not
+  implemented; `ProfileConfig.create_manager()` raises `NotImplementedError`.
+- **Advanced detectors** — Prophet and TimesFM integrations are planned (the
+  optional extras are already reserved in `pyproject.toml`).
+- **Parallel execution** — a `--threads` option to process metrics concurrently.
+- **Further performance** — vectorized seasonality extraction, DB connection
+  pooling, query-result caching.

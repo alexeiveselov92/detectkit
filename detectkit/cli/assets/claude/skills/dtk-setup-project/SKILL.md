@@ -51,7 +51,7 @@ Assume ClickHouse unless told otherwise.
 
 Ask for, and confirm:
 
-- `host` — ClickHouse host (e.g. `localhost`, `clickhouse.example.com`).
+- `host` — ClickHouse host (e.g. `localhost`, `clickhouse.internal`).
 - `port` — **native protocol** port (commonly `9000`, sometimes `9100`; TLS
   `9440`). Not the HTTP port `8123`.
 - `user` — defaults to `default`.

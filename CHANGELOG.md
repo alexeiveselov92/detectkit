@@ -30,6 +30,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verifies with a non-destructive `--steps load` run. The quickstart's
   "Configure Database Connection" step and the `dtk init-claude` reference now
   point to it.
+- **Visualizing results guide** (`docs/guides/visualizing-results.md`):
+  BI-tool-agnostic and database-agnostic SQL recipes for charting the `_dtk_*`
+  tables (value + confidence band, anomaly markers, anomaly counts, latest-value
+  stat, multi-detector comparison, severity breakdown) in Grafana, Superset,
+  Metabase, Tableau, or plain SQL.
+
+### Changed
+- Example ClickHouse `host` in the shipped `dtk init-claude` rules/skill and in
+  the profiles docs is now a neutral placeholder (`clickhouse.example.com`)
+  instead of a sample IP address.
 
 ## [0.10.0] - 2026-06-19
 

@@ -2,9 +2,8 @@
 
 These support pruning data left behind when an analyst edits metric configs
 on production — most importantly removing all rows for a metric whose YAML no
-longer exists in the project (TECHNICAL_SPEC.md §14.4 / init_plan.md
-"Scenario D"). They are used only by the ``dtk clean`` CLI command, never by
-the run pipeline.
+longer exists in the project. They are used only by the ``dtk clean`` CLI
+command, never by the run pipeline.
 """
 
 from __future__ import annotations

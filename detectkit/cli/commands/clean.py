@@ -2,8 +2,7 @@
 Implementation of 'dtk clean' command.
 
 Removes internal data that no longer matches the project's YAML configs —
-the rows left behind when an analyst edits metrics on production
-(TECHNICAL_SPEC.md §14.4 / init_plan.md "Scenario D"). Two modes:
+the rows left behind when an analyst edits metrics on production. Two modes:
 
 * ``--select`` (drift mode): for metrics that still exist, delete detection
   results whose ``detector_id`` is no longer produced by the config (a

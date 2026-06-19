@@ -23,7 +23,7 @@ class _TasksMixin(_InternalTablesBase):
         A ``running`` row whose age exceeds its stored ``timeout_seconds`` is
         treated as stale and overridden — the owning process likely died
         without releasing the lock (e.g. the database restarted mid-run), and
-        a hung row must never block future runs (TECHNICAL_SPEC.md §13.1).
+        a hung row must never block future runs.
 
         With ``force=True`` the running-status check is skipped entirely and
         the lock is taken unconditionally; the row is still (re)written as

@@ -49,10 +49,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Tell the pipelab infra repo a fresh image is on GHCR so it redeploys
-  # dtk.pipelab.dev. Mirrors the repository_dispatch used by braindump-app /
-  # fintrack-app. Requires the PIPELAB_DISPATCH_TOKEN secret (a PAT with `repo`
-  # scope). If the infra repo is not `alexeiveselov92/pipelab`, fix the URL below.
+  # Tell the deploy infra repo a fresh image is on GHCR so it redeploys
+  # dtk.pipelab.dev. Requires the PIPELAB_DISPATCH_TOKEN secret (a PAT with
+  # `repo` scope); set the target infra repo in the dispatch URL below.
   notify-pipelab:
     needs: build-and-push
     runs-on: ubuntu-latest

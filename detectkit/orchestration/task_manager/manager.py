@@ -16,7 +16,7 @@ from detectkit.orchestration.task_manager._load_step import _LoadStepMixin
 from detectkit.orchestration.task_manager._types import PipelineStep, TaskStatus
 
 # Age (seconds) after which a 'running' pipeline lock is considered stale and
-# overridden — see acquire_lock / TECHNICAL_SPEC.md §13.1. A run whose
+# overridden — see acquire_lock. A run whose
 # 'running' row is older than this is assumed to have died without releasing
 # the lock (e.g. the database restarted mid-run).
 PIPELINE_LOCK_TIMEOUT_SECONDS = 3600

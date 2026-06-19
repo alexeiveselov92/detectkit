@@ -67,7 +67,7 @@ class TestDetectionsTable:
         """Test detections table schema."""
         model = get_detections_table_model()
 
-        # Check all columns exist (according to init_plan.md spec)
+        # Check all columns exist
         column_names = [col.name for col in model.columns]
         expected_columns = [
             "metric_name",

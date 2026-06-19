@@ -47,6 +47,44 @@ def test_get_last_datapoint_timestamp_returns_none_when_empty(internal_tables):
     assert internal_tables.get_last_datapoint_timestamp("never_seen") is None
 
 
+def test_reinsert_newer_version_keeps_latest_value(internal_tables):
+    """Re-saving the same (metric, timestamp) with a newer version must surface
+    the latest value — last-writer-wins, reproducing ReplacingMergeTree."""
+    base = datetime(2024, 6, 1, 0, 0, 0)
+    ts = np.array([base], dtype="datetime64[ms]")
+
+    internal_tables.save_datapoints(
+        metric_name="reinsert",
+        data={
+            "timestamp": ts,
+            "value": np.array([1.0], dtype=np.float64),
+            "seasonality_data": np.array(["{}"], dtype=object),
+        },
+        interval_seconds=60,
+        seasonality_columns=[],
+    )
+    internal_tables.save_datapoints(
+        metric_name="reinsert",
+        data={
+            "timestamp": ts,
+            "value": np.array([2.0], dtype=np.float64),
+            "seasonality_data": np.array(["{}"], dtype=object),
+        },
+        interval_seconds=60,
+        seasonality_columns=[],
+    )
+
+    loaded = internal_tables.load_datapoints("reinsert")
+    values = list(loaded["value"])
+    if type(internal_tables._manager).__name__ == "ClickHouseDatabaseManager":
+        # ClickHouse dedup is eventual (no FINAL on the load path); the latest
+        # value must at least be present.
+        assert 2.0 in values
+    else:
+        # SQL backends enforce the primary key: exactly one row, latest value.
+        assert values == [2.0]
+
+
 def test_metric_name_with_quotes_is_safe(internal_tables):
     """Crafted metric_name must never run as SQL — verifies parameterisation."""
     payload = "x'); DROP TABLE _dtk_datapoints; --"

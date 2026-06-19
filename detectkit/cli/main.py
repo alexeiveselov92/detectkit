@@ -36,23 +36,31 @@ def cli():
     default=".",
     help="Directory to create project in (default: current directory)",
 )
-def init(project_name: str, target_dir: str):
+@click.option(
+    "--db-type",
+    type=click.Choice(["clickhouse", "postgres", "mysql"]),
+    default="clickhouse",
+    show_default=True,
+    help="Database backend to scaffold the dev/prod profiles and example query for.",
+)
+def init(project_name: str, target_dir: str, db_type: str):
     """
     Initialize a new detectkit project.
 
     Creates project structure with configuration files and directories:
     - detectkit_project.yml (project config)
-    - profiles.yml (database connections)
+    - profiles.yml (database connections — for the chosen --db-type)
     - metrics/ (metric definitions)
     - sql/ (SQL queries)
 
     Example:
         dtk init my_monitoring_project
         dtk init analytics --target-dir /opt/projects
+        dtk init my_project --db-type postgres
     """
     from detectkit.cli.commands.init import run_init
 
-    run_init(project_name, target_dir)
+    run_init(project_name, target_dir, db_type=db_type)
 
 
 @cli.command(name="init-claude")

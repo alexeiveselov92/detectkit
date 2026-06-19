@@ -66,11 +66,11 @@ class _DetectionsMixin(_InternalTablesBase):
     ) -> int:
         """Delete detection rows for the supplied filter set.
 
-        ``mutations_sync=True`` waits for the ClickHouse mutation to finish
-        before returning (``SETTINGS mutations_sync = 1``); the default keeps
-        the async behaviour used by the ``--full-refresh`` hot path. The
-        ``dtk clean`` command passes ``True`` so a follow-up dry-run reflects
-        the deletion immediately.
+        ``mutations_sync=True`` waits for the delete to be fully applied before
+        returning (on ClickHouse it adds ``SETTINGS mutations_sync = 1``; SQL
+        backends are always synchronous). The default keeps the async behaviour
+        used by the ``--full-refresh`` hot path. The ``dtk clean`` command
+        passes ``True`` so a follow-up dry-run reflects the deletion immediately.
         """
         full_table_name = self._manager.get_full_table_name(TABLE_DETECTIONS, use_internal=True)
 
@@ -86,11 +86,9 @@ class _DetectionsMixin(_InternalTablesBase):
             where_parts.append("timestamp < %(to_timestamp)s")
             params["to_timestamp"] = to_timestamp
 
-        query = f"ALTER TABLE {full_table_name} DELETE WHERE {' AND '.join(where_parts)}"
-        if mutations_sync:
-            query += " SETTINGS mutations_sync = 1"
-        self._manager.execute_query(query, params=params)
-        return 0
+        return self._manager.delete_rows(
+            full_table_name, " AND ".join(where_parts), params, sync=mutations_sync
+        )
 
     def list_detector_ids(self, metric_name: str) -> dict[str, int]:
         """Return ``{detector_id: row_count}`` for every detector stored for a metric.
@@ -100,7 +98,7 @@ class _DetectionsMixin(_InternalTablesBase):
         """
         full_table_name = self._manager.get_full_table_name(TABLE_DETECTIONS, use_internal=True)
         query = f"""
-        SELECT detector_id, count() AS cnt
+        SELECT detector_id, count(*) AS cnt
         FROM {full_table_name}
         WHERE metric_name = %(metric_name)s
         GROUP BY detector_id

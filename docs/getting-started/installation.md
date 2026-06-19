@@ -6,7 +6,7 @@ This guide covers installing detectkit and its dependencies.
 
 - **Python**: 3.10 or higher
 - **pip**: Latest version recommended
-- **Database**: ClickHouse (the only supported backend today; PostgreSQL and MySQL are planned but not yet implemented)
+- **Database**: ClickHouse (20.3+), PostgreSQL (12+), or MySQL (8.0+) — all fully supported
 
 ## Basic Installation
 
@@ -42,10 +42,6 @@ pip install clickhouse-driver
 
 ### PostgreSQL
 
-> **Not yet implemented.** PostgreSQL support is planned. The extra and driver
-> install fine, but creating a connection raises `NotImplementedError`
-> ("PostgreSQL support coming soon"). Use ClickHouse for now.
-
 ```bash
 pip install detectkit[postgres]
 ```
@@ -56,13 +52,10 @@ Or install driver manually:
 pip install psycopg2-binary
 ```
 
-**Planned versions**: PostgreSQL 12+
+**Supported versions**: PostgreSQL 12+. See the
+[PostgreSQL guide](../guides/databases-postgres.md) for the profile shape.
 
 ### MySQL
-
-> **Not yet implemented.** MySQL support is planned. The extra and driver
-> install fine, but creating a connection raises `NotImplementedError`
-> ("MySQL support coming soon"). Use ClickHouse for now.
 
 ```bash
 pip install detectkit[mysql]
@@ -74,7 +67,8 @@ Or install driver manually:
 pip install pymysql
 ```
 
-**Planned versions**: MySQL 8.0+
+**Supported versions**: MySQL 8.0+. See the
+[MySQL guide](../guides/databases-mysql.md) for the profile shape.
 
 ### Multiple Databases
 

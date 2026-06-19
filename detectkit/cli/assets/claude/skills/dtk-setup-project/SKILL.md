@@ -40,12 +40,17 @@ side by side, ask which one to set up.
 
 ## Step 1 — Pick the database backend
 
-**ClickHouse is the only implemented backend today.** PostgreSQL and MySQL
-profiles validate, but `dtk run` raises `NotImplementedError("PostgreSQL
-support coming soon")` / `"MySQL support coming soon"` when it builds the
-manager. If the user wants Postgres/MySQL, say plainly that runs won't work
-yet; you can still write the profile shape for later, but set expectations.
-Assume ClickHouse unless told otherwise.
+**ClickHouse, PostgreSQL and MySQL are all fully supported.** Ask which one the
+project uses (default to ClickHouse if unsure). `dtk init --db-type
+{clickhouse,postgres,mysql}` scaffolds `profiles.yml` for the chosen backend.
+The location fields differ:
+- **ClickHouse** / **MySQL** — two *databases*: `internal_database` / `data_database`.
+- **PostgreSQL** — connect to a `database` (must already exist), then two
+  *schemas*: `internal_schema` / `data_schema`.
+
+The metric query SQL dialect also differs (e.g. `toStartOfInterval` on
+ClickHouse vs `date_trunc`/`to_timestamp` on Postgres vs `FROM_UNIXTIME` on
+MySQL). Everything else — detectors, alerting, the CLI — is identical.
 
 ## Step 2 — Connection details (gather, don't guess)
 
@@ -74,8 +79,8 @@ values):
   data, e.g. `detectkit` or `monitoring`.
 - `data_database` — where the source tables your metric queries read from live.
 
-For Postgres these are `internal_schema` / `data_schema`; for MySQL they are
-`internal_database` / `data_database` (relevant only once those backends land).
+For Postgres these are `internal_schema` / `data_schema` (inside the connected
+`database`); for MySQL they are `internal_database` / `data_database`.
 
 ## Step 4 — Profile name & `default_profile`
 

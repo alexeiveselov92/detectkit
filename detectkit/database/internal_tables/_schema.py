@@ -14,6 +14,10 @@ class _SchemaMixin(_InternalTablesBase):
         """
         for table_name, model_factory in INTERNAL_TABLES.items():
             full_table_name = self._manager.get_full_table_name(table_name, use_internal=True)
+            table_model = model_factory()
+            # Always register the schema so the manager knows each table's primary
+            # key / version column on the insert path — even on a fresh manager
+            # whose tables already exist (so create_table below is skipped).
+            self._manager.register_table(full_table_name, table_model)
             if not self._manager.table_exists(table_name, schema=self._manager.internal_location):
-                table_model = model_factory()
                 self._manager.create_table(full_table_name, table_model, if_not_exists=True)

@@ -26,11 +26,10 @@ alert_channels:
 
 ### Database Profiles
 
-> **Only ClickHouse is implemented today.** PostgreSQL and MySQL profiles
-> validate at config load, but `create_manager()` raises
-> `NotImplementedError("... coming soon")` for them
-> (`detectkit/config/profile.py:152,154`). ClickHouse is the only supported
-> backend for running the pipeline.
+ClickHouse, PostgreSQL and MySQL are all fully supported. The connection fields
+differ per backend (ClickHouse/MySQL use **databases**; PostgreSQL connects to a
+`database` and uses **schemas**). See the per-backend
+[Databases guide](databases.md) for a focused walkthrough of each.
 
 #### ClickHouse Profile
 
@@ -69,9 +68,8 @@ profiles:
 
 #### PostgreSQL Profile
 
-> **Not yet implemented.** This profile shape is accepted by the config
-> loader, but running it raises `NotImplementedError("PostgreSQL support
-> coming soon")`. Use ClickHouse for now.
+PostgreSQL connects to a `database` and stores tables in **schemas** inside it.
+The `database` must already exist; detectkit creates the schemas.
 
 ```yaml
 profiles:
@@ -82,28 +80,27 @@ profiles:
     user: postgres
     password: "your_password"
 
-    # Schema locations
-    internal_schema: detectkit  # For _dtk_* tables
-    data_schema: public         # For data queries
+    database: detectkit         # database to connect to (must already exist)
+    internal_schema: detectkit  # schema for _dtk_* tables (auto-created)
+    data_schema: public         # schema for your data queries
 ```
 
 **Required fields**:
 - `type`: Must be `"postgres"`
 - `host`: PostgreSQL server hostname
 - `port`: PostgreSQL port (default: 5432)
-- `internal_schema`: Schema for _dtk_* tables
+- `database`: Database to connect to (must already exist)
+- `internal_schema`: Schema for _dtk_* tables (detectkit creates it)
 - `data_schema`: Schema for data queries
 
 **Optional fields**:
 - `user`: Username (default: `"default"`)
 - `password`: Password (default: empty string)
-- `settings`: Dict of database-specific settings
+- `settings`: Extra `psycopg2.connect` keyword arguments
 
 #### MySQL Profile
 
-> **Not yet implemented.** This profile shape is accepted by the config
-> loader, but running it raises `NotImplementedError("MySQL support coming
-> soon")`. Use ClickHouse for now.
+MySQL (8.0+) uses **databases** (no separate schema concept).
 
 ```yaml
 profiles:
@@ -114,7 +111,7 @@ profiles:
     user: root
     password: "your_password"
 
-    # Database locations
+    # Database locations (auto-created)
     internal_database: detectkit
     data_database: analytics
 ```
@@ -123,13 +120,14 @@ profiles:
 - `type`: Must be `"mysql"`
 - `host`: MySQL server hostname
 - `port`: MySQL port (default: 3306)
-- `internal_database`: Database for _dtk_* tables
+- `internal_database`: Database for _dtk_* tables (detectkit creates it)
 - `data_database`: Database for data queries
 
 **Optional fields**:
 - `user`: Username (default: `"default"`)
 - `password`: Password (default: empty string)
-- `settings`: Dict of database-specific settings
+- `database`: Optional default database for the connection
+- `settings`: Extra `pymysql.connect` keyword arguments
 
 ### Alert Channels
 

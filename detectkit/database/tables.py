@@ -39,6 +39,7 @@ def get_datapoints_table_model() -> TableModel:
         primary_key=["metric_name", "timestamp"],
         engine="ReplacingMergeTree(created_at)",
         order_by=["metric_name", "timestamp"],
+        version_column="created_at",
     )
 
 
@@ -80,6 +81,7 @@ def get_detections_table_model() -> TableModel:
         primary_key=["metric_name", "detector_id", "timestamp"],
         engine="ReplacingMergeTree(created_at)",
         order_by=["metric_name", "detector_id", "timestamp"],
+        version_column="created_at",
     )
 
 
@@ -169,6 +171,7 @@ def get_alert_states_table_model() -> TableModel:
         primary_key=["metric_name", "alert_config_id"],
         engine="ReplacingMergeTree(updated_at)",
         order_by=["metric_name", "alert_config_id"],
+        version_column="updated_at",
     )
 
 

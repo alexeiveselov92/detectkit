@@ -8,8 +8,174 @@ from pathlib import Path
 
 import click
 
+# Active dev/prod profile blocks per backend (indented under `profiles:`).
+_ACTIVE_PROFILES = {
+    "clickhouse": """  # Local dev — runnable against a local ClickHouse once the databases exist.
+  # ClickHouse needs BOTH locations (there is no `database:` field):
+  #   internal_database -> where detectkit's own _dtk_* tables live
+  #   data_database     -> where your metric source tables live
+  dev:
+    type: clickhouse
+    host: localhost
+    port: 9000            # native protocol (not the 8123 HTTP port)
+    user: default
+    password: ""
+    internal_database: detectkit   # _dtk_* tables (create this database once)
+    data_database: default         # your source data lives here
 
-def run_init(project_name: str, target_dir: str):
+  # Production — keep secrets in env vars, never commit credentials.
+  prod:
+    type: clickhouse
+    host: "{{ env_var('CLICKHOUSE_HOST') }}"
+    port: 9000
+    user: "{{ env_var('CLICKHOUSE_USER') }}"
+    password: "{{ env_var('CLICKHOUSE_PASSWORD') }}"
+    internal_database: detectkit   # _dtk_* tables
+    data_database: monitoring      # your source data
+""",
+    "postgres": """  # Local dev — runnable against a local PostgreSQL. PostgreSQL uses SCHEMAS:
+  #   database        -> the database to connect to (must already exist)
+  #   internal_schema -> schema for detectkit's own _dtk_* tables (auto-created)
+  #   data_schema     -> schema your metric source tables live in
+  dev:
+    type: postgres
+    host: localhost
+    port: 5432
+    user: postgres
+    password: postgres
+    database: detectkit
+    internal_schema: detectkit
+    data_schema: public
+
+  # Production — keep secrets in env vars, never commit credentials.
+  prod:
+    type: postgres
+    host: "{{ env_var('POSTGRES_HOST') }}"
+    port: 5432
+    user: "{{ env_var('POSTGRES_USER') }}"
+    password: "{{ env_var('POSTGRES_PASSWORD') }}"
+    database: "{{ env_var('POSTGRES_DB') }}"
+    internal_schema: detectkit
+    data_schema: public
+""",
+    "mysql": """  # Local dev — runnable against a local MySQL (8.0+). MySQL uses DATABASES:
+  #   internal_database -> database for detectkit's own _dtk_* tables (auto-created)
+  #   data_database     -> database your metric source tables live in
+  dev:
+    type: mysql
+    host: localhost
+    port: 3306
+    user: root
+    password: ""
+    internal_database: detectkit
+    data_database: analytics
+
+  # Production — keep secrets in env vars, never commit credentials.
+  prod:
+    type: mysql
+    host: "{{ env_var('MYSQL_HOST') }}"
+    port: 3306
+    user: "{{ env_var('MYSQL_USER') }}"
+    password: "{{ env_var('MYSQL_PASSWORD') }}"
+    internal_database: detectkit
+    data_database: monitoring
+""",
+}
+
+# Commented single-profile examples for the backends that are NOT active.
+_COMMENTED_EXAMPLES = {
+    "clickhouse": """  # Example ClickHouse profile (needs internal_database + data_database)
+  # clickhouse_dev:
+  #   type: clickhouse
+  #   host: localhost
+  #   port: 9000
+  #   user: default
+  #   password: ""
+  #   internal_database: detectkit
+  #   data_database: default
+""",
+    "postgres": """  # Example PostgreSQL profile (connect to `database`; tables live in schemas)
+  # postgres_dev:
+  #   type: postgres
+  #   host: localhost
+  #   port: 5432
+  #   user: postgres
+  #   password: postgres
+  #   database: detectkit
+  #   internal_schema: detectkit
+  #   data_schema: public
+""",
+    "mysql": """  # Example MySQL profile (8.0+; internal_database + data_database)
+  # mysql_dev:
+  #   type: mysql
+  #   host: localhost
+  #   port: 3306
+  #   user: root
+  #   password: ""
+  #   internal_database: detectkit
+  #   data_database: analytics
+""",
+}
+
+# Timestamp-bucketing expression for the example metric query, per dialect.
+_BUCKET_SQL = {
+    "clickhouse": "toStartOfInterval(event_time, INTERVAL {{ interval_seconds }} SECOND)",
+    "postgres": (
+        "to_timestamp(floor(extract(epoch from event_time) / {{ interval_seconds }})"
+        " * {{ interval_seconds }})"
+    ),
+    "mysql": (
+        "FROM_UNIXTIME(FLOOR(UNIX_TIMESTAMP(event_time) / {{ interval_seconds }})"
+        " * {{ interval_seconds }})"
+    ),
+}
+
+# Alert-channel section (backend-independent); appended after the profiles.
+_ALERT_CHANNELS = """
+# Alert channels (referenced by name from a metric's alerting.channels)
+alert_channels:
+  # Mattermost. Supported keys: webhook_url, username, icon_emoji, channel,
+  # timeout. NOTE: there is no `icon_url` param — use `icon_emoji`.
+  mattermost_alerts:
+    type: mattermost
+    webhook_url: "{{ env_var('MATTERMOST_WEBHOOK_URL') }}"
+    username: detectkit
+    icon_emoji: ":warning:"
+
+  # Slack example (same fields as mattermost)
+  # slack_alerts:
+  #   type: slack
+  #   webhook_url: "{{ env_var('SLACK_WEBHOOK_URL') }}"
+  #   channel: "#alerts"
+  #   username: detectkit
+
+  # Telegram example (required: bot_token, chat_id)
+  # telegram_alerts:
+  #   type: telegram
+  #   bot_token: "{{ env_var('TELEGRAM_BOT_TOKEN') }}"
+  #   chat_id: "{{ env_var('TELEGRAM_CHAT_ID') }}"
+
+  # Email example (required: smtp_host, smtp_port, from_email, to_emails)
+  # email_alerts:
+  #   type: email
+  #   smtp_host: smtp.gmail.com
+  #   smtp_port: 587
+  #   from_email: alerts@example.com
+  #   to_emails:
+  #     - team@example.com
+  #   smtp_username: "{{ env_var('SMTP_USERNAME') }}"
+  #   smtp_password: "{{ env_var('SMTP_PASSWORD') }}"
+
+  # Generic webhook example (required: webhook_url; optional extra_headers)
+  # webhook_alerts:
+  #   type: webhook
+  #   webhook_url: "{{ env_var('WEBHOOK_URL') }}"
+  #   extra_headers:
+  #     Authorization: "Bearer {{ env_var('WEBHOOK_TOKEN') }}"
+"""
+
+
+def run_init(project_name: str, target_dir: str, db_type: str = "clickhouse"):
     """
     Initialize a new detectkit project.
 
@@ -85,103 +251,26 @@ timeouts:
     (target_path / "detectkit_project.yml").write_text(project_config)
 
     # Create profiles.yml (must validate against ProfilesConfig: connections
-    # live under a top-level 'profiles:' mapping). ClickHouse needs BOTH
-    # `internal_database` (for the _dtk_* tables) and `data_database` (where the
-    # metric queries read from) — there is no `database:` field, so the dev
-    # profile below is runnable as-is against a local ClickHouse.
-    profiles_config = """# Database connection profiles
-
-default_profile: dev
-
-profiles:
-  # Local dev — runnable against a local ClickHouse once the databases exist.
-  # ClickHouse needs BOTH locations (there is no `database:` field):
-  #   internal_database -> where detectkit's own _dtk_* tables live
-  #   data_database     -> where your metric source tables live
-  dev:
-    type: clickhouse
-    host: localhost
-    port: 9000            # native protocol (not the 8123 HTTP port)
-    user: default
-    password: ""
-    internal_database: detectkit   # _dtk_* tables (create this database once)
-    data_database: default         # your source data lives here
-
-  # Production — keep secrets in env vars, never commit credentials.
-  prod:
-    type: clickhouse
-    host: "{{ env_var('CLICKHOUSE_HOST') }}"
-    port: 9000
-    user: "{{ env_var('CLICKHOUSE_USER') }}"
-    password: "{{ env_var('CLICKHOUSE_PASSWORD') }}"
-    internal_database: detectkit   # _dtk_* tables
-    data_database: monitoring      # your source data
-
-  # Example PostgreSQL profile (uses internal_schema / data_schema)
-  # postgres_dev:
-  #   type: postgres
-  #   host: localhost
-  #   port: 5432
-  #   user: postgres
-  #   password: postgres
-  #   internal_schema: detectkit
-  #   data_schema: public
-
-  # Example MySQL profile
-  # mysql_dev:
-  #   type: mysql
-  #   host: localhost
-  #   port: 3306
-  #   user: root
-  #   password: root
-  #   internal_database: detectkit
-  #   data_database: analytics
-
-# Alert channels (referenced by name from a metric's alerting.channels)
-alert_channels:
-  # Mattermost. Supported keys: webhook_url, username, icon_emoji, channel,
-  # timeout. NOTE: there is no `icon_url` param — use `icon_emoji`.
-  mattermost_alerts:
-    type: mattermost
-    webhook_url: "{{ env_var('MATTERMOST_WEBHOOK_URL') }}"
-    username: detectkit
-    icon_emoji: ":warning:"
-
-  # Slack example (same fields as mattermost)
-  # slack_alerts:
-  #   type: slack
-  #   webhook_url: "{{ env_var('SLACK_WEBHOOK_URL') }}"
-  #   channel: "#alerts"
-  #   username: detectkit
-
-  # Telegram example (required: bot_token, chat_id)
-  # telegram_alerts:
-  #   type: telegram
-  #   bot_token: "{{ env_var('TELEGRAM_BOT_TOKEN') }}"
-  #   chat_id: "{{ env_var('TELEGRAM_CHAT_ID') }}"
-
-  # Email example (required: smtp_host, smtp_port, from_email, to_emails)
-  # email_alerts:
-  #   type: email
-  #   smtp_host: smtp.gmail.com
-  #   smtp_port: 587
-  #   from_email: alerts@example.com
-  #   to_emails:
-  #     - team@example.com
-  #   smtp_username: "{{ env_var('SMTP_USERNAME') }}"
-  #   smtp_password: "{{ env_var('SMTP_PASSWORD') }}"
-
-  # Generic webhook example (required: webhook_url; optional extra_headers)
-  # webhook_alerts:
-  #   type: webhook
-  #   webhook_url: "{{ env_var('WEBHOOK_URL') }}"
-  #   extra_headers:
-  #     Authorization: "Bearer {{ env_var('WEBHOOK_TOKEN') }}"
-"""
+    # live under a top-level 'profiles:' mapping). The active dev/prod profiles
+    # are scaffolded for the chosen --db-type; the other backends are included
+    # as commented examples. See the per-database docs for connection details.
+    other_backends = [t for t in ("clickhouse", "postgres", "mysql") if t != db_type]
+    commented = "\n".join(_COMMENTED_EXAMPLES[t] for t in other_backends)
+    profiles_config = (
+        "# Database connection profiles\n\n"
+        "default_profile: dev\n\n"
+        "profiles:\n"
+        f"{_ACTIVE_PROFILES[db_type]}\n"
+        f"{commented}"
+        f"{_ALERT_CHANNELS}"
+    )
 
     (target_path / "profiles.yml").write_text(profiles_config)
 
-    # Create example metric (must validate against MetricConfig)
+    # Create example metric (must validate against MetricConfig). The
+    # timestamp-bucketing expression is dialect-specific; it is substituted for
+    # the __DTK_BUCKET__ sentinel below so the Jinja `{{ }}` placeholders in the
+    # rest of the query are left untouched.
     example_metric = """# Example metric configuration
 name: example_cpu_usage
 description: CPU usage monitoring example
@@ -191,7 +280,7 @@ description: CPU usage monitoring example
 #   {{ interval_seconds }} - metric interval in seconds
 query: |
   SELECT
-    toStartOfInterval(event_time, INTERVAL {{ interval_seconds }} SECOND) AS timestamp,
+    __DTK_BUCKET__ AS timestamp,
     avg(cpu_usage) AS value
   FROM system_metrics
   WHERE event_time >= '{{ dtk_start_time }}'
@@ -252,6 +341,7 @@ tags:
   - system
 """
 
+    example_metric = example_metric.replace("__DTK_BUCKET__", _BUCKET_SQL[db_type])
     (target_path / "metrics" / "example_cpu_usage.yml").write_text(example_metric)
 
     # Create README
@@ -315,7 +405,7 @@ See https://github.com/alexeiveselov92/detectkit for full documentation.
     click.echo()
     click.echo("Next steps:")
     click.echo(f"  1. cd {project_name}")
-    click.echo("  2. Configure database connection in profiles.yml")
+    click.echo(f"  2. Configure your {db_type} connection in profiles.yml")
     click.echo("  3. Create or edit metric definitions in metrics/")
     click.echo("  4. Run: dtk run --select example_cpu_usage")
     click.echo()

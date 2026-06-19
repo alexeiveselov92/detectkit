@@ -1,5 +1,6 @@
 ---
 import Logo from '../components/Logo.astro';
+import DbBadges from '../components/DbBadges.astro';
 import '../styles/brand.css';
 import '../styles/landing.css';
 
@@ -196,6 +197,14 @@ const bodyEmail = [alertTitle, ...alertRule, 'CC: oncall_engineer'].join('\n');
           <span class="title">metrics/api_errors.yml</span>
         </div>
         <div class="body code" set:html={yamlHtml}></div>
+      </div>
+    </section>
+
+    <!-- ===== works with (databases) ===== -->
+    <section class="wrap">
+      <div class="db-strip">
+        <span class="db-strip-label">Works with</span>
+        <DbBadges />
       </div>
     </section>
 

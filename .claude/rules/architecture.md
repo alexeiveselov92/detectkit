@@ -4,8 +4,8 @@ detectkit is a modular, database-agnostic library for monitoring metrics with
 automatic anomaly detection. It is built around a three-stage pipeline —
 **load → detect → alert** — driven by a dbt-like CLI (`dtk`) over YAML configs.
 Core principles: **numpy-first** (no pandas in core logic; only in optional
-helpers), **database-agnostic** (a generic manager interface, ClickHouse as the
-implemented backend), **idempotent / resumable** (every stage resumes from the
+helpers), **database-agnostic** (a generic manager interface with ClickHouse,
+PostgreSQL and MySQL backends), **idempotent / resumable** (every stage resumes from the
 last persisted timestamp), **modular** (small focused files, packages split into
 mixins so nothing grows past ~250 lines), and **type-safe** (pydantic configs +
 type hints throughout).
@@ -59,7 +59,10 @@ detectkit/
 │   └── models.py                # ColumnDefinition, TableModel (DB-agnostic DDL spec)
 ├── database/
 │   ├── manager.py               # BaseDatabaseManager (generic, table_name-keyed interface)
-│   ├── clickhouse_manager.py    # ClickHouseDatabaseManager (the implemented backend)
+│   ├── clickhouse_manager.py    # ClickHouseDatabaseManager
+│   ├── _sql_manager.py          # SQLDatabaseManager (shared base for Postgres/MySQL)
+│   ├── postgres_manager.py      # PostgresDatabaseManager (psycopg2)
+│   ├── mysql_manager.py         # MySQLDatabaseManager (pymysql)
 │   ├── tables.py                # TableModel factories for all _dtk_* tables
 │   └── internal_tables/         # InternalTablesManager: per-table mixins over the manager
 ├── loaders/
@@ -94,16 +97,39 @@ interface of **generic** operations keyed by `table_name` — it deliberately do
 - `insert_batch(table_name, data, conflict_strategy)` — columns as numpy arrays
 - `get_last_timestamp(table_name, metric_name, timestamp_column)`
 - `upsert_task_status(...)` and `upsert_record(table_name, key_columns, data)`
+- `delete_rows(table_name, where_clause, params, sync)` — the one generic delete
+  primitive (ClickHouse renders `ALTER TABLE … DELETE`; SQL backends `DELETE FROM`)
+- `final_modifier` — dedup-read modifier (`" FINAL"` on ClickHouse, `""` elsewhere)
 - `internal_location` / `data_location` properties + `get_full_table_name(...)`
 
-`detectkit/database/clickhouse_manager.py` (`ClickHouseDatabaseManager`) is the
-**only implemented backend** (native protocol via `clickhouse-driver`). It
-auto-creates the internal and data databases on connect. ClickHouse has no
-native UPSERT, so `upsert_task_status` / `upsert_record` use `ALTER TABLE …
-DELETE` (with `mutations_sync = 1`) followed by `INSERT`. PostgreSQL and MySQL
-are **scaffolded but not implemented**: `ProfileConfig.create_manager()` in
-`detectkit/config/profile.py` raises `NotImplementedError("PostgreSQL support
-coming soon")` / `"MySQL support coming soon"`.
+Three backends implement this interface:
+
+- `clickhouse_manager.py` (`ClickHouseDatabaseManager`) — native protocol via
+  `clickhouse-driver`. Auto-creates the internal/data databases on connect.
+  ClickHouse has no native UPSERT, so `upsert_task_status` / `upsert_record` use
+  `ALTER TABLE … DELETE` (with `mutations_sync = 1`) followed by `INSERT`, and
+  dedup relies on `ReplacingMergeTree` + `FINAL` reads.
+- `_sql_manager.py` (`SQLDatabaseManager`) — shared base for the two standard-SQL
+  backends. Owns the DB-API flow once (cursor → dict rows, transactions, numpy →
+  driver coercion, DDL rendering with an **enforced PRIMARY KEY** and per-dialect
+  type mapping, version-aware upserts). Dialect hooks: `_connect`,
+  `_ensure_locations`, `_TYPE_MAP` / `_string_type`, `_build_insert_sql`.
+- `postgres_manager.py` (`PostgresDatabaseManager`, psycopg2) — connects to a
+  `database` and uses **schemas** (`CREATE SCHEMA IF NOT EXISTS`); dedup via
+  `INSERT … ON CONFLICT DO UPDATE` guarded by the version column.
+- `mysql_manager.py` (`MySQLDatabaseManager`, pymysql, MySQL 8.0+) — uses
+  **databases** (`CREATE DATABASE IF NOT EXISTS`); dedup via `INSERT … ON
+  DUPLICATE KEY UPDATE` (row-alias form). PK `String` columns render as
+  `VARCHAR(255)` (TEXT can't be PK-indexed).
+
+`ProfileConfig.create_manager()` (`detectkit/config/profile.py`) builds the right
+backend from `type`; PostgreSQL additionally requires a `database` connect-target.
+
+The `TableModel` carries a `version_column` (the last-writer-wins key encoded as
+`ReplacingMergeTree(<col>)` on ClickHouse and driving the version-aware upsert on
+SQL backends). The `InternalTablesManager` mixins are backend-neutral: they emit
+no ClickHouse-only SQL, routing all deletes through `delete_rows` and dedup reads
+through `final_modifier` (locked in by `tests/unit/test_internal_tables_agnostic.py`).
 
 `detectkit/core/models.py` holds `TableModel` and `ColumnDefinition` — the
 database-agnostic schema spec the manager turns into backend-specific DDL.
@@ -275,10 +301,11 @@ lock (so it also clears a stuck row). `dtk unlock` clears a held lock on demand;
 - **Vectorize `WindowedStatDetector.detect()`** — points are scored in a Python
   loop. Fine for incremental runs, slow for large historical backfills; numpy
   rolling-window operations are the main performance opportunity.
-- **PostgreSQL / MySQL backends** — scaffolded (profiles validate) but not
-  implemented; `ProfileConfig.create_manager()` raises `NotImplementedError`.
 - **Advanced detectors** — Prophet and TimesFM integrations are planned (the
   optional extras are already reserved in `pyproject.toml`).
+- **DB connection pooling** — each manager holds a single connection; the SQL
+  backends use per-statement `executemany`, fine for incremental runs but not
+  optimized for very large backfills.
 - **Parallel execution** — a `--threads` option to process metrics concurrently.
 - **Further performance** — vectorized seasonality extraction, DB connection
   pooling, query-result caching.

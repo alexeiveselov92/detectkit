@@ -3,7 +3,7 @@
 **detectkit** is a Python library + CLI (`dtk`) for monitoring time-series
 metrics with anomaly detection and multi-channel alerting. It is dbt-like:
 metrics are YAML + SQL run through a `load → detect → alert` pipeline.
-numpy-first (no pandas in core logic), ClickHouse backend, Python 3.10+.
+numpy-first (no pandas in core logic), ClickHouse / PostgreSQL / MySQL backends, Python 3.10+.
 
 > **Using detectkit, not hacking on it?** See the [README](README.md), the
 > [docs](docs/), and `dtk init-claude` (which sets up assistant context inside

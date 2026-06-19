@@ -177,14 +177,15 @@ alerting:
 
 ### 🗄️ Database Support
 
-Works with your existing data warehouse:
+Works with your existing data warehouse — all three backends are first-class:
 
-- **ClickHouse** - the only supported backend today
-- **PostgreSQL** - planned, not yet implemented
-- **MySQL** - planned, not yet implemented
+- **ClickHouse** - native protocol, `detectkit[clickhouse]`
+- **PostgreSQL** - 12+, `detectkit[postgres]`
+- **MySQL** - 8.0+, `detectkit[mysql]`
 
-> **Note:** ClickHouse is currently the only working backend. Selecting
-> `postgres` or `mysql` raises `NotImplementedError` ("coming soon").
+Only the connection and the SQL dialect of your metric queries differ; detectors,
+alerting and the CLI are identical. See the [Databases guide](guides/databases.md)
+for the per-backend breakdown.
 
 ## Architecture
 

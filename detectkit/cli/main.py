@@ -55,6 +55,38 @@ def init(project_name: str, target_dir: str):
     run_init(project_name, target_dir)
 
 
+@cli.command(name="init-claude")
+@click.option(
+    "--target-dir",
+    "-d",
+    default=".",
+    help="Folder holding your detectkit project(s) (default: current directory)",
+)
+def init_claude(target_dir: str):
+    """
+    Set up Claude Code context for working with detectkit.
+
+    Scaffolds AI-assistant context into the folder that holds your detectkit
+    project(s), so Claude can natively help you create metrics, tune detectors,
+    configure alerts and run the pipeline. Writes:
+
+    - CLAUDE.md (created, or a managed detectkit block is injected/refreshed —
+      your own content is preserved)
+    - .claude/rules/detectkit/ (reference docs the assistant reads on demand)
+    - .claude/skills/ (e.g. the dtk-new-metric skill)
+
+    The content ships with detectkit and tracks the installed version, so
+    re-run this after upgrading to refresh it. The operation is idempotent.
+
+    Example:
+        dtk init-claude
+        dtk init-claude --target-dir /opt/monitoring
+    """
+    from detectkit.cli.commands.init_claude import run_init_claude
+
+    run_init_claude(target_dir)
+
+
 @cli.command()
 @click.option(
     "--select",

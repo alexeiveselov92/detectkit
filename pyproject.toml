@@ -89,6 +89,10 @@ where = ["."]
 include = ["detectkit*"]
 exclude = ["tests*", "docs*"]
 
+[tool.setuptools.package-data]
+# Claude Code context shipped by `dtk init-claude` (CLAUDE block, rules, skills).
+"detectkit.cli" = ["assets/**/*.md"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

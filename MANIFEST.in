@@ -2,6 +2,7 @@ include README.md
 include LICENSE
 include requirements.txt
 recursive-include detectkit *.py
+recursive-include detectkit/cli/assets *.md
 recursive-exclude tests *
 recursive-exclude * __pycache__
 recursive-exclude * *.pyc

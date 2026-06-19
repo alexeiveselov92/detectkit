@@ -21,6 +21,11 @@ pip install detectkit[clickhouse]
 
 ### First Metric
 
+> **Fastest path:** let Claude Code set it up for you — run `dtk init-claude`,
+> then the **`dtk-setup-project`** skill configures `profiles.yml` interactively
+> for your database. See
+> [Quickstart → Fastest start](getting-started/quickstart.md#fastest-start-set-up-with-an-ai-assistant).
+
 ```bash
 # Initialize project
 dtk init my_monitoring

@@ -8,6 +8,24 @@ This guide will walk you through creating your first detectkit project and monit
 - Database connection (ClickHouse, PostgreSQL, or MySQL)
 - Basic SQL knowledge
 
+## Fastest start: set up with an AI assistant
+
+If you use [Claude Code](https://claude.com/claude-code), it can do the setup
+for you interactively — no hand-editing YAML:
+
+```bash
+dtk init my_monitoring && cd my_monitoring
+dtk init-claude          # adds CLAUDE.md + .claude/rules + skills to this folder
+```
+
+Then, in Claude Code, ask it to **run the `dtk-setup-project` skill**. It walks
+you through `profiles.yml` based on your database (ClickHouse today): connection
+details, the internal `_dtk_*` vs data locations, an optional first alert
+channel — and verifies it with a non-destructive run. Next, ask it to run
+**`dtk-new-metric`** to scaffold your first metric. That's the whole setup.
+
+Prefer to do it by hand? The manual steps below do exactly the same thing.
+
 ## Step 1: Initialize Project
 
 Create a new detectkit project:

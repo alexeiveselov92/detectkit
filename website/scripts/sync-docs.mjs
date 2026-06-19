@@ -37,12 +37,17 @@ const PAGES = [
   { src: 'docs/guides/alerting-no-data-errors.md', dest: 'guides/alerting-no-data-errors.md' },
   { src: 'docs/guides/alerting-templates-mentions.md', dest: 'guides/alerting-templates-mentions.md' },
   { src: 'docs/guides/alerting-patterns.md', dest: 'guides/alerting-patterns.md' },
+  { src: 'docs/guides/visualizing-results.md', dest: 'guides/visualizing-results.md' },
   { src: 'docs/reference/cli.md', dest: 'reference/cli.md' },
   { src: 'docs/reference/detectors/mad.md', dest: 'reference/detectors/mad.md' },
   { src: 'docs/reference/detectors/zscore.md', dest: 'reference/detectors/zscore.md' },
   { src: 'docs/reference/detectors/iqr.md', dest: 'reference/detectors/iqr.md' },
   { src: 'docs/reference/detectors/manual_bounds.md', dest: 'reference/detectors/manual_bounds.md' },
   { src: 'docs/examples/README.md', dest: 'examples.md', title: 'Examples' },
+  // "For developers" — sourced from the repo's own .claude/rules so the dev
+  // context is single-source (in Claude Code) and rendered on the site.
+  { src: '.claude/rules/architecture.md', dest: 'development/architecture.md', title: 'Architecture' },
+  { src: '.claude/rules/contributing.md', dest: 'development/contributing.md', title: 'Contributing' },
   { src: 'CHANGELOG.md', dest: 'changelog.md', title: 'Changelog' },
 ];
 

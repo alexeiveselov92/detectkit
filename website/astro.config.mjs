@@ -69,6 +69,7 @@ export default defineConfig({
                 { label: 'Patterns', link: '/guides/alerting-patterns/' },
               ],
             },
+            { label: 'Visualizing results', link: '/guides/visualizing-results/' },
           ],
         },
         {
@@ -87,6 +88,13 @@ export default defineConfig({
           ],
         },
         { label: 'Examples', link: '/examples/' },
+        {
+          label: 'For developers',
+          items: [
+            { label: 'Architecture', link: '/development/architecture/' },
+            { label: 'Contributing', link: '/development/contributing/' },
+          ],
+        },
         { label: 'Changelog', link: '/changelog/' },
       ],
     }),

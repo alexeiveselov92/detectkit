@@ -66,5 +66,7 @@ GRAFANA_DASHBOARD.md
 PROGRESS.md
 TODO.md
 
-# Per-developer Claude Code state (CLAUDE.md is tracked; local skills/settings are not)
-.claude/
+# Per-developer Claude Code state. CLAUDE.md is tracked (top level) and the
+# repo's own dev rules are tracked; local settings/skills/etc. are not.
+.claude/*
+!.claude/rules/

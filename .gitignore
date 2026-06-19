@@ -58,7 +58,8 @@ profiles.yml
 .env
 *.zip
 
-# Per-developer Claude Code state. CLAUDE.md is tracked (top level) and the
-# repo's own dev rules are tracked; local settings/skills/etc. are not.
-.claude/*
-!.claude/rules/
+# Claude Code: project config is SHARED so contributing works out of the box.
+# CLAUDE.md and everything under .claude/ (rules, and any future commands /
+# agents / shared settings.json) is committed. Only personal, per-machine
+# overrides are ignored.
+.claude/*.local.json

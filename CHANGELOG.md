@@ -5,7 +5,38 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.10.0] - 2026-06-19
+
+### Added
+- **`dtk init-claude` — AI-native onboarding.** A new command that scaffolds
+  [Claude Code](https://claude.com/claude-code) context into the folder holding
+  your detectkit project(s), so an assistant can natively help you build and
+  operate metrics, detectors and alerts. It writes:
+  - `CLAUDE.md` — created if absent, otherwise a managed detectkit block is
+    injected/refreshed between `<!-- BEGIN detectkit … -->` /
+    `<!-- END detectkit -->` markers (your own content is preserved).
+  - `.claude/rules/detectkit/` — reference docs the assistant reads on demand
+    (`overview`, `cli`, `project`, `metrics`, `detectors`, `alerting`).
+  - `.claude/skills/` — skills that scaffold work: `dtk-setup-project`
+    (first-time DB/channel setup) and `dtk-new-metric` (a validated metric YAML).
+
+  The content ships with the package and tracks the installed version, so
+  **re-run `dtk init-claude` after upgrading** to refresh it. The operation is
+  idempotent. The canonical source lives in `detectkit/cli/assets/claude/` and
+  is kept in sync with the user docs on every release.
+- **`dtk-setup-project` skill** (shipped by `dtk init-claude`): an interactive,
+  database-type-aware setup that gathers your real connection details, points
+  the profile at your database, optionally configures a first alert channel, and
+  verifies with a non-destructive `--steps load` run. Surfaced at the top of the
+  Quickstart and in the `dtk init-claude` reference.
+- **Visualizing results guide** (`docs/guides/visualizing-results.md`):
+  BI-tool-agnostic and database-agnostic SQL recipes for charting the `_dtk_*`
+  tables (value + confidence band, anomaly markers, anomaly counts, latest-value
+  stat, multi-detector comparison, severity breakdown) in Grafana, Superset,
+  Metabase, Tableau, or plain SQL.
+- **Developer docs** rendered on the site under a "For developers" section
+  (architecture, contributing, design & brand), single-sourced from
+  `.claude/rules/` so they double as in-repo AI-assistant context.
 
 ### Fixed
 - **`dtk init` now scaffolds a runnable, schema-correct project.** The generated
@@ -23,43 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     instead of the real `webhook_url` / `extra_headers` (also corrected in the
     `dtk init-claude` project rules).
 
-### Added
-- **`dtk-setup-project` skill** shipped by `dtk init-claude`: an interactive,
-  database-type-aware setup that gathers your real connection details, points
-  the profile at your database, optionally configures a first alert channel, and
-  verifies with a non-destructive `--steps load` run. The quickstart's
-  "Configure Database Connection" step and the `dtk init-claude` reference now
-  point to it.
-- **Visualizing results guide** (`docs/guides/visualizing-results.md`):
-  BI-tool-agnostic and database-agnostic SQL recipes for charting the `_dtk_*`
-  tables (value + confidence band, anomaly markers, anomaly counts, latest-value
-  stat, multi-detector comparison, severity breakdown) in Grafana, Superset,
-  Metabase, Tableau, or plain SQL.
-
 ### Changed
 - Example ClickHouse `host` in the shipped `dtk init-claude` rules/skill and in
   the profiles docs is now a neutral placeholder (`clickhouse.example.com`)
   instead of a sample IP address.
-
-## [0.10.0] - 2026-06-19
-
-### Added
-- **`dtk init-claude` — AI-native onboarding.** A new command that scaffolds
-  [Claude Code](https://claude.com/claude-code) context into the folder holding
-  your detectkit project(s), so an assistant can natively help you build and
-  operate metrics, detectors and alerts. It writes:
-  - `CLAUDE.md` — created if absent, otherwise a managed detectkit block is
-    injected/refreshed between `<!-- BEGIN detectkit … -->` /
-    `<!-- END detectkit -->` markers (your own content is preserved).
-  - `.claude/rules/detectkit/` — reference docs the assistant reads on demand
-    (`overview`, `cli`, `project`, `metrics`, `detectors`, `alerting`).
-  - `.claude/skills/dtk-new-metric/` — a skill that scaffolds a validated
-    metric YAML.
-
-  The content ships with the package and tracks the installed version, so
-  **re-run `dtk init-claude` after upgrading** to refresh it. The operation is
-  idempotent. The canonical source lives in `detectkit/cli/assets/claude/` and
-  is kept in sync with the user docs on every release.
 
 ## [0.9.0] - 2026-06-19
 

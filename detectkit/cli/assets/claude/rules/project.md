@@ -9,22 +9,24 @@ errors (not empty strings).
 ## `detectkit_project.yml`
 
 ```yaml
-name: my_monitoring            # project identifier (shown in logs, error-alert titles)
+name: my_monitoring            # required — project identifier (logs, error-alert titles)
+version: "1.0"                 # optional (default "1.0")
 default_profile: prod          # profile name from profiles.yml
 
-paths:
-  metrics_dir: metrics         # where metric YAMLs live (default: metrics)
-  sql_dir: sql                 # where query_file: SQL lives (default: sql)
-  templates_dir: templates     # custom alert templates (default: templates)
+paths:                         # optional — directory names
+  metrics: metrics             # where metric YAMLs live (default: metrics)
+  sql: sql                     # where query_file: SQL lives (default: sql)
+  templates: templates         # custom alert templates (default: templates)
 
-default_tables:                # internal table names (overridable per metric)
+tables:                        # internal table names (overridable per metric)
   datapoints: _dtk_datapoints
   detections: _dtk_detections
   tasks: _dtk_tasks
 
-timeouts:
-  query_timeout: 300           # SQL execution timeout (s)
-  lock_timeout: 3600           # how long a task lock is held before expiring (s)
+timeouts:                      # per-step, seconds
+  load: 3600                   # load step (default 3600)
+  detect: 7200                 # detect step (default 7200)
+  alert: 300                   # alert step (default 300)
 
 error_alerting:                # optional, see below
   enabled: false
@@ -76,6 +78,10 @@ alert_channels:
 
 ### Database profiles
 
+> ClickHouse is the only implemented backend today. PostgreSQL and MySQL are
+> planned — their profiles validate, but creating a manager raises
+> `NotImplementedError("... coming soon")`.
+
 **ClickHouse** (priority backend):
 ```yaml
 profiles:
@@ -92,7 +98,7 @@ profiles:
       max_memory_usage: 10000000000
 ```
 
-**PostgreSQL**:
+**PostgreSQL** (planned, not yet implemented):
 ```yaml
 profiles:
   prod:
@@ -108,7 +114,7 @@ profiles:
     max_overflow: 10               # optional
 ```
 
-**MySQL**:
+**MySQL** (planned, not yet implemented):
 ```yaml
 profiles:
   prod:
@@ -161,7 +167,7 @@ alert_channels:
     smtp_port: 587                # required (587 TLS, 465 SSL)
     from_email: "alerts@example.com"   # required
     to_emails: ["ops@example.com"]     # required (list)
-    smtp_user: "..."              # optional
+    smtp_username: "..."          # optional
     smtp_password: "..."          # optional (use env_var)
     use_tls: true                 # optional (default: true)
 ```

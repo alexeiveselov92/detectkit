@@ -499,7 +499,9 @@ Sends a mock alert through all configured channels with fake data:
 - Mock anomaly value: `0.8532`
 - Mock confidence interval: `[0.4521, 0.6234]`
 - Mock severity: `4.52`
-- Mock consecutive count: `3`
+- Rule preview: the mock mirrors the alert config's own `min_detectors`,
+  `direction`, and `consecutive_anomalies` (defaults `1` / `same` / `3`), so
+  the message shows the alert-centric layout a real firing would produce
 
 **Use cases**:
 - Verify webhook URLs work

@@ -148,13 +148,20 @@ class TestBaseAlertChannel:
         assert "N/A" in message  # Confidence interval shows as N/A
 
     def test_get_default_template(self):
-        """Test default template retrieval."""
+        """Default anomaly template is alert-centric and surfaces the rule."""
         channel = MockAlertChannel()
         template = channel.get_default_template()
 
-        assert "Anomaly detected" in template
+        # The alert is the subject, not the anomaly.
+        assert "Alert" in template
+        assert "Anomaly detected" not in template
         assert "{metric_name}" in template
-        assert "{value}" in template
+        # The parameters the alert fired with are foregrounded.
+        assert "{min_detectors}" in template
+        assert "{direction_policy}" in template
+        assert "{consecutive_required}" in template
+        # The anomaly value is still present (secondary).
+        assert "{value_display}" in template
 
     def test_send_method(self):
         """Test send method is called."""
@@ -204,7 +211,7 @@ class TestRecoveryFormatting:
 
         message = channel.format_message(alert)
 
-        assert "recovered" in message.lower()
+        assert "cleared" in message.lower()
         assert "cpu_usage" in message
         assert "85.0" in message
 
@@ -261,7 +268,7 @@ class TestRecoveryFormatting:
         channel = MockAlertChannel()
         template = channel.get_default_recovery_template()
 
-        assert "recovered" in template.lower()
+        assert "cleared" in template.lower()
         assert "{metric_name}" in template
 
     def test_is_recovery_default_false(self):

@@ -207,6 +207,23 @@ class _DecisionMixin(_OrchestratorBase):
             detector_params = primary.detector_params
             combined_metadata = primary.detection_metadata
 
+        # Observed direction shown in the message. For "same"/"up"/"down" the
+        # caller passes the locked/policy direction. For "any" it passes None
+        # because the quorum may combine directions — collapse to the shared
+        # side only when every quorum member agrees, otherwise label it
+        # "mixed" so the message never claims an agreement that did not happen
+        # (e.g. one up + one down satisfying min_detectors=2).
+        if direction:
+            observed_direction = direction
+        else:
+            quorum_dirs = {d.direction for d in anomalies if d.direction in ("up", "down")}
+            if len(quorum_dirs) == 1:
+                observed_direction = next(iter(quorum_dirs))
+            elif len(quorum_dirs) >= 2:
+                observed_direction = "mixed"
+            else:
+                observed_direction = primary.direction
+
         return AlertData(
             metric_name=self.metric_name,
             timestamp=primary.timestamp,
@@ -216,12 +233,18 @@ class _DecisionMixin(_OrchestratorBase):
             confidence_upper=primary.confidence_upper,
             detector_name=detector_name,
             detector_params=detector_params,
-            direction=direction or primary.direction,
+            direction=observed_direction,
             severity=max_severity,
             detection_metadata=combined_metadata,
             consecutive_count=consecutive_count,
             description=self.description,
             mentions=self.mentions,
+            # Alert rule the message foregrounds: configured thresholds plus
+            # the observed quorum size that satisfied them.
+            min_detectors=self.conditions.min_detectors,
+            direction_policy=self.conditions.direction,
+            consecutive_required=self.conditions.consecutive_anomalies,
+            detector_count=len(anomalies),
         )
 
     def should_alert_no_data(

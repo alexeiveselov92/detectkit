@@ -176,4 +176,9 @@ class _RecoveryMixin(_OrchestratorBase):
             is_recovery=True,
             description=self.description,
             mentions=self.mentions,
+            # Echo the rule that had fired so the recovery message names the
+            # same alert condition that just cleared.
+            min_detectors=self.conditions.min_detectors,
+            direction_policy=self.conditions.direction,
+            consecutive_required=self.conditions.consecutive_anomalies,
         )

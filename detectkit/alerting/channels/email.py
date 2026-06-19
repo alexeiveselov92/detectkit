@@ -54,7 +54,7 @@ class EmailChannel(BaseAlertChannel):
         smtp_username: str | None = None,
         smtp_password: str | None = None,
         use_tls: bool = True,
-        subject_template: str = "Anomaly Alert: {metric_name}",
+        subject_template: str = "⚠ Alert: {metric_name}",
         template: str | None = None,
         **kwargs,
     ):

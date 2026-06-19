@@ -662,9 +662,9 @@ Timeline with notify_on_recovery: true and consecutive_anomalies: 3:
 
 10:00 - 1st anomaly
 10:10 - 2nd anomaly
-10:20 - 3rd anomaly  → ALERT sent ("Anomaly detected in cpu_usage")
+10:20 - 3rd anomaly  → ALERT sent ("⚠ Alert: cpu_usage")
 10:30 - Normal point
-10:40 - Normal point → RECOVERY sent ("Metric recovered: cpu_usage")
+10:40 - Normal point → RECOVERY sent ("✅ Alert cleared: cpu_usage")
 10:50 - Normal point
 11:00 - NEW 1st anomaly
 ...
@@ -690,10 +690,13 @@ alerting:
 | `{timestamp}` | Timestamp of the last detection point |
 | `{timezone}` | Configured timezone |
 | `{value}` | Metric value at recovery point |
+| `{value_display}` | NaN-safe value string — always renders, falls back to `"no data"` (used by the default recovery template) |
 | `{confidence_lower}` | Lower confidence bound |
 | `{confidence_upper}` | Upper confidence bound |
 | `{confidence_interval}` | Formatted as `[lower, upper]` |
+| `{expected_range}` | One-sided aware expected band (`>= lo` / `<= hi` / `[lo, hi]` / `N/A`) |
 | `{detector_name}` | Detector that was monitoring |
+| `{min_detectors}` / `{direction_policy}` / `{consecutive_required}` | The rule of the alert that cleared (echoed so recovery names the same condition) |
 | `{status}` | Always `"RECOVERED"` in recovery messages |
 | `{mentions}` | Formatted mentions string (e.g., `@user1 @user2`), empty if none |
 | `{mentions_line}` | Same as `{mentions}` with leading newline, empty if none |
@@ -1088,15 +1091,29 @@ Override default alert message format.
 
 ### Default Template
 
+The default message foregrounds the **alert** (the rule that fired and the
+parameters it fired with); the anomaly appears as supporting evidence below.
+
 ```
-Anomaly detected in metric: {metric_name}
-{description_line}Time: {timestamp}
-Value: {value} | CI: {confidence_interval}
-Direction: {direction} | Severity: {severity:.2f} | Consecutive: {consecutive_count}
-Detector: {detector_name}
+⚠ Alert: {metric_name}
+{description_line}Quorum {detector_count}/{min_detectors} · direction {direction} (policy {direction_policy}) · consecutive {consecutive_count}/{consecutive_required}
+Rule: min_detectors={min_detectors} · direction={direction_policy} · consecutive={consecutive_required}
+
+Latest point (evidence):
+· Time: {timestamp}
+· Value: {value_display} | Expected: {expected_range}
+· Severity: {severity:.2f}
+Detectors: {detector_name}
 Parameters: {detector_params}
 {mentions_line}
 ```
+
+The first line names the **alert** and the metric. The `Quorum … · direction …
+· consecutive …` line shows the observed match against the rule (`actual/required`),
+and the `Rule:` line restates the configured thresholds. The detector value,
+expected range and severity follow as evidence. `{expected_range}` renders
+one-sided detector bounds cleanly (e.g. `>= 7.00` for a lower-only
+`manual_bounds`) instead of `[7.00, nan]`.
 
 ### Creating Custom Template
 
@@ -1139,10 +1156,15 @@ alerting:
 | `value_display` | NaN-safe string version — always renders, falls back to `"no data"` | all (v0.5.0) |
 | `confidence_lower` / `confidence_upper` | Bounds of confidence interval | anomaly, recovery |
 | `confidence_interval` | Formatted as `[lower, upper]` or `"N/A"` | all |
+| `expected_range` | One-sided aware expected band: `>= lo`, `<= hi`, `[lo, hi]`, or `"N/A"`. Renders one-sided detector bounds cleanly instead of `[7.00, nan]` | all |
 | `detector_name` | Detector that triggered (e.g., `"MADDetector:threshold=3.0"`); `"N detectors"` when several detectors formed the quorum | anomaly, recovery |
+| `detector_count` | Observed number of detectors that agreed (the quorum size that fired) | anomaly |
+| `min_detectors` | Configured quorum threshold the alert fired on (the rule) | anomaly, recovery |
 | `severity` | Severity score; max across the quorum for multi-detector alerts | anomaly |
-| `direction` | `"up"` or `"down"` | anomaly |
-| `consecutive_count` | Number of consecutive anomalies | anomaly |
+| `direction` | Observed/locked anomaly direction: `"up"` or `"down"` | anomaly |
+| `direction_policy` | Configured direction rule: `"same"`, `"any"`, `"up"`, `"down"` | anomaly, recovery |
+| `consecutive_count` | Observed number of consecutive anomalies | anomaly |
+| `consecutive_required` | Configured consecutive threshold the alert fired on (the rule) | anomaly, recovery |
 | `status` | `"ANOMALY"`, `"RECOVERED"`, `"NO_DATA"`, or `"ERROR"` | all (v0.5.0 added NO_DATA / ERROR) |
 | `error_type` / `error_message` | Exception details | error only (v0.5.0) |
 | `description` / `description_line` | Metric description | all |
@@ -1176,14 +1198,22 @@ cd my_project
 dtk test-alert api_response_time
 ```
 
-This sends a mock alert through configured channels with fake data:
+This sends a mock alert through configured channels with fake data. The mock
+uses the alert config's own rule (`min_detectors` / `direction` /
+`consecutive_anomalies`), so the preview matches what a real firing would look
+like — here with the defaults (`min_detectors: 1`, `direction: same`,
+`consecutive_anomalies: 3`):
 
 ```
-Anomaly detected in metric: api_response_time
-Time: 2026-06-12 14:30:00
-Value: 0.8532 | CI: [0.4521, 0.6234]
-Direction: above | Severity: 4.52 | Consecutive: 3
-Detector: MADDetector:threshold=3.0
+⚠ Alert: api_response_time
+Quorum 1/1 · direction up (policy same) · consecutive 3/3
+Rule: min_detectors=1 · direction=same · consecutive=3
+
+Latest point (evidence):
+· Time: 2026-06-12 14:30:00 (UTC)
+· Value: 0.8532 | Expected: [0.45, 0.62]
+· Severity: 4.52
+Detectors: MADDetector:threshold=3.0
 Parameters: {"threshold": 3.0, "window_size": 8640}
 ```
 

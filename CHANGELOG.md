@@ -5,6 +5,39 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-06-19
+
+### Changed
+- **Alert messages are now alert-centric, not anomaly-centric.** The default
+  notification leads with the **alert** and the parameters it fired with — the
+  quorum/direction/consecutive rule — and shows the triggering anomaly as
+  supporting evidence below. This reflects the library's model: the alert is
+  the primary entity, and an anomaly is a secondary signal the rule interprets
+  (a detector anomaly can mean very different things under different
+  `min_detectors`/`direction`/`consecutive_anomalies` settings). The old
+  `"Anomaly detected in metric: …"` body and `"Anomaly detected: …"` /
+  `"Metric recovered: …"` titles become:
+  - Anomaly: title `⚠ Alert: <metric>`; body shows
+    `Quorum <actual>/<required> · direction <observed> (policy <configured>) ·
+    consecutive <actual>/<required>`, a `Rule:` line restating the configured
+    thresholds, then the latest point (time / value / expected range / severity)
+    and the detectors + params as evidence.
+  - Recovery: title `✅ Alert cleared: <metric>`; body states the alert
+    condition no longer holds and echoes the same rule.
+  Custom templates are unaffected — every previous template variable still works.
+
+### Added
+- **New alert template variables** that surface the rule the alert fired with:
+  `{min_detectors}`, `{direction_policy}`, `{consecutive_required}` (the
+  configured thresholds) and `{detector_count}` (observed detectors that
+  agreed). Plus `{expected_range}`, a one-sided-aware expected band that renders
+  one-sided detector bounds cleanly — `>= 7.00` for a lower-only
+  `manual_bounds` instead of the confusing `[7.00, nan]`.
+- `AlertData` now carries the alert-rule fields (`min_detectors`,
+  `direction_policy`, `consecutive_required`, `detector_count`); the
+  orchestrator fills them from the alert config's `AlertConditions`, and
+  `dtk test-alert` previews them using the metric's own alert rule.
+
 ## [0.8.2] - 2026-06-15
 
 ### Changed

@@ -44,6 +44,23 @@ def create_mock_alert_data(
     # different teams). Pull them from the specific config we're testing.
     mentions = list(alerting_config.mentions) if alerting_config else []
 
+    # Preview the alert with the rule it would actually fire on (min_detectors
+    # / direction / consecutive) so the test message matches the alert-centric
+    # default layout. Observed counts are set to satisfy the rule, as a real
+    # firing would.
+    min_detectors = getattr(alerting_config, "min_detectors", 1) or 1
+    direction_policy = getattr(alerting_config, "direction", "same") or "same"
+    consecutive_required = getattr(alerting_config, "consecutive_anomalies", 1) or 1
+    # Observed direction for the preview: a concrete side for up/down/same; for
+    # an "any" quorum of 2+ detectors show "mixed" (its whole point is that
+    # cross-direction anomalies combine), mirroring the real engine output.
+    if direction_policy in ("up", "down"):
+        observed_direction = direction_policy
+    elif direction_policy == "any" and min_detectors >= 2:
+        observed_direction = "mixed"
+    else:
+        observed_direction = "up"
+
     # Create realistic mock data
     return AlertData(
         metric_name=metric_config.name,
@@ -54,7 +71,7 @@ def create_mock_alert_data(
         confidence_upper=0.6234,
         detector_name="MADDetector:threshold=3.0",
         detector_params='{"threshold": 3.0, "window_size": 8640}',
-        direction="above",
+        direction=observed_direction,
         severity=4.52,
         detection_metadata={
             "global_median": 0.5123,
@@ -68,8 +85,12 @@ def create_mock_alert_data(
                 }
             ],
         },
-        consecutive_count=3,
+        consecutive_count=consecutive_required,
         mentions=mentions,
+        min_detectors=min_detectors,
+        direction_policy=direction_policy,
+        consecutive_required=consecutive_required,
+        detector_count=min_detectors,
     )
 
 

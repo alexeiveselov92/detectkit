@@ -666,8 +666,8 @@ alerting:
   - `true` = Send one recovery notification per incident
 
 - **`template_recovery`**: Custom recovery message template
-  - Supports: `{metric_name}`, `{timestamp}`, `{value}`, `{confidence_interval}`, `{detector_name}`, `{status}`
-  - Default template: `"Metric recovered: {metric_name}\nTime: {timestamp}\nValue: {value}\n..."`
+  - Supports the same variables as anomaly templates (incl. `{expected_range}` and the rule echo `{min_detectors}` / `{direction_policy}` / `{consecutive_required}`), plus `{status}`
+  - Default template (alert-centric): `"✅ Alert cleared: {metric_name}\nThe alert condition no longer holds — the metric is back within expected bounds.\nRule: ...\n..."`
 
 - **`suppress_until`**: Temporarily suppress alerts until a UTC datetime
   - `null` = No suppression (default)

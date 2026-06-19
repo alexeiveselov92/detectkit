@@ -36,6 +36,15 @@ class AlertData:
             as ``{project_name}`` in templates and as a ``[name] `` prefix
             in the default error title. Lets multiple projects share the
             same alert channel without ambiguity.
+
+    Alert-rule fields (``min_detectors``, ``direction_policy``,
+    ``consecutive_required``, ``detector_count``) describe *why the alert
+    fired* — the configured quorum/direction/consecutive thresholds plus
+    the observed number of agreeing detectors. They are filled by the
+    orchestrator from :class:`AlertConditions` and are deliberately kept
+    distinct from the observed ``direction``/``consecutive_count`` above so
+    templates can contrast "required vs actual". They default to ``None``
+    so direct-API callers (and non-anomaly alerts) still render cleanly.
     """
 
     metric_name: str
@@ -58,6 +67,11 @@ class AlertData:
     description: str | None = None
     mentions: list[str] = field(default_factory=list)
     project_name: str | None = None
+    # Alert rule (the parameters the alert fired with) — see class docstring.
+    min_detectors: int | None = None
+    direction_policy: str | None = None
+    consecutive_required: int | None = None
+    detector_count: int = 1
 
 
 class BaseAlertChannel(ABC):
@@ -123,10 +137,17 @@ class BaseAlertChannel(ABC):
         - {value} / {value_display}
         - {confidence_lower}
         - {confidence_upper}
+        - {confidence_interval} — "[lower, upper]" or "N/A"
+        - {expected_range} — one-sided aware: ">= lo", "<= hi",
+          "[lo, hi]" or "N/A" (renders one-sided detector bounds cleanly)
         - {detector_name}
-        - {direction}
+        - {detector_count} — observed detectors that agreed (the quorum)
+        - {direction} — observed/locked direction of the anomaly
+        - {direction_policy} — configured direction rule ("same"/"any"/...)
+        - {min_detectors} — configured quorum threshold (the rule)
+        - {consecutive_count} — observed consecutive points
+        - {consecutive_required} — configured consecutive threshold (rule)
         - {severity}
-        - {consecutive_count}
         - {status}
 
         Args:
@@ -177,6 +198,40 @@ class BaseAlertChannel(ABC):
         else:
             confidence_str = "N/A"
 
+        # One-sided-aware expected range. A NaN/inf bound means "no bound on
+        # that side" (e.g. ManualBounds with only ``lower_bound`` set), so we
+        # render ">= lo" / "<= hi" instead of the confusing "[7.00, nan]".
+        def _bounded(b: Any) -> bool:
+            return b is not None and not (isinstance(b, float) and (math.isnan(b) or math.isinf(b)))
+
+        lo_ok = _bounded(alert_data.confidence_lower)
+        hi_ok = _bounded(alert_data.confidence_upper)
+        if lo_ok and hi_ok:
+            expected_range = (
+                f"[{alert_data.confidence_lower:.2f}, {alert_data.confidence_upper:.2f}]"
+            )
+        elif lo_ok:
+            expected_range = f">= {alert_data.confidence_lower:.2f}"
+        elif hi_ok:
+            expected_range = f"<= {alert_data.confidence_upper:.2f}"
+        else:
+            expected_range = "N/A"
+
+        # Alert-rule display values. The orchestrator fills these from the
+        # configured AlertConditions; for direct-API/non-anomaly callers that
+        # leave them unset we fall back to the observed counts so the default
+        # templates never render a bare "None".
+        detector_count = alert_data.detector_count
+        min_detectors = (
+            alert_data.min_detectors if alert_data.min_detectors is not None else detector_count
+        )
+        consecutive_required = (
+            alert_data.consecutive_required
+            if alert_data.consecutive_required is not None
+            else alert_data.consecutive_count
+        )
+        direction_policy = alert_data.direction_policy or alert_data.direction
+
         # Display-safe value: stays usable even when value is None/NaN (no-data).
         raw_value = alert_data.value
         if raw_value is None or (isinstance(raw_value, float) and math.isnan(raw_value)):
@@ -221,11 +276,16 @@ class BaseAlertChannel(ABC):
                 confidence_lower=alert_data.confidence_lower,
                 confidence_upper=alert_data.confidence_upper,
                 confidence_interval=confidence_str,
+                expected_range=expected_range,
                 detector_name=alert_data.detector_name,
+                detector_count=detector_count,
                 detector_params=alert_data.detector_params,
                 direction=alert_data.direction,
+                direction_policy=direction_policy,
+                min_detectors=min_detectors,
                 severity=alert_data.severity,
                 consecutive_count=alert_data.consecutive_count,
+                consecutive_required=consecutive_required,
                 status=status,
                 error_type=alert_data.error_type or "",
                 error_message=alert_data.error_message or "",
@@ -312,12 +372,19 @@ class BaseAlertChannel(ABC):
             Default template string
         """
         return (
-            "Anomaly detected in metric: {metric_name}\n"
+            "⚠ Alert: {metric_name}\n"
             "{description_line}"
-            "Time: {timestamp}\n"
-            "Value: {value} | CI: {confidence_interval}\n"
-            "Direction: {direction} | Severity: {severity:.2f} | Consecutive: {consecutive_count}\n"
-            "Detector: {detector_name}\n"
+            "Quorum {detector_count}/{min_detectors} · "
+            "direction {direction} (policy {direction_policy}) · "
+            "consecutive {consecutive_count}/{consecutive_required}\n"
+            "Rule: min_detectors={min_detectors} · "
+            "direction={direction_policy} · consecutive={consecutive_required}\n"
+            "\n"
+            "Latest point (evidence):\n"
+            "· Time: {timestamp}\n"
+            "· Value: {value_display} | Expected: {expected_range}\n"
+            "· Severity: {severity:.2f}\n"
+            "Detectors: {detector_name}\n"
             "Parameters: {detector_params}"
             "{mentions_line}"
         )
@@ -330,12 +397,17 @@ class BaseAlertChannel(ABC):
             Default recovery template string
         """
         return (
-            "Metric recovered: {metric_name}\n"
+            "✅ Alert cleared: {metric_name}\n"
             "{description_line}"
-            "Time: {timestamp}\n"
-            "Value: {value} | CI: {confidence_interval}\n"
-            "Detector: {detector_name}\n"
-            "Status: metric returned to normal"
+            "The alert condition no longer holds — "
+            "the metric is back within expected bounds.\n"
+            "Rule: min_detectors={min_detectors} · "
+            "direction={direction_policy} · consecutive={consecutive_required}\n"
+            "\n"
+            "Latest point:\n"
+            "· Time: {timestamp}\n"
+            "· Value: {value_display} | Expected: {expected_range}\n"
+            "Detectors: {detector_name}"
             "{mentions_line}"
         )
 
@@ -348,7 +420,7 @@ class BaseAlertChannel(ABC):
         Returns:
             Default title template string
         """
-        return "Anomaly detected: {metric_name}"
+        return "⚠ Alert: {metric_name}"
 
     def get_default_recovery_title_template(self) -> str:
         """
@@ -357,7 +429,7 @@ class BaseAlertChannel(ABC):
         Returns:
             Default recovery title template string
         """
-        return "Metric recovered: {metric_name}"
+        return "✅ Alert cleared: {metric_name}"
 
     def get_default_no_data_template(self) -> str:
         """

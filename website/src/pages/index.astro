@@ -1,6 +1,7 @@
 ---
 import Logo from '../components/Logo.astro';
 import DbBadges from '../components/DbBadges.astro';
+import ChannelIcon from '../components/ChannelIcon.astro';
 import '../styles/brand.css';
 import '../styles/landing.css';
 
@@ -312,10 +313,10 @@ const bodyEmail = [alertTitle, ...alertRule, 'CC: oncall_engineer'].join('\n');
         <input class="pf-radio" type="radio" name="platform" id="pf-telegram" />
         <input class="pf-radio" type="radio" name="platform" id="pf-email" />
         <div class="pf-tabs">
-          <label for="pf-slack">Slack</label>
-          <label for="pf-mattermost">Mattermost</label>
-          <label for="pf-telegram">Telegram</label>
-          <label for="pf-email">Email</label>
+          <label for="pf-slack"><ChannelIcon name="slack" />Slack</label>
+          <label for="pf-mattermost"><ChannelIcon name="mattermost" />Mattermost</label>
+          <label for="pf-telegram"><ChannelIcon name="telegram" />Telegram</label>
+          <label for="pf-email"><ChannelIcon name="email" />Email</label>
         </div>
         <p class="pf-note">
           The same alert, posted by detectk to each channel — rendered exactly as that channel

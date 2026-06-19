@@ -48,6 +48,7 @@ const PAGES = [
   // context is single-source (in Claude Code) and rendered on the site.
   { src: '.claude/rules/architecture.md', dest: 'development/architecture.md', title: 'Architecture' },
   { src: '.claude/rules/contributing.md', dest: 'development/contributing.md', title: 'Contributing' },
+  { src: '.claude/rules/design.md', dest: 'development/design.md', title: 'Design & brand' },
   { src: 'CHANGELOG.md', dest: 'changelog.md', title: 'Changelog' },
 ];
 

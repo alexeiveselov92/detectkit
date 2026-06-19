@@ -93,6 +93,7 @@ export default defineConfig({
           items: [
             { label: 'Architecture', link: '/development/architecture/' },
             { label: 'Contributing', link: '/development/contributing/' },
+            { label: 'Design & brand', link: '/development/design/' },
           ],
         },
         { label: 'Changelog', link: '/changelog/' },

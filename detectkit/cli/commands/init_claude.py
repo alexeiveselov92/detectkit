@@ -23,13 +23,19 @@ from __future__ import annotations
 
 import re
 from importlib.resources import files
-from importlib.resources.abc import Traversable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 
 from detectkit import __version__
 from detectkit.cli._output import echo_done, echo_tree
+
+if TYPE_CHECKING:
+    # ``importlib.resources.abc`` only exists on Python 3.11+. Import it for
+    # typing only (``from __future__ import annotations`` keeps annotations as
+    # strings, so it is never evaluated at runtime — safe on 3.10).
+    from importlib.resources.abc import Traversable
 
 # Region in CLAUDE.md owned by this command. The BEGIN marker carries the
 # detectkit version (informational); the regex below matches any version so a
@@ -50,8 +56,12 @@ _NEW_FILE_HEADER = (
 
 
 def _assets_root() -> Traversable:
-    """Return the packaged ``assets/claude`` directory as a Traversable."""
-    return files("detectkit.cli").joinpath("assets", "claude")
+    """Return the packaged ``assets/claude`` directory as a Traversable.
+
+    Uses single-argument ``joinpath`` chaining; the multi-argument form is only
+    available on Python 3.12+, while detectkit supports 3.10+.
+    """
+    return files("detectkit.cli").joinpath("assets").joinpath("claude")
 
 
 def _render_block(section_text: str) -> str:

@@ -8,6 +8,7 @@ The `dtk` CLI provides dbt-like commands for managing metric monitoring:
 
 ```bash
 dtk init <project>              # Initialize new project
+dtk init-claude                 # Set up Claude Code context for this folder
 dtk run --select <selector>     # Run metric pipeline
 dtk test-alert <metric>         # Test alert channels
 dtk unlock --select <selector>  # Clear a stuck pipeline lock
@@ -86,6 +87,70 @@ my_monitoring/
 └── sql/                    # SQL query files
     └── .gitkeep
 ```
+
+---
+
+### `dtk init-claude`
+
+Set up [Claude Code](https://claude.com/claude-code) context for working with
+detectkit. Run it in the folder that holds your detectkit project(s) — it gives
+an AI assistant the context and tools to help you create metrics, tune
+detectors, configure alerts and run the pipeline natively.
+
+#### Syntax
+
+```bash
+dtk init-claude [OPTIONS]
+```
+
+#### Options
+
+**`--target-dir`, `-d`** (default: `.`)
+Folder holding your detectkit project(s) to set up.
+
+#### Created / updated files
+
+```
+<target>/
+├── CLAUDE.md                       # created, or a managed detectkit block is
+│                                   #   injected/refreshed (your content is kept)
+└── .claude/
+    ├── rules/detectkit/            # reference docs the assistant reads on demand
+    │   ├── overview.md
+    │   ├── cli.md
+    │   ├── project.md
+    │   ├── metrics.md
+    │   ├── detectors.md
+    │   └── alerting.md
+    └── skills/
+        └── dtk-new-metric/         # skill: scaffold a validated metric YAML
+            └── SKILL.md
+```
+
+#### Behavior
+
+- **Idempotent.** The detectkit block in `CLAUDE.md` lives between
+  `<!-- BEGIN detectkit … -->` / `<!-- END detectkit -->` markers; re-running
+  refreshes only that block and the managed files. Anything you write outside
+  the markers is preserved. A re-run with no upstream change reports everything
+  `unchanged`.
+- **Versioned.** The content ships with detectkit and tracks the installed
+  version, so **re-run `dtk init-claude` after upgrading** to refresh the
+  guidance to match the new release.
+- Works whether the folder holds one project or several side by side.
+
+#### Examples
+
+```bash
+# Set up the current folder
+dtk init-claude
+
+# Set up a specific monitoring root
+dtk init-claude --target-dir /opt/monitoring
+```
+
+After running, open the folder in Claude Code and ask it about your metrics,
+alerts or configs — or invoke the `dtk-new-metric` skill to scaffold a metric.
 
 ---
 

@@ -29,6 +29,14 @@ my_monitoring/
     └── .gitkeep
 ```
 
+> **Tip — set up an AI assistant.** If you use [Claude
+> Code](https://claude.com/claude-code), run `dtk init-claude` in this folder.
+> It writes a `CLAUDE.md` and `.claude/rules/detectkit/` reference plus a
+> `dtk-new-metric` skill, so the assistant can help you write metrics, tune
+> detectors and configure alerts out of the box. Re-run it after upgrading
+> detectkit to refresh the context. See
+> [`dtk init-claude`](../reference/cli.md#dtk-init-claude).
+
 ## Step 2: Configure Database Connection
 
 Edit `profiles.yml` to add your database connection:

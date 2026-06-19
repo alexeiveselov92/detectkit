@@ -5,6 +5,26 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`dtk init-claude` — AI-native onboarding.** A new command that scaffolds
+  [Claude Code](https://claude.com/claude-code) context into the folder holding
+  your detectkit project(s), so an assistant can natively help you build and
+  operate metrics, detectors and alerts. It writes:
+  - `CLAUDE.md` — created if absent, otherwise a managed detectkit block is
+    injected/refreshed between `<!-- BEGIN detectkit … -->` /
+    `<!-- END detectkit -->` markers (your own content is preserved).
+  - `.claude/rules/detectkit/` — reference docs the assistant reads on demand
+    (`overview`, `cli`, `project`, `metrics`, `detectors`, `alerting`).
+  - `.claude/skills/dtk-new-metric/` — a skill that scaffolds a validated
+    metric YAML.
+
+  The content ships with the package and tracks the installed version, so
+  **re-run `dtk init-claude` after upgrading** to refresh it. The operation is
+  idempotent. The canonical source lives in `detectkit/cli/assets/claude/` and
+  is kept in sync with the user docs on every release.
+
 ## [0.9.0] - 2026-06-19
 
 ### Changed

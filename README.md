@@ -19,6 +19,7 @@
 - **Database agnostic** — ClickHouse, PostgreSQL, MySQL
 - **Idempotent** — resume from interruptions, no duplicate processing
 - **CLI** — `dtk init`, `dtk run --select`, `dtk unlock`, `dtk clean`, tag-based selectors
+- **AI-native onboarding** — `dtk init-claude` sets up Claude Code context (CLAUDE.md + rules + a metric-scaffolding skill) so an assistant can help you build metrics out of the box
 
 ## Installation
 
@@ -41,6 +42,10 @@ pip install detectkit[all-db]       # All databases
 # Create project
 dtk init my_monitoring
 cd my_monitoring
+
+# Optional: set up Claude Code context so an AI assistant can help you
+# write metrics, tune detectors and configure alerts (re-run after upgrades)
+dtk init-claude
 
 # Configure database in profiles.yml, then:
 dtk run --select cpu_usage

@@ -82,6 +82,26 @@ const logLines = [
 ];
 const logHtml = logLines.map((l) => `<div class="ln">${l}</div>`).join('');
 
+// ---- `dtk init-claude` output (matches init_claude.py + _output.py) ----
+const claudeLines = [
+  'Target: ~/monitoring',
+  '',
+  sp('  ┌─ CLAUDE.md', C.cyan, true),
+  '  └─ detectkit section ' + sp('created', C.green),
+  sp('  ┌─ .claude/rules/detectkit/', C.cyan, true),
+  '  │   overview.md ' + sp('(created)', C.green),
+  '  │   cli.md ' + sp('(created)', C.green),
+  '  │   project.md ' + sp('(created)', C.green),
+  '  │   metrics.md ' + sp('(created)', C.green),
+  '  │   detectors.md ' + sp('(created)', C.green),
+  '  └─ alerting.md ' + sp('(created)', C.green),
+  sp('  ┌─ .claude/skills/', C.cyan, true),
+  '  └─ dtk-new-metric/SKILL.md ' + sp('(created)', C.green),
+  '',
+  sp('Done. Claude context ready (8 created).', C.cyan, true),
+];
+const claudeHtml = claudeLines.map((l) => `<div class="ln">${l}</div>`).join('');
+
 // ---- alert mock body (verbatim from the channels' default templates) ----
 const alertBody = [
   'Quorum 1/1 · direction above (policy same) · consecutive 3/3',
@@ -201,6 +221,28 @@ const alertBody = [
           <span class="title">dtk run --select api_error_rate</span>
         </div>
         <div class="body" set:html={logHtml}></div>
+      </div>
+    </section>
+
+    <!-- ===== AI-native onboarding ===== -->
+    <section class="wrap section">
+      <div class="eyebrow">dtk init-claude</div>
+      <h2>AI-native: build metrics with an assistant, out of the box.</h2>
+      <p class="sub">
+        One command sets up <a href="https://claude.com/claude-code">Claude Code</a> for your
+        project folder — a <code>CLAUDE.md</code>, a <code>.claude/rules/detectkit/</code> reference,
+        and a <code>dtk-new-metric</code> skill. Now an assistant writes metrics, tunes detectors and
+        wires up alerts with full knowledge of detectkit. Re-run it after an upgrade to refresh the
+        context.
+      </p>
+      <div class="term">
+        <div class="term-bar">
+          <span class="b" style="background:#E5675B"></span>
+          <span class="b" style="background:#E0A23B"></span>
+          <span class="b" style="background:#2E9E73"></span>
+          <span class="title">dtk init-claude</span>
+        </div>
+        <div class="body" set:html={claudeHtml}></div>
       </div>
     </section>
 

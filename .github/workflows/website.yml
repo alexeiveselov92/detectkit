@@ -6,6 +6,7 @@ on:
     paths:
       - 'website/**'
       - 'docs/**'
+      - '.claude/rules/**'
       - 'CHANGELOG.md'
       - '.github/workflows/website.yml'
   workflow_dispatch:

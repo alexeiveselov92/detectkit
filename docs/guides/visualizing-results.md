@@ -12,10 +12,13 @@ charts people most often want: the metric over time, the detector's confidence
 band, anomaly markers, anomaly counts, the latest value vs its expected range,
 and detector comparisons.
 
-> **Database note.** ClickHouse is the only implemented backend today, so the
-> examples use ClickHouse SQL. The *shape* of every query is portable; only a
-> few things are dialect-specific (date/time bucketing, interval literals, JSON
-> extraction). Those spots are called out inline with a portable alternative.
+> **Database note.** The examples use ClickHouse SQL, but detectkit runs on
+> ClickHouse, PostgreSQL and MySQL — the `_dtk_*` tables exist on all three. The
+> *shape* of every query is portable; only a few things are dialect-specific
+> (date/time bucketing, interval literals, JSON extraction, and dedup: ClickHouse
+> needs `FINAL` to collapse `ReplacingMergeTree` versions, while PostgreSQL/MySQL
+> enforce the primary key so a plain `SELECT` is already deduplicated). Those
+> spots are called out inline with a portable alternative.
 
 ## What's in the tables
 

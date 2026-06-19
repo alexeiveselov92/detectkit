@@ -49,7 +49,7 @@ class _MaintenanceMixin(_InternalTablesBase):
         counts: dict[str, int] = {}
         for table in METRIC_KEYED_TABLES:
             full_table_name = self._manager.get_full_table_name(table, use_internal=True)
-            query = f"SELECT count() AS cnt FROM {full_table_name} WHERE metric_name = %(m)s"
+            query = f"SELECT count(*) AS cnt FROM {full_table_name} WHERE metric_name = %(m)s"
             result = self._manager.execute_query(query, {"m": metric_name})
             counts[table] = int(result[0]["cnt"]) if result else 0
         return counts
@@ -57,13 +57,11 @@ class _MaintenanceMixin(_InternalTablesBase):
     def purge_metric(self, metric_name: str) -> None:
         """Delete every row for *metric_name* across all internal tables.
 
-        Each delete waits for its mutation (``SETTINGS mutations_sync = 1``)
-        so the purge is fully applied when this returns.
+        Each delete is issued synchronously (``sync=True``) so the purge is
+        fully applied when this returns.
         """
         for table in METRIC_KEYED_TABLES:
             full_table_name = self._manager.get_full_table_name(table, use_internal=True)
-            query = (
-                f"ALTER TABLE {full_table_name} DELETE WHERE metric_name = %(m)s "
-                f"SETTINGS mutations_sync = 1"
+            self._manager.delete_rows(
+                full_table_name, "metric_name = %(m)s", {"m": metric_name}, sync=True
             )
-            self._manager.execute_query(query, {"m": metric_name})

@@ -275,6 +275,62 @@ class BaseDatabaseManager(ABC):
         """
         pass
 
+    @abstractmethod
+    def delete_rows(
+        self,
+        table_name: str,
+        where_clause: str,
+        params: dict[str, Any] | None = None,
+        sync: bool = False,
+    ) -> int:
+        """
+        Delete rows matching a WHERE clause from a table.
+
+        This is the single generic delete primitive. It exists so that
+        higher-level code (InternalTablesManager) never has to write
+        backend-specific delete syntax: ClickHouse renders an
+        ``ALTER TABLE ... DELETE`` mutation, while SQL backends render a plain
+        ``DELETE FROM ... WHERE ...``.
+
+        Args:
+            table_name: Fully qualified table name to delete from
+            where_clause: SQL predicate placed after ``WHERE`` (may use
+                ``%(name)s`` placeholders resolved from ``params``)
+            params: Optional query parameters for the WHERE clause
+            sync: If True, wait for the delete to be fully applied before
+                returning. On ClickHouse this appends ``SETTINGS
+                mutations_sync = 1`` (async mutations are synchronous-on-request);
+                SQL backends are always synchronous so this is a no-op there.
+
+        Returns:
+            Number of rows deleted when the backend can report it (SQL
+            backends), else 0 (ClickHouse mutations do not return a count).
+
+        Example:
+            >>> manager.delete_rows(
+            ...     "detectk_internal._dtk_datapoints",
+            ...     "metric_name = %(m)s AND timestamp >= %(from)s",
+            ...     {"m": "cpu_usage", "from": dt},
+            ... )
+        """
+        pass
+
+    @property
+    def final_modifier(self) -> str:
+        """
+        SQL fragment appended after a table name to collapse duplicate versions
+        on read.
+
+        ClickHouse's ReplacingMergeTree may hold transient duplicate primary
+        keys until a background merge runs, so dedup reads append ``FINAL``.
+        Backends with an enforced unique primary key (PostgreSQL, MySQL) never
+        have duplicates, so this is the empty string for them.
+
+        Returns:
+            ``" FINAL"`` on ClickHouse, ``""`` (no modifier) by default.
+        """
+        return ""
+
     @property
     @abstractmethod
     def internal_location(self) -> str:
@@ -312,6 +368,23 @@ class BaseDatabaseManager(ABC):
             'analytics'
         """
         pass
+
+    def register_table(self, table_name: str, table_model: TableModel) -> None:
+        """
+        Register a table's schema (primary key, version column) with the manager.
+
+        Backends that need per-table schema knowledge on the insert path — to
+        build conflict handling / version-aware upserts — record it here. This is
+        called for every internal table on every run (even when the table already
+        exists, so the DDL step is skipped), so a fresh manager instance always
+        knows the schema. The default is a no-op (ClickHouse derives nothing from
+        it; dedup is handled by the table engine).
+
+        Args:
+            table_name: Fully qualified table name
+            table_model: Table schema definition
+        """
+        return None
 
     def get_full_table_name(self, table_name: str, use_internal: bool = True) -> str:
         """

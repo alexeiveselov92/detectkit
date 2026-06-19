@@ -56,6 +56,15 @@ export default defineConfig({
                 { label: 'Metrics', link: '/guides/configuration-metrics/' },
               ],
             },
+            {
+              label: 'Databases',
+              items: [
+                { label: 'Overview', link: '/guides/databases/' },
+                { label: 'ClickHouse', link: '/guides/databases-clickhouse/' },
+                { label: 'PostgreSQL', link: '/guides/databases-postgres/' },
+                { label: 'MySQL', link: '/guides/databases-mysql/' },
+              ],
+            },
             { label: 'Detectors', link: '/guides/detectors/' },
             {
               label: 'Alerting',

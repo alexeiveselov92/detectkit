@@ -47,6 +47,12 @@ class TableModel:
         engine: Database engine (ClickHouse-specific, e.g., "MergeTree")
         order_by: Columns for ORDER BY clause (ClickHouse-specific)
         indexes: Additional indexes to create
+        version_column: Column that drives last-writer-wins deduplication.
+            On ClickHouse this is the version encoded in the engine string
+            (e.g. ``ReplacingMergeTree(created_at)``); on SQL backends with an
+            enforced primary key it drives a version-aware upsert so a re-insert
+            with a newer ``version_column`` replaces the existing row. ``None``
+            for tables that do not deduplicate by version (e.g. ``_dtk_tasks``).
 
     Example:
         >>> model = TableModel(
@@ -65,6 +71,7 @@ class TableModel:
     engine: str | None = None
     order_by: list[str] | None = None
     indexes: list[str] = field(default_factory=list)
+    version_column: str | None = None
 
     def __post_init__(self):
         """Validate table model."""
@@ -85,6 +92,10 @@ class TableModel:
             for order_col in self.order_by:
                 if order_col not in column_names:
                     raise ValueError(f"ORDER BY column '{order_col}' not found in table columns")
+
+        # Validate version column exists (if specified)
+        if self.version_column and self.version_column not in column_names:
+            raise ValueError(f"Version column '{self.version_column}' not found in table columns")
 
     def get_column(self, name: str) -> ColumnDefinition | None:
         """

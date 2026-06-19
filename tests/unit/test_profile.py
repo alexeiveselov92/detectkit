@@ -107,8 +107,8 @@ class TestProfileConfig:
         except Exception as exc:
             pytest.skip(f"ClickHouse server not reachable: {exc}")
 
-    def test_unsupported_database_create_manager(self):
-        """Test error when creating manager for unsupported database."""
+    def test_postgres_requires_database(self):
+        """PostgreSQL profiles must declare the connect-target database."""
         profile = ProfileConfig(
             type="postgres",
             host="localhost",
@@ -117,8 +117,47 @@ class TestProfileConfig:
             data_schema="public",
         )
 
-        with pytest.raises(NotImplementedError, match="PostgreSQL support"):
+        with pytest.raises(ValueError, match="must set 'database'"):
             profile.create_manager()
+
+    def test_postgres_create_manager(self):
+        """PostgreSQL manager is built when a database is provided."""
+        profile = ProfileConfig(
+            type="postgres",
+            host="localhost",
+            port=5432,
+            database="detectkit",
+            internal_schema="detectk",
+            data_schema="public",
+        )
+
+        try:
+            manager = profile.create_manager()
+            assert manager is not None
+            manager.close()
+        except ImportError:
+            pytest.skip("psycopg2 not installed")
+        except Exception as exc:
+            pytest.skip(f"PostgreSQL server not reachable: {exc}")
+
+    def test_mysql_create_manager(self):
+        """MySQL manager is built from a profile (no NotImplementedError)."""
+        profile = ProfileConfig(
+            type="mysql",
+            host="localhost",
+            port=3306,
+            internal_database="detectk",
+            data_database="analytics",
+        )
+
+        try:
+            manager = profile.create_manager()
+            assert manager is not None
+            manager.close()
+        except ImportError:
+            pytest.skip("pymysql not installed")
+        except Exception as exc:
+            pytest.skip(f"MySQL server not reachable: {exc}")
 
 
 class TestProfilesConfig:

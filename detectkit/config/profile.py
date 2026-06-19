@@ -41,6 +41,13 @@ class ProfileConfig(BaseModel):
     user: str = Field(default="default", description="Database user")
     password: str = Field(default="", description="Database password")
 
+    # Connection-target database. Required for PostgreSQL (the database to
+    # connect to, inside which internal_schema/data_schema live); optional for
+    # MySQL; unused for ClickHouse.
+    database: str | None = Field(
+        default=None, description="Database to connect to (PostgreSQL/MySQL)"
+    )
+
     # Internal location for _dtk_* tables
     internal_database: str | None = Field(
         default=None, description="Database for internal tables (ClickHouse/MySQL)"
@@ -136,7 +143,9 @@ class ProfileConfig(BaseModel):
             Database manager instance
 
         Raises:
-            NotImplementedError: If database type not yet implemented
+            ValueError: If the database type is unsupported, or required
+                connection fields (e.g. PostgreSQL ``database``) are missing
+            ImportError: If the backend's driver is not installed
         """
         if self.type == "clickhouse":
             return ClickHouseDatabaseManager(
@@ -149,9 +158,36 @@ class ProfileConfig(BaseModel):
                 settings=self.settings,
             )
         elif self.type == "postgres":
-            raise NotImplementedError("PostgreSQL support coming soon")
+            from detectkit.database.postgres_manager import PostgresDatabaseManager
+
+            if not self.database:
+                raise ValueError(
+                    "PostgreSQL profiles must set 'database' (the database to "
+                    "connect to, inside which internal_schema/data_schema live)"
+                )
+            return PostgresDatabaseManager(
+                host=self.host,
+                port=self.port,
+                user=self.user,
+                password=self.password,
+                database=self.database,
+                internal_schema=self.get_internal_location(),
+                data_schema=self.get_data_location(),
+                settings=self.settings,
+            )
         elif self.type == "mysql":
-            raise NotImplementedError("MySQL support coming soon")
+            from detectkit.database.mysql_manager import MySQLDatabaseManager
+
+            return MySQLDatabaseManager(
+                host=self.host,
+                port=self.port,
+                user=self.user,
+                password=self.password,
+                database=self.database,
+                internal_database=self.get_internal_location(),
+                data_database=self.get_data_location(),
+                settings=self.settings,
+            )
         else:
             raise ValueError(f"Unsupported database type: {self.type}")
 

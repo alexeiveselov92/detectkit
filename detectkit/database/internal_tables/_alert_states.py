@@ -2,8 +2,9 @@
 
 Each row tracks per-(metric, alert_config) state used by the alerting
 orchestrator: the last sent alert/recovery timestamps and a running
-counter. Reads use ``FINAL`` to collapse ReplacingMergeTree versions;
-writes go through DELETE+INSERT so updates are immediately visible.
+counter. Reads append the backend's dedup modifier (``FINAL`` on ClickHouse,
+nothing on SQL backends with an enforced primary key); writes go through the
+generic ``upsert_record`` so updates are immediately visible on every backend.
 """
 
 from __future__ import annotations
@@ -27,8 +28,7 @@ class _AlertStatesMixin(_InternalTablesBase):
         full_table_name = self._manager.get_full_table_name(TABLE_ALERT_STATES, use_internal=True)
         query = f"""
         SELECT last_alert_sent, last_recovery_sent, alert_count
-        FROM {full_table_name}
-        FINAL
+        FROM {full_table_name}{self._manager.final_modifier}
         WHERE metric_name = %(metric_name)s
           AND alert_config_id = %(alert_config_id)s
         LIMIT 1
@@ -80,20 +80,6 @@ class _AlertStatesMixin(_InternalTablesBase):
             existing["alert_count"] + 1 if increment_count else existing["alert_count"]
         )
 
-        delete_query = f"""
-        ALTER TABLE {full_table_name}
-        DELETE WHERE metric_name = %(metric_name)s
-          AND alert_config_id = %(alert_config_id)s
-        SETTINGS mutations_sync = 1
-        """
-        self._manager.execute_query(
-            delete_query,
-            params={
-                "metric_name": metric_name,
-                "alert_config_id": alert_config_id,
-            },
-        )
-
         now = now_utc_naive()
         insert_data = {
             "metric_name": np.array([metric_name]),
@@ -111,7 +97,11 @@ class _AlertStatesMixin(_InternalTablesBase):
             "alert_count": np.array([new_alert_count], dtype=np.uint32),
             "updated_at": np.array([now], dtype="datetime64[ms]"),
         }
-        self._manager.insert_batch(full_table_name, insert_data, conflict_strategy="ignore")
+        self._manager.upsert_record(
+            full_table_name,
+            key_columns={"metric_name": metric_name, "alert_config_id": alert_config_id},
+            data=insert_data,
+        )
 
     def list_alert_config_ids(self, metric_name: str) -> list[str]:
         """Return every ``alert_config_id`` with stored state for a metric.
@@ -132,17 +122,12 @@ class _AlertStatesMixin(_InternalTablesBase):
     def delete_alert_state(self, metric_name: str, alert_config_id: str) -> int:
         """Delete the alert-state row for a single ``(metric, alert_config)``."""
         full_table_name = self._manager.get_full_table_name(TABLE_ALERT_STATES, use_internal=True)
-        query = f"""
-        ALTER TABLE {full_table_name}
-        DELETE WHERE metric_name = %(metric_name)s
-          AND alert_config_id = %(alert_config_id)s
-        SETTINGS mutations_sync = 1
-        """
-        self._manager.execute_query(
-            query,
-            params={"metric_name": metric_name, "alert_config_id": alert_config_id},
+        return self._manager.delete_rows(
+            full_table_name,
+            "metric_name = %(metric_name)s AND alert_config_id = %(alert_config_id)s",
+            {"metric_name": metric_name, "alert_config_id": alert_config_id},
+            sync=True,
         )
-        return 0
 
     def get_last_alert_timestamp(
         self,

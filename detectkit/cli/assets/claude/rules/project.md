@@ -78,11 +78,11 @@ alert_channels:
 
 ### Database profiles
 
-> ClickHouse is the only implemented backend today. PostgreSQL and MySQL are
-> planned — their profiles validate, but creating a manager raises
-> `NotImplementedError("... coming soon")`.
+> ClickHouse, PostgreSQL and MySQL are all fully supported. ClickHouse/MySQL use
+> two *databases*; PostgreSQL connects to one `database` and uses two *schemas*.
+> `dtk init --db-type {clickhouse,postgres,mysql}` scaffolds the right shape.
 
-**ClickHouse** (priority backend):
+**ClickHouse**:
 ```yaml
 profiles:
   prod:
@@ -98,36 +98,34 @@ profiles:
       max_memory_usage: 10000000000
 ```
 
-**PostgreSQL** (planned, not yet implemented):
+**PostgreSQL** (connect to `database`, tables in schemas):
 ```yaml
 profiles:
   prod:
     type: postgres
     host: localhost
     port: 5432
-    database: analytics            # required
+    database: detectkit            # required — must already exist
     user: postgres
     password: "..."
-    internal_schema: detectkit     # required — _dtk_* tables
+    internal_schema: detectkit     # required — _dtk_* tables (auto-created)
     data_schema: public            # required — data queries
-    pool_size: 5                   # optional
-    max_overflow: 10               # optional
+    settings: {}                   # optional — extra psycopg2.connect kwargs
 ```
 
-**MySQL** (planned, not yet implemented):
+**MySQL** (8.0+; two databases):
 ```yaml
 profiles:
   prod:
     type: mysql
     host: localhost
     port: 3306
-    database: analytics            # required
     user: root
     password: "..."
-    internal_database: detectkit   # required
+    internal_database: detectkit   # required — _dtk_* tables (auto-created)
     data_database: analytics       # required
-    charset: utf8mb4               # optional
-    autocommit: true               # optional
+    database: analytics            # optional — default db for the connection
+    settings: {}                   # optional — extra pymysql.connect kwargs
 ```
 
 ### Alert channels
@@ -185,12 +183,12 @@ alert_channels:
 ## Notes
 
 - **First-run setup:** the `profiles.yml` that `dtk init` writes is a
-  placeholder — its `dev` profile points `internal_database` / `data_database`
-  at example values (`detectkit` / `default`) on `localhost`. Edit the host,
-  credentials and both database names to match your environment before running
-  (the **`dtk-setup-project`** skill walks this). There is no `database:` field —
-  ClickHouse needs both `internal_database` and `data_database`, or the run
-  raises `internal_database must be set for ClickHouse`.
+  placeholder scaffolded for `--db-type` (default ClickHouse) — its `dev`
+  profile points the location fields at example values on `localhost`. Edit the
+  host, credentials and location names to match your environment before running
+  (the **`dtk-setup-project`** skill walks this). ClickHouse/MySQL use
+  `internal_database` / `data_database` (no `database:` field on ClickHouse);
+  PostgreSQL connects to a `database` and uses `internal_schema` / `data_schema`.
 - `dtk run` (without `--profile`) uses the `default_profile` declared in
   **`profiles.yml`**; the `default_profile` in `detectkit_project.yml` is not
   read at runtime — keep them in sync to avoid confusion.

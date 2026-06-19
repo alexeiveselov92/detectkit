@@ -315,6 +315,74 @@
   margin: 0;
 }
 
+/* ---------- works-with databases (brand logos) ---------- */
+.db-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 32px;
+  padding: 22px 0;
+  border-top: 1px solid var(--border);
+}
+.db-strip-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+  font-weight: 600;
+}
+.db-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 28px;
+}
+.db-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--db-name);
+}
+.db-chip {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--db-chip);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.db-chip svg {
+  width: 17px;
+  height: 17px;
+}
+@media (max-width: 640px) {
+  .db-strip {
+    gap: 14px;
+  }
+  .db-badges {
+    gap: 16px;
+  }
+  .db-badge {
+    gap: 6px;
+    font-size: 12.5px;
+  }
+  .db-chip {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+  }
+  .db-chip svg {
+    width: 13px;
+    height: 13px;
+  }
+}
+
 /* ---------- detectors ---------- */
 .det-grid {
   display: grid;

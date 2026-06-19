@@ -1,9 +1,15 @@
 """Integration-test fixtures.
 
-Spins up a real ClickHouse server in Docker (via ``testcontainers``) so
-the suite can exercise the database layer end-to-end. The whole module
-is skipped when ``testcontainers`` or Docker is unavailable, which keeps
-``pytest -m "not integration"`` working in environments without Docker.
+Spins up real ClickHouse, PostgreSQL, and MySQL servers in Docker (via
+``testcontainers``) so the database layer is exercised end-to-end against every
+supported backend. The whole module is skipped when ``testcontainers`` or Docker
+is unavailable, which keeps ``pytest -m "not integration"`` working in
+environments without Docker. Each per-backend container fixture additionally
+``importorskip``s its own ``testcontainers`` submodule, so a backend whose extra
+is not installed is skipped individually rather than failing the suite.
+
+The ``internal_tables`` fixture is parametrized over the three backends, so every
+``test_*_e2e`` assertion runs against ClickHouse, PostgreSQL, and MySQL.
 """
 
 from __future__ import annotations
@@ -17,10 +23,7 @@ import pytest
 # main CI job (``-m "not integration"``) skips them by default.
 pytestmark = pytest.mark.integration
 
-testcontainers = pytest.importorskip(
-    "testcontainers.clickhouse",
-    reason="install testcontainers[clickhouse] to run integration tests",
-)
+pytest.importorskip("testcontainers", reason="install the 'integration' extra to run these tests")
 
 
 def _docker_available() -> bool:
@@ -41,12 +44,13 @@ if not _docker_available():  # pragma: no cover - environment dependent
     )
 
 
+# ── per-backend containers (session-scoped, started lazily) ──────────────────
+
+
 @pytest.fixture(scope="session")
 def clickhouse_container() -> Iterator:
-    """Run a single ClickHouse container for the whole session."""
-    from testcontainers.clickhouse import ClickHouseContainer
-
-    container = ClickHouseContainer("clickhouse/clickhouse-server:24.3")
+    cc = pytest.importorskip("testcontainers.clickhouse")
+    container = cc.ClickHouseContainer("clickhouse/clickhouse-server:24.3")
     container.start()
     try:
         yield container
@@ -54,19 +58,74 @@ def clickhouse_container() -> Iterator:
         container.stop()
 
 
-@pytest.fixture()
-def clickhouse_manager(clickhouse_container):
-    """Hand each test a fresh ``ClickHouseDatabaseManager`` instance."""
-    from detectkit.database.clickhouse_manager import ClickHouseDatabaseManager
+@pytest.fixture(scope="session")
+def postgres_container() -> Iterator:
+    pc = pytest.importorskip("testcontainers.postgres")
+    container = pc.PostgresContainer("postgres:16")
+    container.start()
+    try:
+        yield container
+    finally:
+        container.stop()
 
-    manager = ClickHouseDatabaseManager(
-        host=clickhouse_container.get_container_host_ip(),
-        port=int(clickhouse_container.get_exposed_port(9000)),
-        user=clickhouse_container.username,
-        password=clickhouse_container.password,
-        internal_database="detectkit_internal_it",
-        data_database="detectkit_data_it",
-    )
+
+@pytest.fixture(scope="session")
+def mysql_container() -> Iterator:
+    mc = pytest.importorskip("testcontainers.mysql")
+    # Connect as root so the manager may CREATE DATABASE for its locations.
+    container = mc.MySqlContainer("mysql:8.0", username="root", password="testpwd")
+    container.start()
+    try:
+        yield container
+    finally:
+        container.stop()
+
+
+# ── parametrized manager / internal-tables fixtures ──────────────────────────
+
+
+@pytest.fixture(params=["clickhouse", "postgres", "mysql"])
+def db_manager(request):
+    """A fresh database manager per backend (parametrized)."""
+    backend = request.param
+    container = request.getfixturevalue(f"{backend}_container")
+    host = container.get_container_host_ip()
+
+    if backend == "clickhouse":
+        from detectkit.database.clickhouse_manager import ClickHouseDatabaseManager
+
+        manager = ClickHouseDatabaseManager(
+            host=host,
+            port=int(container.get_exposed_port(9000)),
+            user=container.username,
+            password=container.password,
+            internal_database="detectkit_internal_it",
+            data_database="detectkit_data_it",
+        )
+    elif backend == "postgres":
+        from detectkit.database.postgres_manager import PostgresDatabaseManager
+
+        manager = PostgresDatabaseManager(
+            host=host,
+            port=int(container.get_exposed_port(5432)),
+            user=container.username,
+            password=container.password,
+            database=container.dbname,
+            internal_schema="detectkit_internal_it",
+            data_schema="detectkit_data_it",
+        )
+    else:  # mysql
+        from detectkit.database.mysql_manager import MySQLDatabaseManager
+
+        manager = MySQLDatabaseManager(
+            host=host,
+            port=int(container.get_exposed_port(3306)),
+            user=container.username,
+            password=container.password,
+            internal_database="detectkit_internal_it",
+            data_database="detectkit_data_it",
+        )
+
     try:
         yield manager
     finally:
@@ -74,10 +133,10 @@ def clickhouse_manager(clickhouse_container):
 
 
 @pytest.fixture()
-def internal_tables(clickhouse_manager):
-    """Provision the ``_dtk_*`` tables for the test."""
+def internal_tables(db_manager):
+    """Provision the ``_dtk_*`` tables on the active backend for the test."""
     from detectkit.database.internal_tables import InternalTablesManager
 
-    internal = InternalTablesManager(clickhouse_manager)
+    internal = InternalTablesManager(db_manager)
     internal.ensure_tables()
     return internal

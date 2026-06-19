@@ -69,7 +69,9 @@ dev = [
 ]
 # Integration tests (require Docker)
 integration = [
-    "testcontainers[clickhouse]>=4.0",
+    "testcontainers[clickhouse,postgres,mysql]>=4.0",
+    "psycopg2-binary>=2.9.0",
+    "pymysql>=1.0.0",
 ]
 
 [project.scripts]
@@ -148,6 +150,8 @@ module = [
     "clickhouse_driver.*",
     "orjson.*",
     "requests.*",
+    "psycopg2.*",
+    "pymysql.*",
 ]
 ignore_missing_imports = true
 

@@ -48,14 +48,15 @@ class TestListDetectorIds:
 class TestDeleteDetectionsSync:
     def test_no_sync_by_default(self, internal_manager, mock_manager):
         internal_manager.delete_detections("cpu_usage", detector_id="abc")
-        query = mock_manager.execute_query.call_args[0][0]
-        assert "mutations_sync" not in query
+        # Deletes go through the generic delete_rows primitive, not raw SQL.
+        assert mock_manager.delete_rows.call_args.kwargs["sync"] is False
 
     def test_sync_appends_settings(self, internal_manager, mock_manager):
         internal_manager.delete_detections("cpu_usage", detector_id="abc", mutations_sync=True)
-        query = mock_manager.execute_query.call_args[0][0]
-        assert "SETTINGS mutations_sync = 1" in query
-        assert "detector_id = %(detector_id)s" in query
+        table, where_clause = mock_manager.delete_rows.call_args[0][:2]
+        assert TABLE_DETECTIONS in table
+        assert mock_manager.delete_rows.call_args.kwargs["sync"] is True
+        assert "detector_id = %(detector_id)s" in where_clause
 
 
 class TestAlertStateHelpers:
@@ -68,12 +69,10 @@ class TestAlertStateHelpers:
 
     def test_delete_alert_state(self, internal_manager, mock_manager):
         internal_manager.delete_alert_state("cpu_usage", "a1")
-        query, params = (
-            mock_manager.execute_query.call_args[0][0],
-            mock_manager.execute_query.call_args[1]["params"],
-        )
-        assert TABLE_ALERT_STATES in query
-        assert "SETTINGS mutations_sync = 1" in query
+        table, where_clause, params = mock_manager.delete_rows.call_args[0][:3]
+        assert TABLE_ALERT_STATES in table
+        assert mock_manager.delete_rows.call_args.kwargs["sync"] is True
+        assert "metric_name = %(metric_name)s" in where_clause
         assert params == {"metric_name": "cpu_usage", "alert_config_id": "a1"}
 
 
@@ -102,10 +101,10 @@ class TestMaintenanceHelpers:
 
     def test_purge_metric_deletes_every_table(self, internal_manager, mock_manager):
         internal_manager.purge_metric("gone")
-        assert mock_manager.execute_query.call_count == len(METRIC_KEYED_TABLES)
-        for call in mock_manager.execute_query.call_args_list:
-            assert "DELETE WHERE metric_name = %(m)s" in call[0][0]
-            assert "SETTINGS mutations_sync = 1" in call[0][0]
+        assert mock_manager.delete_rows.call_count == len(METRIC_KEYED_TABLES)
+        for call in mock_manager.delete_rows.call_args_list:
+            assert "metric_name = %(m)s" in call[0][1]
+            assert call.kwargs["sync"] is True
 
 
 # ── valid-hash helpers (use the real factory / hashing) ──────────────────────

@@ -3,9 +3,9 @@
 detectkit is a Python library and CLI (`dtk`) for monitoring time-series
 metrics with automatic anomaly detection and multi-channel alerting. It is
 **dbt-like**: metrics live as YAML + SQL in a project directory, and you run
-them with one command. Core logic is pure numpy (no pandas). **ClickHouse is
-the only implemented backend today**; PostgreSQL and MySQL are planned (their
-profiles validate but creating a manager raises `NotImplementedError`).
+them with one command. Core logic is pure numpy (no pandas). **ClickHouse,
+PostgreSQL and MySQL are all fully supported** — only the connection and the SQL
+dialect of your metric queries differ between them.
 
 ## The pipeline: load → detect → alert
 

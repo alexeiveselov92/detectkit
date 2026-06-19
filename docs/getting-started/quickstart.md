@@ -103,13 +103,12 @@ profiles:
 > `data_database`, or the run fails with `internal_database must be set for
 > ClickHouse`.)
 
+> **Tip:** `dtk init --db-type postgres` (or `mysql`) scaffolds `profiles.yml`
+> with the right fields for that backend from the start.
+
 ### PostgreSQL Example
 
-> **Not yet implemented.** PostgreSQL and MySQL are planned but not wired up
-> yet — selecting `type: postgres` or `type: mysql` raises
-> `PostgreSQL support coming soon` / `MySQL support coming soon`. **ClickHouse
-> is the only supported backend today.** The example below shows the intended
-> shape for when it lands.
+PostgreSQL connects to a `database` (must already exist) and uses **schemas**:
 
 ```yaml
 profiles:
@@ -119,10 +118,29 @@ profiles:
     port: 5432
     user: postgres
     password: "your_password"
-    database: analytics
-    internal_schema: detectkit
+    database: detectkit         # must already exist
+    internal_schema: detectkit  # auto-created
     data_schema: public
 ```
+
+### MySQL Example
+
+MySQL (8.0+) uses **databases** (auto-created):
+
+```yaml
+profiles:
+  prod:
+    type: mysql
+    host: localhost
+    port: 3306
+    user: root
+    password: "your_password"
+    internal_database: detectkit
+    data_database: analytics
+```
+
+See the [Databases guide](../guides/databases.md) for the full per-backend
+breakdown (install extras, connection fields, SQL dialect).
 
 ## Step 3: Create Your First Metric
 

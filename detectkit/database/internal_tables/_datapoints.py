@@ -124,7 +124,11 @@ class _DatapointsMixin(_InternalTablesBase):
         from_timestamp: datetime | None = None,
         to_timestamp: datetime | None = None,
     ) -> int:
-        """Issue an ``ALTER TABLE ... DELETE`` over the matching range."""
+        """Delete datapoints for *metric_name* over the matching range.
+
+        Returns the number of rows deleted when the backend reports it (SQL
+        backends); ClickHouse mutations are asynchronous and report 0.
+        """
         full_table_name = self._manager.get_full_table_name(TABLE_DATAPOINTS, use_internal=True)
 
         where_parts = ["metric_name = %(metric_name)s"]
@@ -136,7 +140,4 @@ class _DatapointsMixin(_InternalTablesBase):
             where_parts.append("timestamp < %(to_timestamp)s")
             params["to_timestamp"] = to_timestamp
 
-        query = f"ALTER TABLE {full_table_name} DELETE WHERE {' AND '.join(where_parts)}"
-        self._manager.execute_query(query, params=params)
-        # ClickHouse mutation is async; row count is unavailable
-        return 0
+        return self._manager.delete_rows(full_table_name, " AND ".join(where_parts), params)

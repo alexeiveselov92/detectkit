@@ -5,6 +5,40 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-06-20
+
+### Added
+- **PostgreSQL and MySQL are now fully supported backends.** detectkit's
+  database-agnostic architecture is realized end to end: ClickHouse, PostgreSQL
+  (12+) and MySQL (8.0+) all run the complete `load → detect → alert` pipeline.
+  Only the connection and the SQL dialect of your metric queries differ —
+  detectors, alerting, the CLI and the project layout are identical.
+  - `PostgresDatabaseManager` (`detectkit[postgres]`, psycopg2) — connects to a
+    `database` and stores tables in **schemas** (`CREATE SCHEMA IF NOT EXISTS`).
+  - `MySQLDatabaseManager` (`detectkit[mysql]`, pymysql) — uses **databases**
+    (`CREATE DATABASE IF NOT EXISTS`); requires MySQL 8.0+.
+  - Both share a new `SQLDatabaseManager` base that renders DDL with an enforced
+    `PRIMARY KEY`, maps the abstract column types per dialect, and reproduces
+    ClickHouse's `ReplacingMergeTree` last-writer-wins dedup with a **version-aware
+    upsert** (`ON CONFLICT DO UPDATE` / `ON DUPLICATE KEY UPDATE`).
+- **`dtk init --db-type {clickhouse,postgres,mysql}`** scaffolds `profiles.yml`
+  and the example metric query for the chosen backend (default: `clickhouse`).
+- **New `database` profile field** — the connect-target database, required for
+  PostgreSQL (the database inside which the schemas live).
+- **Per-database documentation** — a new **Databases** section in the docs
+  (overview + ClickHouse / PostgreSQL / MySQL pages) covering install extras,
+  `profiles.yml` shape, connection fields and SQL dialect per backend; plus a
+  "Works with" database badge row on the landing page.
+
+### Changed
+- The shared `InternalTablesManager` layer is now genuinely backend-neutral: a
+  generic `delete_rows()` primitive and a `final_modifier` dedup-read hook replace
+  the ClickHouse-only `ALTER TABLE … DELETE` / `FINAL` / `count()` SQL that
+  previously leaked through `execute_query`. `TableModel` gained an explicit
+  `version_column`. ClickHouse behavior is unchanged.
+- `ProfileConfig.create_manager()` no longer raises `NotImplementedError` for
+  `postgres` / `mysql`.
+
 ## [0.10.0] - 2026-06-19
 
 ### Added

@@ -296,6 +296,37 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
 
         return None
 
+    def delete_rows(
+        self,
+        table_name: str,
+        where_clause: str,
+        params: dict[str, Any] | None = None,
+        sync: bool = False,
+    ) -> int:
+        """
+        Delete rows via a ClickHouse ``ALTER TABLE ... DELETE`` mutation.
+
+        Args:
+            table_name: Fully qualified table name
+            where_clause: SQL predicate placed after ``WHERE``
+            params: Optional query parameters
+            sync: If True, append ``SETTINGS mutations_sync = 1`` so the
+                mutation is fully applied before returning.
+
+        Returns:
+            0 — ClickHouse mutations are asynchronous and do not report a count.
+        """
+        query = f"ALTER TABLE {table_name} DELETE WHERE {where_clause}"
+        if sync:
+            query += " SETTINGS mutations_sync = 1"
+        self._client.execute(query, params or {})
+        return 0
+
+    @property
+    def final_modifier(self) -> str:
+        """ClickHouse collapses ReplacingMergeTree versions on read with FINAL."""
+        return " FINAL"
+
     def upsert_task_status(
         self,
         metric_name: str,
@@ -328,21 +359,17 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         now = now_utc_naive()
 
         # Delete existing record (if any), sync to ensure old row is gone before insert
-        delete_query = f"""
-        ALTER TABLE {full_table}
-        DELETE WHERE metric_name = %(metric_name)s
-          AND detector_id = %(detector_id)s
-          AND process_type = %(process_type)s
-        SETTINGS mutations_sync = 1
-        """
-
-        self._client.execute(
-            delete_query,
+        self.delete_rows(
+            full_table,
+            "metric_name = %(metric_name)s "
+            "AND detector_id = %(detector_id)s "
+            "AND process_type = %(process_type)s",
             {
                 "metric_name": metric_name,
                 "detector_id": detector_id,
                 "process_type": process_type,
             },
+            sync=True,
         )
 
         last_ts_naive = to_naive_utc(last_processed_timestamp)
@@ -388,12 +415,7 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         """
         # Step 1: DELETE existing record (if any)
         where_parts = [f"{col} = %({col})s" for col in key_columns.keys()]
-        delete_query = f"""
-        ALTER TABLE {table_name}
-        DELETE WHERE {' AND '.join(where_parts)}
-        """
-
-        self._client.execute(delete_query, key_columns)
+        self.delete_rows(table_name, " AND ".join(where_parts), dict(key_columns))
 
         # Step 2: INSERT new record
         return self.insert_batch(table_name, data, conflict_strategy="ignore")

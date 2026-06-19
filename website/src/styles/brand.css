@@ -1,0 +1,78 @@
+/*
+ * detectkit brand theme — derived verbatim from the brand guide
+ * (website/brand/Detectkit Brand.dc.html). Applies to the Starlight docs.
+ * The marketing landing reuses the brand tokens below directly.
+ */
+
+:root {
+  /* ----- brand tokens (theme-independent; used by the landing too) ----- */
+  --clay: #d15b36;
+  --clay-700: #b4471f;
+  --ink: #1b1916;
+  --muted: #6e675b;
+  --faint: #9a9384;
+  --paper: #f5f1e8;
+  --surface: #fbf9f3;
+  --border: #e6e0d4;
+  --term-bg: #211e1a;
+  --term-border: #332f29;
+  --term-text: #c9c2b4;
+  /* status semantics (verbatim from webhook.py) */
+  --st-recovery: #36a64f;
+  --st-nodata: #f0ad4e;
+  --st-anomaly: #d63232;
+  --st-error: #5a7a8c;
+  --accent-green: #2e9e73;
+
+  /* ----- fonts ----- */
+  --sl-font: 'Schibsted Grotesk', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --sl-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ===== Dark theme (Starlight default) ===== */
+:root {
+  --sl-color-accent-low: #46190e;
+  --sl-color-accent: #d15b36;
+  --sl-color-accent-high: #f0b9a6;
+  --sl-color-white: #fbf9f3;
+  --sl-color-gray-1: #ece7db;
+  --sl-color-gray-2: #c9c2b4;
+  --sl-color-gray-3: #9a9384;
+  --sl-color-gray-4: #6e675b;
+  --sl-color-gray-5: #403b34;
+  --sl-color-gray-6: #2a2620;
+  --sl-color-black: #1b1916;
+
+  --sl-color-bg-nav: #211e1a;
+  --sl-color-bg-sidebar: #211e1a;
+  --sl-color-hairline: #332f29;
+  --sl-color-hairline-light: #332f29;
+  --sl-color-hairline-shade: #26231f;
+}
+
+/* ===== Light theme (warm paper) ===== */
+:root[data-theme='light'] {
+  --sl-color-accent-low: #f7ddd2;
+  --sl-color-accent: #c14e2b;
+  --sl-color-accent-high: #7a2f17;
+  --sl-color-white: #1b1916;
+  --sl-color-gray-1: #2b2823;
+  --sl-color-gray-2: #454039;
+  --sl-color-gray-3: #6e675b;
+  --sl-color-gray-4: #8a8373;
+  --sl-color-gray-5: #cfc8b8;
+  --sl-color-gray-6: #ece6da;
+  --sl-color-black: #f5f1e8;
+
+  --sl-color-bg-nav: #fbf9f3;
+  --sl-color-bg-sidebar: #fbf9f3;
+  --sl-color-hairline: #e6e0d4;
+  --sl-color-hairline-light: #e6e0d4;
+  --sl-color-hairline-shade: #efeadf;
+}
+
+/* Wordmark in the header: tighten like the brand lockup. */
+.site-title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}

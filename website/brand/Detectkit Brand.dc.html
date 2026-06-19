@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:#F5F1E8;color:#1B1916;font-family:'Schibsted Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  ::selection{background:#D15B36;color:#FBF9F3}
+</style>
+</helmet>
+
+<div style="max-width:1180px;margin:0 auto;padding:0 32px 120px">
+
+  <!-- ============ COVER ============ -->
+  <section data-screen-label="Cover" style="padding:84px 0 56px;border-bottom:1px solid #E6E0D4">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:64px">
+      <svg width="34" height="34" viewBox="0 0 100 100" aria-hidden="true"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+      <span style="font-size:21px;font-weight:700;letter-spacing:-.02em">detectkit</span>
+      <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:12px;color:#9A9384;letter-spacing:.02em">brand system · v0.1</span>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:#D15B36;font-weight:600;margin-bottom:22px">Identity &amp; design direction</div>
+    <h1 style="font-size:72px;line-height:.98;letter-spacing:-.035em;font-weight:800;margin:0 0 28px;max-width:14ch">A signal you can trust.</h1>
+    <p style="font-size:20px;line-height:1.5;color:#6E675B;max-width:60ch;margin:0">{{ coverLede }}</p>
+
+    <div style="display:flex;gap:0;margin-top:64px;border:1px solid #E6E0D4;border-radius:14px;overflow:hidden;background:#FBF9F3">
+      <div style="flex:1;padding:24px 26px;border-right:1px solid #E6E0D4">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9A9384;margin-bottom:10px">Principles</div>
+        <div style="font-size:15.5px;line-height:1.5;color:#1B1916;font-weight:500">Simple · Clear · Light · Recognizable</div>
+      </div>
+      <div style="flex:1;padding:24px 26px;border-right:1px solid #E6E0D4">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9A9384;margin-bottom:10px">Character</div>
+        <div style="font-size:15.5px;line-height:1.5;color:#1B1916;font-weight:500">Engineering, calm — warm minimalism</div>
+      </div>
+      <div style="flex:1;padding:24px 26px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9A9384;margin-bottom:10px">References</div>
+        <div style="font-size:15.5px;line-height:1.5;color:#1B1916;font-weight:500">dbt — structure · Claude — warmth &amp; tone</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LOGO CONCEPTS ============ -->
+  <section data-screen-label="Logo concepts" style="padding:72px 0 0">
+    <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:8px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;font-weight:600">01</div>
+      <h2 style="font-size:34px;letter-spacing:-.025em;font-weight:700;margin:0">Finding the mark</h2>
+    </div>
+    <p style="font-size:17px;line-height:1.5;color:#6E675B;max-width:62ch;margin:0 0 40px">Five directions around the core idea — <strong style="color:#1B1916;font-weight:600">detect</strong>: catch an anomaly in a stream of metrics. From a literal spike to a reticle and a monogram.</p>
+
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:18px">
+
+      <!-- 1 Spike (chosen) -->
+      <div style="background:#FBF9F3;border:2px solid #D15B36;border-radius:14px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:18px;position:relative">
+        <span style="position:absolute;top:10px;right:10px;font-family:'JetBrains Mono',monospace;font-size:9px;background:#D15B36;color:#FBF9F3;padding:2px 6px;border-radius:5px;letter-spacing:.04em">CHOSEN</span>
+        <svg width="76" height="76" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+        <div style="text-align:center"><div style="font-size:14px;font-weight:600">Spike</div><div style="font-size:12px;color:#9A9384;margin-top:2px">anomaly in the line</div></div>
+      </div>
+
+      <!-- 2 Reticle -->
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:14px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:18px;opacity:.7">
+        <svg width="76" height="76" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="none" stroke="#D15B36" stroke-width="5"/><circle cx="50" cy="50" r="24" fill="none" stroke="#D15B36" stroke-width="5"/><line x1="50" y1="14" x2="50" y2="30" stroke="#D15B36" stroke-width="5" stroke-linecap="round"/><line x1="50" y1="70" x2="50" y2="86" stroke="#D15B36" stroke-width="5" stroke-linecap="round"/><line x1="14" y1="50" x2="30" y2="50" stroke="#D15B36" stroke-width="5" stroke-linecap="round"/><line x1="70" y1="50" x2="86" y2="50" stroke="#D15B36" stroke-width="5" stroke-linecap="round"/><circle cx="62" cy="40" r="6.5" fill="#D15B36"/></svg>
+        <div style="text-align:center"><div style="font-size:14px;font-weight:600">Reticle</div><div style="font-size:12px;color:#9A9384;margin-top:2px">aim, detector</div></div>
+      </div>
+
+      <!-- 3 Bounds -->
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:14px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:18px;opacity:.7">
+        <svg width="76" height="76" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#1B1916"/><line x1="20" y1="38" x2="80" y2="38" stroke="#7C766A" stroke-width="5" stroke-linecap="round" stroke-dasharray="3 11"/><line x1="20" y1="70" x2="80" y2="70" stroke="#7C766A" stroke-width="5" stroke-linecap="round" stroke-dasharray="3 11"/><polyline points="20,58 38,60 50,55 62,22 80,50" fill="none" stroke="#D15B36" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="62" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+        <div style="text-align:center"><div style="font-size:14px;font-weight:600">Bounds</div><div style="font-size:12px;color:#9A9384;margin-top:2px">breaking the band</div></div>
+      </div>
+
+      <!-- 4 Monogram -->
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:14px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:18px;opacity:.7">
+        <svg width="76" height="76" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><circle cx="44" cy="58" r="20" fill="none" stroke="#FBF9F3" stroke-width="8"/><path d="M64 20 L64 78" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round"/><circle cx="64" cy="38" r="7.5" fill="#D15B36"/></svg>
+        <div style="text-align:center"><div style="font-size:14px;font-weight:600">Monogram</div><div style="font-size:12px;color:#9A9384;margin-top:2px">the “d”</div></div>
+      </div>
+
+      <!-- 5 Bars -->
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:14px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;gap:18px;opacity:.7">
+        <svg width="76" height="76" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="none" stroke="#D15B36" stroke-width="5"/><rect x="22" y="58" width="11" height="22" rx="5.5" fill="#D9C5B0"/><rect x="38" y="50" width="11" height="30" rx="5.5" fill="#D9C5B0"/><rect x="54" y="20" width="11" height="60" rx="5.5" fill="#D15B36"/><rect x="70" y="54" width="11" height="26" rx="5.5" fill="#D9C5B0"/></svg>
+        <div style="text-align:center"><div style="font-size:14px;font-weight:600">Bars</div><div style="font-size:12px;color:#9A9384;margin-top:2px">peak in the distribution</div></div>
+      </div>
+    </div>
+    <p style="font-size:14px;color:#9A9384;margin:22px 0 0;font-family:'JetBrains Mono',monospace">→ chosen: <span style="color:#D15B36">Spike — anomaly in the line</span>. Legible at 24px, works as an avatar tile, a direct metaphor for catching an outlier.</p>
+  </section>
+
+  <!-- ============ PRIMARY MARK ============ -->
+  <section data-screen-label="Primary mark" style="padding:72px 0 0">
+    <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:40px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;font-weight:600">02</div>
+      <h2 style="font-size:34px;letter-spacing:-.025em;font-weight:700;margin:0">Primary mark</h2>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:24px;align-items:stretch">
+      <!-- hero mark -->
+      <div style="background:#1B1916;border-radius:18px;padding:56px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+        <div style="position:absolute;inset:0;background-image:linear-gradient(#FFFFFF0D 1px,transparent 1px),linear-gradient(90deg,#FFFFFF0D 1px,transparent 1px);background-size:32px 32px"></div>
+        <svg width="220" height="220" viewBox="0 0 100 100" style="position:relative"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+      </div>
+      <!-- construction -->
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:18px;padding:36px;display:flex;flex-direction:column;justify-content:center">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9A9384;margin-bottom:18px">Construction</div>
+        <svg width="100%" viewBox="0 0 100 100" style="max-width:260px;margin:0 auto"><rect x="3" y="3" width="94" height="94" rx="26" fill="none" stroke="#D15B36" stroke-width="1"/><line x1="0" y1="62" x2="100" y2="62" stroke="#C8402F" stroke-width=".6" stroke-dasharray="2 2"/><line x1="0" y1="22" x2="100" y2="22" stroke="#2E9E73" stroke-width=".6" stroke-dasharray="2 2"/><line x1="50" y1="0" x2="50" y2="100" stroke="#9A9384" stroke-width=".4" stroke-dasharray="2 2"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#1B1916" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="4" fill="#D15B36"/></svg>
+        <p style="font-size:13.5px;line-height:1.55;color:#6E675B;margin:18px 0 0">Flat baseline (normal) → a sharp peak breaking the upper bound. The apex is accented with a dot — the moment of detection. Tile corners <span style="font-family:'JetBrains Mono',monospace;color:#1B1916">r = 26/100</span>.</p>
+      </div>
+    </div>
+
+    <!-- variants row -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:18px">
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:14px;padding:28px;display:flex;flex-direction:column;align-items:center;gap:16px">
+        <svg width="64" height="64" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+        <div style="font-size:12.5px;color:#9A9384">Primary</div>
+      </div>
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:14px;padding:28px;display:flex;flex-direction:column;align-items:center;gap:16px">
+        <svg width="64" height="64" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="none" stroke="#D15B36" stroke-width="6"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#D15B36" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#D15B36"/></svg>
+        <div style="font-size:12.5px;color:#9A9384">Outline</div>
+      </div>
+      <div style="background:#1B1916;border:1px solid #1B1916;border-radius:14px;padding:28px;display:flex;flex-direction:column;align-items:center;gap:16px">
+        <svg width="64" height="64" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#FBF9F3"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#1B1916" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#1B1916"/></svg>
+        <div style="font-size:12.5px;color:#7C766A">Inverse</div>
+      </div>
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:14px;padding:28px;display:flex;flex-direction:column;align-items:center;gap:16px">
+        <svg width="64" height="64" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#1B1916"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+        <div style="font-size:12.5px;color:#9A9384">Mono</div>
+      </div>
+    </div>
+
+    <!-- min sizes -->
+    <div style="margin-top:18px;background:#FBF9F3;border:1px solid #E6E0D4;border-radius:14px;padding:30px 34px;display:flex;align-items:center;gap:40px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9A9384;writing-mode:vertical-rl;transform:rotate(180deg)">min sizes</div>
+      <div style="display:flex;align-items:flex-end;gap:34px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px"><svg width="48" height="48" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg><span style="font-size:11px;color:#9A9384;font-family:'JetBrains Mono',monospace">48</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px"><svg width="32" height="32" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg><span style="font-size:11px;color:#9A9384;font-family:'JetBrains Mono',monospace">32</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px"><svg width="24" height="24" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg><span style="font-size:11px;color:#9A9384;font-family:'JetBrains Mono',monospace">24</span></div>
+      </div>
+      <p style="font-size:13.5px;line-height:1.5;color:#6E675B;margin:0;max-width:34ch">The mark stays legible down to 24px — the bot avatar size in Slack and Mattermost.</p>
+    </div>
+  </section>
+
+  <!-- ============ WORDMARK ============ -->
+  <section data-screen-label="Logo" style="padding:72px 0 0">
+    <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:40px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;font-weight:600">03</div>
+      <h2 style="font-size:34px;letter-spacing:-.025em;font-weight:700;margin:0">Logo</h2>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+      <!-- full lockup -->
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:16px;padding:48px;display:flex;flex-direction:column;gap:30px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9A9384">Full · horizontal</div>
+        <div style="display:flex;align-items:center;gap:16px">
+          <svg width="52" height="52" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+          <span style="font-size:38px;font-weight:700;letter-spacing:-.03em">detectkit</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px">
+          <svg width="36" height="36" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#1B1916"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+          <span style="font-size:26px;font-weight:700;letter-spacing:-.03em;color:#1B1916">detect<span style="color:#9A9384">kit</span></span>
+        </div>
+      </div>
+      <!-- short / dtk -->
+      <div style="background:#1B1916;border-radius:16px;padding:48px;display:flex;flex-direction:column;gap:30px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#7C766A">Short · CLI</div>
+        <div style="display:flex;align-items:center;gap:18px">
+          <svg width="52" height="52" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:40px;font-weight:700;letter-spacing:-.02em;color:#FBF9F3">dtk</span>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:#7C766A;border-top:1px solid #332F29;padding-top:20px">
+          <span style="color:#2E9E73">$</span> dtk run <span style="color:#D9A05B">--select</span> tag:critical
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COLOR DIRECTIONS ============ -->
+  <section data-screen-label="Color directions" style="padding:72px 0 0">
+    <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:8px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;font-weight:600">04</div>
+      <h2 style="font-size:34px;letter-spacing:-.025em;font-weight:700;margin:0">Color directions</h2>
+    </div>
+    <p style="font-size:17px;line-height:1.5;color:#6E675B;max-width:62ch;margin:0 0 40px">Four accent options on warm paper. Chosen: <strong style="color:#1B1916;font-weight:600">Warm Clay</strong> — close to Claude in warmth, but its own hue (not dbt orange).</p>
+
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px">
+      <div style="border:2px solid #D15B36;border-radius:14px;overflow:hidden;background:#FBF9F3">
+        <div style="display:flex;height:84px"><div style="flex:2;background:#D15B36"></div><div style="flex:1;background:#F5F1E8"></div><div style="flex:1;background:#1B1916"></div></div>
+        <div style="padding:16px 18px"><div style="font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px">Warm Clay <span style="font-family:'JetBrains Mono',monospace;font-size:10px;background:#D15B36;color:#FBF9F3;padding:2px 6px;border-radius:5px">chosen</span></div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384;margin-top:6px">#D15B36 · #F5F1E8</div></div>
+      </div>
+      <div style="border:1px solid #E6E0D4;border-radius:14px;overflow:hidden;background:#FBF9F3">
+        <div style="display:flex;height:84px"><div style="flex:2;background:#127C71"></div><div style="flex:1;background:#F2F0E9"></div><div style="flex:1;background:#16201E"></div></div>
+        <div style="padding:16px 18px"><div style="font-size:14px;font-weight:600">Signal Teal</div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384;margin-top:6px">#127C71 · reliability</div></div>
+      </div>
+      <div style="border:1px solid #E6E0D4;border-radius:14px;overflow:hidden;background:#FBF9F3">
+        <div style="display:flex;height:84px"><div style="flex:2;background:#5B53E0"></div><div style="flex:1;background:#F3F2F7"></div><div style="flex:1;background:#171623"></div></div>
+        <div style="padding:16px 18px"><div style="font-size:14px;font-weight:600">Electric Indigo</div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384;margin-top:6px">#5B53E0 · tech accent</div></div>
+      </div>
+      <div style="border:1px solid #E6E0D4;border-radius:14px;overflow:hidden;background:#FBF9F3">
+        <div style="display:flex;height:84px"><div style="flex:2;background:#1B1916"></div><div style="flex:1;background:#F5F1E8"></div><div style="flex:1;background:#E0A23B"></div></div>
+        <div style="padding:16px 18px"><div style="font-size:14px;font-weight:600">Mono + Amber</div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384;margin-top:6px">#1B1916 · #E0A23B</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TOKENS ============ -->
+  <section data-screen-label="Tokens" style="padding:56px 0 0">
+    <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:18px;padding:40px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9A9384;margin-bottom:24px">Design tokens · palette</div>
+
+      <div style="font-size:13px;font-weight:600;color:#6E675B;margin-bottom:14px">Brand &amp; neutrals</div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:34px">
+        <div><div style="height:64px;border-radius:10px;background:#D15B36;border:1px solid #00000010"></div><div style="margin-top:8px;font-size:12.5px;font-weight:600">Clay</div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384">--clay #D15B36</div></div>
+        <div><div style="height:64px;border-radius:10px;background:#B4471F;border:1px solid #00000010"></div><div style="margin-top:8px;font-size:12.5px;font-weight:600">Clay deep</div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384">--clay-700 #B4471F</div></div>
+        <div><div style="height:64px;border-radius:10px;background:#1B1916;border:1px solid #00000010"></div><div style="margin-top:8px;font-size:12.5px;font-weight:600">Ink</div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384">--ink #1B1916</div></div>
+        <div><div style="height:64px;border-radius:10px;background:#6E675B;border:1px solid #00000010"></div><div style="margin-top:8px;font-size:12.5px;font-weight:600">Muted</div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384">--muted #6E675B</div></div>
+        <div><div style="height:64px;border-radius:10px;background:#F5F1E8;border:1px solid #E6E0D4"></div><div style="margin-top:8px;font-size:12.5px;font-weight:600">Paper</div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384">--paper #F5F1E8</div></div>
+        <div><div style="height:64px;border-radius:10px;background:#FBF9F3;border:1px solid #E6E0D4"></div><div style="margin-top:8px;font-size:12.5px;font-weight:600">Surface</div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384">--surface #FBF9F3</div></div>
+      </div>
+
+      <div style="font-size:13px;font-weight:600;color:#6E675B;margin-bottom:14px">Status semantics <span style="font-weight:400;color:#9A9384">— the core of alerting</span></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
+        <div style="display:flex;align-items:center;gap:12px;padding:14px;border:1px solid #E6E0D4;border-radius:10px"><span style="width:34px;height:34px;border-radius:8px;background:#36A64F;flex:none"></span><div><div style="font-size:13px;font-weight:600">Recovery</div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384">#36A64F</div></div></div>
+        <div style="display:flex;align-items:center;gap:12px;padding:14px;border:1px solid #E6E0D4;border-radius:10px"><span style="width:34px;height:34px;border-radius:8px;background:#F0AD4E;flex:none"></span><div><div style="font-size:13px;font-weight:600">No-data</div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384">#F0AD4E</div></div></div>
+        <div style="display:flex;align-items:center;gap:12px;padding:14px;border:1px solid #E6E0D4;border-radius:10px"><span style="width:34px;height:34px;border-radius:8px;background:#D63232;flex:none"></span><div><div style="font-size:13px;font-weight:600">Anomaly</div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384">#D63232</div></div></div>
+        <div style="display:flex;align-items:center;gap:12px;padding:14px;border:1px solid #E6E0D4;border-radius:10px"><span style="width:34px;height:34px;border-radius:8px;background:#5A7A8C;flex:none"></span><div><div style="font-size:13px;font-weight:600">Error</div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384">#5A7A8C</div></div></div>
+      </div>
+      <p style="font-size:12.5px;color:#9A9384;margin:16px 0 0;font-family:'JetBrains Mono',monospace">// webhook attachment colors, verbatim from webhook.py: anomaly #D63232 · recovery #36A64F · no-data #F0AD4E</p>
+    </div>
+  </section>
+
+  <!-- ============ TYPOGRAPHY ============ -->
+  <section data-screen-label="Typography" style="padding:72px 0 0">
+    <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:40px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;font-weight:600">05</div>
+      <h2 style="font-size:34px;letter-spacing:-.025em;font-weight:700;margin:0">Typography</h2>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:16px;padding:36px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px"><span style="font-size:20px;font-weight:700">Schibsted Grotesk</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384">UI · headings</span></div>
+        <div style="font-size:52px;font-weight:800;letter-spacing:-.03em;line-height:1">Aa</div>
+        <div style="font-size:15px;color:#6E675B;margin:18px 0 22px;letter-spacing:.01em">abcdefghijklm · 0123456789</div>
+        <div style="display:flex;flex-direction:column;gap:8px;border-top:1px solid #E6E0D4;padding-top:18px">
+          <span style="font-weight:400;font-size:15px">Regular 400 — body &amp; descriptions</span>
+          <span style="font-weight:500;font-size:15px">Medium 500 — captions, labels</span>
+          <span style="font-weight:700;font-size:15px">Bold 700 — headings</span>
+          <span style="font-weight:800;font-size:15px">Extrabold 800 — hero</span>
+        </div>
+      </div>
+      <div style="background:#1B1916;border-radius:16px;padding:36px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px"><span style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:#FBF9F3">JetBrains Mono</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#7C766A">logs · code · CLI</span></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:52px;font-weight:700;color:#FBF9F3;line-height:1">Aa</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:#7C766A;margin:18px 0 22px">abcdefghijklm · 0123456789</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:13px;border-top:1px solid #332F29;padding-top:18px;line-height:1.7">
+          <div style="color:#7C766A">name: <span style="color:#D9A05B">api_error_rate</span></div>
+          <div style="color:#7C766A">detector: <span style="color:#9FB8C4">mad</span> · threshold: <span style="color:#2E9E73">3.0</span></div>
+          <div style="color:#7C766A">status: <span style="color:#E8806F">anomaly</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TERMINAL LOG ============ -->
+  <section data-screen-label="Logs" style="padding:72px 0 0">
+    <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:8px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;font-weight:600">06</div>
+      <h2 style="font-size:34px;letter-spacing:-.025em;font-weight:700;margin:0">Log style</h2>
+    </div>
+    <p style="font-size:17px;line-height:1.5;color:#6E675B;max-width:62ch;margin:0 0 28px">The real output of <span style="font-family:'JetBrains Mono',monospace;color:#1B1916">dtk run</span> — a load → detect → alert tree (<span style="font-family:'JetBrains Mono',monospace;color:#1B1916">┌─ │ └─</span>) with cyan step headers and colored status lines.</p>
+    <div style="background:#211E1A;border-radius:14px;overflow:hidden;border:1px solid #332F29">
+      <div style="display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid #332F29">
+        <span style="width:11px;height:11px;border-radius:50%;background:#E5675B"></span><span style="width:11px;height:11px;border-radius:50%;background:#E0A23B"></span><span style="width:11px;height:11px;border-radius:50%;background:#2E9E73"></span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#7C766A;margin-left:10px">dtk run --select tag:critical</span>
+      </div>
+      <div style="margin:0;padding:24px 22px;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;color:#C9C2B4;overflow-x:auto">
+        <sc-for list="{{ logRows }}" as="row" hint-placeholder-count="22">
+          <div style="min-height:1.2em;white-space:pre"><sc-for list="{{ row }}" as="seg" hint-placeholder-count="1"><span style="{{ seg.style }}">{{ seg.text }}</span></sc-for></div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ALERTS IN THE WILD ============ -->
+  <section data-screen-label="Alerts" style="padding:72px 0 0">
+    <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:8px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;font-weight:600">07</div>
+      <h2 style="font-size:34px;letter-spacing:-.025em;font-weight:700;margin:0">The logo in alerts</h2>
+    </div>
+    <p style="font-size:17px;line-height:1.5;color:#6E675B;max-width:64ch;margin:0 0 28px">Messages assembled verbatim from the channels' default templates in code — webhook attachment for Slack/Mattermost, base template for Telegram. Switch the channel and the event type.</p>
+
+    <!-- controls -->
+    <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;margin-bottom:28px">
+      <div style="display:flex;gap:6px;background:#EDE7DA;padding:5px;border-radius:11px">
+        <sc-for list="{{ platforms }}" as="tab" hint-placeholder-count="3">
+          <button onClick="{{ tab.onClick }}" style="{{ tab.style }}">{{ tab.label }}</button>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:6px;background:#EDE7DA;padding:5px;border-radius:11px">
+        <sc-for list="{{ severities }}" as="sv" hint-placeholder-count="2">
+          <button onClick="{{ sv.onClick }}" style="{{ sv.style }}">{{ sv.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- chat mock -->
+    <div style="background:{{ chatBg }};border:1px solid #E6E0D4;border-radius:16px;padding:30px;min-height:300px">
+
+      <!-- SLACK -->
+      <sc-if value="{{ isSlack }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width:640px;display:flex;gap:12px;font-family:'Schibsted Grotesk',sans-serif">
+          <svg width="36" height="36" viewBox="0 0 100 100" style="border-radius:8px;flex:none"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-weight:700;font-size:15px;color:#1D1C1D">{{ botName }}</span><span style="font-size:10px;font-weight:700;background:#E8E8E8;color:#616061;padding:1px 5px;border-radius:3px;letter-spacing:.03em">APP</span><span style="font-size:12px;color:#616061">12:04</span></div>
+            <div style="display:flex;background:#fff;border-radius:6px;overflow:hidden;border:1px solid #E8E8E8;box-shadow:0 1px 1px #0000000a">
+              <div style="width:4px;background:{{ attachmentColor }};flex:none"></div>
+              <div style="padding:12px 15px;flex:1;min-width:0">
+                <div style="font-weight:700;font-size:15px;color:#1D1C1D;margin-bottom:6px">{{ title }}</div>
+                <div style="font-size:13.5px;line-height:1.55;color:#1D1C1D;white-space:pre-wrap;word-break:break-word">{{ webhookBody }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- MATTERMOST -->
+      <sc-if value="{{ isMM }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width:640px;display:flex;gap:12px;font-family:'Schibsted Grotesk',sans-serif">
+          <svg width="36" height="36" viewBox="0 0 100 100" style="border-radius:50%;flex:none"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-weight:700;font-size:15px;color:#3D3C40">{{ botName }}</span><span style="font-size:10px;font-weight:600;background:#1C58D9;color:#fff;padding:1px 6px;border-radius:3px">BOT</span><span style="font-size:12px;color:#A4A6AA">12:04</span></div>
+            <div style="border-left:4px solid {{ attachmentColor }};background:#fff;border-radius:0 6px 6px 0;padding:12px 16px;box-shadow:0 1px 3px #0000000f">
+              <div style="font-weight:700;font-size:15px;color:#3D3C40;margin-bottom:6px">{{ title }}</div>
+              <div style="font-size:13.5px;line-height:1.55;color:#3D3C40;white-space:pre-wrap;word-break:break-word">{{ webhookBody }}</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- TELEGRAM -->
+      <sc-if value="{{ isTg }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width:480px;font-family:'Schibsted Grotesk',sans-serif">
+          <div style="display:flex;gap:10px;align-items:flex-end">
+            <svg width="34" height="34" viewBox="0 0 100 100" style="border-radius:50%;flex:none"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+            <div style="background:#fff;border-radius:14px 14px 14px 4px;padding:11px 14px;box-shadow:0 1px 2px #0000001a;max-width:400px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-weight:700;font-size:13.5px;color:#D15B36">detectkit</span><svg width="14" height="14" viewBox="0 0 24 24" fill="#3390EC"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg></div>
+              <div style="font-size:13.5px;line-height:1.5;color:#222;white-space:pre-wrap;word-break:break-word">{{ tgBody }}</div>
+              <div style="text-align:right;font-size:11px;color:#A8A8A8;margin-top:4px">12:04</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="margin-top:14px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#9A9384;line-height:1.7">// username: <span style="color:#6E675B">detectk</span> · icon: <span style="color:#6E675B">:warning:</span> by default — set <span style="color:#6E675B">icon_url</span> to the logo PNG so the mark becomes the bot avatar.<br>// attachment color: anomaly <span style="color:#D63232">#D63232</span> · recovery <span style="color:#2E9E73">#36A64F</span> · no-data <span style="color:#E0A23B">#F0AD4E</span></div>
+  </section>
+
+  <!-- ============ LANDING ============ -->
+  <section data-screen-label="Landing" style="padding:72px 0 0">
+    <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:24px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;font-weight:600">08</div>
+      <h2 style="font-size:34px;letter-spacing:-.025em;font-weight:700;margin:0">Landing</h2>
+    </div>
+
+    <div style="border:1px solid #E6E0D4;border-radius:18px;overflow:hidden;background:#F5F1E8">
+      <!-- nav -->
+      <div style="display:flex;align-items:center;gap:14px;padding:20px 34px;border-bottom:1px solid #E6E0D4">
+        <svg width="30" height="30" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+        <span style="font-size:18px;font-weight:700;letter-spacing:-.02em">detectkit</span>
+        <div style="margin-left:30px;display:flex;gap:26px;font-size:14.5px;color:#6E675B;font-weight:500"><span>Docs</span><span>Detectors</span><span>Alerting</span><span>Changelog</span></div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:18px"><span style="font-size:14.5px;color:#6E675B;font-weight:500">GitHub</span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;background:#1B1916;color:#FBF9F3;padding:9px 16px;border-radius:9px">pip install detectkit</span></div>
+      </div>
+      <!-- hero -->
+      <div style="display:grid;grid-template-columns:1fr 1.05fr;gap:40px;padding:64px 34px 56px;align-items:center">
+        <div>
+          <div style="display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#B4471F;background:#D15B3618;border:1px solid #D15B3633;padding:6px 12px;border-radius:20px;margin-bottom:24px"><span style="width:7px;height:7px;border-radius:50%;background:#2E9E73"></span>open source · python</div>
+          <h1 style="font-size:56px;line-height:1.02;letter-spacing:-.035em;font-weight:800;margin:0 0 22px">Metric monitoring that<br><span style="color:#D15B36">catches the spike.</span></h1>
+          <p style="font-size:18px;line-height:1.55;color:#6E675B;margin:0 0 32px;max-width:46ch">Time-series anomaly detection and alerting with a dbt-like project layout. Write your metric as a SQL query plus a detector in YAML, run it with one command.</p>
+          <div style="display:flex;gap:12px;align-items:center">
+            <span style="font-size:15px;font-weight:600;background:#D15B36;color:#FBF9F3;padding:13px 24px;border-radius:11px">Get started</span>
+            <span style="font-size:15px;font-weight:600;color:#1B1916;padding:13px 22px;border-radius:11px;border:1px solid #D8D1C2">Read the docs</span>
+          </div>
+        </div>
+        <div style="background:#211E1A;border-radius:14px;overflow:hidden;border:1px solid #332F29;box-shadow:0 24px 60px -30px #1b191680">
+          <div style="display:flex;align-items:center;gap:7px;padding:13px 16px;border-bottom:1px solid #332F29"><span style="width:10px;height:10px;border-radius:50%;background:#E5675B"></span><span style="width:10px;height:10px;border-radius:50%;background:#E0A23B"></span><span style="width:10px;height:10px;border-radius:50%;background:#2E9E73"></span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#7C766A;margin-left:8px">metrics/api_errors.yml</span></div>
+          <pre style="margin:0;padding:20px;font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.75;color:#C9C2B4;overflow-x:auto">{{ landingSnippet }}</pre>
+        </div>
+      </div>
+      <!-- feature strip -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #E6E0D4">
+        <div style="padding:28px 30px;border-right:1px solid #E6E0D4"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;margin-bottom:10px">// query</div><div style="font-size:16px;font-weight:600;margin-bottom:6px">SQL → numpy</div><div style="font-size:14px;color:#6E675B;line-height:1.5">Any query on ClickHouse · PostgreSQL · MySQL — the foundation of every metric.</div></div>
+        <div style="padding:28px 30px;border-right:1px solid #E6E0D4"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;margin-bottom:10px">// detectors</div><div style="font-size:16px;font-weight:600;margin-bottom:6px">Z-Score · MAD · IQR</div><div style="font-size:14px;color:#6E675B;line-height:1.5">Seasonality, trends, recency weighting.</div></div>
+        <div style="padding:28px 30px"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;margin-bottom:10px">// channels</div><div style="font-size:16px;font-weight:600;margin-bottom:6px">Slack · Mattermost · TG</div><div style="font-size:14px;color:#6E675B;line-height:1.5">@mentions, cooldown, recovery, no-data.</div></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;alertPlatform&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;slack&quot;,&quot;mattermost&quot;,&quot;telegram&quot;],&quot;default&quot;:&quot;slack&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;severity&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;anomaly&quot;,&quot;recovery&quot;],&quot;default&quot;:&quot;anomaly&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = {
+    platform: this.props.alertPlatform || 'slack',
+    severity: this.props.severity || 'anomaly',
+  };
+
+  renderVals() {
+    const platform = this.state.platform;
+    const severity = this.state.severity;
+    const isAnomaly = severity === 'anomaly';
+
+    const mkSeg = (active) => ({
+      border: 'none',
+      cursor: 'pointer',
+      fontFamily: "'Schibsted Grotesk', sans-serif",
+      fontSize: '13.5px',
+      fontWeight: 600,
+      padding: '7px 16px',
+      borderRadius: '8px',
+      background: active ? '#FBF9F3' : 'transparent',
+      color: active ? '#1B1916' : '#6E675B',
+      boxShadow: active ? '0 1px 2px #00000014' : 'none',
+      transition: 'all .15s',
+    });
+
+    const platforms = [
+      { id: 'slack', label: 'Slack' },
+      { id: 'mattermost', label: 'Mattermost' },
+      { id: 'telegram', label: 'Telegram' },
+    ].map(p => ({
+      label: p.label,
+      style: mkSeg(platform === p.id),
+      onClick: () => this.setState({ platform: p.id }),
+    }));
+
+    const severities = [
+      { id: 'anomaly', label: 'Anomaly' },
+      { id: 'recovery', label: 'Recovery' },
+    ].map(s => ({
+      label: s.label,
+      style: mkSeg(severity === s.id),
+      onClick: () => this.setState({ severity: s.id }),
+    }));
+
+    // Title and body built verbatim from the channels' default templates
+    // (webhook.py for Slack/Mattermost attachments, base.py for Telegram).
+    const title = isAnomaly ? '⚠ Alert: api_error_rate' : '✅ Alert cleared: api_error_rate';
+    const attachmentColor = isAnomaly ? '#D63232' : '#36A64F';
+    const params = '{"threshold": 3.0, "window_size": 2016, "window_weights": "exponential", "half_life": "1d"}';
+    const mentions = '@oncall_engineer @here';
+
+    // Webhook body — metric name lives in the attachment title, so it is omitted here.
+    const webhookBody = isAnomaly
+      ? 'Quorum 1/1 · direction above (policy same) · consecutive 3/3\n'
+        + 'Rule: min_detectors=1 · direction=same · consecutive=3\n\n'
+        + 'Latest point (evidence):\n'
+        + '· Time: 2026-06-19 12:04:00 (Europe/Moscow)\n'
+        + '· Value: 4.2 | Expected: <= 1.1\n'
+        + '· Severity: 3.40\n'
+        + 'Detectors: mad\n'
+        + 'Parameters: ' + params + '\n'
+        + mentions
+      : 'The alert condition no longer holds — the metric is back within expected bounds.\n'
+        + 'Rule: min_detectors=1 · direction=same · consecutive=3\n\n'
+        + 'Latest point:\n'
+        + '· Time: 2026-06-19 12:42:00 (Europe/Moscow)\n'
+        + '· Value: 0.9 | Expected: <= 1.1\n'
+        + 'Detectors: mad\n'
+        + mentions;
+
+    // Telegram uses the BASE template — the metric name is part of the body.
+    const tgBody = title + '\n' + webhookBody;
+
+    // Built to match the real CLI output: run.py + _output.py house style
+    // (Processing metric → ┌─ LOAD / DETECT / ALERT tree with │ / └─ children).
+    const C = { def: '#C9C2B4', cyan: '#6CC0B6', green: '#6FCB8E', yellow: '#E7B45C', red: '#E8806F' };
+    const seg = (text, color, bold) => ({ text, style: 'color:' + (color || C.def) + (bold ? ';font-weight:700' : '') });
+    const line = (text, color, bold) => [seg(text, color, bold)];
+    const blank = [seg('\u00A0', C.def)];
+    const logRows = [
+      line('Project root: ~/monitoring'),
+      line('Found 1 metric(s) to process'),
+      blank,
+      line('Processing metric: api_error_rate', C.cyan, true),
+      line('  Config file: metrics/api_errors.yml'),
+      line('  Steps: load, detect, alert'),
+      blank,
+      line('  ┌─ LOAD', C.cyan, true),
+      line('  │ Resuming from last saved: 2026-06-19 11:55:00'),
+      line('  │ Loading from 2026-06-19 12:00:00 to 2026-06-19 12:05:00'),
+      line('  │ Total points: ~1 | Batch size: 10,000'),
+      line('  │ Loading in single batch...'),
+      line('  └─ Loaded 1 datapoints', C.green),
+      blank,
+      line('  ┌─ DETECT', C.cyan, true),
+      line('  │ Running 1 detector(s)...'),
+      line('  │'),
+      line('  │ [1/1] Detector: mad'),
+      line('  │   Detecting from 2026-06-19 12:00:00 to 2026-06-19 12:05:00'),
+      line('  │   Total points: ~1 | Batch size: 1,000'),
+      line('  │   └─ Detected 1 anomalies', C.yellow),
+      line('  └─ Total anomalies: 1', C.yellow),
+      blank,
+      line('  ┌─ ALERT', C.cyan, true),
+      line('  │ Checking alert conditions...'),
+      [seg('  │ '), seg('⚠ Alert triggered! Sending to 1 channel(s)...', C.yellow, true)],
+      [seg('  │   '), seg('✓', C.green), seg(' mattermost_ops')],
+      line('  └─ Sent 1/1 alerts', C.green),
+      blank,
+      line('✓ Pipeline completed successfully', C.green, true),
+    ];
+
+    const landingSnippet =
+`# metrics/api_errors.yml
+name: api_error_rate
+interval: "5min"
+
+query: |
+  SELECT
+    toStartOfInterval(timestamp, INTERVAL 5 MINUTE) AS timestamp,
+    countIf(status_code >= 500) / count() * 100 AS value
+  FROM http_requests
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp <  '{{ dtk_end_time }}'
+  GROUP BY timestamp ORDER BY timestamp
+
+detectors:
+  - type: mad
+    params:
+      threshold: 3.0
+      window_size: 2016          # 7d of 5-min points
+      window_weights: exponential
+      half_life: "1d"
+
+alerting:
+  enabled: true
+  channels: [mattermost_ops]
+  consecutive_anomalies: 3
+  direction: "up"
+  mentions: [oncall_engineer, here]`;
+
+    return {
+      platforms, severities,
+      isSlack: platform === 'slack',
+      isMM: platform === 'mattermost',
+      isTg: platform === 'telegram',
+      chatBg: platform === 'telegram' ? '#CFE3D6' : '#FFFFFF',
+      title, attachmentColor, webhookBody, tgBody, botName: 'detectk',
+      logRows, landingSnippet,
+      coverLede: 'detectkit catches anomalies in metrics and posts clear alerts to chat. The mark and the design system have to read just as sharply in a 24px bot avatar as on a documentation page.',
+    };
+  }
+}
+</script>
+</body>
+</html>

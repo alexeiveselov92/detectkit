@@ -1,0 +1,325 @@
+---
+import Logo from '../components/Logo.astro';
+import '../styles/brand.css';
+import '../styles/landing.css';
+
+const repo = 'https://github.com/alexeiveselov92/detectkit';
+const pypi = 'https://pypi.org/project/detectkit/';
+const docsHref = '/overview/';
+const startHref = '/getting-started/installation/';
+
+const title = 'detectkit — metric monitoring that catches the spike';
+const description =
+  'Time-series anomaly detection and alerting with a dbt-like project layout. Write a metric as SQL plus a detector in YAML, run it with one command.';
+
+// ---- hero config snippet (verbatim from the brand guide) ----
+const yamlLines = [
+  '<span class="c"># metrics/api_errors.yml</span>',
+  '<span class="k">name</span>: <span class="s">api_error_rate</span>',
+  '<span class="k">interval</span>: <span class="s">"5min"</span>',
+  '',
+  '<span class="k">query</span>: |',
+  '  <span class="kw">SELECT</span>',
+  '    toStartOfInterval(timestamp, <span class="kw">INTERVAL</span> 5 MINUTE) <span class="kw">AS</span> timestamp,',
+  '    countIf(status_code &gt;= 500) / count() * 100 <span class="kw">AS</span> value',
+  '  <span class="kw">FROM</span> http_requests',
+  "  <span class=\"kw\">WHERE</span> timestamp &gt;= <span class=\"s\">'{{ dtk_start_time }}'</span>",
+  "    <span class=\"kw\">AND</span> timestamp &lt;  <span class=\"s\">'{{ dtk_end_time }}'</span>",
+  '  <span class="kw">GROUP BY</span> timestamp <span class="kw">ORDER BY</span> timestamp',
+  '',
+  '<span class="k">detectors</span>:',
+  '  - <span class="k">type</span>: <span class="s">mad</span>',
+  '    <span class="k">params</span>:',
+  '      <span class="k">threshold</span>: <span class="n">3.0</span>',
+  '      <span class="k">window_size</span>: <span class="n">2016</span>          <span class="c"># 7d of 5-min points</span>',
+  '      <span class="k">window_weights</span>: <span class="s">exponential</span>',
+  '      <span class="k">half_life</span>: <span class="s">"1d"</span>',
+  '',
+  '<span class="k">alerting</span>:',
+  '  <span class="k">enabled</span>: <span class="n">true</span>',
+  '  <span class="k">channels</span>: [<span class="s">mattermost_ops</span>]',
+  '  <span class="k">consecutive_anomalies</span>: <span class="n">3</span>',
+  '  <span class="k">direction</span>: <span class="s">"up"</span>',
+  '  <span class="k">mentions</span>: [<span class="s">oncall_engineer</span>, <span class="s">here</span>]',
+];
+const yamlHtml = yamlLines.map((l) => `<div class="ln">${l}</div>`).join('');
+
+// ---- real `dtk run` output (matches run.py + _output.py) ----
+const C = { def: '#C9C2B4', cyan: '#6CC0B6', green: '#6FCB8E', yellow: '#E7B45C' };
+const sp = (t, color, bold) =>
+  `<span style="color:${color || C.def}${bold ? ';font-weight:700' : ''}">${t}</span>`;
+const logLines = [
+  'Project root: ~/monitoring',
+  'Found 1 metric(s) to process',
+  '',
+  sp('Processing metric: api_error_rate', C.cyan, true),
+  '  Config file: metrics/api_errors.yml',
+  '  Steps: load, detect, alert',
+  '',
+  sp('  ┌─ LOAD', C.cyan, true),
+  '  │ Resuming from last saved: 2026-06-19 11:55:00',
+  '  │ Loading from 2026-06-19 12:00:00 to 2026-06-19 12:05:00',
+  '  │ Total points: ~1 | Batch size: 10,000',
+  '  │ Loading in single batch...',
+  sp('  └─ Loaded 1 datapoints', C.green),
+  '',
+  sp('  ┌─ DETECT', C.cyan, true),
+  '  │ Running 1 detector(s)...',
+  '  │',
+  '  │ [1/1] Detector: mad',
+  '  │   Detecting from 2026-06-19 12:00:00 to 2026-06-19 12:05:00',
+  '  │   Total points: ~1 | Batch size: 1,000',
+  sp('  │   └─ Detected 1 anomalies', C.yellow),
+  sp('  └─ Total anomalies: 1', C.yellow),
+  '',
+  sp('  ┌─ ALERT', C.cyan, true),
+  '  │ Checking alert conditions...',
+  '  │ ' + sp('⚠ Alert triggered! Sending to 1 channel(s)...', C.yellow, true),
+  '  │   ' + sp('✓', C.green) + ' mattermost_ops',
+  sp('  └─ Sent 1/1 alerts', C.green),
+  '',
+  sp('✓ Pipeline completed successfully', C.green, true),
+];
+const logHtml = logLines.map((l) => `<div class="ln">${l}</div>`).join('');
+
+// ---- alert mock body (verbatim from the channels' default templates) ----
+const alertBody = [
+  'Quorum 1/1 · direction above (policy same) · consecutive 3/3',
+  'Rule: min_detectors=1 · direction=same · consecutive=3',
+  '',
+  'Latest point (evidence):',
+  '· Time: 2026-06-19 12:04:00 (Europe/Moscow)',
+  '· Value: 4.2 | Expected: &lt;= 1.1',
+  '· Severity: 3.40',
+  'Detectors: mad',
+  'Parameters: {"threshold": 3.0, "window_size": 2016, "window_weights": "exponential", "half_life": "1d"}',
+  '@oncall_engineer @here',
+].join('\n');
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href="https://dtk.pipelab.dev/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content="https://dtk.pipelab.dev/" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="landing">
+    <!-- ===== header ===== -->
+    <header class="site-header">
+      <nav class="wrap nav">
+        <a class="brand" href="/">
+          <Logo size={30} />
+          <span>detectkit</span>
+        </a>
+        <div class="nav-links">
+          <a href={docsHref}>Docs</a>
+          <a href="/guides/detectors/">Detectors</a>
+          <a href="/guides/alerting/">Alerting</a>
+          <a href="/changelog/">Changelog</a>
+        </div>
+        <div class="nav-right">
+          <a class="ghost-link" href={repo}>GitHub</a>
+          <a class="pip" href={pypi}>pip install detectkit</a>
+        </div>
+      </nav>
+    </header>
+
+    <!-- ===== hero ===== -->
+    <section class="wrap hero">
+      <div>
+        <div class="badge"><span class="dot"></span>open source · python</div>
+        <h1>Metric monitoring that<br /><span class="accent">catches the spike.</span></h1>
+        <p class="lede">
+          Time-series anomaly detection and alerting with a dbt-like project layout. Write your
+          metric as a SQL query plus a detector in YAML, run it with one command.
+        </p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href={startHref}>Get started</a>
+          <a class="btn btn-ghost" href={docsHref}>Read the docs</a>
+        </div>
+      </div>
+      <div class="term">
+        <div class="term-bar">
+          <span class="b" style="background:#E5675B"></span>
+          <span class="b" style="background:#E0A23B"></span>
+          <span class="b" style="background:#2E9E73"></span>
+          <span class="title">metrics/api_errors.yml</span>
+        </div>
+        <div class="body code" set:html={yamlHtml}></div>
+      </div>
+    </section>
+
+    <!-- ===== feature strip ===== -->
+    <section class="wrap" style="padding-bottom:8px">
+      <div class="features">
+        <div class="feature">
+          <div class="tag">// query</div>
+          <h3>SQL → numpy</h3>
+          <p>Any query on ClickHouse · PostgreSQL · MySQL — the foundation of every metric.</p>
+        </div>
+        <div class="feature">
+          <div class="tag">// detectors</div>
+          <h3>Z-Score · MAD · IQR</h3>
+          <p>Seasonality, trends, recency weighting.</p>
+        </div>
+        <div class="feature">
+          <div class="tag">// channels</div>
+          <h3>Slack · Mattermost · TG</h3>
+          <p>@mentions, cooldown, recovery, no-data.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== run output ===== -->
+    <section class="wrap section">
+      <div class="eyebrow">dtk run</div>
+      <h2>A load → detect → alert run, in one tree.</h2>
+      <p class="sub">
+        The real output of <code>dtk run</code> — a load → detect → alert tree with cyan step
+        headers and colored status lines. Idempotent: it resumes from the last saved point.
+      </p>
+      <div class="term">
+        <div class="term-bar">
+          <span class="b" style="background:#E5675B"></span>
+          <span class="b" style="background:#E0A23B"></span>
+          <span class="b" style="background:#2E9E73"></span>
+          <span class="title">dtk run --select api_error_rate</span>
+        </div>
+        <div class="body" set:html={logHtml}></div>
+      </div>
+    </section>
+
+    <!-- ===== detectors ===== -->
+    <section class="wrap section">
+      <div class="eyebrow">detectors</div>
+      <h2>Robust statistics, not magic.</h2>
+      <p class="sub">
+        Windowed statistical detectors with seasonality grouping, recency weighting and robust
+        detrending — plus fixed thresholds when you already know the bounds.
+      </p>
+      <div class="det-grid">
+        <div class="det">
+          <h3>mad</h3>
+          <p>Median absolute deviation — robust default, σ-equivalent threshold.</p>
+        </div>
+        <div class="det">
+          <h3>zscore</h3>
+          <p>Classic mean/std for clean, normally distributed metrics.</p>
+        </div>
+        <div class="det">
+          <h3>iqr</h3>
+          <p>Interquartile range — for skewed distributions and outliers.</p>
+        </div>
+        <div class="det">
+          <h3>manual_bounds</h3>
+          <p>Hard SLAs — alert when a metric crosses a known threshold.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== alerting ===== -->
+    <section class="wrap section">
+      <div class="eyebrow">alerting</div>
+      <h2>Alerts that lead with the rule that fired.</h2>
+      <p class="sub">
+        Direction-aware multi-detector quorum, cooldown, recovery and no-data alerts — posted to
+        chat with the alert and its rule up top, anomaly evidence below.
+      </p>
+      <div class="alert-wrap">
+        <div class="slack-msg">
+          <Logo size={36} class="slack-av" />
+          <div class="slack-body">
+            <div class="slack-head">
+              <span class="slack-name">detectk</span>
+              <span class="slack-app">APP</span>
+              <span class="slack-time">12:04</span>
+            </div>
+            <div class="attachment">
+              <div class="bar"></div>
+              <div class="content">
+                <div class="title">⚠ Alert: api_error_rate</div>
+                <div class="text" set:html={alertBody}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== CTA ===== -->
+    <section class="wrap">
+      <div class="cta-band">
+        <div class="grid-bg"></div>
+        <div class="inner">
+          <h2>Ship your first detector in five minutes.</h2>
+          <p>SQL + YAML, one command. No agents, no dashboards to babysit.</p>
+          <div class="cta-row">
+            <a class="btn btn-primary" href={startHref}>Get started</a>
+            <a class="pip" href={pypi}>pip install detectkit</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== footer ===== -->
+    <footer class="wrap footer">
+      <div class="footer-grid">
+        <div>
+          <a class="brand" href="/">
+            <Logo size={28} />
+            <span>detectkit</span>
+          </a>
+          <p class="tagline">
+            Time-series anomaly detection and alerting with a dbt-like project layout.
+          </p>
+        </div>
+        <div>
+          <h4>Docs</h4>
+          <ul>
+            <li><a href={docsHref}>Overview</a></li>
+            <li><a href="/getting-started/quickstart/">Quickstart</a></li>
+            <li><a href="/guides/configuration/">Configuration</a></li>
+            <li><a href="/reference/cli/">CLI reference</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Reference</h4>
+          <ul>
+            <li><a href="/guides/detectors/">Detectors</a></li>
+            <li><a href="/guides/alerting/">Alerting</a></li>
+            <li><a href="/examples/">Examples</a></li>
+            <li><a href="/changelog/">Changelog</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Project</h4>
+          <ul>
+            <li><a href={repo}>GitHub</a></li>
+            <li><a href={pypi}>PyPI</a></li>
+            <li><a href={`${repo}/issues`}>Issues</a></li>
+            <li><a href={`${repo}/blob/main/LICENSE`}>License (MIT)</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="legal">
+        <span>© 2026 detectkit · MIT License</span>
+        <span>Built with Astro + Starlight</span>
+      </div>
+    </footer>
+  </body>
+</html>

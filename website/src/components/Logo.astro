@@ -1,0 +1,25 @@
+---
+interface Props {
+  size?: number;
+  class?: string;
+}
+const { size = 32, class: className } = Astro.props;
+---
+<svg
+  width={size}
+  height={size}
+  viewBox="0 0 100 100"
+  class={className}
+  aria-hidden="true"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"></rect>
+  <polyline
+    points="14,62 36,62 50,22 64,62 86,62"
+    fill="none"
+    stroke="#FBF9F3"
+    stroke-width="8"
+    stroke-linecap="round"
+    stroke-linejoin="round"></polyline>
+  <circle cx="50" cy="22" r="6.5" fill="#FBF9F3"></circle>
+</svg>

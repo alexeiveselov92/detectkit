@@ -11,6 +11,8 @@ WORKDIR /app
 # Doc sources (kept as the single source of truth; imported by scripts/sync-docs.mjs)
 COPY docs ./docs
 COPY CHANGELOG.md ./CHANGELOG.md
+# Developer rules render under the site's "For developers" section (sync-docs.mjs)
+COPY .claude/rules ./.claude/rules
 # Site sources (no node_modules / dist — keeps the layer slim and cacheable)
 COPY website/astro.config.mjs website/tsconfig.json ./website/
 COPY website/scripts ./website/scripts

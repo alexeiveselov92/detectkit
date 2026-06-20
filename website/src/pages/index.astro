@@ -126,6 +126,179 @@ const bodyTelegram = [alertTitle, ...alertRule, '@oncall_engineer @here'].join('
 // Email: the subject carries the title (the body repeats it); broadcast `here`
 // is dropped and named mentions become a CC line.
 const bodyEmail = [alertTitle, ...alertRule, 'CC: oncall_engineer'].join('\n');
+
+// ---- Detectors explainer: four "corridors of normal", each shown on the
+// metric shape it is built for (mad = noisy, zscore = clean bell, iqr = skewed,
+// manual = hard-bounded). A rolling-median corridor is recomputed per series
+// (or fixed for manual_bounds) on a 900×380 grid. The SVG holds only graphics;
+// every text annotation (legend, axis, anomaly callout, max/min) is an HTML
+// overlay so it stays legible when the chart scales down on mobile. Colors are
+// .dx-* tokens in landing.css (no hardcoded hex). Geometry mirrors the brand guide.
+const dxExplainer = (() => {
+  const N = 46;
+  const W = 900;
+  const H = 380;
+  const x0 = 70;
+  const x1 = W - 74;
+  const y1 = H - 56;
+  const plotW = x1 - x0;
+  const plotH = y1 - 66;
+  const X = (i) => +(x0 + (i / (N - 1)) * plotW).toFixed(1);
+  const Yv = (v) => +(y1 - v * plotH).toFixed(1);
+  const pct = (v, span) => +((v / span) * 100).toFixed(2);
+  const median = (a) => {
+    const s = [...a].sort((p, q) => p - q);
+    const m = s.length >> 1;
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  };
+  const clamp = (v) => Math.max(0.04, Math.min(0.98, v));
+  const grid = [0.25, 0.5, 0.75]
+    .map((v) => `<line class="dx-grid" x1="${x0}" y1="${Yv(v)}" x2="${x1}" y2="${Yv(v)}"/>`)
+    .join('');
+
+  // Each detector's series is the kind of metric it handles best.
+  const SERIES = {
+    // mad — messy, jittery signal with a sharp final spike (robust default)
+    mad: [
+      0.45, 0.4, 0.48, 0.42, 0.38, 0.46, 0.41, 0.49, 0.43, 0.39, 0.47, 0.42,
+      0.5, 0.44, 0.4, 0.48, 0.43, 0.51, 0.45, 0.41, 0.49, 0.44, 0.42, 0.48,
+      0.45, 0.4, 0.47, 0.5, 0.44, 0.42, 0.48, 0.54, 0.9, 0.58, 0.46, 0.42,
+      0.49, 0.44, 0.4, 0.47, 0.42, 0.5, 0.45, 0.41, 0.48, 0.44,
+    ],
+    // iqr — skewed signal: low baseline with occasional upward tails
+    iqr: [
+      0.34, 0.31, 0.36, 0.33, 0.3, 0.35, 0.32, 0.5, 0.37, 0.33, 0.31, 0.36,
+      0.34, 0.49, 0.33, 0.3, 0.35, 0.32, 0.38, 0.34, 0.31, 0.48, 0.35, 0.33,
+      0.3, 0.36, 0.34, 0.32, 0.5, 0.33, 0.31, 0.36, 0.9, 0.42, 0.34, 0.31,
+      0.35, 0.33, 0.3, 0.47, 0.34, 0.32, 0.36, 0.33, 0.31, 0.35,
+    ],
+    // manual_bounds — steady signal that briefly breaches a hard ceiling
+    manual: [
+      0.48, 0.45, 0.5, 0.47, 0.44, 0.49, 0.46, 0.51, 0.47, 0.45, 0.5, 0.46,
+      0.52, 0.48, 0.45, 0.49, 0.47, 0.51, 0.48, 0.46, 0.5, 0.47, 0.45, 0.49,
+      0.47, 0.44, 0.48, 0.51, 0.47, 0.45, 0.49, 0.56, 0.86, 0.59, 0.48, 0.45,
+      0.5, 0.46, 0.44, 0.49, 0.46, 0.51, 0.47, 0.45, 0.49, 0.46,
+    ],
+  };
+  // zscore — clean, smooth, bell-shaped signal with a single tail event
+  const zscoreSeries = () => {
+    const a = [];
+    for (let i = 0; i < N; i++) {
+      a.push(+(0.5 + 0.085 * Math.sin(i * 0.46) + 0.015 * Math.cos(i * 1.1)).toFixed(3));
+    }
+    a[32] = 0.9;
+    return a;
+  };
+
+  const GLYPH = {
+    mad:
+      '<svg viewBox="0 0 40 40" class="dx-gl"><rect class="dx-gl-area" x="14" y="6" width="12" height="28" rx="3" fill-opacity="0.13"/><line class="dx-gl-stroke" x1="20" y1="6" x2="20" y2="34" stroke-width="2.4" stroke-linecap="round"/><line class="dx-gl-stroke" x1="14" y1="6" x2="26" y2="6" stroke-width="2.4" stroke-linecap="round"/><line class="dx-gl-stroke" x1="14" y1="34" x2="26" y2="34" stroke-width="2.4" stroke-linecap="round"/><circle class="dx-gl-solid" cx="20" cy="20" r="4"/></svg>',
+    zscore:
+      '<svg viewBox="0 0 44 34" class="dx-gl"><path class="dx-gl-area" d="M3 31 C16 31 16 6 22 6 C28 6 28 31 41 31" fill-opacity="0.12"/><path class="dx-gl-stroke" d="M3 31 C16 31 16 6 22 6 C28 6 28 31 41 31" fill="none" stroke-width="2.2" stroke-linecap="round"/><line class="dx-gl-stroke" x1="22" y1="6" x2="22" y2="31" stroke-width="1.4" stroke-dasharray="2 3"/><circle class="dx-gl-solid" cx="38" cy="29" r="2.6"/></svg>',
+    iqr:
+      '<svg viewBox="0 0 44 34" class="dx-gl"><line class="dx-gl-stroke" x1="4" y1="17" x2="13" y2="17" stroke-width="2" stroke-linecap="round"/><line class="dx-gl-stroke" x1="31" y1="17" x2="36" y2="17" stroke-width="2" stroke-linecap="round"/><rect class="dx-gl-box" x="13" y="8" width="18" height="18" rx="3" fill-opacity="0.13" stroke-width="2.2"/><line class="dx-gl-stroke" x1="22" y1="8" x2="22" y2="26" stroke-width="2.2"/><circle class="dx-gl-solid" cx="41" cy="17" r="2.8"/></svg>',
+    manual:
+      '<svg viewBox="0 0 40 40" class="dx-gl"><line class="dx-gl-stroke" x1="5" y1="11" x2="35" y2="11" stroke-width="2.4" stroke-dasharray="6 4" stroke-linecap="round"/><line class="dx-gl-stroke" x1="5" y1="29" x2="35" y2="29" stroke-width="2.4" stroke-dasharray="6 4" stroke-linecap="round"/><path class="dx-gl-solid" d="M20 18 l4 5 h-8 z"/><path class="dx-gl-solid" d="M20 22 l-4 -5 h8 z" opacity="0.4"/></svg>',
+  };
+
+  const META = {
+    mad: {
+      code: 'mad',
+      name: 'Median absolute deviation',
+      desc: 'Measures the typical distance from the median. A handful of wild spikes barely move it — the most robust default.',
+      formula: 'median ± 3 × MAD',
+      best: 'Spiky, noisy metrics with outliers in their history.',
+      anom: '3.40 σ',
+      cfg: { hUp: 0.135, hDn: 0.135 },
+    },
+    zscore: {
+      code: 'zscore',
+      name: 'Z-score',
+      desc: 'Classic mean ± k standard deviations. Fast and simple, but one big outlier inflates the band — keep it for clean data.',
+      formula: 'mean ± 3 × σ',
+      best: 'Clean, roughly bell-shaped metrics.',
+      anom: 'z = 4.1',
+      cfg: { hUp: 0.13, hDn: 0.13 },
+    },
+    iqr: {
+      code: 'iqr',
+      name: 'Interquartile range',
+      desc: 'Builds the corridor from the middle 50% of values, then extends fences 1.5×IQR out. Comfortable with skewed, long-tailed data.',
+      formula: '[ Q1 − 1.5·IQR , Q3 + 1.5·IQR ]',
+      best: 'Skewed distributions and one-sided outliers.',
+      anom: 'beyond fence',
+      cfg: { hUp: 0.21, hDn: 0.1 },
+    },
+    manual: {
+      code: 'manual_bounds',
+      name: 'Manual bounds',
+      desc: 'No statistics at all — you set hard floor and ceiling values. Alerts the instant a metric crosses a known SLA line.',
+      formula: 'value < min  or  value > max',
+      best: 'Known SLAs and hard business limits.',
+      anom: '> max',
+      cfg: null,
+    },
+  };
+
+  const build = (id) => {
+    const m = META[id];
+    const manual = id === 'manual';
+    const values = id === 'zscore' ? zscoreSeries() : SERIES[id];
+    const center = values.map((_, i) => median(values.slice(Math.max(0, i - 4), Math.min(N, i + 5))));
+    let upper, lower;
+    if (manual) {
+      upper = values.map(() => 0.7);
+      lower = values.map(() => 0.2);
+    } else {
+      upper = center.map((c) => clamp(c + m.cfg.hUp));
+      lower = center.map((c) => clamp(c - m.cfg.hDn));
+    }
+    const lineP = 'M' + values.map((v, i) => X(i) + ',' + Yv(v)).join(' L');
+    const bandP =
+      'M' +
+      upper.map((v, i) => X(i) + ',' + Yv(v)).join(' L') +
+      ' L' +
+      lower.map((v, i) => X(i) + ',' + Yv(v)).reverse().join(' L') +
+      ' Z';
+    const centerP = manual ? '' : 'M' + center.map((v, i) => X(i) + ',' + Yv(v)).join(' L');
+    const ai = values.indexOf(Math.max(...values));
+    const ax = X(ai);
+    const ay = Yv(values[ai]);
+
+    const svg =
+      `<svg class="dx-svg" viewBox="0 0 ${W} ${H}" aria-hidden="true">` +
+      grid +
+      `<line class="dx-axisline" x1="${x0}" y1="${y1 + 1}" x2="${x1}" y2="${y1 + 1}" stroke-width="1.4"/>` +
+      `<path class="dx-band" d="${bandP}" fill-opacity="0.12"/>` +
+      (manual
+        ? `<line class="dx-bound" x1="${x0}" y1="${Yv(0.7)}" x2="${x1}" y2="${Yv(0.7)}" stroke-width="2.2" stroke-dasharray="9 6"/>` +
+          `<line class="dx-bound" x1="${x0}" y1="${Yv(0.2)}" x2="${x1}" y2="${Yv(0.2)}" stroke-width="2.2" stroke-dasharray="9 6"/>`
+        : `<path class="dx-center" d="${centerP}" fill="none" stroke-width="1.4" stroke-dasharray="2 6" stroke-opacity="0.55"/>`) +
+      `<path class="dx-line" d="${lineP}" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" pathLength="1"/>` +
+      `<circle class="dx-anom-halo" cx="${ax}" cy="${ay}" r="9"/>` +
+      `<circle class="dx-anom" cx="${ax}" cy="${ay}" r="6" stroke-width="2.5"/>` +
+      `</svg>`;
+
+    const bounds = manual
+      ? [
+          { label: 'max', top: pct(Yv(0.7), H) },
+          { label: 'min', top: pct(Yv(0.2), H) },
+        ]
+      : [];
+
+    return {
+      id,
+      ...m,
+      svg,
+      glyph: GLYPH[id],
+      bounds,
+      calloutLeft: pct(ax, W),
+      calloutTop: pct(ay, H),
+    };
+  };
+
+  return { list: ['mad', 'zscore', 'iqr', 'manual'].map(build) };
+})();
 ---
 
 <!doctype html>
@@ -276,27 +449,89 @@ const bodyEmail = [alertTitle, ...alertRule, 'CC: oncall_engineer'].join('\n');
       <div class="eyebrow">detectors</div>
       <h2>Robust statistics, not magic.</h2>
       <p class="sub">
-        Windowed statistical detectors with seasonality grouping, recency weighting and robust
-        detrending — plus fixed thresholds when you already know the bounds.
+        Every detector learns a <strong>corridor of normal</strong> from recent history, then flags
+        the moment a metric steps outside it. Switch the detector to see the kind of metric it's
+        built for.
       </p>
-      <div class="det-grid">
-        <div class="det">
-          <h3>mad</h3>
-          <p>Median absolute deviation — robust default, σ-equivalent threshold.</p>
+
+      <!-- CSS-only detector switcher: hidden radios drive the tab + panel visibility -->
+      <div class="dx-card">
+        <input class="dx-radio" type="radio" name="dx-detector" id="dx-mad" checked />
+        <input class="dx-radio" type="radio" name="dx-detector" id="dx-zscore" />
+        <input class="dx-radio" type="radio" name="dx-detector" id="dx-iqr" />
+        <input class="dx-radio" type="radio" name="dx-detector" id="dx-manual" />
+
+        <div class="dx-stage">
+          {
+            dxExplainer.list.map((d) => (
+              <div class={`dx-panel dx-panel-${d.id}`}>
+                <div class="dx-chart">
+                  <div class="dx-legend">
+                    <span><i class="dx-sw dx-sw-line" />metric</span>
+                    <span><i class="dx-sw dx-sw-band" />expected range</span>
+                    <span><i class="dx-sw dx-sw-anom" />anomaly</span>
+                  </div>
+                  <div class="dx-plot">
+                    <Fragment set:html={d.svg} />
+                    <div
+                      class="dx-callout"
+                      style={`left:${d.calloutLeft}%;top:${d.calloutTop}%`}
+                    >
+                      <span class="dx-callout-kw">anomaly</span>
+                      <span class="dx-callout-sep">·</span>
+                      <span class="dx-callout-val">{d.anom}</span>
+                    </div>
+                    {d.bounds.map((b) => (
+                      <span class="dx-bound-tag" style={`top:${b.top}%`}>
+                        {b.label}
+                      </span>
+                    ))}
+                  </div>
+                  <div class="dx-axis-row">
+                    <span>7 days ago</span>
+                    <span>now</span>
+                  </div>
+                </div>
+
+                <div class="dx-info">
+                  <div class="dx-info-head">
+                    <div class="dx-glyph-chip" set:html={d.glyph} />
+                    <div>
+                      <div class="dx-code">{d.code}</div>
+                      <div class="dx-subname">{d.name}</div>
+                    </div>
+                  </div>
+                  <p class="dx-desc">{d.desc}</p>
+                  <div class="dx-meta">
+                    <div>
+                      <div class="dx-meta-h">Corridor</div>
+                      <div class="dx-chip">{d.formula}</div>
+                    </div>
+                    <div>
+                      <div class="dx-meta-h">Best for</div>
+                      <div class="dx-best">{d.best}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          }
         </div>
-        <div class="det">
-          <h3>zscore</h3>
-          <p>Classic mean/std for clean, normally distributed metrics.</p>
-        </div>
-        <div class="det">
-          <h3>iqr</h3>
-          <p>Interquartile range — for skewed distributions and outliers.</p>
-        </div>
-        <div class="det">
-          <h3>manual_bounds</h3>
-          <p>Hard SLAs — alert when a metric crosses a known threshold.</p>
+
+        <div class="dx-tabs">
+          <label for="dx-mad"><span class="dx-tab-dot" />mad</label>
+          <label for="dx-zscore"><span class="dx-tab-dot" />zscore</label>
+          <label for="dx-iqr"><span class="dx-tab-dot" />iqr</label>
+          <label for="dx-manual"><span class="dx-tab-dot" />manual_bounds</label>
         </div>
       </div>
+
+      <p class="dx-foot">
+        // the corridor is recomputed per window with seasonality grouping &amp; recency weighting —
+        newer points count more<br />
+        // each detector is shown on the metric shape it handles best — robust, bell-shaped, skewed
+        or hard-bounded
+      </p>
     </section>
 
     <!-- ===== alerting ===== -->

@@ -171,10 +171,11 @@ alerting:
 | `confidence_interval` | Formatted as `[lower, upper]` or `"N/A"` | all |
 | `expected_range` | One-sided aware expected band: `>= lo`, `<= hi`, `[lo, hi]`, or `"N/A"`. Renders one-sided detector bounds cleanly instead of `[7.00, nan]` | all |
 | `detector_name` | Detector that triggered (e.g., `"MADDetector:threshold=3.0"`); `"N detectors"` when several detectors formed the quorum | anomaly, recovery |
+| `detector_params` | Detector parameters as a JSON string (empty for no-data/error) | anomaly, recovery |
 | `detector_count` | Observed number of detectors that agreed (the quorum size that fired) | anomaly |
 | `min_detectors` | Configured quorum threshold the alert fired on (the rule) | anomaly, recovery |
 | `severity` | Severity score; max across the quorum for multi-detector alerts | anomaly |
-| `direction` | Observed/locked anomaly direction: `"up"` or `"down"`; also `"mixed"` for an `any`-policy quorum spanning both up and down, and `"none"` for no-data/recovery | anomaly |
+| `direction` | Observed/locked anomaly direction: `"up"` or `"down"`; also `"mixed"` for an `any`-policy quorum spanning both up and down, and `"none"` for no-data/recovery | all |
 | `direction_policy` | Configured direction rule: `"same"`, `"any"`, `"up"`, `"down"` | anomaly, recovery |
 | `consecutive_count` | Observed number of consecutive anomalies | anomaly |
 | `consecutive_required` | Configured consecutive threshold the alert fired on (the rule) | anomaly, recovery |
@@ -182,6 +183,8 @@ alerting:
 | `error_type` / `error_message` | Exception details | error only (v0.5.0) |
 | `description` / `description_line` | Metric description | all |
 | `mentions` / `mentions_line` | Formatted mentions | all |
+| `dashboard_url` | Raw `alerting.dashboard_url` (empty string when unset); also surfaced natively as a clickable title on Slack/Mattermost, an inline link on Telegram, and an "Open dashboard" button in email (v0.13.0) | all |
+| `dashboard_line` | `"Dashboard: <url>\n"` when set, else empty; appended to the default plain-text templates (v0.13.0) | all |
 
 All variables are always substitutable in every alert kind — the
 "Available in" column marks where a value is *meaningful*, not where the

@@ -67,6 +67,14 @@ class AlertData:
     description: str | None = None
     mentions: list[str] = field(default_factory=list)
     project_name: str | None = None
+    # Optional actionable links surfaced in the message. ``dashboard_url`` is the
+    # headline link (rendered natively as a clickable title/link on
+    # Slack/Mattermost, an ``<a>`` on Telegram, a button in email, and exposed as
+    # the ``{dashboard_url}`` template variable). ``links`` adds further
+    # ``label -> url`` pairs for advanced use. Both default to empty so existing
+    # callers and templates render unchanged.
+    dashboard_url: str | None = None
+    links: dict[str, str] = field(default_factory=dict)
     # Alert rule (the parameters the alert fired with) — see class docstring.
     min_detectors: int | None = None
     direction_policy: str | None = None
@@ -171,12 +179,47 @@ class BaseAlertChannel(ABC):
             else:
                 template = self.get_default_template()
 
-        # Format timestamp to string
+        ctx = self.build_context(alert_data)
+
+        try:
+            message = template.format(**ctx)
+        except (KeyError, ValueError, TypeError):
+            # Template has an unknown variable or a format spec that doesn't fit
+            # the actual value (e.g. ``{value:.2f}`` in a no-data template where
+            # value is a string). Fall back to the kind-appropriate default.
+            if alert_data.is_error:
+                fallback = self.get_default_error_template()
+            elif alert_data.is_no_data:
+                fallback = self.get_default_no_data_template()
+            elif alert_data.is_recovery:
+                fallback = self.get_default_recovery_template()
+            else:
+                fallback = self.get_default_template()
+            if template == fallback:
+                # Already on the default — re-raise instead of recursing.
+                raise
+            message = self.format_message(alert_data, fallback)
+
+        return message
+
+    def build_context(self, alert_data: AlertData) -> dict[str, Any]:
+        """Compute the display-ready variables for *alert_data*.
+
+        This is the **single source** of the values injected into message
+        templates *and* consumed by channels that render natively (the webhook
+        attachment fields, the Telegram HTML message, the email HTML card), so
+        every surface stays consistent. It does no escaping — each channel
+        applies its own (HTML for Telegram/email, markdown for webhook).
+
+        Returns a dict whose keys are exactly the ``{placeholders}`` the default
+        templates use, plus a few extras (``dashboard_url``, ``dashboard_line``).
+        """
         import math
         from datetime import datetime
 
         import numpy as np
 
+        # Format timestamp to string
         ts = alert_data.timestamp
         if isinstance(ts, np.datetime64):
             ts = ts.astype(datetime)
@@ -248,13 +291,18 @@ class BaseAlertChannel(ABC):
         mentions_str = self.format_mentions(alert_data.mentions)
         mentions_line = f"\n{mentions_str}" if mentions_str else ""
 
+        # Optional dashboard link surfaced both as a raw placeholder and a ready
+        # "Dashboard: <url>" line (empty when unset so templates stay clean).
+        dashboard_url = alert_data.dashboard_url or ""
+        dashboard_line = f"Dashboard: {dashboard_url}\n" if dashboard_url else ""
+
         # Project name + synth prefix for templates. Prefix is empty when
         # project_name is None so default templates render cleanly for
         # callers that don't set it.
         project_name = alert_data.project_name or ""
         project_name_prefix = f"[{alert_data.project_name}] " if alert_data.project_name else ""
 
-        # Format message
+        # Status keyword
         if alert_data.is_error:
             status = "ERROR"
         elif alert_data.is_no_data:
@@ -264,54 +312,83 @@ class BaseAlertChannel(ABC):
         else:
             status = "ANOMALY"
 
-        try:
-            message = template.format(
-                metric_name=alert_data.metric_name,
-                project_name=project_name,
-                project_name_prefix=project_name_prefix,
-                timestamp=ts_str,
-                timezone=alert_data.timezone,
-                value=value_for_template,
-                value_display=value_display,
-                confidence_lower=alert_data.confidence_lower,
-                confidence_upper=alert_data.confidence_upper,
-                confidence_interval=confidence_str,
-                expected_range=expected_range,
-                detector_name=alert_data.detector_name,
-                detector_count=detector_count,
-                detector_params=alert_data.detector_params,
-                direction=alert_data.direction,
-                direction_policy=direction_policy,
-                min_detectors=min_detectors,
-                severity=alert_data.severity,
-                consecutive_count=alert_data.consecutive_count,
-                consecutive_required=consecutive_required,
-                status=status,
-                error_type=alert_data.error_type or "",
-                error_message=alert_data.error_message or "",
-                description=alert_data.description or "",
-                description_line=description_line,
-                mentions=mentions_str,
-                mentions_line=mentions_line,
-            )
-        except (KeyError, ValueError, TypeError):
-            # Template has an unknown variable or a format spec that doesn't fit
-            # the actual value (e.g. ``{value:.2f}`` in a no-data template where
-            # value is a string). Fall back to the kind-appropriate default.
-            if alert_data.is_error:
-                fallback = self.get_default_error_template()
-            elif alert_data.is_no_data:
-                fallback = self.get_default_no_data_template()
-            elif alert_data.is_recovery:
-                fallback = self.get_default_recovery_template()
-            else:
-                fallback = self.get_default_template()
-            if template == fallback:
-                # Already on the default — re-raise instead of recursing.
-                raise
-            message = self.format_message(alert_data, fallback)
+        return {
+            "metric_name": alert_data.metric_name,
+            "project_name": project_name,
+            "project_name_prefix": project_name_prefix,
+            "timestamp": ts_str,
+            "timezone": alert_data.timezone,
+            "value": value_for_template,
+            "value_display": value_display,
+            "confidence_lower": alert_data.confidence_lower,
+            "confidence_upper": alert_data.confidence_upper,
+            "confidence_interval": confidence_str,
+            "expected_range": expected_range,
+            "detector_name": alert_data.detector_name,
+            "detector_count": detector_count,
+            "detector_params": alert_data.detector_params,
+            "direction": alert_data.direction,
+            "direction_policy": direction_policy,
+            "min_detectors": min_detectors,
+            "severity": alert_data.severity,
+            "consecutive_count": alert_data.consecutive_count,
+            "consecutive_required": consecutive_required,
+            "status": status,
+            "error_type": alert_data.error_type or "",
+            "error_message": alert_data.error_message or "",
+            "description": alert_data.description or "",
+            "description_line": description_line,
+            "dashboard_url": dashboard_url,
+            "dashboard_line": dashboard_line,
+            "mentions": mentions_str,
+            "mentions_line": mentions_line,
+        }
 
-        return message
+    # ---- Status presentation (shared accents across all channels) ----
+    # Kept in sync with the brand status tokens (.claude/rules/design.md) and the
+    # website status colors so chat, email and dashboards read the same way.
+    _STATUS_COLORS = {
+        "anomaly": "#D63232",
+        "recovery": "#36A64F",
+        "no_data": "#F0AD4E",
+        "error": "#5A7A8C",
+    }
+    _STATUS_WORDS = {
+        "anomaly": "Anomaly",
+        "recovery": "Recovered",
+        "no_data": "No data",
+        "error": "Pipeline error",
+    }
+    # Colored status dots — used where there is no native color bar (Telegram).
+    _STATUS_EMOJI = {
+        "anomaly": "\U0001f534",  # red circle
+        "recovery": "\U0001f7e2",  # green circle
+        "no_data": "\U0001f7e1",  # yellow circle
+        "error": "\U0001f6d1",  # stop sign
+    }
+
+    @staticmethod
+    def status_kind(alert_data: AlertData) -> str:
+        """Return the alert kind: ``anomaly`` / ``recovery`` / ``no_data`` / ``error``."""
+        if alert_data.is_error:
+            return "error"
+        if alert_data.is_no_data:
+            return "no_data"
+        if alert_data.is_recovery:
+            return "recovery"
+        return "anomaly"
+
+    def status_color(self, alert_data: AlertData) -> str:
+        """Accent color for this alert kind (hex)."""
+        return self._STATUS_COLORS[self.status_kind(alert_data)]
+
+    def status_word(self, alert_data: AlertData) -> str:
+        """Human-readable status word for this alert kind."""
+        return self._STATUS_WORDS[self.status_kind(alert_data)]
+
+    def status_emoji(self, alert_data: AlertData) -> str:
+        """Colored status dot for channels without a native color bar."""
+        return self._STATUS_EMOJI[self.status_kind(alert_data)]
 
     def format_mentions(self, mentions: list[str]) -> str:
         """
@@ -385,7 +462,8 @@ class BaseAlertChannel(ABC):
             "· Value: {value_display} | Expected: {expected_range}\n"
             "· Severity: {severity:.2f}\n"
             "Detectors: {detector_name}\n"
-            "Parameters: {detector_params}"
+            "Parameters: {detector_params}\n"
+            "{dashboard_line}"
             "{mentions_line}"
         )
 
@@ -407,7 +485,8 @@ class BaseAlertChannel(ABC):
             "Latest point:\n"
             "· Time: {timestamp}\n"
             "· Value: {value_display} | Expected: {expected_range}\n"
-            "Detectors: {detector_name}"
+            "Detectors: {detector_name}\n"
+            "{dashboard_line}"
             "{mentions_line}"
         )
 
@@ -442,7 +521,8 @@ class BaseAlertChannel(ABC):
             "No data for metric: {metric_name}\n"
             "{description_line}"
             "Time: {timestamp}\n"
-            "Status: query returned no datapoint for the latest interval"
+            "Status: query returned no datapoint for the latest interval\n"
+            "{dashboard_line}"
             "{mentions_line}"
         )
 
@@ -456,7 +536,8 @@ class BaseAlertChannel(ABC):
             "Pipeline failed for metric: {metric_name}\n"
             "{description_line}"
             "Time: {timestamp}\n"
-            "Error: {error_type}: {error_message}"
+            "Error: {error_type}: {error_message}\n"
+            "{dashboard_line}"
             "{mentions_line}"
         )
 

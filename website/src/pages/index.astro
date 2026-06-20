@@ -104,28 +104,205 @@ const claudeLines = [
 ];
 const claudeHtml = claudeLines.map((l) => `<div class="ln">${l}</div>`).join('');
 
-// ---- alert mock bodies (verbatim from each channel's default template) ----
-// Shared evidence block (rule + latest point) — identical across channels.
-const alertTitle = '⚠ Alert: api_error_rate';
-const alertRule = [
-  'Quorum 1/1 · direction above (policy same) · consecutive 3/3',
-  'Rule: min_detectors=1 · direction=same · consecutive=3',
-  '',
-  'Latest point (evidence):',
-  '· Time: 2026-06-19 12:04:00 (Europe/Moscow)',
-  '· Value: 4.2 | Expected: &lt;= 1.1',
-  '· Severity: 3.40',
-  'Detectors: mad',
-  'Parameters: {"threshold": 3.0, "window_size": 2016, "window_weights": "exponential", "half_life": "1d"}',
+// ---- alert preview: each channel rendered the way detectkit actually emits
+// it, for both Anomaly and Recovery. Slack/Mattermost = a fields-based webhook
+// attachment; Telegram = an escaped-HTML Bot API message; Email = a branded
+// HTML card. A dashboard_url is surfaced as a first-class action on every
+// channel (clickable title/link, inline link, button) — see the alerting
+// config snippet above the demo. The chrome mirrors each platform's own UI.
+const dashUrl = 'https://grafana.ops/d/api-errors';
+
+// detectkit logo as an inline SVG string (the <Logo> component can't be used
+// inside a set:html string). `rx` is the avatar corner radius per platform.
+const logoSvg = (size: number, rx: string) =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 100 100" style="border-radius:${rx};flex:none">` +
+  `<rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/>` +
+  `<polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>` +
+  `<circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>`;
+
+// Per-state content. Fields are [label, value, short, mono].
+const linkField: [string, string, boolean, boolean] = [
+  'Links',
+  `Dashboard: <a href="${dashUrl}">${dashUrl}</a>`,
+  false,
+  false,
 ];
-// Slack / Mattermost: webhook attachment — the metric name is the attachment
-// title, so the body omits it. `here` ships as <!here> but renders as @here.
-const bodyWebhook = [...alertRule, '@oncall_engineer @here'].join('\n');
-// Telegram: a plain Bot API message — the title line lives inside the text.
-const bodyTelegram = [alertTitle, ...alertRule, '@oncall_engineer @here'].join('\n');
-// Email: the subject carries the title (the body repeats it); broadcast `here`
-// is dropped and named mentions become a CC line.
-const bodyEmail = [alertTitle, ...alertRule, 'CC: oncall_engineer'].join('\n');
+const ALERT = {
+  anomaly: {
+    title: '⚠ Alert: api_error_rate',
+    pill: 'ANOMALY',
+    lead: 'Rule: min_detectors=1 · direction=same · consecutive=3. Latest 3/3 consecutive points met the quorum.',
+    fields: [
+      ['Value', '4.2', true, true],
+      ['Expected', '&lt;= 1.1', true, true],
+      ['Quorum', '1/1 · above', true, false],
+      ['Severity', '3.40', true, false],
+      ['Detected at', '2026-06-19 12:04:00 (Europe/Moscow)', false, false],
+      ['Detectors', 'mad', false, true],
+      ['Parameters', '{"threshold": 3.0, "window_size": 2016, "half_life": "1d"}', false, true],
+      linkField,
+    ] as [string, string, boolean, boolean][],
+    emailStats: [
+      ['Value', '4.2'],
+      ['Expected', '&lt;= 1.1'],
+      ['Severity', '3.40'],
+      ['Detected at', '2026-06-19 12:04:00 (Europe/Moscow)'],
+    ] as [string, string][],
+    params: '{"threshold": 3.0, "window_size": 2016, "half_life": "1d"}',
+  },
+  recovery: {
+    title: '✓ Alert cleared: api_error_rate',
+    pill: 'RECOVERED',
+    lead: 'The alert condition no longer holds — the metric is back within expected bounds. Rule: min_detectors=1 · direction=same · consecutive=3.',
+    fields: [
+      ['Value', '1.0', true, true],
+      ['Expected', '&lt;= 1.1', true, true],
+      ['Detected at', '2026-06-19 12:36:00 (Europe/Moscow)', false, false],
+      ['Detectors', 'mad', false, true],
+      linkField,
+    ] as [string, string, boolean, boolean][],
+    emailStats: [
+      ['Value', '1.0'],
+      ['Expected', '&lt;= 1.1'],
+      ['Detector', 'mad'],
+      ['Cleared at', '2026-06-19 12:36:00 (Europe/Moscow)'],
+    ] as [string, string][],
+    params: '',
+  },
+};
+
+// Slack / Mattermost — one fields-based attachment (the metric name is the
+// clickable attachment title; long values span full width; mentions ride in
+// the top-level message text).
+const fieldsHtml = (fields: [string, string, boolean, boolean][]) =>
+  '<div class="att-fields">' +
+  fields
+    .map(([k, v, short, mono]) => {
+      const val = k === 'Links' ? v : mono ? `<code>${v}</code>` : v;
+      return `<div class="att-field ${short ? 'short' : 'full'}"><div class="fk">${k}</div><div class="fv">${val}</div></div>`;
+    })
+    .join('') +
+  '</div>';
+
+const attachmentHtml = (sev: 'anomaly' | 'recovery') => {
+  const d = ALERT[sev];
+  return (
+    '<div class="att-mentions"><span class="ment">@oncall_engineer</span> <span class="ment">@here</span></div>' +
+    '<div class="attachment">' +
+    '<div class="bar"></div>' +
+    '<div class="content">' +
+    `<a class="att-title" href="${dashUrl}">${d.title}<span class="ext"> ↗</span></a>` +
+    `<div class="att-lead">${d.lead}</div>` +
+    fieldsHtml(d.fields) +
+    `<div class="att-footer">${logoSvg(13, '3px')}<span>detectkit</span></div>` +
+    '</div></div>'
+  );
+};
+
+const slackPanelHtml = (sev: 'anomaly' | 'recovery') =>
+  '<div class="chat-msg">' +
+  logoSvg(38, '9px') +
+  '<div class="chat-body"><div class="chat-head">' +
+  '<span class="chat-name">detectkit</span><span class="chat-tag">APP</span><span class="chat-time">12:04</span>' +
+  '</div>' +
+  attachmentHtml(sev) +
+  '</div></div>';
+
+const mmPanelHtml = (sev: 'anomaly' | 'recovery') =>
+  '<div class="chat-msg">' +
+  logoSvg(38, '50%') +
+  '<div class="chat-body"><div class="chat-head">' +
+  '<span class="chat-name">detectkit</span><span class="chat-tag bot">BOT</span><span class="chat-time">12:04</span>' +
+  '</div>' +
+  attachmentHtml(sev) +
+  '</div></div>';
+
+// Telegram — an escaped-HTML message: status dot, bold headline, rule, evidence
+// in <code>, an inline "Open dashboard" link, then mentions.
+const tgCheck =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="#3390EC"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>';
+const tgTextHtml = (sev: 'anomaly' | 'recovery') => {
+  const dot = sev === 'anomaly' ? '🔴' : '🟢';
+  const word = sev === 'anomaly' ? 'Anomaly' : 'Recovered';
+  const head =
+    `${dot} <b>${word} · api_error_rate</b>\n\n` +
+    (sev === 'anomaly'
+      ? '<b>Quorum</b> 1/1 · direction <b>above</b> · <b>3/3</b> consecutive\n'
+      : 'The alert condition no longer holds — the metric is back within expected bounds.\n') +
+    '<i>Rule: min_detectors=1 · direction=same · consecutive=3</i>\n\n';
+  const evidence =
+    sev === 'anomaly'
+      ? '• Value: <code>4.2</code> · Expected: <code>&lt;= 1.1</code>\n' +
+        '• Severity: <code>3.40</code>\n' +
+        '• Time: <code>2026-06-19 12:04:00 (Europe/Moscow)</code>\n' +
+        '• Detector: <code>mad</code>\n' +
+        '• Parameters: <code>{"threshold": 3.0, "window_size": 2016, "half_life": "1d"}</code>\n'
+      : '• Value: <code>1.0</code> · Expected: <code>&lt;= 1.1</code>\n' +
+        '• Time: <code>2026-06-19 12:36:00 (Europe/Moscow)</code>\n' +
+        '• Detector: <code>mad</code>\n';
+  return (
+    head +
+    evidence +
+    `\n<a href="${dashUrl}">Open dashboard</a>\n\n` +
+    '<span class="ment">@oncall_engineer</span>'
+  );
+};
+
+const tgPanelHtml = (sev: 'anomaly' | 'recovery') =>
+  '<div class="tg-msg">' +
+  logoSvg(34, '50%') +
+  '<div class="tg-bubble">' +
+  `<div class="tg-name">detectkit ${tgCheck}</div>` +
+  `<div class="tg-text">${tgTextHtml(sev)}</div>` +
+  '<div class="tg-meta">12:04</div>' +
+  '</div></div>';
+
+// Email — a branded HTML card inside a mail-client chrome.
+const emailStatsHtml = (stats: [string, string][]) =>
+  '<div class="ec-grid">' +
+  stats
+    .map(
+      ([k, v]) =>
+        `<div class="ec-cell"><div class="ec-k">${k}</div><div class="ec-v">${v}</div></div>`
+    )
+    .join('') +
+  '</div>';
+
+const emailCardHtml = (sev: 'anomaly' | 'recovery') => {
+  const d = ALERT[sev];
+  const paramsBlock = d.params
+    ? `<div class="ec-plabel">Detector · mad</div><div class="ec-params">${d.params}</div>`
+    : '';
+  return (
+    '<div class="email-card">' +
+    '<div class="ec-accent"></div>' +
+    '<div class="ec-head">' +
+    logoSvg(26, '6px') +
+    '<span class="ec-brand">detectkit</span>' +
+    `<span class="ec-pill">${d.pill}</span>` +
+    '</div>' +
+    '<div class="ec-title">api_error_rate</div>' +
+    `<div class="ec-lead">${d.lead}</div>` +
+    emailStatsHtml(d.emailStats) +
+    paramsBlock +
+    `<a class="ec-btn" href="${dashUrl}">Open dashboard →</a>` +
+    '<div class="ec-foot">Sent by detectkit · CC: oncall_engineer</div>' +
+    '</div>'
+  );
+};
+
+const emailPanelHtml = (sev: 'anomaly' | 'recovery') =>
+  '<div class="email-msg">' +
+  '<div class="email-head">' +
+  logoSvg(34, '50%') +
+  '<div class="email-meta">' +
+  '<div class="email-from"><b>detectkit alerts</b> <span>&lt;alerts@detectkit.dev&gt;</span></div>' +
+  '<div class="email-sub">to team@example.com · 12:04</div>' +
+  '</div>' +
+  '<svg class="email-reply" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9C2B4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>' +
+  '</div>' +
+  emailCardHtml(sev) +
+  '</div>';
 
 // ---- Detectors explainer: four "corridors of normal", each shown on the
 // metric shape it is built for (mad = noisy, zscore = clean bell, iqr = skewed,
@@ -547,86 +724,52 @@ const dxExplainer = (() => {
         <input class="pf-radio" type="radio" name="platform" id="pf-mattermost" />
         <input class="pf-radio" type="radio" name="platform" id="pf-telegram" />
         <input class="pf-radio" type="radio" name="platform" id="pf-email" />
-        <div class="pf-tabs">
-          <label for="pf-slack"><ChannelIcon name="slack" />Slack</label>
-          <label for="pf-mattermost"><ChannelIcon name="mattermost" />Mattermost</label>
-          <label for="pf-telegram"><ChannelIcon name="telegram" />Telegram</label>
-          <label for="pf-email"><ChannelIcon name="email" />Email</label>
+        <input class="pf-radio" type="radio" name="severity" id="sev-anomaly" checked />
+        <input class="pf-radio" type="radio" name="severity" id="sev-recovery" />
+        <div class="pf-controls">
+          <div class="pf-tabs">
+            <label for="pf-slack"><ChannelIcon name="slack" />Slack</label>
+            <label for="pf-mattermost"><ChannelIcon name="mattermost" />Mattermost</label>
+            <label for="pf-telegram"><ChannelIcon name="telegram" />Telegram</label>
+            <label for="pf-email"><ChannelIcon name="email" />Email</label>
+          </div>
+          <div class="pf-sev">
+            <label for="sev-anomaly">Anomaly</label>
+            <label for="sev-recovery">Recovery</label>
+          </div>
         </div>
         <p class="pf-note">
-          The same alert, posted by detectk to each channel — rendered exactly as that channel
-          formats it. The title placement, color and @mentions differ per platform.
+          The same alert, posted by detectkit to each channel — rendered as that channel formats it: a
+          fields attachment on Slack/Mattermost, escaped HTML on Telegram, a branded card in email.
+          The <code>dashboard_url</code> below becomes a first-class link on every channel.
         </p>
-        <div class="pf-panels">
-          <!-- Slack: webhook attachment, red bar, metric name in the title -->
-          <div class="pf-panel pf-slack-panel">
-            <div class="chat-msg">
-              <Logo size={36} class="chat-av" />
-              <div class="chat-body">
-                <div class="chat-head">
-                  <span class="chat-name">detectk</span>
-                  <span class="chat-tag">APP</span>
-                  <span class="chat-time">12:04</span>
-                </div>
-                <div class="attachment">
-                  <div class="bar"></div>
-                  <div class="content">
-                    <div class="title">{alertTitle}</div>
-                    <div class="text" set:html={bodyWebhook}></div>
-                  </div>
-                </div>
-              </div>
+        <div class="pf-surface">
+          <div class="pf-panels">
+            <!-- Slack — fields-based webhook attachment, clickable title -->
+            <div class="pf-panel pf-slack-panel">
+              <div class="sev-anomaly-only" set:html={slackPanelHtml('anomaly')}></div>
+              <div class="sev-recovery-only" set:html={slackPanelHtml('recovery')}></div>
             </div>
-          </div>
-          <!-- Mattermost: same Slack-compatible attachment; BOT tag -->
-          <div class="pf-panel pf-mm-panel">
-            <div class="chat-msg">
-              <Logo size={36} class="chat-av" />
-              <div class="chat-body">
-                <div class="chat-head">
-                  <span class="chat-name">detectk</span>
-                  <span class="chat-tag">BOT</span>
-                  <span class="chat-time">12:04</span>
-                </div>
-                <div class="attachment">
-                  <div class="bar"></div>
-                  <div class="content">
-                    <div class="title">{alertTitle}</div>
-                    <div class="text" set:html={bodyWebhook}></div>
-                  </div>
-                </div>
-              </div>
+            <!-- Mattermost — same attachment, circle avatar + BOT tag -->
+            <div class="pf-panel pf-mm-panel">
+              <div class="sev-anomaly-only" set:html={mmPanelHtml('anomaly')}></div>
+              <div class="sev-recovery-only" set:html={mmPanelHtml('recovery')}></div>
             </div>
-          </div>
-          <!-- Telegram: plain Bot API message, title inside the text, no color bar -->
-          <div class="pf-panel pf-tg-panel">
-            <div class="tg-msg">
-              <Logo size={34} class="tg-av" />
-              <div class="tg-bubble">
-                <div class="tg-name">detectk_bot</div>
-                <div class="tg-text" set:html={bodyTelegram}></div>
-                <div class="tg-meta">12:04</div>
-              </div>
+            <!-- Telegram — escaped-HTML message, status dot, no color bar -->
+            <div class="pf-panel pf-tg-panel">
+              <div class="sev-anomaly-only" set:html={tgPanelHtml('anomaly')}></div>
+              <div class="sev-recovery-only" set:html={tgPanelHtml('recovery')}></div>
             </div>
-          </div>
-          <!-- Email: subject + plain-text body; mentions become a CC line -->
-          <div class="pf-panel pf-email-panel">
-            <div class="email-card">
-              <div class="email-head">
-                <div class="email-row">
-                  <span class="email-k">From</span><span>detectk &lt;alerts@detectk.dev&gt;</span>
-                </div>
-                <div class="email-row">
-                  <span class="email-k">To</span><span>oncall@team.example</span>
-                </div>
-                <div class="email-row">
-                  <span class="email-k">Subject</span><span class="email-subject">{alertTitle}</span>
-                </div>
-              </div>
-              <div class="email-body" set:html={bodyEmail}></div>
+            <!-- Email — branded HTML card inside a mail client -->
+            <div class="pf-panel pf-email-panel">
+              <div class="sev-anomaly-only" set:html={emailPanelHtml('anomaly')}></div>
+              <div class="sev-recovery-only" set:html={emailPanelHtml('recovery')}></div>
             </div>
           </div>
         </div>
+        <pre class="pf-yaml"><span class="k">alerting</span>:
+  <span class="k">channels</span>: [<span class="s">mattermost_ops</span>]
+  <span class="k">dashboard_url</span>: <span class="s">{dashUrl}</span>   <span class="c"># one line → a link on every channel</span></pre>
       </div>
     </section>
 

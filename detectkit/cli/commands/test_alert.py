@@ -87,6 +87,8 @@ def create_mock_alert_data(
         },
         consecutive_count=consecutive_required,
         mentions=mentions,
+        dashboard_url=getattr(alerting_config, "dashboard_url", None),
+        links=dict(getattr(alerting_config, "links", {}) or {}),
         min_detectors=min_detectors,
         direction_policy=direction_policy,
         consecutive_required=consecutive_required,

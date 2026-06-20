@@ -107,6 +107,11 @@ alerting:
     - slack_critical
     - email_team
 
+  # Dashboard / runbook links (v0.13.0)
+  dashboard_url: https://grafana.ops/d/api-errors   # clickable title / link / button
+  links:                                            # extra "label: url" links
+    Runbook: https://runbooks.ops/api-errors
+
   # Filtering
   min_detectors: 1               # Detectors that must satisfy the quorum per point
   direction: "same"              # "same", "any", "up", "down"

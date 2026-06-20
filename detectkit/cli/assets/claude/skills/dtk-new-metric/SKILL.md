@@ -94,6 +94,8 @@ If the user wants notifications:
   re-alerts on every run. Consider `notify_on_recovery: true` for important
   metrics and `no_data_alert: true` for cron-fed metrics where absence is a
   failure.
+- Add `dashboard_url:` (and optional `links:`) if there's a dashboard/runbook —
+  it becomes a first-class "Open dashboard" action on every channel.
 
 If the user doesn't want alerts yet, omit the `alerting` block (the metric still
 loads and detects).
@@ -132,6 +134,7 @@ alerting:
   direction: "up"
   consecutive_anomalies: 3
   alert_cooldown: "30min"
+  dashboard_url: https://grafana.ops/d/api-errors   # optional "Open dashboard" action
 ```
 
 ## Step 7 — Validate before declaring done

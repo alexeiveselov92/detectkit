@@ -39,6 +39,13 @@ also leads with the **project name** (`[name] `) — see
   The subject is prefixed with `[project]` and the plain-text body
   remains the multipart fallback.
 
+On both anomaly and recovery alerts the **firing rule is set apart the same way
+in every channel**: a bold **Rule** label followed by an inline-code chip
+(`min_detectors=… · direction=… · consecutive=…`), with the quorum explanation
+on its own line — so the configured rule reads at a glance instead of running
+into the surrounding prose. (Bold is rendered in each platform's native syntax;
+the code chip looks the same everywhere.)
+
 ### Dashboard and runbook links
 
 Two metric-level `alerting:` fields surface as first-class links on every

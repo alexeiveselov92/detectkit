@@ -1056,10 +1056,22 @@
 }
 .att-lead {
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.7;
   color: #1d1c1d;
   margin-bottom: 11px;
   font-family: var(--sans);
+}
+.att-lead strong {
+  font-weight: 700;
+  color: #1d1c1d;
+}
+.att-lead code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: #f3f1ec;
+  color: #b4471f;
+  padding: 1px 5px;
+  border-radius: 4px;
 }
 .att-fields {
   display: grid;
@@ -1245,8 +1257,21 @@
 .ec-lead {
   padding: 5px 22px 14px;
   font-size: 13.5px;
-  line-height: 1.45;
+  line-height: 1.7;
   color: #6e675b;
+}
+.ec-lead strong {
+  font-weight: 700;
+  color: #1b1916;
+}
+.ec-lead code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: #f5f1e8;
+  border: 1px solid #e6e0d4;
+  color: #1b1916;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 .ec-grid {
   display: grid;

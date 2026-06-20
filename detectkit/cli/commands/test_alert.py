@@ -23,6 +23,7 @@ def create_mock_alert_data(
     alerting_config,
     timezone_display: str = "UTC",
     help_url: str | None = None,
+    project_name: str | None = None,
 ) -> AlertData:
     """
     Create realistic mock AlertData for testing.
@@ -36,6 +37,10 @@ def create_mock_alert_data(
         timezone_display: Timezone for display
         help_url: Resolved "how to read this alert" link to preview (the
             project's ``alert_help_url``); ``None`` renders no help link.
+        project_name: Project name from ``detectkit_project.yml`` — stamped so
+            the preview carries the same ``[name]`` prefix a real ``dtk run``
+            renders (the run pipeline sets it in ``_alert_step.py``); ``None``
+            renders no prefix.
 
     Returns:
         AlertData with mock anomaly data
@@ -90,6 +95,7 @@ def create_mock_alert_data(
         },
         consecutive_count=consecutive_required,
         mentions=mentions,
+        project_name=project_name,
         dashboard_url=getattr(alerting_config, "dashboard_url", None),
         links=dict(getattr(alerting_config, "links", {}) or {}),
         help_url=help_url,
@@ -123,7 +129,13 @@ def run_test_alert(metric_name: str, profile: str | None = None):
     with open(project_config_path) as f:
         project_data = yaml.safe_load(f)
 
-    metrics_dir_name = project_data.get("metrics_path", "metrics")
+    # Project name drives the [name] prefix a real `dtk run` stamps on every
+    # alert (see _alert_step.py); thread it so the preview matches a real firing.
+    project_name = project_data.get("name")
+
+    # Metrics dir lives under `paths.metrics` (default "metrics"); the old
+    # top-level `metrics_path` key is deprecated and ignored by ProjectConfig.
+    metrics_dir_name = (project_data.get("paths") or {}).get("metrics", "metrics")
 
     # Resolve the "how to read this alert" link so the preview matches what real
     # alerts would carry (brand default, a custom URL, or hidden via false).
@@ -187,7 +199,11 @@ def run_test_alert(metric_name: str, profile: str | None = None):
         print(f"   Channels: {', '.join(alerting_config.channels)}\n")
 
         alert_data = create_mock_alert_data(
-            metric_config, alerting_config, timezone_display, help_url=help_url
+            metric_config,
+            alerting_config,
+            timezone_display,
+            help_url=help_url,
+            project_name=project_name,
         )
 
         success_count = 0

@@ -586,6 +586,9 @@ Sends a mock alert through all configured channels with fake data:
 - Rule preview: the mock mirrors the alert config's own `min_detectors`,
   `direction`, and `consecutive_anomalies` (defaults `1` / `same` / `3`), so
   the message shows the alert-centric layout a real firing would produce
+- Project label: the preview carries the project-name `[name]` prefix (from
+  `detectkit_project.yml`), exactly as a real `dtk run` stamps it — so a preview
+  on a shared multi-project channel reads identically to the real alert
 
 **Use cases**:
 - Verify webhook URLs work

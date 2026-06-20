@@ -167,9 +167,9 @@ class TelegramChannel(BaseAlertChannel):
                 f"<b>{ctx['consecutive_count']}/{ctx['consecutive_required']}</b> consecutive"
             )
             lines.append(
-                f"<i>Rule: min_detectors={ctx['min_detectors']} · "
+                f"<b>Rule</b> <code>min_detectors={ctx['min_detectors']} · "
                 f"direction={esc(ctx['direction_policy'])} · "
-                f"consecutive={ctx['consecutive_required']}</i>"
+                f"consecutive={ctx['consecutive_required']}</code>"
             )
             lines.append("")
             lines.append(
@@ -188,9 +188,9 @@ class TelegramChannel(BaseAlertChannel):
                 "expected bounds."
             )
             lines.append(
-                f"<i>Rule: min_detectors={ctx['min_detectors']} · "
+                f"<b>Rule</b> <code>min_detectors={ctx['min_detectors']} · "
                 f"direction={esc(ctx['direction_policy'])} · "
-                f"consecutive={ctx['consecutive_required']}</i>"
+                f"consecutive={ctx['consecutive_required']}</code>"
             )
             lines.append("")
             lines.append(

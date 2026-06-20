@@ -213,6 +213,15 @@ leads with a colored **status circle** — 🔴 anomaly, 🟢 recovery, 🟡 no-
   table, a monospace params box, an optional "Open dashboard" button, and a
   footer. The plain-text body remains the multipart fallback.
 
+On anomaly **and** recovery alerts the **firing rule is set apart uniformly** in
+every default-rendered channel: a bold **Rule** label + an inline-code chip
+(`min_detectors=… · direction=… · consecutive=…`), with the quorum explanation
+on its own line, so the rule reads as "this is the config that fired" at a
+glance. Bold is platform-aware (`*Rule*` on Slack, `**Rule**` on
+Mattermost/generic; `<b>Rule</b>` on Telegram; `<strong>` in email), while the
+code chip is identical everywhere. Custom templates and the plain-text fallbacks
+are unchanged.
+
 ## Project label (multi-project channels)
 
 The bot keeps the **detectkit brand** name + avatar by default (so users rarely

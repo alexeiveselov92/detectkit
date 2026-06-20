@@ -296,6 +296,16 @@ with the brand name (`detectkit · <project>`). Direct-API callers leave it
   table, a monospace params box, an optional "Open dashboard" button, and a
   footer; the plain-text body remains the multipart fallback.
 
+On anomaly **and** recovery alerts the **firing rule is set apart uniformly**:
+a bold **Rule** label + an inline-code chip (`min_detectors=… · direction=… ·
+consecutive=…`), with the quorum explanation on its own line. Bold is
+platform-aware on webhook channels (`*Rule*` Slack mrkdwn vs `**Rule**`
+Mattermost/generic CommonMark, via `WebhookChannel._bold`, mirroring
+`_link_markup`); Telegram renders `<b>Rule</b> <code>…</code>`; email renders
+the same bold-label + monospace chip via `EmailChannel._rule_html` (it had no
+explicit rule line before). The backtick/`<code>` chip renders identically
+everywhere; custom templates and the plain-text fallbacks are unchanged.
+
 Two `AlertConfig` fields (`detectkit/config/metric_config.py`) drive the action
 links, surfaced as first-class actions on every channel: **`dashboard_url`** (a
 dashboard/runbook URL — clickable title on webhook channels, inline link on

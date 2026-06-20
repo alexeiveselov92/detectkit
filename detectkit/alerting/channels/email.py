@@ -315,13 +315,13 @@ class EmailChannel(BaseAlertChannel):
             parts.append(self._lead_html(ctx["description"]))
 
         if kind == "anomaly":
-            lead = (
-                f"Fired because the latest {ctx['consecutive_count']}/"
-                f"{ctx['consecutive_required']} consecutive points each met the quorum "
-                f"(min_detectors={ctx['min_detectors']}, direction "
-                f"{html.escape(str(ctx['direction_policy']))})."
+            parts.append(self._rule_html(ctx))
+            parts.append(
+                self._lead_html(
+                    f"Latest {ctx['consecutive_count']}/{ctx['consecutive_required']} "
+                    "consecutive points met the quorum."
+                )
             )
-            parts.append(self._lead_html(lead))
             parts.append(
                 self._stat_grid(
                     [
@@ -340,6 +340,7 @@ class EmailChannel(BaseAlertChannel):
                 "expected bounds."
             )
             parts.append(self._lead_html(lead))
+            parts.append(self._rule_html(ctx))
             parts.append(
                 self._stat_grid(
                     [
@@ -378,6 +379,26 @@ class EmailChannel(BaseAlertChannel):
             f'<tr><td style="padding:4px 24px 16px 24px;font-family:{_SANS};font-size:14px;'
             f'color:{_MUTED};mso-line-height-rule:exactly;line-height:20px;">'
             f"{html.escape(text)}</td></tr>"
+        )
+
+    def _rule_html(self, ctx: dict[str, Any]) -> str:
+        """The configured firing rule: a bold ``Rule`` label + a monospace chip.
+
+        Mirrors the inline-code "Rule chip" the webhook/Telegram channels render,
+        so the same firing rule reads the same way in every channel.
+        """
+        expr = (
+            f"min_detectors={ctx['min_detectors']} &middot; "
+            f"direction={html.escape(str(ctx['direction_policy']))} &middot; "
+            f"consecutive={ctx['consecutive_required']}"
+        )
+        return (
+            f'<tr><td style="padding:0 24px 14px 24px;font-family:{_SANS};font-size:13px;'
+            f'color:{_MUTED};mso-line-height-rule:exactly;line-height:22px;">'
+            f'<strong style="color:{_INK};">Rule</strong>&nbsp;'
+            f'<code style="font-family:{_MONO};font-size:12px;background-color:{_PAPER};'
+            f'border:1px solid {_BORDER};border-radius:4px;padding:2px 6px;color:{_INK};">'
+            f"{expr}</code></td></tr>"
         )
 
     def _stat_grid(self, pairs: list[tuple[str, str]]) -> str:

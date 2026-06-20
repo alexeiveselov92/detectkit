@@ -5,6 +5,28 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.3] - 2026-06-20
+
+### Changed
+- **The firing rule is set apart consistently in every channel.** On anomaly and
+  recovery alerts the configured rule now renders as a bold **Rule** label
+  followed by an inline-code chip (`min_detectors=… · direction=… ·
+  consecutive=…`), with the quorum explanation on its own line — so the rule
+  reads as "this is the config that fired" at a glance instead of running into
+  the surrounding prose. Applied across **all** default-rendered channels and to
+  both alert kinds:
+  - **Slack / Mattermost / generic webhook** — bold label is platform-aware
+    (`*Rule*` on Slack mrkdwn, `**Rule**` on Mattermost/generic CommonMark, via
+    the new `WebhookChannel._bold`); the backtick code chip renders identically
+    on both.
+  - **Telegram** — the rule line changed from italic (`<i>Rule: …</i>`) to
+    `<b>Rule</b> <code>…</code>`.
+  - **Email** — previously had **no** explicit rule line (the rule was buried in
+    prose); it now renders the same bold-label + monospace chip (`_rule_html`),
+    matching the other channels.
+  - The landing-page channel previews were updated to match.
+  Custom templates and the plain-text fallback bodies are unchanged.
+
 ## [0.16.2] - 2026-06-20
 
 ### Fixed

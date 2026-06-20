@@ -136,7 +136,8 @@ const ALERT = {
   anomaly: {
     title: '🔴 [payments] Alert: api_error_rate',
     pill: 'ANOMALY',
-    lead: 'Rule: min_detectors=1 · direction=same · consecutive=3. Latest 3/3 consecutive points met the quorum.',
+    rule: 'min_detectors=1 · direction=same · consecutive=3',
+    lead: 'Latest 3/3 consecutive points met the quorum.',
     fields: [
       ['Value', '4.2', true, true],
       ['Expected', '&lt;= 1.1', true, true],
@@ -158,7 +159,8 @@ const ALERT = {
   recovery: {
     title: '🟢 [payments] Alert cleared: api_error_rate',
     pill: 'RECOVERED',
-    lead: 'The alert condition no longer holds — the metric is back within expected bounds. Rule: min_detectors=1 · direction=same · consecutive=3.',
+    rule: 'min_detectors=1 · direction=same · consecutive=3',
+    lead: 'The alert condition no longer holds — the metric is back within expected bounds.',
     fields: [
       ['Value', '1.0', true, true],
       ['Expected', '&lt;= 1.1', true, true],
@@ -174,6 +176,15 @@ const ALERT = {
     ] as [string, string][],
     params: '',
   },
+};
+
+// The firing rule, set apart as a bold "Rule" label + an inline-code chip
+// (the way every channel now renders it), followed by the plain explanation —
+// rule-first for anomaly, lead-first for recovery, mirroring the real channels.
+const ruleLead = (sev: 'anomaly' | 'recovery') => {
+  const d = ALERT[sev];
+  const chip = `<strong>Rule</strong> <code>${d.rule}</code>`;
+  return sev === 'anomaly' ? `${chip}<br>${d.lead}` : `${d.lead}<br>${chip}`;
 };
 
 // Slack / Mattermost — one fields-based attachment (the metric name is the
@@ -197,7 +208,7 @@ const attachmentHtml = (sev: 'anomaly' | 'recovery') => {
     '<div class="bar"></div>' +
     '<div class="content">' +
     `<a class="att-title" href="${dashUrl}">${d.title}<span class="ext"> ↗</span></a>` +
-    `<div class="att-lead">${d.lead}</div>` +
+    `<div class="att-lead">${ruleLead(sev)}</div>` +
     fieldsHtml(d.fields) +
     `<div class="att-footer">${logoSvg(13, '3px')}<span>detectkit · payments</span></div>` +
     '</div></div>'
@@ -234,7 +245,7 @@ const tgTextHtml = (sev: 'anomaly' | 'recovery') => {
     (sev === 'anomaly'
       ? '<b>Quorum</b> 1/1 · direction <b>above</b> · <b>3/3</b> consecutive\n'
       : 'The alert condition no longer holds — the metric is back within expected bounds.\n') +
-    '<i>Rule: min_detectors=1 · direction=same · consecutive=3</i>\n\n';
+    '<b>Rule</b> <code>min_detectors=1 · direction=same · consecutive=3</code>\n\n';
   const evidence =
     sev === 'anomaly'
       ? '• Value: <code>4.2</code> · Expected: <code>&lt;= 1.1</code>\n' +
@@ -288,7 +299,7 @@ const emailCardHtml = (sev: 'anomaly' | 'recovery') => {
     '</div>' +
     '<div class="ec-eyebrow">payments</div>' +
     '<div class="ec-title">api_error_rate</div>' +
-    `<div class="ec-lead">${d.lead}</div>` +
+    `<div class="ec-lead">${ruleLead(sev)}</div>` +
     emailStatsHtml(d.emailStats) +
     paramsBlock +
     `<a class="ec-btn" href="${dashUrl}">Open dashboard →</a>` +

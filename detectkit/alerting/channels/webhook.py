@@ -256,11 +256,19 @@ class WebhookChannel(BaseAlertChannel):
         def code(s: str) -> str:
             return f"`{s}`" if s else ""
 
+        # The configured firing rule, set apart as a bold "Rule" label + an
+        # inline-code chip so it reads as "this is the config that fired" at a
+        # glance. Backticks render identically on Slack and Mattermost; the bold
+        # label is platform-aware (see ``_bold``).
+        rule_chip = f"{self._bold('Rule')} " + code(
+            f"min_detectors={ctx['min_detectors']} · "
+            f"direction={ctx['direction_policy']} · "
+            f"consecutive={ctx['consecutive_required']}"
+        )
+
         if kind == "anomaly":
             lead = (
-                f"Rule: min_detectors={ctx['min_detectors']} · "
-                f"direction={ctx['direction_policy']} · "
-                f"consecutive={ctx['consecutive_required']}. "
+                f"{rule_chip}\n"
                 f"Latest {ctx['consecutive_count']}/{ctx['consecutive_required']} "
                 "consecutive points met the quorum."
             )
@@ -275,9 +283,7 @@ class WebhookChannel(BaseAlertChannel):
         elif kind == "recovery":
             lead = (
                 "The alert condition no longer holds — the metric is back within "
-                f"expected bounds. Rule: min_detectors={ctx['min_detectors']} · "
-                f"direction={ctx['direction_policy']} · "
-                f"consecutive={ctx['consecutive_required']}."
+                f"expected bounds.\n{rule_chip}"
             )
             short("Value", code(ctx["value_display"]))
             short("Expected", code(ctx["expected_range"]))
@@ -328,6 +334,20 @@ class WebhookChannel(BaseAlertChannel):
             "fields": fields,
             "mrkdwn_in": ["text", "fields"],
         }
+
+    def _bold(self, text: str) -> str:
+        """Render *text* bold in the target platform's markdown.
+
+        Slack mrkdwn uses ``*bold*``; Mattermost and generic webhooks use
+        CommonMark ``**bold**`` (where ``*x*`` would render as italic). Mirrors
+        the platform branch in :meth:`_link_markup`, detecting Slack from the
+        webhook host.
+        """
+        if not text:
+            return ""
+        if "hooks.slack.com" in self.webhook_url:
+            return f"*{text}*"
+        return f"**{text}**"
 
     def _link_markup(self, url: str, label: str) -> str:
         """Render *label* as a clickable link in the target platform's syntax.

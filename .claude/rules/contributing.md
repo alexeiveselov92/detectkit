@@ -124,16 +124,26 @@ automatically — do not add per-detector params that bypass the hash.
 
 Channels live in `detectkit/alerting/channels/`. The base class
 `BaseAlertChannel` (`base.py`) already provides `format_message`,
-`format_title`, `format_mentions`, and all the default templates.
+`format_title`, `format_mentions`, all the default templates, and
+`build_context` / `status_color` / `status_word` / `status_emoji` helpers.
+
+For a **rich, platform-native** layout (the webhook/Telegram/email channels do
+this), build the message from `build_context(alert_data)` — the single dict of
+display-ready values (`value_display`, `expected_range`, `timestamp`,
+`detector_params`, `dashboard_url`, …) shared with the template path — and apply
+your platform's own escaping (HTML for Telegram/email, markdown for webhook).
+Fall back to `format_message(alert_data, template)` when the caller passes a
+custom `template`. Lead the title/headline with `status_emoji(alert_data)` and
+pick accents with `status_color(alert_data)` so status reads from color.
 
 1. Create `detectkit/alerting/channels/<name>.py`. Subclass
    `BaseAlertChannel`, or `WebhookChannel` (`webhook.py`) for a
    webhook/POST-style channel.
 2. Implement `send(self, alert_data: AlertData, template=None) -> bool` (return
    `True`/`False`; log and swallow transport errors rather than crashing the
-   pipeline). Override the `get_default_*_template()` /
-   `get_default_*_title_template()` methods only if the channel needs a
-   different layout from the base defaults.
+   pipeline). Build the body natively from `build_context`, or override the
+   `get_default_*_template()` / `get_default_*_title_template()` methods only if
+   the channel needs a different plain-text layout from the base defaults.
 3. Override `format_mentions` for platform-native mention syntax if needed.
 4. Register the type in `AlertChannelFactory.CHANNEL_TYPES`
    (`detectkit/alerting/channels/factory.py`), mapping a lowercase type name to

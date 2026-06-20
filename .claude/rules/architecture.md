@@ -262,7 +262,11 @@ runs.
 
 **Default rendering is platform-native** (no custom `template`). The value
 computation behind all of it is shared: `BaseAlertChannel.build_context` is the
-single source feeding both custom templates and native rendering.
+single source feeding both custom templates and native rendering. Every alert
+title/headline leads with a colored **status circle** so the status reads from
+color alone — 🔴 anomaly, 🟢 recovery, 🟡 no-data, 🔵 pipeline error
+(`BaseAlertChannel._STATUS_EMOJI` / `status_color`, kept in sync with the
+`--st-*` brand tokens).
 
 - **Slack / Mattermost / generic webhook** (all via `WebhookChannel`) render one
   message *attachment* — a status-colored accent bar, a clickable title (the
@@ -274,7 +278,7 @@ single source feeding both custom templates and native rendering.
   text-only attachment (color/title/branding kept, no fields grid).
 - **Telegram** defaults to `parse_mode: HTML` (was Markdown). The default
   message is structured and HTML-escaped: a colored status dot (red anomaly /
-  green recovery / yellow no-data / stop error), a bold headline, the rule, then
+  green recovery / yellow no-data / blue error), a bold headline, the rule, then
   evidence in `<code>` (value / expected / severity / time / detector / params),
   an inline "Open dashboard" link, then mentions. This fixes a real bug — the
   old Markdown mode raised `can't parse entities` on params JSON containing

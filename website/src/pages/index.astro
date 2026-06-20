@@ -124,15 +124,11 @@ const logoSvg = (size: number, rx: string) =>
   `<circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>`;
 
 // Per-state content. Fields are [label, value, short, mono].
+// Links is one compact block of clickable labels — never raw URLs (a real
+// dashboard URL can be paragraph-long), matching the webhook channel rendering.
 const linkField: [string, string, boolean, boolean] = [
   'Links',
-  `Dashboard: <a href="${dashUrl}">${dashUrl}</a>`,
-  false,
-  false,
-];
-const helpField: [string, string, boolean, boolean] = [
-  'How to read this alert',
-  `<a href="${helpUrl}">${helpUrl}</a>`,
+  `<a href="${dashUrl}">Dashboard</a> · <a href="${helpUrl}">How to read this alert</a>`,
   false,
   false,
 ];
@@ -150,7 +146,6 @@ const ALERT = {
       ['Detectors', 'mad', false, true],
       ['Parameters', '{"threshold": 3.0, "window_size": 2016, "half_life": "1d"}', false, true],
       linkField,
-      helpField,
     ] as [string, string, boolean, boolean][],
     emailStats: [
       ['Value', '4.2'],
@@ -170,7 +165,6 @@ const ALERT = {
       ['Detected at', '2026-06-19 12:36:00 (Europe/Moscow)', false, false],
       ['Detectors', 'mad', false, true],
       linkField,
-      helpField,
     ] as [string, string, boolean, boolean][],
     emailStats: [
       ['Value', '1.0'],

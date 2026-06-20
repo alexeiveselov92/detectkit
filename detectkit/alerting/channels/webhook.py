@@ -293,20 +293,21 @@ class WebhookChannel(BaseAlertChannel):
             err = f"{ctx['error_type']}: {ctx['error_message']}".strip(": ")
             full("Error", code(err))
 
-        # Optional links block (dashboard_url is already the clickable title;
-        # surface bare URLs here too so they're visible/linkified on both).
-        link_lines = []
+        # Links block — kept as its own flexible field, but every entry is a
+        # compact clickable label, never a raw URL string. A Grafana dashboard
+        # URL can be a paragraph long once it carries variables; nobody should
+        # read that in an alert, so we hide it behind the label and render in the
+        # platform's link syntax. Holds dashboard + any extra links + the "how to
+        # read this alert" guide, joined by " · ".
+        link_parts = []
         if alert_data.dashboard_url:
-            link_lines.append(f"Dashboard: {alert_data.dashboard_url}")
+            link_parts.append(self._link_markup(alert_data.dashboard_url, "Dashboard"))
         for label, url in alert_data.links.items():
-            link_lines.append(f"{label}: {url}")
-        if link_lines:
-            full("Links", "\n".join(link_lines))
-
-        # "How to read this alert" — the last field, a bare URL (auto-linkified on
-        # both Slack and Mattermost) pointing readers at the interpretation guide.
+            link_parts.append(self._link_markup(url, label))
         if ctx["help_url"]:
-            full(ctx["help_label"], ctx["help_url"])
+            link_parts.append(self._link_markup(ctx["help_url"], ctx["help_label"]))
+        if link_parts:
+            full("Links", " · ".join(link_parts))
 
         # A plain-text one-liner for notification previews / unsupported clients.
         if kind == "no_data":
@@ -327,6 +328,19 @@ class WebhookChannel(BaseAlertChannel):
             "fields": fields,
             "mrkdwn_in": ["text", "fields"],
         }
+
+    def _link_markup(self, url: str, label: str) -> str:
+        """Render *label* as a clickable link in the target platform's syntax.
+
+        Slack incoming webhooks (``hooks.slack.com``) use ``<url|label>``;
+        Mattermost and other webhooks use markdown ``[label](url)``. This keeps a
+        link a short clickable phrase instead of a raw URL — important because a
+        real dashboard URL (e.g. Grafana with many variables) can be extremely
+        long, and no one should have to read it inside an alert.
+        """
+        if "hooks.slack.com" in self.webhook_url:
+            return f"<{url}|{label}>"
+        return f"[{label}]({url})"
 
     @staticmethod
     def _unix_ts(ts: Any) -> int | None:

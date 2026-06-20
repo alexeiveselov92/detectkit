@@ -16,10 +16,10 @@ also leads with the **project name** (`[name] `) — see
   message *attachment* with a status-colored accent bar, a clickable title (the
   project + metric; links to `dashboard_url` when set), a short markdown lead (the
   rule that fired), and a compact fields grid — short fields Value / Expected /
-  Quorum / Severity, then full-width Detected at / Detectors / Parameters — plus
-  a branded footer (`detectkit · <project>`) and footer icon, then a bottom
-  full-width "How to read this alert" field whose value is the bare URL
-  (auto-linkified). `@mentions` ride in
+  Quorum / Severity, then full-width Detected at / Detectors / Parameters, and a
+  compact **Links** field of clickable labels (Dashboard / any extra links /
+  "How to read this alert") — never raw URLs — plus a branded footer
+  (`detectkit · <project>`) and footer icon. `@mentions` ride in
   the **top-level message text** (not the attachment) so Slack actually notifies.
   A custom `template` renders instead as a plain text-only attachment (status
   color, title and branding kept, no fields grid).
@@ -45,12 +45,16 @@ Two metric-level `alerting:` fields surface as first-class links on every
 channel:
 
 - `dashboard_url` — optional dashboard/runbook URL. Rendered as the clickable
-  attachment title on Slack/Mattermost/webhook, an inline "Open dashboard" link
-  on Telegram, and an "Open dashboard" button in email. Also exposed to custom
-  templates as `{dashboard_url}` (raw URL, empty string when unset) and
-  `{dashboard_line}` (`Dashboard: <url>\n` when set, else empty — appended to the
-  default plain-text templates).
-- `links` — a `label: url` map of extra links appended alongside `dashboard_url`.
+  attachment title **and** a `Dashboard` label in the webhook `Links` field, an
+  inline "Open dashboard" link on Telegram, and an "Open dashboard" button in
+  email. On webhooks the URL is always hidden behind a clickable label (a real
+  Grafana URL can be paragraph-long with all its variables), using each
+  platform's link syntax — Slack `<url|label>`, Mattermost/generic markdown
+  links. Also exposed to custom templates as `{dashboard_url}` (raw URL,
+  empty string when unset) and `{dashboard_line}` (`Dashboard: <url>\n` when set,
+  else empty — appended to the default plain-text templates).
+- `links` — a `label: url` map of extra links shown as more clickable labels in
+  the same webhook `Links` field (and alongside the other links on Telegram/email).
 
 ```yaml
 # In metric config
@@ -70,9 +74,9 @@ also carries a **stakeholder-facing "How to read this alert" link** — a
 plain-language pointer for non-operators who see the alert but don't run the
 pipeline. By default it links to the official detectkit guide,
 [Reading alerts](reading-alerts.md)
-(`https://dtk.pipelab.dev/guides/reading-alerts/`). It renders per channel as the
-bottom field on Slack/Mattermost/webhook, on the Telegram links line (after "Open
-dashboard"), and in the email footer.
+(`https://dtk.pipelab.dev/guides/reading-alerts/`). It renders per channel as a
+clickable label in the webhook `Links` field, on the Telegram links line (after
+"Open dashboard"), and in the email footer.
 
 The link is controlled project-wide by the `alert_help_url` field in
 `detectkit_project.yml` (tri-state: unset → the official guide, a URL string →

@@ -204,6 +204,11 @@ skills) into your project so the assistant understands the project layout:
 dtk init-claude
 ```
 
+It installs three skills: **`dtk-setup-project`** (configure the database
+connection and a first alert channel), **`dtk-new-metric`** (scaffold a
+validated metric), and **`dtk-feedback`** (file a redacted bug report, feature
+request, or feedback as a GitHub issue upstream).
+
 Re-run it after upgrading detectkit to refresh the shipped context.
 
 ## Upgrading

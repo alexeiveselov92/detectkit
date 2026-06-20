@@ -19,7 +19,7 @@
 - **Database agnostic** — ClickHouse, PostgreSQL, MySQL
 - **Idempotent** — resume from interruptions, no duplicate processing
 - **CLI** — `dtk init`, `dtk run --select`, `dtk unlock`, `dtk clean`, tag-based selectors
-- **AI-native onboarding** — `dtk init-claude` sets up Claude Code context (CLAUDE.md + rules + a metric-scaffolding skill) so an assistant can help you build metrics out of the box
+- **AI-native onboarding** — `dtk init-claude` sets up Claude Code context (CLAUDE.md + rules + three skills) so an assistant can scaffold metrics, configure databases, and file feedback upstream
 
 ## Installation
 

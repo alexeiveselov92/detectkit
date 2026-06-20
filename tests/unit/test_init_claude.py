@@ -23,6 +23,7 @@ RULE_FILES = {
 }
 SKILL_FILE = ".claude/skills/dtk-new-metric/SKILL.md"
 SETUP_SKILL_FILE = ".claude/skills/dtk-setup-project/SKILL.md"
+FEEDBACK_SKILL_FILE = ".claude/skills/dtk-feedback/SKILL.md"
 
 
 def _read(p: Path) -> str:
@@ -53,12 +54,17 @@ class TestFreshScaffold:
         assert setup_skill.exists()
         assert "name: dtk-setup-project" in _read(setup_skill)
 
+        feedback_skill = tmp_path / FEEDBACK_SKILL_FILE
+        assert feedback_skill.exists()
+        assert "name: dtk-feedback" in _read(feedback_skill)
+
     def test_block_points_to_rules_and_skill(self, tmp_path):
         run_init_claude(str(tmp_path))
         text = _read(tmp_path / "CLAUDE.md")
         assert ".claude/rules/detectkit/" in text
         assert "dtk-new-metric" in text
         assert "dtk-setup-project" in text
+        assert "dtk-feedback" in text
 
 
 class TestIdempotency:

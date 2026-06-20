@@ -5,6 +5,23 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-06-20
+
+### Added
+- **`dtk-feedback` skill** shipped by `dtk init-claude`. When a `dtk` command
+  fails or behaves unexpectedly, the user wants a feature, or has feedback, the
+  assistant can file it as a GitHub issue on the upstream repo
+  (`alexeiveselov92/detectkit`). The skill rules out local config problems
+  first, auto-collects diagnostic context (detectkit/Python/OS versions, backend
+  type, command + traceback, a minimal redacted repro), **strips every secret**,
+  searches for duplicates, and **never submits without explicit confirmation** —
+  using the `gh` CLI when available, or a prefilled "new issue" URL as a
+  fallback. Filed issues carry a `via:assistant` attribution (a body marker, and
+  the label when the maintainer has created it) so the assistant funnel can be
+  triaged. Surfaced across the docs (the `CLAUDE.md` block,
+  `docs/reference/cli.md`, the README feature list, the getting-started "Getting
+  Help"/"AI Onboarding" sections, and the landing page).
+
 ## [0.13.1] - 2026-06-20
 
 ### Fixed

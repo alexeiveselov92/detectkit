@@ -53,8 +53,8 @@ template for your own metrics.
 
 > **Tip — set up an AI assistant.** If you use [Claude
 > Code](https://claude.com/claude-code), run `dtk init-claude` in this folder.
-> It writes a `CLAUDE.md` and `.claude/rules/detectkit/` reference plus two
-> skills — **`dtk-setup-project`** (walk through `profiles.yml` interactively)
+> It writes a `CLAUDE.md` and `.claude/rules/detectkit/` reference plus the
+> setup skills — **`dtk-setup-project`** (walk through `profiles.yml` interactively)
 > and **`dtk-new-metric`** (scaffold a metric) — so the assistant can do the
 > setup below for you and help you write metrics, tune detectors and configure
 > alerts. Re-run it after upgrading detectkit to refresh the context. See
@@ -486,4 +486,8 @@ detectors:
 
 - **Documentation**: Full guides available in [docs/](../)
 - **Examples**: See [examples/](../examples/) for more configurations
+- **If something looks like a bug**: when a `dtk` command errors or behaves
+  unexpectedly and it isn't your config, use the **`dtk-feedback`** skill (from
+  `dtk init-claude`) to file a redacted bug report or feature request upstream —
+  it collects diagnostics, strips every secret, and asks you to confirm first.
 - **Issues**: Report bugs at https://github.com/alexeiveselov92/detectkit/issues

@@ -26,7 +26,7 @@ version — **read the relevant one on demand** instead of guessing:
 | Choosing/tuning detectors, preprocessing, trends, seasonality | `.claude/rules/detectkit/detectors.md` |
 | Alert rules (quorum/direction/consecutive), cooldown, recovery, templates | `.claude/rules/detectkit/alerting.md` |
 
-### Set up & scaffold (skills)
+### Skills
 
 - **First-time setup** — use the **`dtk-setup-project`** skill to configure the
   database connection in `profiles.yml` (the `dtk init` placeholder ships example
@@ -34,6 +34,11 @@ version — **read the relevant one on demand** instead of guessing:
   channel.
 - **A new metric** — use the **`dtk-new-metric`** skill; it walks the config out
   to a YAML file that validates and is ready to run.
+- **Hit a detectkit bug, or have feedback** — once you've ruled out a local
+  config fix (see the gotchas below), use the **`dtk-feedback`** skill to file a
+  redacted bug report, feature request, or comment as a GitHub issue on the
+  upstream repo. It auto-collects the diagnostic context, strips every secret,
+  and never submits without showing you the exact text first.
 
 ### Gotchas that bite (keep these in mind)
 

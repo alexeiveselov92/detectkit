@@ -127,8 +127,10 @@ Folder holding your detectkit project(s) to set up.
     └── skills/
         ├── dtk-setup-project/      # skill: configure profiles.yml (DB + channels)
         │   └── SKILL.md
-        └── dtk-new-metric/         # skill: scaffold a validated metric YAML
-            └── SKILL.md
+        ├── dtk-new-metric/         # skill: scaffold a validated metric YAML
+        │   └── SKILL.md
+        └── dtk-feedback/           # skill: file a redacted bug/feature/feedback
+            └── SKILL.md            #        issue upstream (with your confirmation)
 ```
 
 #### Behavior
@@ -154,9 +156,12 @@ dtk init-claude --target-dir /opt/monitoring
 ```
 
 After running, open the folder in Claude Code and ask it about your metrics,
-alerts or configs. Two skills come with it: **`dtk-setup-project`** (configure
+alerts or configs. Three skills come with it: **`dtk-setup-project`** (configure
 `profiles.yml` — the database connection and a first alert channel — so runs
-work end to end) and **`dtk-new-metric`** (scaffold a validated metric YAML).
+work end to end), **`dtk-new-metric`** (scaffold a validated metric YAML), and
+**`dtk-feedback`** (file a bug report, feature request, or feedback as a GitHub
+issue on the upstream repo — it collects the diagnostic context, redacts every
+secret, and asks you to confirm before submitting).
 
 ---
 

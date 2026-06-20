@@ -5,6 +5,16 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.1] - 2026-06-20
+
+### Fixed
+- Sync the `dtk init-claude` AI-context assets and the dev rules with the
+  0.13.0 alerting redesign: document the colored **status circle** that leads
+  every alert title (🔴 anomaly / 🟢 recovery / 🟡 no-data / 🔵 pipeline error),
+  correct the stale "stop error" wording, cover `build_context` + native
+  rendering in the add-a-channel guide, and surface `dashboard_url` in the
+  metric example. Docs/assets only — no code or behavior change.
+
 ## [0.13.0] - 2026-06-20
 
 ### Added

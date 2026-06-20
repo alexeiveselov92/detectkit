@@ -97,7 +97,7 @@ Sends one notification per incident when the metric returns to normal after an
 alert fired. **Direction-aware**: after a "down" alert, a fresh "up" anomaly
 does not block recovery (the original condition no longer holds). Independent of
 `alert_cooldown` (recovery always sends once per incident). Default body is
-alert-centric (`✅ Alert cleared: <metric>`).
+alert-centric (`🟢 Alert cleared: <metric>`).
 
 ## No-data alerts
 

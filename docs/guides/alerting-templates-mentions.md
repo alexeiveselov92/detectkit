@@ -108,7 +108,7 @@ The default message foregrounds the **alert** (the rule that fired and the
 parameters it fired with); the anomaly appears as supporting evidence below.
 
 ```
-⚠ Alert: {metric_name}
+🔴 Alert: {metric_name}
 {description_line}Quorum {detector_count}/{min_detectors} · direction {direction} (policy {direction_policy}) · consecutive {consecutive_count}/{consecutive_required}
 Rule: min_detectors={min_detectors} · direction={direction_policy} · consecutive={consecutive_required}
 
@@ -226,7 +226,7 @@ like — here with the defaults (`min_detectors: 1`, `direction: same`,
 `consecutive_anomalies: 3`):
 
 ```
-⚠ Alert: api_response_time
+🔴 Alert: api_response_time
 Quorum 1/1 · direction up (policy same) · consecutive 3/3
 Rule: min_detectors=1 · direction=same · consecutive=3
 

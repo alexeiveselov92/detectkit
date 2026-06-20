@@ -359,12 +359,13 @@ class BaseAlertChannel(ABC):
         "no_data": "No data",
         "error": "Pipeline error",
     }
-    # Colored status dots — used where there is no native color bar (Telegram).
+    # Colored status dots — the at-a-glance status cue that leads every alert
+    # title/headline (and the only color cue on Telegram, which has no bar).
     _STATUS_EMOJI = {
         "anomaly": "\U0001f534",  # red circle
         "recovery": "\U0001f7e2",  # green circle
         "no_data": "\U0001f7e1",  # yellow circle
-        "error": "\U0001f6d1",  # stop sign
+        "error": "\U0001f535",  # blue circle
     }
 
     @staticmethod
@@ -449,7 +450,7 @@ class BaseAlertChannel(ABC):
             Default template string
         """
         return (
-            "⚠ Alert: {metric_name}\n"
+            "🔴 Alert: {metric_name}\n"
             "{description_line}"
             "Quorum {detector_count}/{min_detectors} · "
             "direction {direction} (policy {direction_policy}) · "
@@ -475,7 +476,7 @@ class BaseAlertChannel(ABC):
             Default recovery template string
         """
         return (
-            "✅ Alert cleared: {metric_name}\n"
+            "🟢 Alert cleared: {metric_name}\n"
             "{description_line}"
             "The alert condition no longer holds — "
             "the metric is back within expected bounds.\n"
@@ -499,7 +500,7 @@ class BaseAlertChannel(ABC):
         Returns:
             Default title template string
         """
-        return "⚠ Alert: {metric_name}"
+        return "🔴 Alert: {metric_name}"
 
     def get_default_recovery_title_template(self) -> str:
         """
@@ -508,7 +509,7 @@ class BaseAlertChannel(ABC):
         Returns:
             Default recovery title template string
         """
-        return "✅ Alert cleared: {metric_name}"
+        return "🟢 Alert cleared: {metric_name}"
 
     def get_default_no_data_template(self) -> str:
         """
@@ -518,7 +519,7 @@ class BaseAlertChannel(ABC):
         has no datapoint (no row OR row with NULL/NaN value).
         """
         return (
-            "No data for metric: {metric_name}\n"
+            "🟡 No data for metric: {metric_name}\n"
             "{description_line}"
             "Time: {timestamp}\n"
             "Status: query returned no datapoint for the latest interval\n"
@@ -528,12 +529,12 @@ class BaseAlertChannel(ABC):
 
     def get_default_no_data_title_template(self) -> str:
         """Get default title template for no-data alerts."""
-        return "No data: {metric_name}"
+        return "🟡 No data: {metric_name}"
 
     def get_default_error_template(self) -> str:
         """Default body template for project-level error alerts."""
         return (
-            "Pipeline failed for metric: {metric_name}\n"
+            "🔵 Pipeline failed for metric: {metric_name}\n"
             "{description_line}"
             "Time: {timestamp}\n"
             "Error: {error_type}: {error_message}\n"
@@ -549,7 +550,7 @@ class BaseAlertChannel(ABC):
         stay distinguishable. The prefix collapses to an empty string
         when ``AlertData.project_name`` is None.
         """
-        return "{project_name_prefix}Pipeline error: {metric_name}"
+        return "🔵 {project_name_prefix}Pipeline error: {metric_name}"
 
     def __repr__(self) -> str:
         """String representation of channel."""

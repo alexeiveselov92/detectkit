@@ -301,13 +301,13 @@ class TestErrorAlertFormatting:
             error_message="boom",
             project_name="my_monitoring",
         )
-        assert channel.format_title(alert) == "[my_monitoring] Pipeline error: <startup>"
+        assert channel.format_title(alert) == "🔵 [my_monitoring] Pipeline error: <startup>"
 
     def test_default_title_unchanged_without_project_name(self):
         """When project_name is None the prefix collapses — backwards-compat."""
         channel = _RecordingChannel()
         alert = self._error_alert()  # project_name not set
-        assert channel.format_title(alert) == "Pipeline error: cpu_usage"
+        assert channel.format_title(alert) == "🔵 Pipeline error: cpu_usage"
 
     def test_project_name_available_in_custom_template(self):
         channel = _RecordingChannel()

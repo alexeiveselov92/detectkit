@@ -146,9 +146,9 @@ Error: {error_type}: {error_message}
 {mentions_line}
 ```
 
-Title (webhook channels): `[{project_name}] Pipeline error: {metric_name}`
+Title (webhook channels): `🔵 [{project_name}] Pipeline error: {metric_name}`
 when `project_name` is set in `detectkit_project.yml`, otherwise just
-`Pipeline error: {metric_name}` (backwards-compat). The bracketed prefix
+`🔵 Pipeline error: {metric_name}` (backwards-compat). The bracketed prefix
 makes it obvious which project crashed when multiple detectkit instances
 share an alert channel.
 

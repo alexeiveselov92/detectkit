@@ -5,6 +5,22 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.2] - 2026-06-20
+
+### Fixed
+- **`dtk test-alert` preview now matches a real firing.** The preview was built
+  without the project-name `[name]` prefix that `dtk run` stamps on every alert
+  (since 0.15.0), so a preview on a shared multi-project channel read
+  `🔴 Alert: <metric>` while the real alert read `🔴 [Kiss 1] Alert: <metric>`.
+  `create_mock_alert_data()` now threads `project_name` from
+  `detectkit_project.yml` onto the mock `AlertData`, matching the run pipeline
+  (`_alert_step.py`).
+- **`dtk test-alert` resolves the metrics directory from `paths.metrics`.** It
+  read the deprecated top-level `metrics_path` key (ignored by `ProjectConfig`),
+  so a project that customized `paths.metrics` couldn't find its metrics from
+  `test-alert` — it only worked when the dir happened to be the default
+  `metrics`. Closes #13.
+
 ## [0.16.1] - 2026-06-20
 
 ### Changed

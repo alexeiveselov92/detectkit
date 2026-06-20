@@ -55,8 +55,9 @@ dtk run --select <sel> [--steps load,detect,alert] [--from DATE] [--to DATE] \
 
 Sends a mock alert (fake value/CI/severity) through the metric's configured
 channels, using that alert config's own rule (`min_detectors` / `direction` /
-`consecutive_anomalies`), so the preview matches a real firing. Use it to
-verify webhook URLs, channel permissions, and custom templates.
+`consecutive_anomalies`) and the project-name `[name]` prefix, so the preview
+matches a real firing. Use it to verify webhook URLs, channel permissions, and
+custom templates.
 
 ## `dtk unlock --select <sel>`
 

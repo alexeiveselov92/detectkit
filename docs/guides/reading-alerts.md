@@ -63,6 +63,7 @@ one means.
 | **Detected at** | The timestamp of the flagged point, in the configured timezone. |
 | **Severity** | Roughly *how far* outside normal the value was — bigger means more extreme. Use it to prioritize between several alerts, not as an exact unit. |
 | **Quorum** | How many independent checks agreed it was abnormal (e.g. `2/2`), and in which direction (up/down). More agreement = more confidence. |
+| **Rule** | The condition that fired, shown as a chip: `min_detectors=… · direction=… · consecutive=…` — *how many checks had to agree, in which direction, for how many points in a row*. It appears on both 🔴 anomalies and 🟢 recoveries. |
 | **Detectors / Parameters** | The technical checks that flagged it and their settings. Safe to ignore unless you're tuning the monitoring. |
 | **[name] prefix** | If the title starts with `[something]`, that's the **project** the alert came from — useful when several projects post to the same channel. |
 

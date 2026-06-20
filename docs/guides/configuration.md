@@ -180,9 +180,11 @@ alert_help_url: https://wiki.example.com/runbooks/reading-detectkit-alerts
 
 **Per-channel rendering**:
 
-- **Slack / Mattermost / generic webhook** — a bottom full-width
-  attachment field titled "How to read this alert" whose value is the
-  bare URL (auto-linkified on both platforms).
+- **Slack / Mattermost / generic webhook** — a clickable
+  "How to read this alert" label in the compact `Links` field (alongside
+  the `Dashboard` label and any extra `links`), never a raw URL — using
+  each platform's link syntax (Slack `<url|label>`, Mattermost/generic
+  markdown links).
 - **Telegram** — appended to the links line (after the optional "Open
   dashboard" link) as a "How to read this alert" link.
 - **Email** — in the footer, after "Sent by detectkit · &lt;project&gt;"

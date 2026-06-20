@@ -394,6 +394,17 @@ list of one block. See the [Alerting Guide](alerting.md) for full details.
   - `{}` (default) — no extra links
   - Each entry is appended as a labelled link, e.g.
     `{Runbook: 'https://...', Grafana: 'https://...'}`
+  - On webhook channels (Slack/Mattermost/generic) these render as compact
+    clickable labels in one `Links` field — never raw URLs (since v0.16.1)
+
+- **`{help_url}` / `{help_line}`** (template variables, since v0.16.0): the
+  "How to read this alert" stakeholder link carried on every alert. This is
+  **not** a per-metric field — it is set project-wide via `alert_help_url` in
+  `detectkit_project.yml` (tri-state: unset → official guide, URL → your
+  runbook, `false` → hidden); see
+  [Configuration → `alert_help_url`](configuration.md#alert_help_url-string--bool-optional).
+  Available to custom templates as `{help_url}` / `{help_line}`, mirroring
+  `{dashboard_url}` / `{dashboard_line}`.
 
 ```yaml
 alerting:

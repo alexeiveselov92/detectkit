@@ -117,6 +117,7 @@ for r in results:
 - [Configuration Guide](docs/guides/configuration.md) — all config options
 - [Detectors Guide](docs/guides/detectors.md) — choosing the right detector
 - [Alerting Guide](docs/guides/alerting.md) — channels, mentions, cooldown, recovery
+- [Reading Alerts](docs/guides/reading-alerts.md) — what a received alert means (for stakeholders)
 - [CLI Reference](docs/reference/cli.md) — command-line documentation
 - [Examples](docs/examples/) — real-world monitoring scenarios
 - [Changelog](CHANGELOG.md) — version history

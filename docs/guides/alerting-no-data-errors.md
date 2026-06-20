@@ -60,12 +60,15 @@ is no value):
 | Variable | Description |
 |---|---|
 | `{metric_name}` | Metric name |
+| `{project_name}` | `detectkit_project.yml` `name`, or empty string. Since v0.15.0 populated for every alert kind, not just errors |
+| `{project_name_prefix}` | `"[<project_name>] "` when set, empty string otherwise. Leads the default no-data title |
 | `{timestamp}` | Timestamp of the missing interval (formatted, in `{timezone}`) |
 | `{timezone}` | Configured timezone |
 | `{description}` | Metric `description`, empty string if none |
 | `{description_line}` | Same with trailing newline, empty if none |
 | `{status}` | Always `"NO_DATA"` |
 | `{mentions}` / `{mentions_line}` | Formatted mentions |
+| `{help_url}` / `{help_line}` | "How to read this alert" link URL / line (since v0.16.0); empty when hidden project-wide via `alert_help_url: false` |
 | `{value_display}` | Always the literal string `"no data"` |
 
 If a template uses `{value:.2f}` or another numeric format spec on a
@@ -74,8 +77,10 @@ rather than crashing — but write the template with no-data in mind.
 
 ### Visual Distinction
 
-Webhook channels (Slack/Mattermost) render no-data alerts with the
-amber color `#F0AD4E` to distinguish them from anomalies (red) and
+Every no-data title leads with the **🟡 status circle** so the kind reads
+from color alone (🔴 anomaly / 🟢 recovery / 🟡 no-data / 🔵 pipeline
+error). On webhook channels (Slack/Mattermost) the attachment accent bar
+is also the amber `#F0AD4E`, distinguishing it from anomalies (red) and
 recoveries (green).
 
 ### When to Use

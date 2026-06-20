@@ -5,6 +5,33 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.4] - 2026-06-20
+
+### Fixed
+- Sync the user-facing docs (`docs/`) and the README with the 0.15–0.16
+  alerting changes — **docs only, no code or behavior change**:
+  - **`docs/guides/configuration.md`** — corrected the `alert_help_url`
+    per-channel rendering. The webhook "How to read this alert" link was still
+    described as a bottom attachment field showing the **bare URL**; since
+    0.16.1 it renders as a compact clickable **label** in the shared `Links`
+    field (Slack `<url|label>` / Mattermost-generic markdown), never a raw URL.
+  - **`docs/guides/alerting-no-data-errors.md`** — the no-data
+    template-variable table now lists `{project_name}` / `{project_name_prefix}`
+    (0.15.0) and `{help_url}` / `{help_line}` (0.16.0), matching the error-alert
+    table; the **Visual Distinction** note now leads with the 🟡 status circle
+    instead of only the amber accent color.
+  - **`docs/guides/reading-alerts.md`** — the stakeholder "Anatomy of an alert"
+    table gains a **Rule** row describing the rule chip set apart on every
+    anomaly and recovery since 0.16.3.
+  - **`docs/guides/configuration-metrics.md`** — `links` now notes the
+    compact-label webhook rendering (0.16.1), and the `{help_url}` / `{help_line}`
+    template variables are documented (set project-wide via `alert_help_url`).
+  - **`README.md`** — added the new *Reading Alerts* stakeholder guide to the
+    documentation list.
+
+  The `dtk init-claude` assets and dev rules were already current; this only
+  brings the docs site and README in line.
+
 ## [0.16.3] - 2026-06-20
 
 ### Changed

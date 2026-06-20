@@ -49,6 +49,7 @@ alerting:                      # optional — see alerting.md
   channels: [mattermost_ops]
   consecutive_anomalies: 3
   alert_cooldown: "30min"
+  dashboard_url: https://grafana.ops/d/api-errors   # optional; clickable in every alert
 
 tables:                        # optional — per-metric internal table overrides
   datapoints: _dtk_datapoints_api

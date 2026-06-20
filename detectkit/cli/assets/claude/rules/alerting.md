@@ -156,7 +156,9 @@ custom templates — see `{dashboard_url}` / `{dashboard_line}` below.
 With no custom `template`, each channel renders a structured, branded message
 (alert-centric: the rule that fired leads, the anomaly value is evidence). The
 shared value computation lives in one place (`BaseAlertChannel.build_context`),
-so templates and native rendering stay consistent.
+so templates and native rendering stay consistent. Every alert title/headline
+leads with a colored **status circle** — 🔴 anomaly, 🟢 recovery, 🟡 no-data,
+🔵 pipeline error — so the status reads from color alone.
 
 - **Slack / Mattermost / generic webhook** — one message *attachment* with a
   status-colored accent bar, a clickable title (the metric; links to
@@ -168,7 +170,7 @@ so templates and native rendering stay consistent.
   branding kept, no fields grid).
 - **Telegram** — default `parse_mode` is now **HTML**. The default message is
   structured and HTML-escaped: a colored status dot (red anomaly / green
-  recovery / yellow no-data / stop error), a bold headline, the rule, then
+  recovery / yellow no-data / blue error), a bold headline, the rule, then
   evidence in `<code>` (value/expected/severity/time/detector/params), an inline
   "Open dashboard" link, then mentions. This fixes the old Markdown mode raising
   "can't parse entities" on params JSON containing underscores (e.g.

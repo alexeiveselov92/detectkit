@@ -266,7 +266,13 @@ single source feeding both custom templates and native rendering. Every alert
 title/headline leads with a colored **status circle** so the status reads from
 color alone — 🔴 anomaly, 🟢 recovery, 🟡 no-data, 🔵 pipeline error
 (`BaseAlertChannel._STATUS_EMOJI` / `status_color`, kept in sync with the
-`--st-*` brand tokens).
+`--st-*` brand tokens). It then leads with the **project name** as a
+`{project_name_prefix}` (`[name] `) on every kind, so multiple projects sharing
+one channel stay distinct while keeping the brand bot name + avatar. The
+orchestrator stamps `AlertData.project_name` from `ProjectConfig.name`
+(`_alert_step.py` → `_OrchestratorBase`); the webhook/email footers also pair it
+with the brand name (`detectkit · <project>`). Direct-API callers leave it
+`None` and render unchanged.
 
 - **Slack / Mattermost / generic webhook** (all via `WebhookChannel`) render one
   message *attachment* — a status-colored accent bar, a clickable title (the

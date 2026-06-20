@@ -64,6 +64,7 @@ class _AlertStepMixin(_TaskManagerBase):
                 mentions=alerting_config.mentions,
                 dashboard_url=alerting_config.dashboard_url,
                 links=alerting_config.links,
+                project_name=getattr(self.project_config, "name", None),
             )
 
             last_point = orchestrator.get_last_complete_point()

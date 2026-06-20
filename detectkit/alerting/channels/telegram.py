@@ -148,7 +148,12 @@ class TelegramChannel(BaseAlertChannel):
             return html.escape(str(value))
 
         metric = esc(ctx["metric_name"])
-        lines: list[str] = [f"{dot} <b>{word} · {metric}</b>"]
+        # Lead the headline with the project name (when set) so multiple
+        # projects sharing one chat stay distinguishable — Telegram has no
+        # footer/avatar override, so this prefix is the only project cue.
+        proj = ctx["project_name"]
+        head_prefix = f"[{esc(proj)}] " if proj else ""
+        lines: list[str] = [f"{dot} <b>{head_prefix}{word} · {metric}</b>"]
 
         if ctx["description"]:
             lines.append(f"<i>{esc(self._cap(ctx['description'], _DESC_CAP))}</i>")

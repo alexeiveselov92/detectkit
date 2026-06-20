@@ -5,6 +5,32 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-06-20
+
+### Added
+- **Project name on every alert.** The project name (`detectkit_project.yml` →
+  `name`) is now stamped onto every alert the pipeline sends and shown by
+  default, so two detectkit projects pointed at the **same** channel stay
+  distinguishable while both keep the default brand bot name + avatar (users no
+  longer have to override `username`/`icon_url` just to tell projects apart).
+  - **Title / headline / subject** of every alert kind (anomaly, recovery,
+    no-data, error) leads with a `[name] ` prefix:
+    `🔴 [payments] Alert: api_error_rate`.
+  - **Slack / Mattermost / webhook** also pair it in the attachment footer
+    (`detectkit · payments`).
+  - **Telegram** carries it in the bold headline (it has no footer or
+    per-message avatar to brand).
+  - **Email** prefixes the subject, adds a small project eyebrow above the
+    metric, and pairs it in the footer (`Sent by detectkit · payments`).
+  - Exposed to custom templates everywhere as `{project_name}` and
+    `{project_name_prefix}` (previously only populated for project-level error
+    alerts). `AlertData.project_name` is threaded from `ProjectConfig.name`
+    through the orchestrator (`_alert_step` → `AlertOrchestrator`); direct
+    library/API callers that don't set it render unchanged.
+  - The project `name` remains **informational only** — it keys no `_dtk_*`
+    table — so it can be renamed freely (spaces allowed for a prettier label
+    like `name: "Payments API"`).
+
 ## [0.14.0] - 2026-06-20
 
 ### Added

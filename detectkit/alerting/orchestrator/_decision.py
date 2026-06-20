@@ -241,6 +241,7 @@ class _DecisionMixin(_OrchestratorBase):
             mentions=self.mentions,
             dashboard_url=self.dashboard_url,
             links=self.links,
+            project_name=self.project_name,
             # Alert rule the message foregrounds: configured thresholds plus
             # the observed quorum size that satisfied them.
             min_detectors=self.conditions.min_detectors,
@@ -300,6 +301,7 @@ class _DecisionMixin(_OrchestratorBase):
             mentions=self.mentions,
             dashboard_url=self.dashboard_url,
             links=self.links,
+            project_name=self.project_name,
         )
 
     def get_last_complete_point(self, now: datetime | None = None) -> datetime:

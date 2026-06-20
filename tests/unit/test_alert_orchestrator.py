@@ -936,3 +936,95 @@ class TestRecoveryNotifications:
 
         assert results["MattermostChannel"] is False
         internal.update_recovery_timestamp.assert_not_called()
+
+
+class TestProjectNameThreading:
+    """``project_name`` from the project config rides into every AlertData.
+
+    Lets multiple projects share one alert channel (keeping the default brand
+    bot name + avatar) while staying distinguishable in the message.
+    """
+
+    @staticmethod
+    def _orchestrator(internal=None):
+        return AlertOrchestrator(
+            metric_name="cpu_usage",
+            alert_config_id="cfg",
+            interval=Interval("10min"),
+            conditions=AlertConditions(consecutive_anomalies=1),
+            internal=internal,
+            project_name="my_monitoring",
+        )
+
+    def test_anomaly_alert_data_carries_project_name(self):
+        orchestrator = self._orchestrator()
+        detections = [
+            DetectionRecord(
+                timestamp=np.datetime64("2024-01-01T12:00:00", "ms"),
+                detector_name="zscore",
+                detector_id="abc",
+                detector_params="{}",
+                value=100.0,
+                is_anomaly=True,
+                confidence_lower=80.0,
+                confidence_upper=120.0,
+                direction="up",
+                severity=2.5,
+                detection_metadata={},
+            )
+        ]
+        should_alert, alert_data = orchestrator.should_alert(detections)
+        assert should_alert is True
+        assert alert_data.project_name == "my_monitoring"
+
+    def test_no_data_alert_data_carries_project_name(self):
+        alert_config = Mock()
+        alert_config.no_data_alert = True
+        internal = Mock()
+        internal.get_value_at.return_value = None  # missing datapoint
+        internal.get_last_alert_timestamp.return_value = None  # not in cooldown
+
+        orchestrator = AlertOrchestrator(
+            metric_name="cpu_usage",
+            alert_config_id="cfg",
+            interval=Interval("10min"),
+            conditions=AlertConditions(consecutive_anomalies=1),
+            internal=internal,
+            alert_config=alert_config,
+            project_name="my_monitoring",
+        )
+        last_point = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        should_no_data, alert_data = orchestrator.should_alert_no_data(last_point)
+        assert should_no_data is True
+        assert alert_data.is_no_data is True
+        assert alert_data.project_name == "my_monitoring"
+
+    def test_recovery_alert_data_carries_project_name(self):
+        orchestrator = self._orchestrator()
+        detections = [
+            DetectionRecord(
+                timestamp=np.datetime64("2024-01-01T12:00:00", "ms"),
+                detector_name="zscore",
+                detector_id="abc",
+                detector_params="{}",
+                value=90.0,
+                is_anomaly=False,
+                confidence_lower=80.0,
+                confidence_upper=120.0,
+                direction="none",
+                severity=0.0,
+                detection_metadata={},
+            )
+        ]
+        recovery_data = orchestrator._build_recovery_data(detections)
+        assert recovery_data is not None
+        assert recovery_data.project_name == "my_monitoring"
+
+    def test_project_name_defaults_to_none(self):
+        """Direct-API callers that don't set it render unchanged (back-compat)."""
+        orchestrator = AlertOrchestrator(
+            metric_name="cpu_usage",
+            alert_config_id="cfg",
+            interval=Interval("10min"),
+        )
+        assert orchestrator.project_name is None

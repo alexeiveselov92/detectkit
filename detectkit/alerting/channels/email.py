@@ -74,7 +74,7 @@ class EmailChannel(BaseAlertChannel):
         smtp_username: str | None = None,
         smtp_password: str | None = None,
         use_tls: bool = True,
-        subject_template: str = "🔴 Alert: {metric_name}",
+        subject_template: str = "🔴 {project_name_prefix}Alert: {metric_name}",
         from_name: str = BRAND_USERNAME,
         template: str | None = None,
         **kwargs,
@@ -144,10 +144,18 @@ class EmailChannel(BaseAlertChannel):
         # of a bot display name. formataddr quotes the name when required.
         msg["From"] = formataddr((self.from_name, self.from_email))
         msg["To"] = ", ".join(self.to_emails)
-        # Strip CR/LF from the metric name before it reaches the Subject header
-        # so a metric name can never inject extra email headers.
+        # Strip CR/LF from the metric *and* project name before they reach the
+        # Subject header so neither can inject extra email headers. The project
+        # prefix ("[my_project] ") makes the inbox row distinguishable when
+        # several projects email the same address.
         subject_metric = alert_data.metric_name.replace("\r", " ").replace("\n", " ")
-        msg["Subject"] = self.subject_template.format(metric_name=subject_metric)
+        project_clean = (alert_data.project_name or "").replace("\r", " ").replace("\n", " ")
+        project_prefix = f"[{project_clean}] " if project_clean else ""
+        msg["Subject"] = self.subject_template.format(
+            metric_name=subject_metric,
+            project_name_prefix=project_prefix,
+            project_name=project_clean,
+        )
 
         # Attach both parts. In multipart/alternative the LAST part is the
         # preferred one, so HTML (the branded card) is shown when supported and
@@ -247,6 +255,8 @@ class EmailChannel(BaseAlertChannel):
             f'font-size:4px;background-color:{accent};">&nbsp;</td></tr>'
             # header: logo + wordmark + status pill
             f"{self._header_html(accent, pill)}"
+            # project eyebrow (small label above the metric, only when set)
+            f"{self._eyebrow_html(ctx['project_name'])}"
             # title
             f'<tr><td style="padding:6px 24px 2px 24px;font-family:{_SANS};font-size:22px;'
             f'font-weight:bold;color:{_INK};mso-line-height-rule:exactly;line-height:28px;">'
@@ -256,6 +266,17 @@ class EmailChannel(BaseAlertChannel):
             # footer
             f"{footer}"
             "</table></td></tr></table></body></html>"
+        )
+
+    def _eyebrow_html(self, project_name: str) -> str:
+        """Small uppercase project label above the metric title (empty if unset)."""
+        if not project_name:
+            return ""
+        return (
+            f'<tr><td style="padding:10px 24px 0 24px;font-family:{_SANS};font-size:11px;'
+            f"font-weight:bold;letter-spacing:0.5px;color:{_FAINT};text-transform:uppercase;"
+            f'mso-line-height-rule:exactly;line-height:14px;">'
+            f"{html.escape(project_name)}</td></tr>"
         )
 
     def _header_html(self, accent: str, pill: str) -> str:
@@ -432,11 +453,16 @@ class EmailChannel(BaseAlertChannel):
     def _footer_html(self, alert_data: AlertData) -> str:
         cc = self.format_mentions(alert_data.mentions)
         cc_html = f" &middot; {html.escape(cc)}" if cc else ""
+        # Pair the brand with the project name ("Sent by detectkit · my_project")
+        # so the source project is clear even past the subject/eyebrow.
+        project_html = (
+            f" &middot; {html.escape(alert_data.project_name)}" if alert_data.project_name else ""
+        )
         return (
             f'<tr><td bgcolor="{_SURFACE}" style="background-color:{_SURFACE};'
             f"border-top:1px solid {_BORDER};padding:14px 24px;font-family:{_SANS};"
             f'font-size:12px;color:{_FAINT};mso-line-height-rule:exactly;line-height:16px;">'
-            f"Sent by detectkit{cc_html}</td></tr>"
+            f"Sent by detectkit{project_html}{cc_html}</td></tr>"
         )
 
     def format_mentions(self, mentions: list[str]) -> str:

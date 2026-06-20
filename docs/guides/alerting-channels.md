@@ -8,27 +8,32 @@ With no custom `template`, each channel renders a native, alert-centric layout:
 the message leads with the rule that fired, and the anomaly value is supporting
 evidence. The shared value computation (value, expected, severity, quorum,
 detectors, parameters) lives in `BaseAlertChannel.build_context`, so templates
-and native rendering read the same numbers.
+and native rendering read the same numbers. Every default title/headline/subject
+also leads with the **project name** (`[name] `) — see
+[Project label](#project-label-multi-project-channels).
 
 - **Slack / Mattermost / generic webhook** (all via `WebhookChannel`): a single
   message *attachment* with a status-colored accent bar, a clickable title (the
-  metric; links to `dashboard_url` when set), a short markdown lead (the rule
-  that fired), and a compact fields grid — short fields Value / Expected /
+  project + metric; links to `dashboard_url` when set), a short markdown lead (the
+  rule that fired), and a compact fields grid — short fields Value / Expected /
   Quorum / Severity, then full-width Detected at / Detectors / Parameters — plus
-  a branded footer and footer icon. `@mentions` ride in the **top-level message
-  text** (not the attachment) so Slack actually notifies. A custom `template`
-  renders instead as a plain text-only attachment (status color, title and
-  branding kept, no fields grid).
+  a branded footer (`detectkit · <project>`) and footer icon. `@mentions` ride in
+  the **top-level message text** (not the attachment) so Slack actually notifies.
+  A custom `template` renders instead as a plain text-only attachment (status
+  color, title and branding kept, no fields grid).
 - **Telegram**: a structured, HTML-escaped message (default `parse_mode` is now
   `HTML`) — a colored status dot (red anomaly / green recovery / yellow no-data /
-  stop error), a bold headline, the rule, then the evidence in `<code>`
-  (value / expected / severity / time / detector / params), an inline
-  "Open dashboard" link, then mentions. Custom templates are sent verbatim under
-  the parse mode, so keep them HTML-safe (or set `parse_mode: Markdown`).
+  blue error), a bold headline (`[project] Status · metric`), the rule, then the
+  evidence in `<code>` (value / expected / severity / time / detector / params),
+  an inline "Open dashboard" link, then mentions. Custom templates are sent
+  verbatim under the parse mode, so keep them HTML-safe (or set
+  `parse_mode: Markdown`).
 - **Email**: a branded HTML card (inline-CSS, table-based, Outlook-safe) — a
-  colored accent and status pill, the metric, a 2-column value / expected /
-  severity table, a monospace params box, an optional "Open dashboard" button,
-  and a footer. The plain-text body remains the multipart fallback.
+  colored accent and status pill, a small project eyebrow above the metric, the
+  metric, a 2-column value / expected / severity table, a monospace params box,
+  an optional "Open dashboard" button, and a footer (`Sent by detectkit ·
+  <project>`). The subject is prefixed with `[project]` and the plain-text body
+  remains the multipart fallback.
 
 ### Dashboard and runbook links
 
@@ -66,6 +71,27 @@ avatar is sent as an `icon_url` (a hosted PNG). Override it per channel:
 
 `icon_url` takes precedence over `icon_emoji`; setting either one opts out of
 the brand avatar. Telegram and email brand differently — see their sections.
+
+## Project label (multi-project channels)
+
+Because the bot keeps the brand name + avatar by default, two detectkit projects
+pointed at the **same** channel would otherwise look identical. To keep them
+distinct without overriding the brand, detectkit stamps the project name
+(`detectkit_project.yml` → `name`) onto every alert and shows it by default — no
+extra config:
+
+- The **title / headline / subject** leads with `[name] ` on every alert kind
+  (anomaly, recovery, no-data, error): `🔴 [payments] Alert: api_error_rate`.
+- **Slack / Mattermost / webhook** also pair it in the footer (`detectkit · payments`).
+- **Telegram** carries it in the bold headline (it has no footer or per-message avatar).
+- **Email** prefixes the subject, adds a project eyebrow above the metric, and
+  pairs it in the footer.
+
+It is also exposed to custom templates as `{project_name}` and
+`{project_name_prefix}` (`"[name] "` when set, else `""`). The `name` is
+informational only (it keys no `_dtk_*` table), so you can rename it freely —
+spaces are allowed for a prettier label like `name: "Payments API"`. Direct
+library/API callers that don't pass a project name render unchanged.
 
 ### Mattermost
 

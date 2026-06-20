@@ -140,7 +140,7 @@ for full field reference.
 ### Default Template
 
 ```
-Pipeline failed for metric: {metric_name}
+🔵 {project_name_prefix}Pipeline failed for metric: {metric_name}
 {description_line}Time: {timestamp}
 Error: {error_type}: {error_message}
 {mentions_line}
@@ -148,17 +148,19 @@ Error: {error_type}: {error_message}
 
 Title (webhook channels): `🔵 [{project_name}] Pipeline error: {metric_name}`
 when `project_name` is set in `detectkit_project.yml`, otherwise just
-`🔵 Pipeline error: {metric_name}` (backwards-compat). The bracketed prefix
-makes it obvious which project crashed when multiple detectkit instances
-share an alert channel.
+`🔵 Pipeline error: {metric_name}` (backwards-compat). Since v0.15.0 the
+`{project_name_prefix}` lead is not error-specific — **every** default alert
+title/headline/subject carries it (see the
+[Channels guide](alerting-channels.md)). The bracketed prefix makes it obvious
+which project crashed when multiple detectkit instances share an alert channel.
 
 ### Template Variables
 
 | Variable | Description |
 |---|---|
 | `{metric_name}` | Name of the metric whose pipeline failed (or `<startup>` for early failures) |
-| `{project_name}` | `detectkit_project.yml` `name` field, or empty string (v0.5.3) |
-| `{project_name_prefix}` | `"[<project_name>] "` when set, empty string otherwise (v0.5.3) |
+| `{project_name}` | `detectkit_project.yml` `name` field, or empty string. Since v0.15.0 populated for every alert, not just errors |
+| `{project_name_prefix}` | `"[<project_name>] "` when set, empty string otherwise. Since v0.15.0 leads every default title/headline/subject |
 | `{error_type}` | Exception class name (e.g., `ConnectionRefusedError`) |
 | `{error_message}` | Exception `str(exc)` |
 | `{timestamp}` | When the alert was built (formatted in `{timezone}`) |

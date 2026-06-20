@@ -9,7 +9,9 @@ errors (not empty strings).
 ## `detectkit_project.yml`
 
 ```yaml
-name: my_monitoring            # required — project identifier (logs, error-alert titles)
+name: my_monitoring            # required — project identifier; also labels every
+                               # alert ("[my_monitoring] Alert: …") so multiple
+                               # projects on one channel stay distinct (alerting.md)
 version: "1.0"                 # optional (default "1.0")
 default_profile: prod          # profile name from profiles.yml
 
@@ -57,8 +59,10 @@ error_alerting:
   via cron cadence). Channel send failures are swallowed so a flaky webhook
   can't crash the run.
 - Extra template variables: `{error_type}`, `{error_message}`, `{status}`
-  (always `"ERROR"`), `{project_name}`, `{project_name_prefix}` (=
-  `"[<name>] "` when `name` set — keeps multi-project channels distinguishable).
+  (always `"ERROR"`). `{project_name}` / `{project_name_prefix}` (=
+  `"[<name>] "` when `name` set) are available here **and in every other alert
+  template** — and by default lead the title/headline on all channels, keeping
+  multi-project channels distinguishable (see `alerting.md` → Project label).
 
 ## `profiles.yml`
 

@@ -758,3 +758,143 @@ class TestTelegramHtmlRendering:
         alert.is_recovery = True
         self._channel().send(alert)
         assert mock_post.call_args.kwargs["json"]["text"].startswith("\U0001f7e2")
+
+
+def _proj_alert(*, project_name="my_monitoring", **overrides):
+    """An anomaly alert carrying a project name (and any field overrides)."""
+    base = {
+        "metric_name": "cpu_usage",
+        "timestamp": datetime(2024, 1, 1, 12, 0, 0),
+        "timezone": "UTC",
+        "value": 95.0,
+        "confidence_lower": 70.0,
+        "confidence_upper": 90.0,
+        "detector_name": "zscore",
+        "detector_params": "{}",
+        "direction": "above",
+        "severity": 2.5,
+        "detection_metadata": {},
+        "project_name": project_name,
+    }
+    base.update(overrides)
+    return AlertData(**base)
+
+
+class TestProjectNameRendering:
+    """The project name surfaces by default across every channel.
+
+    With the brand bot name + avatar kept, the project label is what keeps two
+    projects posting to the same channel distinguishable.
+    """
+
+    # ---- base default titles (used by every channel via format_title) ----
+    def test_base_titles_prefix_project_for_all_kinds(self):
+        channel = MockAlertChannel()
+        assert channel.format_title(_proj_alert()) == "🔴 [my_monitoring] Alert: cpu_usage"
+        assert (
+            channel.format_title(_proj_alert(is_recovery=True))
+            == "🟢 [my_monitoring] Alert cleared: cpu_usage"
+        )
+        assert (
+            channel.format_title(_proj_alert(value=None, is_no_data=True))
+            == "🟡 [my_monitoring] No data: cpu_usage"
+        )
+
+    def test_base_title_collapses_without_project(self):
+        channel = MockAlertChannel()
+        assert channel.format_title(_proj_alert(project_name=None)) == "🔴 Alert: cpu_usage"
+
+    def test_default_body_leads_with_project_prefix(self):
+        channel = MockAlertChannel()
+        message = channel.format_message(_proj_alert())
+        assert message.startswith("🔴 [my_monitoring] Alert: cpu_usage")
+
+    def test_project_name_template_vars(self):
+        channel = MockAlertChannel()
+        message = channel.format_message(
+            _proj_alert(), template="{project_name_prefix}{metric_name} ({project_name})"
+        )
+        assert message == "[my_monitoring] cpu_usage (my_monitoring)"
+
+    # ---- webhook (Slack/Mattermost) ----
+    def test_webhook_title_prefixed_and_footer_paired(self):
+        payload = WebhookChannel(webhook_url="https://x/hooks/y").build_payload(_proj_alert())
+        attachment = payload["attachments"][0]
+        assert attachment["title"] == "🔴 [my_monitoring] Alert: cpu_usage"
+        assert attachment["footer"] == "detectkit · my_monitoring"
+
+    def test_webhook_footer_plain_without_project(self):
+        payload = WebhookChannel(webhook_url="https://x/hooks/y").build_payload(
+            _proj_alert(project_name=None)
+        )
+        assert payload["attachments"][0]["footer"] == "detectkit"
+
+    def test_webhook_custom_username_paired_with_project(self):
+        payload = WebhookChannel(webhook_url="https://x/hooks/y", username="ops-bot").build_payload(
+            _proj_alert()
+        )
+        assert payload["attachments"][0]["footer"] == "ops-bot · my_monitoring"
+
+    def test_webhook_custom_template_keeps_project_title_and_footer(self):
+        """The opaque custom-template path still carries the project label."""
+        payload = WebhookChannel(webhook_url="https://x/hooks/y").build_payload(
+            _proj_alert(), template="CUSTOM: {metric_name}"
+        )
+        attachment = payload["attachments"][0]
+        assert attachment["title"] == "🔴 [my_monitoring] Alert: cpu_usage"
+        assert attachment["footer"] == "detectkit · my_monitoring"
+        assert "fields" not in attachment  # still a text-only attachment
+
+    # ---- telegram ----
+    @patch("detectkit.alerting.channels.telegram.requests.post")
+    def test_telegram_headline_prefixed_with_project(self, mock_post):
+        mock_post.return_value = Mock(raise_for_status=Mock())
+        TelegramChannel(bot_token="t", chat_id="c").send(_proj_alert())
+        text = mock_post.call_args.kwargs["json"]["text"]
+        assert "<b>[my_monitoring] Anomaly · cpu_usage</b>" in text
+
+    @patch("detectkit.alerting.channels.telegram.requests.post")
+    def test_telegram_escapes_project_name(self, mock_post):
+        mock_post.return_value = Mock(raise_for_status=Mock())
+        TelegramChannel(bot_token="t", chat_id="c").send(_proj_alert(project_name="a & b"))
+        text = mock_post.call_args.kwargs["json"]["text"]
+        assert "[a &amp; b]" in text
+
+    @patch("detectkit.alerting.channels.telegram.requests.post")
+    def test_telegram_no_prefix_without_project(self, mock_post):
+        mock_post.return_value = Mock(raise_for_status=Mock())
+        TelegramChannel(bot_token="t", chat_id="c").send(_proj_alert(project_name=None))
+        text = mock_post.call_args.kwargs["json"]["text"]
+        assert "<b>Anomaly · cpu_usage</b>" in text
+
+    # ---- email ----
+    @staticmethod
+    def _email_channel():
+        from detectkit.alerting.channels.email import EmailChannel
+
+        return EmailChannel(smtp_host="h", smtp_port=587, from_email="a@x", to_emails=["t@x"])
+
+    @patch("detectkit.alerting.channels.email.smtplib.SMTP")
+    def test_email_subject_prefixed_with_project(self, mock_smtp):
+        self._email_channel().send(_proj_alert())
+        import email as email_lib
+        from email.header import decode_header, make_header
+
+        raw = mock_smtp.return_value.sendmail.call_args[0][2]
+        # The emoji makes the Subject RFC2047-encoded; decode before asserting.
+        subject = str(make_header(decode_header(email_lib.message_from_string(raw)["Subject"])))
+        assert "[my_monitoring] Alert: cpu_usage" in subject
+
+    def test_email_html_has_project_eyebrow_and_footer(self):
+        body = self._email_channel()._build_html_body(_proj_alert(), "plain")
+        # Eyebrow above the metric title + brand-paired footer.
+        assert "my_monitoring" in body
+        assert "Sent by detectkit &middot; my_monitoring" in body
+
+    def test_email_html_escapes_project_name(self):
+        body = self._email_channel()._build_html_body(_proj_alert(project_name="a & b"), "plain")
+        assert "a &amp; b" in body
+
+    def test_email_without_project_unchanged(self):
+        body = self._email_channel()._build_html_body(_proj_alert(project_name=None), "plain")
+        assert "Sent by detectkit</td>" in body

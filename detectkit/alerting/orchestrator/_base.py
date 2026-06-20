@@ -25,6 +25,7 @@ class _OrchestratorBase:
         mentions: list[str] | None = None,
         dashboard_url: str | None = None,
         links: dict[str, str] | None = None,
+        project_name: str | None = None,
     ):
         self.metric_name = metric_name
         self.interval = interval
@@ -37,6 +38,11 @@ class _OrchestratorBase:
         self.mentions = mentions or []
         self.dashboard_url = dashboard_url
         self.links = links or {}
+        # Optional project name (``detectkit_project.yml`` ``name``). Stamped
+        # onto every AlertData so channels can label which project an alert
+        # came from — keeps multiple projects sharing one channel distinct
+        # while the bot keeps the default brand name + avatar.
+        self.project_name = project_name
 
     @staticmethod
     def _group_by_timestamp(

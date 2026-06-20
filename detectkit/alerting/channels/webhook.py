@@ -189,8 +189,13 @@ class WebhookChannel(BaseAlertChannel):
             attachment["title_link"] = alert_data.dashboard_url
 
         # Brand the attachment footer (reliable on Slack even when top-level
-        # username/icon are locked to the app install).
-        attachment["footer"] = self.username or BRAND_USERNAME
+        # username/icon are locked to the app install). Pair the brand name with
+        # the project name when set ("detectkit · my_project") so two projects
+        # posting to the same channel stay distinguishable even past the title.
+        footer = self.username or BRAND_USERNAME
+        if alert_data.project_name:
+            footer = f"{footer} · {alert_data.project_name}"
+        attachment["footer"] = footer
         if self.icon_url:
             attachment["footer_icon"] = self.icon_url
         # Slack-only sugar: a real timestamp under the footer. Mattermost

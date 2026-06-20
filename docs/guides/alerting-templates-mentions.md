@@ -108,7 +108,7 @@ The default message foregrounds the **alert** (the rule that fired and the
 parameters it fired with); the anomaly appears as supporting evidence below.
 
 ```
-🔴 Alert: {metric_name}
+🔴 {project_name_prefix}Alert: {metric_name}
 {description_line}Quorum {detector_count}/{min_detectors} · direction {direction} (policy {direction_policy}) · consecutive {consecutive_count}/{consecutive_required}
 Rule: min_detectors={min_detectors} · direction={direction_policy} · consecutive={consecutive_required}
 
@@ -121,8 +121,12 @@ Parameters: {detector_params}
 {mentions_line}
 ```
 
-The first line names the **alert** and the metric. The `Quorum … · direction …
-· consecutive …` line shows the observed match against the rule (`actual/required`),
+The first line names the **alert** and the metric, led by the project name as a
+`[name] ` prefix (from `detectkit_project.yml`) so two projects posting to the
+same channel stay distinguishable while keeping the default brand bot name +
+avatar. See [Channels](alerting-channels.md) for where each channel surfaces it.
+The `Quorum … · direction … · consecutive …` line shows the observed match
+against the rule (`actual/required`),
 and the `Rule:` line restates the configured thresholds. The detector value,
 expected range and severity follow as evidence. `{expected_range}` renders
 one-sided detector bounds cleanly (e.g. `>= 7.00` for a lower-only
@@ -161,8 +165,8 @@ alerting:
 | Variable | Description | Available in |
 |---|---|---|
 | `metric_name` | Metric name | all |
-| `project_name` | `detectkit_project.yml` `name`, empty if not set (v0.5.3) | all (currently populated by error alerts only) |
-| `project_name_prefix` | `"[<project_name>] "` if set, else empty (v0.5.3) | all (same) |
+| `project_name` | `detectkit_project.yml` `name`, empty if not set | all — populated for every alert by the pipeline (v0.15.0) |
+| `project_name_prefix` | `"[<project_name>] "` if set, else empty; **leads every default title/headline/subject** so multiple projects on one channel stay distinct | all (v0.15.0) |
 | `timestamp` | Timestamp (formatted in `{timezone}`) | all |
 | `timezone` | Timezone display name | all |
 | `value` | Current metric value (numeric, or string `"no data"` for no-data) | all |
@@ -226,7 +230,7 @@ like — here with the defaults (`min_detectors: 1`, `direction: same`,
 `consecutive_anomalies: 3`):
 
 ```
-🔴 Alert: api_response_time
+🔴 [my_monitoring] Alert: api_response_time
 Quorum 1/1 · direction up (policy same) · consecutive 3/3
 Rule: min_detectors=1 · direction=same · consecutive=3
 

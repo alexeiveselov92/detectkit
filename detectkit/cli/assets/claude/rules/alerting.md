@@ -158,7 +158,9 @@ With no custom `template`, each channel renders a structured, branded message
 shared value computation lives in one place (`BaseAlertChannel.build_context`),
 so templates and native rendering stay consistent. Every alert title/headline
 leads with a colored **status circle** — 🔴 anomaly, 🟢 recovery, 🟡 no-data,
-🔵 pipeline error — so the status reads from color alone.
+🔵 pipeline error — so the status reads from color alone. It also leads with the
+**project name** as a `[name] ` prefix (from `detectkit_project.yml`) — see
+[Project label](#project-label-multi-project-channels) below.
 
 - **Slack / Mattermost / generic webhook** — one message *attachment* with a
   status-colored accent bar, a clickable title (the metric; links to
@@ -180,6 +182,25 @@ leads with a colored **status circle** — 🔴 anomaly, 🟢 recovery, 🟡 no-
   colored accent + status pill, the metric, a 2-col value/expected/severity
   table, a monospace params box, an optional "Open dashboard" button, and a
   footer. The plain-text body remains the multipart fallback.
+
+## Project label (multi-project channels)
+
+The bot keeps the **detectkit brand** name + avatar by default (so users rarely
+override them). To still tell apart two projects posting to the **same** channel,
+detectkit stamps the project name (`detectkit_project.yml` → `name`) onto every
+alert and shows it by default — no config needed:
+
+- **Title / headline / subject** lead with a `[name] ` prefix on every kind
+  (anomaly, recovery, no-data, error): `🔴 [payments] Alert: api_error_rate`.
+- **Webhook (Slack/Mattermost)** also pairs it in the footer: `detectkit · payments`.
+- **Telegram** carries it in the bold headline (no footer/avatar to override).
+- **Email** prefixes the subject, shows a small project eyebrow above the metric,
+  and pairs it in the footer (`Sent by detectkit · payments`).
+
+It is exposed to custom templates as `{project_name}` and `{project_name_prefix}`
+(`"[name] "` when set, else `""`). Direct library/API callers that don't set it
+render unchanged. The `name` is informational only (it does not key any `_dtk_*`
+table), so renaming it is safe — spaces are allowed for a prettier label.
 
 ## Multiple alert configs per metric
 
@@ -210,6 +231,7 @@ referenced by path). Key variables:
 | Variable | Meaning |
 |---|---|
 | `{metric_name}`, `{description}` / `{description_line}` | identity |
+| `{project_name}` / `{project_name_prefix}` | project label (`"[name] "` prefix, or `""`) |
 | `{timestamp}`, `{timezone}` | when (display tz via `alerting.timezone`, default UTC) |
 | `{value}` / `{value_display}` | metric value (`value_display` is NaN-safe) |
 | `{confidence_lower}` / `{confidence_upper}` / `{confidence_interval}` | bounds |

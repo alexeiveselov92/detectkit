@@ -23,7 +23,9 @@ File: `detectkit_project.yml`
 ### Basic Structure
 
 ```yaml
-# Project name
+# Project name — also labels every alert ("[my_monitoring] Alert: …") so
+# multiple projects sharing one channel stay distinguishable while keeping the
+# default brand bot name + avatar. See the Alerting → Channels guide.
 name: my_monitoring
 
 # Project version (optional)
@@ -132,11 +134,13 @@ error_alerting:
 - `{error_type}` - Exception class name (e.g., `ConnectionRefusedError`)
 - `{error_message}` - Exception `str(exc)`
 - `{status}` - Always `"ERROR"`
-- `{project_name}` - Project `name` from `detectkit_project.yml`
-  (v0.5.3). Empty string when not set.
+- `{project_name}` - Project `name` from `detectkit_project.yml`.
+  Empty string when not set.
 - `{project_name_prefix}` - `"[<project_name>] "` when set, empty
-  otherwise. The default error title uses this so multi-project
-  channels stay distinguishable (`[my_monitoring] Pipeline error: <startup>`).
+  otherwise. Since v0.15.0 **every** default alert title/headline/subject
+  (anomaly, recovery, no-data and error) leads with this prefix so
+  multi-project channels stay distinguishable
+  (`[my_monitoring] Pipeline error: <startup>`).
 
 **Behaviour notes**:
 

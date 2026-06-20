@@ -32,10 +32,14 @@ class AlertData:
         consecutive_count: Number of consecutive anomalies
         is_recovery: True for recovery notifications
         is_no_data: True for missing-data alerts (no_data_alert)
-        project_name: Optional ``detectkit_project.yml`` name. Surfaces
-            as ``{project_name}`` in templates and as a ``[name] `` prefix
-            in the default error title. Lets multiple projects share the
-            same alert channel without ambiguity.
+        project_name: Optional ``detectkit_project.yml`` name. Surfaces as
+            ``{project_name}`` / ``{project_name_prefix}`` in templates and, by
+            default, as a ``[name] `` prefix on every alert title/headline
+            (anomaly, recovery, no-data, error) plus a brand-paired footer
+            ("detectkit · name" on webhook/email). The detectkit pipeline stamps
+            it from the project config; direct-API callers leave it ``None`` and
+            render unchanged. Lets multiple projects share one alert channel —
+            keeping the default brand bot name + avatar — without ambiguity.
 
     Alert-rule fields (``min_detectors``, ``direction_policy``,
     ``consecutive_required``, ``detector_count``) describe *why the alert
@@ -450,7 +454,7 @@ class BaseAlertChannel(ABC):
             Default template string
         """
         return (
-            "🔴 Alert: {metric_name}\n"
+            "🔴 {project_name_prefix}Alert: {metric_name}\n"
             "{description_line}"
             "Quorum {detector_count}/{min_detectors} · "
             "direction {direction} (policy {direction_policy}) · "
@@ -476,7 +480,7 @@ class BaseAlertChannel(ABC):
             Default recovery template string
         """
         return (
-            "🟢 Alert cleared: {metric_name}\n"
+            "🟢 {project_name_prefix}Alert cleared: {metric_name}\n"
             "{description_line}"
             "The alert condition no longer holds — "
             "the metric is back within expected bounds.\n"
@@ -500,7 +504,7 @@ class BaseAlertChannel(ABC):
         Returns:
             Default title template string
         """
-        return "🔴 Alert: {metric_name}"
+        return "🔴 {project_name_prefix}Alert: {metric_name}"
 
     def get_default_recovery_title_template(self) -> str:
         """
@@ -509,7 +513,7 @@ class BaseAlertChannel(ABC):
         Returns:
             Default recovery title template string
         """
-        return "🟢 Alert cleared: {metric_name}"
+        return "🟢 {project_name_prefix}Alert cleared: {metric_name}"
 
     def get_default_no_data_template(self) -> str:
         """
@@ -519,7 +523,7 @@ class BaseAlertChannel(ABC):
         has no datapoint (no row OR row with NULL/NaN value).
         """
         return (
-            "🟡 No data for metric: {metric_name}\n"
+            "🟡 {project_name_prefix}No data for metric: {metric_name}\n"
             "{description_line}"
             "Time: {timestamp}\n"
             "Status: query returned no datapoint for the latest interval\n"
@@ -529,12 +533,12 @@ class BaseAlertChannel(ABC):
 
     def get_default_no_data_title_template(self) -> str:
         """Get default title template for no-data alerts."""
-        return "🟡 No data: {metric_name}"
+        return "🟡 {project_name_prefix}No data: {metric_name}"
 
     def get_default_error_template(self) -> str:
         """Default body template for project-level error alerts."""
         return (
-            "🔵 Pipeline failed for metric: {metric_name}\n"
+            "🔵 {project_name_prefix}Pipeline failed for metric: {metric_name}\n"
             "{description_line}"
             "Time: {timestamp}\n"
             "Error: {error_type}: {error_message}\n"

@@ -167,9 +167,11 @@ config needed. Control it project-wide with `alert_help_url` in
 Per-channel rendering (defaults only; resolved by
 `ProjectConfig.resolve_alert_help_url`):
 
-- **Slack / Mattermost / generic webhook** — a bottom full-width attachment field
-  titled `How to read this alert` whose value is the bare URL (auto-linkified on
-  both platforms).
+- **Slack / Mattermost / generic webhook** — a clickable `How to read this alert`
+  label in the compact `Links` field (alongside `Dashboard` + any extra links),
+  never a raw URL. Rendered in the platform's link syntax (Slack `<url|label>`,
+  Mattermost/generic markdown links) so a long dashboard URL stays hidden behind
+  its label.
 - **Telegram** — appended to the links line (after the optional "Open dashboard"
   link) as an `<a>` link reading `How to read this alert`.
 - **Email** — in the footer, after `Sent by detectkit · <project>` (and any CC),

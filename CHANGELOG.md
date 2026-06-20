@@ -5,6 +5,21 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.1] - 2026-06-20
+
+### Changed
+- **Webhook links render as compact clickable labels, not raw URLs.** On
+  Slack / Mattermost / generic webhook, `dashboard_url`, `links`, and the
+  "How to read this alert" guide now share **one compact `Links` field** of
+  clickable labels (`Dashboard · Runbook · How to read this alert`) instead of
+  printing full URLs on their own lines. A real dashboard URL (e.g. Grafana with
+  many template variables) can be a paragraph long; hiding it behind its label
+  keeps the alert readable. Links use each platform's native syntax — Slack
+  `<url|label>`, Mattermost/generic markdown links (detected from the webhook
+  host) — via the new `WebhookChannel._link_markup`. The clickable attachment
+  title (`title_link` → `dashboard_url`) and the Telegram/email link rendering
+  are unchanged. The landing-page channel previews were updated to match.
+
 ## [0.16.0] - 2026-06-20
 
 ### Added

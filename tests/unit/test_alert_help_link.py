@@ -80,31 +80,61 @@ class TestBuildContext:
 # --------------------------------------------------------------------------
 # Per-channel native rendering
 # --------------------------------------------------------------------------
+def _links_value(payload):
+    """The compact 'Links' attachment field value, or None when absent."""
+    fields = payload["attachments"][0]["fields"]
+    matches = [f for f in fields if f["title"] == "Links"]
+    return matches[0]["value"] if matches else None
+
+
 class TestWebhookRendering:
-    def test_help_field_rendered(self):
-        payload = WebhookChannel(webhook_url="https://x").build_payload(_alert())
-        fields = payload["attachments"][0]["fields"]
-        help_fields = [f for f in fields if f["title"] == ALERT_GUIDE_LABEL]
-        assert len(help_fields) == 1
-        assert help_fields[0]["value"] == BRAND_ALERT_GUIDE_URL
-        assert help_fields[0]["short"] is False
+    # Mattermost / generic webhook → markdown ``[label](url)``; the help link is
+    # a clickable label, never a raw URL line.
+    def test_help_link_rendered_as_markdown_label(self):
+        value = _links_value(
+            WebhookChannel(webhook_url="https://mm.acme/hooks/x").build_payload(_alert())
+        )
+        assert value is not None
+        assert f"[{ALERT_GUIDE_LABEL}]({BRAND_ALERT_GUIDE_URL})" in value
+        # The bare URL must NOT appear as a standalone "label: url" line.
+        assert f"{ALERT_GUIDE_LABEL}: {BRAND_ALERT_GUIDE_URL}" not in value
 
-    def test_help_field_uses_custom_url(self):
-        payload = WebhookChannel(webhook_url="https://x").build_payload(_alert(help_url=CUSTOM_URL))
-        fields = payload["attachments"][0]["fields"]
-        assert any(f["value"] == CUSTOM_URL for f in fields if f["title"] == ALERT_GUIDE_LABEL)
+    def test_slack_uses_pipe_syntax(self):
+        value = _links_value(
+            WebhookChannel(webhook_url="https://hooks.slack.com/services/x").build_payload(_alert())
+        )
+        assert f"<{BRAND_ALERT_GUIDE_URL}|{ALERT_GUIDE_LABEL}>" in value
 
-    def test_no_help_field_when_unset(self):
-        payload = WebhookChannel(webhook_url="https://x").build_payload(_alert(help_url=None))
-        fields = payload["attachments"][0]["fields"]
-        assert not any(f["title"] == ALERT_GUIDE_LABEL for f in fields)
+    def test_help_link_custom_url(self):
+        value = _links_value(
+            WebhookChannel(webhook_url="https://mm.acme/hooks/x").build_payload(
+                _alert(help_url=CUSTOM_URL)
+            )
+        )
+        assert f"[{ALERT_GUIDE_LABEL}]({CUSTOM_URL})" in value
+
+    def test_dashboard_is_hyperlinked_label_not_raw_url(self):
+        # A long dashboard URL is hidden behind the "Dashboard" label.
+        long_url = "https://grafana.ops/d/x?var-a=1&var-b=2&var-c=3&from=now-6h&to=now"
+        value = _links_value(
+            WebhookChannel(webhook_url="https://mm.acme/hooks/x").build_payload(
+                _alert(dashboard_url=long_url)
+            )
+        )
+        assert f"[Dashboard]({long_url})" in value
+        assert f"Dashboard: {long_url}" not in value  # never the raw "Dashboard: <url>"
+
+    def test_no_links_field_when_no_links_and_help_hidden(self):
+        payload = WebhookChannel(webhook_url="https://mm.acme/hooks/x").build_payload(
+            _alert(help_url=None)
+        )
+        assert _links_value(payload) is None  # _alert() has no dashboard/links either
 
     def test_rendered_on_all_alert_kinds(self):
-        ch = WebhookChannel(webhook_url="https://x")
+        ch = WebhookChannel(webhook_url="https://mm.acme/hooks/x")
         for kw in ({"is_recovery": True}, {"is_no_data": True}, {"is_error": True}):
-            payload = ch.build_payload(_alert(**kw))
-            fields = payload["attachments"][0]["fields"]
-            assert any(f["title"] == ALERT_GUIDE_LABEL for f in fields), kw
+            value = _links_value(ch.build_payload(_alert(**kw)))
+            assert value is not None and ALERT_GUIDE_LABEL in value, kw
 
 
 class TestTelegramRendering:

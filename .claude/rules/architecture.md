@@ -304,9 +304,12 @@ Telegram, an "Open dashboard" button in email, and exposed to templates as
 extra links appended alongside it).
 
 Separately, every default-rendered alert also carries a **"How to read this
-alert"** help link aimed at non-operator stakeholders — a bottom attachment
-field on webhook channels, a links-line entry on Telegram, a footer link in
-email, and `{help_url}` / `{help_line}` for templates. It defaults to the
+alert"** help link aimed at non-operator stakeholders. On webhook channels it
+joins `dashboard_url` + `links` in one compact **Links** field of clickable
+labels (never raw URLs — a Grafana URL can be paragraph-long; rendered with
+`_link_markup` in Slack `<url|label>` vs Mattermost markdown-link syntax); it is
+a links-line entry on Telegram, a footer link in email, and
+`{help_url}` / `{help_line}` for templates. It defaults to the
 brand guide (`BRAND_ALERT_GUIDE_URL` → the `/guides/reading-alerts/` docs page,
 in `channels/branding.py`) and is controlled **project-wide** by
 `ProjectConfig.alert_help_url` (tri-state: unset → default guide, a URL → your

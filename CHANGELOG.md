@@ -5,6 +5,45 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-06-20
+
+### Added
+- **Rich, platform-native alert rendering.** Every channel's default message is
+  now laid out using that platform's own rich primitives instead of a flat text
+  block — the alert still leads with the rule that fired, but the evidence reads
+  cleanly at a glance.
+  - **Slack / Mattermost / generic webhook** build a single message attachment
+    with the status-colored accent bar, a clickable title, a short markdown
+    lead, and a compact **fields grid** (Value / Expected / Quorum / Severity,
+    then full-width Detected-at / Detectors / Parameters), branded with a
+    `footer` + `footer_icon`. Mentions now ride in the **top-level** message
+    text so they reliably notify on Slack. A custom `template` still renders as
+    a plain text attachment (color/title/branding preserved).
+  - **Telegram** now defaults to `parse_mode: HTML` and sends a structured,
+    HTML-escaped message with a colored status dot, bold headline and `<code>`
+    evidence. This **fixes** silent delivery failures: the legacy `Markdown`
+    mode raised *"can't parse entities"* on detector params JSON containing
+    underscores (e.g. `window_size`).
+  - **Email** ships a fully branded **HTML card** (inline-CSS, table-based,
+    Outlook-safe) — a colored accent + status pill, the metric, a 2-column
+    value/expected/severity table, a monospace params box and a footer. The
+    plain-text part remains the fallback.
+- **First-class dashboard / runbook links.** New `dashboard_url` and `links`
+  fields on a metric's `alerting:` config attach actionable links to every
+  alert: a clickable attachment title on Slack/Mattermost, an inline link on
+  Telegram, and an **Open dashboard** button in email. `{dashboard_url}` is also
+  available to custom templates, and `{dashboard_line}` is appended to the
+  default plain-text templates.
+
+### Changed
+- **Telegram default `parse_mode` is now `HTML`** (was `Markdown`). Custom
+  Telegram templates are sent verbatim under the configured parse mode, so they
+  should be HTML-safe; set `parse_mode: Markdown` on the channel to keep the old
+  behavior.
+- The shared message-context builder (`BaseAlertChannel.build_context`) is now
+  the single source of the values used by both templates and native rendering,
+  so chat, email and the website preview stay consistent.
+
 ## [0.12.0] - 2026-06-20
 
 ### Added

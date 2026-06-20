@@ -2,6 +2,58 @@
 
 Channels are configured in `profiles.yml` and referenced by name in metric configs.
 
+## Default message rendering
+
+With no custom `template`, each channel renders a native, alert-centric layout:
+the message leads with the rule that fired, and the anomaly value is supporting
+evidence. The shared value computation (value, expected, severity, quorum,
+detectors, parameters) lives in `BaseAlertChannel.build_context`, so templates
+and native rendering read the same numbers.
+
+- **Slack / Mattermost / generic webhook** (all via `WebhookChannel`): a single
+  message *attachment* with a status-colored accent bar, a clickable title (the
+  metric; links to `dashboard_url` when set), a short markdown lead (the rule
+  that fired), and a compact fields grid — short fields Value / Expected /
+  Quorum / Severity, then full-width Detected at / Detectors / Parameters — plus
+  a branded footer and footer icon. `@mentions` ride in the **top-level message
+  text** (not the attachment) so Slack actually notifies. A custom `template`
+  renders instead as a plain text-only attachment (status color, title and
+  branding kept, no fields grid).
+- **Telegram**: a structured, HTML-escaped message (default `parse_mode` is now
+  `HTML`) — a colored status dot (red anomaly / green recovery / yellow no-data /
+  stop error), a bold headline, the rule, then the evidence in `<code>`
+  (value / expected / severity / time / detector / params), an inline
+  "Open dashboard" link, then mentions. Custom templates are sent verbatim under
+  the parse mode, so keep them HTML-safe (or set `parse_mode: Markdown`).
+- **Email**: a branded HTML card (inline-CSS, table-based, Outlook-safe) — a
+  colored accent and status pill, the metric, a 2-column value / expected /
+  severity table, a monospace params box, an optional "Open dashboard" button,
+  and a footer. The plain-text body remains the multipart fallback.
+
+### Dashboard and runbook links
+
+Two metric-level `alerting:` fields surface as first-class links on every
+channel:
+
+- `dashboard_url` — optional dashboard/runbook URL. Rendered as the clickable
+  attachment title on Slack/Mattermost/webhook, an inline "Open dashboard" link
+  on Telegram, and an "Open dashboard" button in email. Also exposed to custom
+  templates as `{dashboard_url}` (raw URL, empty string when unset) and
+  `{dashboard_line}` (`Dashboard: <url>\n` when set, else empty — appended to the
+  default plain-text templates).
+- `links` — a `label: url` map of extra links appended alongside `dashboard_url`.
+
+```yaml
+# In metric config
+alerting:
+  channels:
+    - mattermost_ops
+  dashboard_url: https://grafana.ops/d/api-errors
+  links:
+    Runbook: https://runbooks.ops/api-errors
+    Grafana: https://grafana.ops/d/api-errors
+```
+
 ## Bot identity (name & avatar)
 
 By default the alert bot uses the **detectkit brand** — the display name
@@ -93,6 +145,14 @@ alerting:
 2. Get bot token
 3. Add bot to channel
 4. Get chat ID (use @userinfobot)
+
+> **Default formatting (Telegram):** the default `parse_mode` is now `HTML`. The
+> built-in message is structured and HTML-escaped (status dot, headline, rule,
+> evidence in `<code>`, optional "Open dashboard" link), which avoids the
+> "can't parse entities" error the old Markdown default raised on params JSON
+> containing underscores (e.g. `window_size`). Custom templates are sent
+> verbatim, so keep them HTML-safe — or set `parse_mode: Markdown` to restore
+> the previous behavior.
 
 > **Bot avatar (Telegram):** Telegram bots show the avatar set on the bot
 > account itself, not a per-message icon — so detectkit can't override it like

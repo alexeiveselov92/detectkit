@@ -178,7 +178,7 @@ alert_channels:
     type: telegram
     bot_token: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
     chat_id: "-1001234567890"
-    parse_mode: "Markdown"      # "Markdown", "HTML", or null (default: "Markdown")
+    parse_mode: "HTML"          # "Markdown", "HTML", or null (default: "HTML")
     disable_notification: false # Send silently without notification (default: false)
 ```
 
@@ -188,8 +188,14 @@ alert_channels:
 - `chat_id`: Target chat/channel ID
 
 **Optional fields**:
-- `parse_mode` (default: `"Markdown"`) - Message formatting: `"Markdown"`, `"HTML"`, or `null`
+- `parse_mode` (default: `"HTML"`) - Message formatting: `"Markdown"`, `"HTML"`, or `null`
 - `disable_notification` (default: `false`) - Send the message silently, without a notification sound
+
+> The default `parse_mode` is now `HTML` (was `Markdown`). The built-in message
+> is HTML-escaped, which fixes a "can't parse entities" error the old Markdown
+> default raised on params JSON containing underscores (e.g. `window_size`).
+> Custom templates are sent verbatim under the parse mode, so keep them
+> HTML-safe — or set `parse_mode: Markdown` to restore the previous behavior.
 
 #### Email Channel
 

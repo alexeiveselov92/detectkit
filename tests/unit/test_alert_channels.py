@@ -10,6 +10,7 @@ from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
 from detectkit.alerting.channels.branding import BRAND_ICON_URL, BRAND_USERNAME
 from detectkit.alerting.channels.mattermost import MattermostChannel
 from detectkit.alerting.channels.slack import SlackChannel
+from detectkit.alerting.channels.telegram import TelegramChannel
 from detectkit.alerting.channels.webhook import WebhookChannel
 
 
@@ -579,7 +580,181 @@ class TestEmailBranding:
         # Plain-text alternative is still present as a fallback.
         assert any(p.get_content_type() == "text/plain" for p in msg.walk())
 
-    def test_build_html_body_escapes_and_brands(self):
-        body = self._channel()._build_html_body("value < 5 & rising")
+    @patch("detectkit.alerting.channels.email.smtplib.SMTP")
+    def test_subject_strips_header_injection(self, mock_smtp):
+        """CR/LF in the metric name must not inject extra email headers."""
+        alert = _anomaly_alert()
+        alert.metric_name = "cpu\r\nBcc: attacker@evil.test"
+        self._channel().send(alert)
+        msg = self._sent_message(mock_smtp)
+        assert "attacker@evil.test" not in (msg["Bcc"] or "")
+        assert "Bcc" not in msg or msg["Bcc"] is None
+        assert "\n" not in msg["Subject"] and "\r" not in msg["Subject"]
+
+    def test_build_html_body_escapes_and_brands_custom(self):
+        """A custom-template body is escaped and rendered inside the branded card."""
+        body = self._channel()._build_html_body(
+            _anomaly_alert(), "value < 5 & rising", is_custom=True
+        )
         assert BRAND_ICON_URL in body
         assert "value &lt; 5 &amp; rising" in body  # HTML-escaped
+
+    def test_build_html_body_default_is_structured_card(self):
+        """The default (no custom template) HTML is the structured stat card."""
+        body = self._channel()._build_html_body(_anomaly_alert(), "ignored plain body")
+        assert BRAND_ICON_URL in body
+        assert "detectkit" in body  # wordmark survives images-off
+        assert "ANOMALY" in body  # status pill
+        assert "Expected" in body and "Severity" in body  # stat grid
+        # status accent color present
+        assert "#d63232".lower() in body.lower()
+
+    def test_build_html_body_escapes_structured_values(self):
+        """Interpolated values in the structured card are HTML-escaped."""
+        alert = _anomaly_alert()
+        alert.description = "drops < 5 & spikes"
+        body = self._channel()._build_html_body(alert, "plain")
+        assert "drops &lt; 5 &amp; spikes" in body
+
+    def test_email_html_renders_dashboard_button(self):
+        """A dashboard_url renders an Open-dashboard button linking to the URL."""
+        alert = _anomaly_alert()
+        alert.dashboard_url = "https://grafana.example/d/abc"
+        body = self._channel()._build_html_body(alert, "plain")
+        assert 'href="https://grafana.example/d/abc"' in body
+        assert "Open dashboard" in body
+
+
+class TestWebhookRichAttachment:
+    """The default webhook payload is a rich fields-based attachment."""
+
+    def _payload(self, alert, template=None):
+        return WebhookChannel(webhook_url="https://example.com/hooks/xxx").build_payload(
+            alert, template
+        )
+
+    def test_default_attachment_has_fields_and_branding(self):
+        attachment = self._payload(_anomaly_alert())["attachments"][0]
+        assert attachment["color"] == "#D63232"
+        assert "cpu_usage" in attachment["title"]
+        # Compact fields grid is built from the context.
+        field_titles = [f["title"] for f in attachment["fields"]]
+        assert "Value" in field_titles
+        assert "Expected" in field_titles
+        assert "Quorum" in field_titles
+        # Branding + markdown opt-in.
+        assert attachment["footer"] == "detectkit"
+        assert attachment["footer_icon"] == BRAND_ICON_URL
+        assert attachment["mrkdwn_in"] == ["text", "fields"]
+
+    def test_mentions_ride_in_top_level_text(self):
+        alert = _anomaly_alert()
+        alert.mentions = ["here", "oncall"]
+        payload = self._payload(alert)
+        # Mentions notify only from top-level text, not inside the attachment.
+        assert "here" in payload["text"]
+        assert "@oncall" in payload["text"]
+
+    def test_no_mentions_omits_top_level_text(self):
+        payload = self._payload(_anomaly_alert())
+        assert "text" not in payload
+
+    def test_dashboard_url_makes_title_clickable(self):
+        alert = _anomaly_alert()
+        alert.dashboard_url = "https://grafana.example/d/abc"
+        attachment = self._payload(alert)["attachments"][0]
+        assert attachment["title_link"] == "https://grafana.example/d/abc"
+
+    def test_custom_template_is_text_only_attachment(self):
+        attachment = self._payload(_anomaly_alert(), template="CUSTOM: {metric_name}")[
+            "attachments"
+        ][0]
+        assert "CUSTOM: cpu_usage" in attachment["text"]
+        assert "fields" not in attachment  # opaque template → no fields grid
+        assert attachment["color"] == "#D63232"
+        assert attachment["footer"] == "detectkit"  # branding kept on fallback
+
+    def test_recovery_uses_green_color(self):
+        alert = _anomaly_alert()
+        alert.is_recovery = True
+        assert self._payload(alert)["attachments"][0]["color"] == "#36A64F"
+
+    def test_error_uses_error_color(self):
+        alert = _anomaly_alert()
+        alert.is_error = True
+        alert.error_type = "DBError"
+        alert.error_message = "connection refused"
+        assert self._payload(alert)["attachments"][0]["color"] == "#5A7A8C"
+
+
+class TestTelegramHtmlRendering:
+    """Telegram defaults to escaped HTML with a status dot and rich layout."""
+
+    @staticmethod
+    def _channel():
+        return TelegramChannel(bot_token="t", chat_id="c")
+
+    def _alert(self):
+        return AlertData(
+            metric_name="api_error_rate",
+            timestamp=datetime(2024, 1, 1, 12, 0, 0),
+            timezone="UTC",
+            value=4.2,
+            confidence_lower=None,
+            confidence_upper=1.1,
+            detector_name="mad",
+            detector_params='{"threshold": 3.0, "window_size": 2016}',
+            direction="up",
+            severity=3.4,
+            detection_metadata={},
+            consecutive_count=3,
+            min_detectors=1,
+            direction_policy="same",
+            consecutive_required=3,
+            detector_count=1,
+        )
+
+    def test_default_parse_mode_is_html(self):
+        assert self._channel().parse_mode == "HTML"
+
+    @patch("detectkit.alerting.channels.telegram.requests.post")
+    def test_html_message_has_status_dot_and_escaped_params(self, mock_post):
+        mock_post.return_value = Mock(raise_for_status=Mock())
+        self._channel().send(self._alert())
+        payload = mock_post.call_args.kwargs["json"]
+        assert payload["parse_mode"] == "HTML"
+        assert payload["disable_web_page_preview"] is True
+        text = payload["text"]
+        assert text.startswith("\U0001f534")  # red status dot for anomaly
+        assert "<b>" in text
+        # The underscore-bearing params live inside <code> (HTML-safe), which is
+        # exactly what the legacy Markdown mode could not render.
+        assert "window_size" in text
+        assert "<code>" in text
+
+    @patch("detectkit.alerting.channels.telegram.requests.post")
+    def test_html_message_renders_dashboard_link(self, mock_post):
+        mock_post.return_value = Mock(raise_for_status=Mock())
+        alert = self._alert()
+        alert.dashboard_url = "https://grafana.example/d/abc?x=1&y=2"
+        self._channel().send(alert)
+        text = mock_post.call_args.kwargs["json"]["text"]
+        assert 'href="https://grafana.example/d/abc?x=1&amp;y=2"' in text
+        assert "Open dashboard" in text
+
+    @patch("detectkit.alerting.channels.telegram.requests.post")
+    def test_special_chars_in_metric_are_escaped(self, mock_post):
+        mock_post.return_value = Mock(raise_for_status=Mock())
+        alert = self._alert()
+        alert.metric_name = "orders<5 & rising"
+        self._channel().send(alert)
+        text = mock_post.call_args.kwargs["json"]["text"]
+        assert "orders&lt;5 &amp; rising" in text
+
+    @patch("detectkit.alerting.channels.telegram.requests.post")
+    def test_recovery_uses_green_dot(self, mock_post):
+        mock_post.return_value = Mock(raise_for_status=Mock())
+        alert = self._alert()
+        alert.is_recovery = True
+        self._channel().send(alert)
+        assert mock_post.call_args.kwargs["json"]["text"].startswith("\U0001f7e2")

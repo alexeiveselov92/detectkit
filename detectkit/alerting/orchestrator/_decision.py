@@ -239,6 +239,8 @@ class _DecisionMixin(_OrchestratorBase):
             consecutive_count=consecutive_count,
             description=self.description,
             mentions=self.mentions,
+            dashboard_url=self.dashboard_url,
+            links=self.links,
             # Alert rule the message foregrounds: configured thresholds plus
             # the observed quorum size that satisfied them.
             min_detectors=self.conditions.min_detectors,
@@ -296,6 +298,8 @@ class _DecisionMixin(_OrchestratorBase):
             is_no_data=True,
             description=self.description,
             mentions=self.mentions,
+            dashboard_url=self.dashboard_url,
+            links=self.links,
         )
 
     def get_last_complete_point(self, now: datetime | None = None) -> datetime:

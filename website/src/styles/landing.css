@@ -780,7 +780,7 @@
   }
 }
 
-/* ---------- alert mock + per-platform selector ---------- */
+/* ---------- alert preview + per-platform selector ---------- */
 .alert-wrap {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -788,9 +788,15 @@
   padding: 30px;
 }
 
-/* CSS-only platform tabs: hidden radios drive label tabs + panel visibility. */
+/* CSS-only platform + severity tabs: hidden radios drive the labels, the
+   surface tint, the accent color and which message variant shows. */
 .platform-demo {
   position: relative;
+  /* accent follows the Anomaly/Recovery toggle (set via :has below) */
+  --accent: var(--st-anomaly);
+}
+.platform-demo:has(#sev-recovery:checked) {
+  --accent: var(--st-recovery);
 }
 .pf-radio {
   position: absolute;
@@ -799,11 +805,18 @@
   opacity: 0;
   pointer-events: none;
 }
+.pf-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
 .pf-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 16px;
 }
 .pf-tabs label {
   display: inline-flex;
@@ -843,19 +856,50 @@
   color: var(--ink);
   border-color: #d8d1c2;
 }
-#pf-slack:checked ~ .pf-tabs label[for='pf-slack'],
-#pf-mattermost:checked ~ .pf-tabs label[for='pf-mattermost'],
-#pf-telegram:checked ~ .pf-tabs label[for='pf-telegram'],
-#pf-email:checked ~ .pf-tabs label[for='pf-email'] {
+#pf-slack:checked ~ .pf-controls .pf-tabs label[for='pf-slack'],
+#pf-mattermost:checked ~ .pf-controls .pf-tabs label[for='pf-mattermost'],
+#pf-telegram:checked ~ .pf-controls .pf-tabs label[for='pf-telegram'],
+#pf-email:checked ~ .pf-controls .pf-tabs label[for='pf-email'] {
   color: var(--surface);
   background: var(--ink);
   border-color: var(--ink);
 }
 /* keyboard focus ring on the active tab */
-#pf-slack:focus-visible ~ .pf-tabs label[for='pf-slack'],
-#pf-mattermost:focus-visible ~ .pf-tabs label[for='pf-mattermost'],
-#pf-telegram:focus-visible ~ .pf-tabs label[for='pf-telegram'],
-#pf-email:focus-visible ~ .pf-tabs label[for='pf-email'] {
+#pf-slack:focus-visible ~ .pf-controls .pf-tabs label[for='pf-slack'],
+#pf-mattermost:focus-visible ~ .pf-controls .pf-tabs label[for='pf-mattermost'],
+#pf-telegram:focus-visible ~ .pf-controls .pf-tabs label[for='pf-telegram'],
+#pf-email:focus-visible ~ .pf-controls .pf-tabs label[for='pf-email'] {
+  outline: 2px solid var(--clay);
+  outline-offset: 2px;
+}
+/* Anomaly / Recovery segmented toggle (mirrors the reference). */
+.pf-sev {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+}
+.pf-sev label {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 5px 13px;
+  border-radius: 7px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+#sev-anomaly:checked ~ .pf-controls .pf-sev label[for='sev-anomaly'],
+#sev-recovery:checked ~ .pf-controls .pf-sev label[for='sev-recovery'] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+#sev-anomaly:focus-visible ~ .pf-controls .pf-sev label[for='sev-anomaly'],
+#sev-recovery:focus-visible ~ .pf-controls .pf-sev label[for='sev-recovery'] {
   outline: 2px solid var(--clay);
   outline-offset: 2px;
 }
@@ -863,30 +907,78 @@
   font-size: 13.5px;
   line-height: 1.5;
   color: var(--muted);
-  max-width: 62ch;
-  margin: 0 0 22px;
+  max-width: 64ch;
+  margin: 0 0 18px;
+}
+.pf-note code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--clay);
+}
+
+/* The chat surface — a tinted backdrop the message cards sit on. Telegram
+   swaps it to its signature green dotted pattern, like the reference. */
+.pf-surface {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  transition: background 0.2s ease;
+}
+.platform-demo:has(#pf-telegram:checked) .pf-surface {
+  background: #cfe3d6;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px);
+  background-size: 18px 18px;
+  border-color: #cfe3d6;
 }
 .pf-panel {
   display: none;
 }
-#pf-slack:checked ~ .pf-panels .pf-slack-panel,
-#pf-mattermost:checked ~ .pf-panels .pf-mm-panel,
-#pf-telegram:checked ~ .pf-panels .pf-tg-panel,
-#pf-email:checked ~ .pf-panels .pf-email-panel {
+#pf-slack:checked ~ .pf-surface .pf-slack-panel,
+#pf-mattermost:checked ~ .pf-surface .pf-mm-panel,
+#pf-telegram:checked ~ .pf-surface .pf-tg-panel,
+#pf-email:checked ~ .pf-surface .pf-email-panel {
+  display: block;
+}
+/* Anomaly / Recovery variant toggle (both rendered, one shown). */
+.sev-recovery-only {
+  display: none;
+}
+#sev-recovery:checked ~ .pf-surface .sev-anomaly-only {
+  display: none;
+}
+#sev-recovery:checked ~ .pf-surface .sev-recovery-only {
   display: block;
 }
 
-/* Slack / Mattermost — shared Slack-compatible webhook attachment. */
+/* config snippet under the demo */
+.pf-yaml {
+  margin: 18px 0 0;
+  background: var(--term-bg);
+  border: 1px solid var(--term-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--term-text);
+  overflow-x: auto;
+}
+.pf-yaml .k {
+  color: #6cc0b6;
+}
+.pf-yaml .s {
+  color: #e7b45c;
+}
+.pf-yaml .c {
+  color: #7c766a;
+}
+
+/* Slack / Mattermost — shared fields-based webhook attachment. */
 .chat-msg {
   display: flex;
   gap: 12px;
-  max-width: 640px;
-}
-.chat-av {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  flex: none;
+  max-width: 560px;
 }
 .chat-body {
   flex: 1;
@@ -899,7 +991,7 @@
   margin-bottom: 6px;
 }
 .chat-name {
-  font-weight: 700;
+  font-weight: 800;
   font-size: 15px;
   color: #1d1c1d;
 }
@@ -912,9 +1004,22 @@
   border-radius: 3px;
   letter-spacing: 0.03em;
 }
+.chat-tag.bot {
+  background: #1c58d9;
+  color: #fff;
+}
 .chat-time {
   font-size: 12px;
-  color: #616061;
+  color: #868686;
+}
+.att-mentions {
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: #1d1c1d;
+}
+.ment {
+  color: #2563d6;
+  font-weight: 600;
 }
 .attachment {
   display: flex;
@@ -922,56 +1027,105 @@
   border: 1px solid #e8e8e8;
   border-radius: 6px;
   overflow: hidden;
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 .attachment .bar {
   width: 4px;
-  background: var(--st-anomaly);
+  background: var(--accent);
   flex: none;
 }
 .attachment .content {
   padding: 12px 15px;
   min-width: 0;
+  flex: 1;
 }
-.attachment .title {
-  font-weight: 700;
+.att-title {
+  display: inline-block;
+  font-weight: 800;
   font-size: 15px;
-  color: #1d1c1d;
-  margin-bottom: 6px;
+  color: #1264a3;
+  text-decoration: none;
+  margin-bottom: 5px;
 }
-.attachment .text {
-  font-size: 13.5px;
-  line-height: 1.55;
+.att-title:hover {
+  text-decoration: underline;
+}
+.att-title .ext {
+  color: #8a8a8a;
+  font-weight: 400;
+}
+.att-lead {
+  font-size: 13px;
+  line-height: 1.5;
   color: #1d1c1d;
-  white-space: pre-wrap;
-  word-break: break-word;
+  margin-bottom: 11px;
   font-family: var(--sans);
 }
+.att-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px 16px;
+}
+.att-field.full {
+  grid-column: 1 / -1;
+}
+.att-field .fk {
+  font-size: 11px;
+  font-weight: 700;
+  color: #616061;
+  margin-bottom: 1px;
+}
+.att-field .fv {
+  font-size: 13px;
+  color: #1d1c1d;
+  word-break: break-word;
+}
+.att-field .fv code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: #f3f1ec;
+  color: #b4471f;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.att-field .fv a {
+  color: #1264a3;
+  text-decoration: none;
+}
+.att-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 11.5px;
+  color: #868686;
+}
+.att-footer svg {
+  border-radius: 3px;
+}
 
-/* Telegram — plain message bubble, no color bar, title lives in the text. */
+/* Telegram — escaped-HTML message bubble, status dot in the text. */
 .tg-msg {
   display: flex;
   gap: 10px;
-  max-width: 560px;
-}
-.tg-av {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  flex: none;
+  align-items: flex-end;
+  max-width: 480px;
 }
 .tg-bubble {
   background: #fff;
-  border-radius: 4px 12px 12px 12px;
-  padding: 8px 12px 6px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  border-radius: 14px 14px 14px 4px;
+  padding: 9px 13px 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
   min-width: 0;
 }
 .tg-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-weight: 700;
   font-size: 13.5px;
-  color: #3390ec;
-  margin-bottom: 2px;
+  color: var(--clay);
+  margin-bottom: 4px;
 }
 .tg-text {
   font-size: 13.5px;
@@ -981,6 +1135,27 @@
   word-break: break-word;
   font-family: var(--sans);
 }
+.tg-text b {
+  font-weight: 700;
+}
+.tg-text i {
+  color: #707579;
+}
+.tg-text code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: #f1f3f5;
+  color: #1d1c1d;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.tg-text a {
+  color: #3390ec;
+  text-decoration: none;
+}
+.tg-text .ment {
+  color: #3390ec;
+}
 .tg-meta {
   font-size: 11px;
   color: #8a949e;
@@ -988,45 +1163,142 @@
   margin-top: 2px;
 }
 
-/* Email — subject + plain-text body; mentions become a CC line. */
-.email-card {
+/* Email — a branded HTML card inside a mail-client chrome. */
+.email-msg {
   background: #fff;
-  border: 1px solid #e8e8e8;
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
   overflow: hidden;
-  max-width: 640px;
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+  max-width: 600px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
 }
 .email-head {
-  padding: 14px 16px;
-  background: #fafafa;
-  border-bottom: 1px solid #ececec;
-}
-.email-row {
   display: flex;
-  gap: 10px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: #4a4a4a;
+  align-items: center;
+  gap: 11px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #efede6;
 }
-.email-k {
+.email-meta {
+  flex: 1;
+  min-width: 0;
+}
+.email-from {
+  font-size: 14px;
+  color: #1b1916;
+}
+.email-from span {
+  color: #9a9384;
+  font-weight: 400;
+}
+.email-sub {
+  font-size: 12.5px;
+  color: #9a9384;
+}
+.email-reply {
   flex: none;
-  width: 56px;
-  color: #8a8a8a;
-  font-weight: 600;
 }
-.email-subject {
+/* the alert card (mirrors the real inline-CSS HTML email) */
+.email-card {
+  background: #fbf9f3;
+}
+.ec-accent {
+  height: 4px;
+  background: var(--accent);
+}
+.ec-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 16px 22px 6px;
+}
+.ec-brand {
   font-weight: 700;
-  color: #1d1c1d;
+  font-size: 15px;
+  color: var(--clay);
 }
-.email-body {
-  padding: 16px;
-  font-size: 13px;
-  line-height: 1.55;
-  color: #1d1c1d;
-  white-space: pre-wrap;
-  word-break: break-word;
+.ec-pill {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #fff;
+  background: var(--accent);
+  padding: 4px 11px;
+  border-radius: 12px;
+}
+.ec-title {
+  padding: 4px 22px 0;
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #1b1916;
+}
+.ec-lead {
+  padding: 5px 22px 14px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: #6e675b;
+}
+.ec-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 22px 14px;
+}
+.ec-cell {
+  background: #f5f1e8;
+  border: 1px solid #e6e0d4;
+  border-radius: 6px;
+  padding: 9px 12px;
+}
+.ec-k {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #9a9384;
+}
+.ec-v {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1b1916;
+}
+.ec-plabel {
+  padding: 0 22px 5px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #9a9384;
+}
+.ec-params {
+  margin: 0 22px 16px;
+  background: #211e1a;
+  border: 1px solid #332f29;
+  border-radius: 6px;
+  padding: 11px 13px;
   font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: #c9c2b4;
+  word-break: break-all;
+}
+.ec-btn {
+  display: inline-block;
+  margin: 0 22px 18px;
+  background: var(--clay);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 9px 16px;
+  border-radius: 7px;
+}
+.ec-foot {
+  padding: 13px 22px;
+  border-top: 1px solid #e6e0d4;
+  background: #fbf9f3;
+  font-size: 12px;
+  color: #9a9384;
 }
 
 /* ---------- CTA band ---------- */

@@ -260,6 +260,39 @@ alerting (`ProjectConfig.error_alerting` → `error_dispatch.py`) notifies on
 DB-down / DDL / runtime failures, including early CLI failures before any metric
 runs.
 
+**Default rendering is platform-native** (no custom `template`). The value
+computation behind all of it is shared: `BaseAlertChannel.build_context` is the
+single source feeding both custom templates and native rendering.
+
+- **Slack / Mattermost / generic webhook** (all via `WebhookChannel`) render one
+  message *attachment* — a status-colored accent bar, a clickable title (the
+  metric, linking to `dashboard_url` when set), a short markdown lead (the rule
+  that fired), and a compact fields grid: short fields Value / Expected /
+  Quorum / Severity, then full-width Detected-at / Detectors / Parameters, plus
+  a branded footer + footer_icon. `@mentions` ride in the **top-level** message
+  text so they notify on Slack. A custom `template` still renders as a plain
+  text-only attachment (color/title/branding kept, no fields grid).
+- **Telegram** defaults to `parse_mode: HTML` (was Markdown). The default
+  message is structured and HTML-escaped: a colored status dot (red anomaly /
+  green recovery / yellow no-data / stop error), a bold headline, the rule, then
+  evidence in `<code>` (value / expected / severity / time / detector / params),
+  an inline "Open dashboard" link, then mentions. This fixes a real bug — the
+  old Markdown mode raised `can't parse entities` on params JSON containing
+  underscores (e.g. `window_size`). Custom templates are sent verbatim under the
+  parse mode (so keep them HTML-safe; set `parse_mode: Markdown` for the old
+  behavior).
+- **Email** sends a branded HTML card (inline-CSS, table-based, Outlook-safe) —
+  colored accent + status pill, the metric, a 2-col value/expected/severity
+  table, a monospace params box, an optional "Open dashboard" button, and a
+  footer; the plain-text body remains the multipart fallback.
+
+Two `AlertConfig` fields (`detectkit/config/metric_config.py`) drive the action
+links, surfaced as first-class actions on every channel: **`dashboard_url`** (a
+dashboard/runbook URL — clickable title on webhook channels, inline link on
+Telegram, an "Open dashboard" button in email, and exposed to templates as
+`{dashboard_url}` / `{dashboard_line}`) and **`links`** (a `{label: url}` map of
+extra links appended alongside it).
+
 ## Idempotency & locking
 
 Every stage **resumes from the last persisted timestamp**: load from

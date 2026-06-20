@@ -450,3 +450,28 @@ alerting:
                 MetricConfig.from_yaml_file(temp_path)
         finally:
             temp_path.unlink()
+
+
+class TestAlertConfigDashboardLinks:
+    """dashboard_url / links are optional and restricted to http(s) URLs."""
+
+    def test_defaults_are_empty(self):
+        cfg = AlertConfig()
+        assert cfg.dashboard_url is None
+        assert cfg.links == {}
+
+    def test_http_urls_accepted(self):
+        cfg = AlertConfig(
+            dashboard_url="https://grafana.ops/d/api-errors",
+            links={"Runbook": "http://runbooks.ops/api"},
+        )
+        assert cfg.dashboard_url == "https://grafana.ops/d/api-errors"
+        assert cfg.links["Runbook"] == "http://runbooks.ops/api"
+
+    def test_dangerous_dashboard_url_rejected(self):
+        with pytest.raises(ValueError, match="http"):
+            AlertConfig(dashboard_url="javascript:alert(1)")
+
+    def test_dangerous_link_url_rejected(self):
+        with pytest.raises(ValueError, match="http"):
+            AlertConfig(links={"x": "data:text/html,<script>"})

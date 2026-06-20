@@ -176,6 +176,8 @@ class _RecoveryMixin(_OrchestratorBase):
             is_recovery=True,
             description=self.description,
             mentions=self.mentions,
+            dashboard_url=self.dashboard_url,
+            links=self.links,
             # Echo the rule that had fired so the recovery message names the
             # same alert condition that just cleared.
             min_detectors=self.conditions.min_detectors,

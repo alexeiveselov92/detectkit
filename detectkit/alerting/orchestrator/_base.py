@@ -23,6 +23,8 @@ class _OrchestratorBase:
         alert_config=None,  # AlertConfig
         description: str | None = None,
         mentions: list[str] | None = None,
+        dashboard_url: str | None = None,
+        links: dict[str, str] | None = None,
     ):
         self.metric_name = metric_name
         self.interval = interval
@@ -33,6 +35,8 @@ class _OrchestratorBase:
         self.alert_config = alert_config
         self.description = description
         self.mentions = mentions or []
+        self.dashboard_url = dashboard_url
+        self.links = links or {}
 
     @staticmethod
     def _group_by_timestamp(

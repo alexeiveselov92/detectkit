@@ -278,6 +278,10 @@ alerting:
     - mattermost_ops
     - slack_critical
 
+  # Dashboard / runbook links (v0.13.0)
+  dashboard_url: null            # Optional dashboard/runbook URL (default: null)
+  links: {}                      # Extra "label: url" links (default: {})
+
   # Anomaly filtering
   min_detectors: 1               # Detectors that must satisfy the quorum per point (default: 1)
   direction: "same"              # "same", "any", "up", "down" (default: "same")
@@ -376,6 +380,28 @@ list of one block. See the [Alerting Guide](alerting.md) for full details.
   - Special keywords: `here`, `channel`, `all` for broadcast mentions
   - Each channel formats mentions in its native syntax
   - Available as `{mentions}` and `{mentions_line}` template variables
+
+- **`dashboard_url`** (v0.13.0): Optional dashboard/runbook URL
+  - `null` (default) — no dashboard link
+  - Surfaced as a first-class action on every channel: a clickable
+    attachment title on Slack/Mattermost, an inline "Open dashboard" link
+    on Telegram, and an "Open dashboard" button in email
+  - Also available to custom templates as `{dashboard_url}` and
+    `{dashboard_line}`
+
+- **`links`** (v0.13.0): Extra `label: url` links shown alongside
+  `dashboard_url`
+  - `{}` (default) — no extra links
+  - Each entry is appended as a labelled link, e.g.
+    `{Runbook: 'https://...', Grafana: 'https://...'}`
+
+```yaml
+alerting:
+  channels: [mattermost_ops]
+  dashboard_url: https://grafana.ops/d/api-errors
+  links:
+    Runbook: https://runbooks.ops/api-errors
+```
 
 - **`no_data_alert`** (v0.5.0): Alert when the latest expected interval
   has no datapoint

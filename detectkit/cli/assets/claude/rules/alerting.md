@@ -131,8 +131,53 @@ mentions: [oncall_engineer, here]   # plain names, no @
 Channel-agnostic: you write plain usernames and each channel renders them
 natively. Special broadcast keywords: `here`, `channel`, `all`. Available as
 `{mentions}` / `{mentions_line}` template variables (appended automatically if
-not placed in a template). Slack `@username` is display-only — use Slack user
-IDs (`U…`) for real pings.
+not placed in a template). On Slack/Mattermost the default rendering puts the
+mentions in the **top-level message text** (not the attachment) so they actually
+notify. Slack `@username` is display-only — use Slack user IDs (`U…`) for real
+pings.
+
+## Dashboard / runbook links
+
+```yaml
+dashboard_url: https://grafana.ops/d/api-errors   # optional; default null
+links:                                             # optional; default {}
+  Runbook: https://runbooks.ops/api-errors
+  Grafana: https://grafana.ops/d/api-errors
+```
+
+`dashboard_url` is surfaced as a first-class action on **every** channel: the
+attachment title is clickable and a link is shown on Slack/Mattermost, Telegram
+gets an inline "Open dashboard" link, and email gets an "Open dashboard" button.
+`links` adds extra `label: url` entries alongside it. Both are also exposed to
+custom templates — see `{dashboard_url}` / `{dashboard_line}` below.
+
+## How default messages render
+
+With no custom `template`, each channel renders a structured, branded message
+(alert-centric: the rule that fired leads, the anomaly value is evidence). The
+shared value computation lives in one place (`BaseAlertChannel.build_context`),
+so templates and native rendering stay consistent.
+
+- **Slack / Mattermost / generic webhook** — one message *attachment* with a
+  status-colored accent bar, a clickable title (the metric; links to
+  `dashboard_url` when set), a short markdown lead (the rule), and a compact
+  fields grid: short fields Value / Expected / Quorum / Severity, then full-width
+  Detected-at / Detectors / Parameters, plus a branded footer + footer icon.
+  @mentions ride in the **top-level** message text so they notify. A custom
+  `template` instead renders as a plain text-only attachment (color/title/
+  branding kept, no fields grid).
+- **Telegram** — default `parse_mode` is now **HTML**. The default message is
+  structured and HTML-escaped: a colored status dot (red anomaly / green
+  recovery / yellow no-data / stop error), a bold headline, the rule, then
+  evidence in `<code>` (value/expected/severity/time/detector/params), an inline
+  "Open dashboard" link, then mentions. This fixes the old Markdown mode raising
+  "can't parse entities" on params JSON containing underscores (e.g.
+  `window_size`). Custom templates are sent verbatim under the parse mode, so
+  they must be HTML-safe; set `parse_mode: Markdown` to keep the old behavior.
+- **Email** — a branded HTML card (inline-CSS, table-based, Outlook-safe):
+  colored accent + status pill, the metric, a 2-col value/expected/severity
+  table, a monospace params box, an optional "Open dashboard" button, and a
+  footer. The plain-text body remains the multipart fallback.
 
 ## Multiple alert configs per metric
 
@@ -172,6 +217,8 @@ referenced by path). Key variables:
 | `{direction}`, `{consecutive_count}`, `{severity}` | observed values |
 | `{status}` | `ANOMALY` / `RECOVERED` / `NO_DATA` / `ERROR` |
 | `{mentions}` / `{mentions_line}` | formatted mentions |
+| `{dashboard_url}` | raw `dashboard_url` (empty string when unset) |
+| `{dashboard_line}` | `Dashboard: <url>\n` when set, else empty (appended to default plain-text templates) |
 
 > For no-data/error alerts there is no numeric value — avoid `{value:.2f}` in
 > those templates (detectkit falls back to the default template rather than

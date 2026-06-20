@@ -200,6 +200,18 @@ class AlertConfig(BaseModel):
         "Special keywords: 'channel', 'all', 'here' for broadcast mentions. "
         "Each channel formats mentions in its native syntax.",
     )
+    dashboard_url: str | None = Field(
+        default=None,
+        description="Optional dashboard/runbook URL surfaced as a first-class action in "
+        "every alert: a clickable title + 'Open dashboard' link on Slack/Mattermost, "
+        "an inline link on Telegram, and a button in email. Also available to custom "
+        "templates as {dashboard_url}.",
+    )
+    links: dict[str, str] = Field(
+        default_factory=dict,
+        description="Additional 'label: url' links appended to the alert alongside "
+        "dashboard_url (e.g. {'Runbook': 'https://...', 'Grafana': 'https://...'}).",
+    )
 
     @field_validator("consecutive_anomalies")
     @classmethod
@@ -207,6 +219,24 @@ class AlertConfig(BaseModel):
         """Validate consecutive anomalies threshold."""
         if v < 1:
             raise ValueError("consecutive_anomalies must be at least 1")
+        return v
+
+    @field_validator("dashboard_url")
+    @classmethod
+    def validate_dashboard_url(cls, v: str | None) -> str | None:
+        """Only allow http(s) links — they become clickable titles/buttons in
+        alerts, so a ``javascript:``/``data:`` URL must never slip through."""
+        if v and not v.startswith(("http://", "https://")):
+            raise ValueError("dashboard_url must be an http:// or https:// URL")
+        return v
+
+    @field_validator("links")
+    @classmethod
+    def validate_links(cls, v: dict[str, str]) -> dict[str, str]:
+        """Each link URL must be http(s) for the same reason as dashboard_url."""
+        for label, url in v.items():
+            if not url.startswith(("http://", "https://")):
+                raise ValueError(f"links['{label}'] must be an http:// or https:// URL")
         return v
 
     @field_validator("min_detectors")

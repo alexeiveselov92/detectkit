@@ -303,6 +303,18 @@ Telegram, an "Open dashboard" button in email, and exposed to templates as
 `{dashboard_url}` / `{dashboard_line}`) and **`links`** (a `{label: url}` map of
 extra links appended alongside it).
 
+Separately, every default-rendered alert also carries a **"How to read this
+alert"** help link aimed at non-operator stakeholders — a bottom attachment
+field on webhook channels, a links-line entry on Telegram, a footer link in
+email, and `{help_url}` / `{help_line}` for templates. It defaults to the
+brand guide (`BRAND_ALERT_GUIDE_URL` → the `/guides/reading-alerts/` docs page,
+in `channels/branding.py`) and is controlled **project-wide** by
+`ProjectConfig.alert_help_url` (tri-state: unset → default guide, a URL → your
+own runbook, `false` → hide). `resolve_alert_help_url()` resolves it; the
+orchestrator (and the error-dispatch path) stamps the result onto
+`AlertData.help_url`. Unlike `dashboard_url`/`links`, it is a project-level
+constant rather than per-`AlertConfig`.
+
 ## Idempotency & locking
 
 Every stage **resumes from the last persisted timestamp**: load from

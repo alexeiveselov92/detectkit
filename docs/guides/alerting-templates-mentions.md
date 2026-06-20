@@ -189,6 +189,8 @@ alerting:
 | `mentions` / `mentions_line` | Formatted mentions | all |
 | `dashboard_url` | Raw `alerting.dashboard_url` (empty string when unset); also surfaced natively as a clickable title on Slack/Mattermost, an inline link on Telegram, and an "Open dashboard" button in email (v0.13.0) | all |
 | `dashboard_line` | `"Dashboard: <url>\n"` when set, else empty; appended to the default plain-text templates (v0.13.0) | all |
+| `help_url` | Raw "How to read this alert" URL (empty when hidden via `alert_help_url: false`); also surfaced natively as a bottom field on Slack/Mattermost, a links-line entry on Telegram, and a footer link in email (v0.16.0) | all |
+| `help_line` | `"How to read this alert: <url>\n"` when set, else empty; appended to the default plain-text templates (v0.16.0) | all |
 
 All variables are always substitutable in every alert kind — the
 "Available in" column marks where a value is *meaningful*, not where the

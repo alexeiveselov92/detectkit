@@ -113,6 +113,7 @@ const claudeHtml = claudeLines.map((l) => `<div class="ln">${l}</div>`).join('')
 // channel (clickable title/link, inline link, button) — see the alerting
 // config snippet above the demo. The chrome mirrors each platform's own UI.
 const dashUrl = 'https://grafana.ops/d/api-errors';
+const helpUrl = 'https://dtk.pipelab.dev/guides/reading-alerts/';
 
 // detectkit logo as an inline SVG string (the <Logo> component can't be used
 // inside a set:html string). `rx` is the avatar corner radius per platform.
@@ -126,6 +127,12 @@ const logoSvg = (size: number, rx: string) =>
 const linkField: [string, string, boolean, boolean] = [
   'Links',
   `Dashboard: <a href="${dashUrl}">${dashUrl}</a>`,
+  false,
+  false,
+];
+const helpField: [string, string, boolean, boolean] = [
+  'How to read this alert',
+  `<a href="${helpUrl}">${helpUrl}</a>`,
   false,
   false,
 ];
@@ -143,6 +150,7 @@ const ALERT = {
       ['Detectors', 'mad', false, true],
       ['Parameters', '{"threshold": 3.0, "window_size": 2016, "half_life": "1d"}', false, true],
       linkField,
+      helpField,
     ] as [string, string, boolean, boolean][],
     emailStats: [
       ['Value', '4.2'],
@@ -162,6 +170,7 @@ const ALERT = {
       ['Detected at', '2026-06-19 12:36:00 (Europe/Moscow)', false, false],
       ['Detectors', 'mad', false, true],
       linkField,
+      helpField,
     ] as [string, string, boolean, boolean][],
     emailStats: [
       ['Value', '1.0'],
@@ -245,7 +254,7 @@ const tgTextHtml = (sev: 'anomaly' | 'recovery') => {
   return (
     head +
     evidence +
-    `\n<a href="${dashUrl}">Open dashboard</a>\n\n` +
+    `\n<a href="${dashUrl}">Open dashboard</a> · <a href="${helpUrl}">How to read this alert</a>\n\n` +
     '<span class="ment">@oncall_engineer</span>'
   );
 };
@@ -289,7 +298,8 @@ const emailCardHtml = (sev: 'anomaly' | 'recovery') => {
     emailStatsHtml(d.emailStats) +
     paramsBlock +
     `<a class="ec-btn" href="${dashUrl}">Open dashboard →</a>` +
-    '<div class="ec-foot">Sent by detectkit · payments · CC: oncall_engineer</div>' +
+    '<div class="ec-foot">Sent by detectkit · payments · CC: oncall_engineer · ' +
+    `<a class="ec-foot-link" href="${helpUrl}">How to read this alert →</a></div>` +
     '</div>'
   );
 };

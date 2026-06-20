@@ -7,6 +7,7 @@ This guide explains how to configure and customize alerting in detectkit.
 > - **This page** — how alerting works + the quorum / direction / consecutive filtering rules.
 > - [Alert channels](alerting-channels.md) — Mattermost, Slack, Telegram, Email, generic webhook.
 > - [Multiple alert blocks](alerting-multiple-blocks.md) — route one metric to several independent alert rules.
+> - [Reading an alert (for stakeholders)](reading-alerts.md) — what a received alert means and what to do.
 > - [Cooldown, suppression & recovery](alerting-cooldown-recovery.md)
 > - [No-data & error alerts](alerting-no-data-errors.md)
 > - [Templates, mentions & testing](alerting-templates-mentions.md)

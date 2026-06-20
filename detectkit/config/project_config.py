@@ -9,6 +9,26 @@ from pathlib import Path
 from pydantic import BaseModel, Field, field_validator
 
 
+def resolve_alert_help_url(value: "str | bool | None") -> "str | None":
+    """Resolve a raw ``alert_help_url`` config value to a concrete URL or None.
+
+    Shared by :meth:`ProjectConfig.resolve_alert_help_url` and the ``dtk
+    test-alert`` preview (which reads the project YAML as a raw dict), so the
+    tri-state rule lives in one place:
+
+    - ``False`` → ``None`` (the link is hidden).
+    - a non-empty string → that URL (a custom runbook/wiki page).
+    - ``None`` / ``True`` / empty → the official detectkit guide.
+    """
+    from detectkit.alerting.channels.branding import BRAND_ALERT_GUIDE_URL
+
+    if value is False:
+        return None
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return BRAND_ALERT_GUIDE_URL
+
+
 class ProjectPathsConfig(BaseModel):
     """
     Project directory paths configuration.
@@ -161,6 +181,44 @@ class ProjectConfig(BaseModel):
         default=None,
         description="Project-level error alerting (DB outages, query failures, etc.)",
     )
+    # "How to read this alert" link surfaced on every default-rendered alert so
+    # stakeholders (PMs, analysts, on-call) can click through to a plain-language
+    # explanation of what they're seeing. Tri-state:
+    #   - unset / None  → the official detectkit guide (brand default)
+    #   - a URL string  → your own runbook/wiki page instead
+    #   - false         → hide the link entirely
+    # Resolved via ``resolve_alert_help_url()`` and stamped onto ``AlertData``.
+    alert_help_url: str | bool | None = Field(
+        default=None,
+        description=(
+            "Link to a guide explaining how to read an alert, shown on every "
+            "alert. Defaults to the official docs; set a URL for your own page, "
+            "or false to hide it."
+        ),
+    )
+
+    @field_validator("alert_help_url")
+    @classmethod
+    def validate_alert_help_url(cls, v: "str | bool | None") -> "str | bool | None":
+        """A string override must look like an http(s) URL; ``True`` means default."""
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return None  # empty string behaves like "use the default"
+            if not (v.startswith("http://") or v.startswith("https://")):
+                raise ValueError(
+                    "alert_help_url must be an http(s) URL, false (to hide), "
+                    "or unset (to use the default)"
+                )
+        return v
+
+    def resolve_alert_help_url(self) -> str | None:
+        """Resolve the configured ``alert_help_url`` to a concrete URL or None.
+
+        Defaults to the official detectkit guide; a string redirects to your own
+        page; ``false`` hides the link. See :func:`resolve_alert_help_url`.
+        """
+        return resolve_alert_help_url(self.alert_help_url)
 
     @field_validator("name")
     @classmethod

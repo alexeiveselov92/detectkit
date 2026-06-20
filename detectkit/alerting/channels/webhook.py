@@ -303,6 +303,11 @@ class WebhookChannel(BaseAlertChannel):
         if link_lines:
             full("Links", "\n".join(link_lines))
 
+        # "How to read this alert" — the last field, a bare URL (auto-linkified on
+        # both Slack and Mattermost) pointing readers at the interpretation guide.
+        if ctx["help_url"]:
+            full(ctx["help_label"], ctx["help_url"])
+
         # A plain-text one-liner for notification previews / unsupported clients.
         if kind == "no_data":
             fallback = f"{title} at {ctx['timestamp']}"
@@ -357,6 +362,7 @@ class WebhookChannel(BaseAlertChannel):
             "Detectors: {detector_name}\n"
             "Parameters: {detector_params}\n"
             "{dashboard_line}"
+            "{help_line}"
             "{mentions_line}"
         )
 
@@ -376,6 +382,7 @@ class WebhookChannel(BaseAlertChannel):
             "· Value: {value_display} | Expected: {expected_range}\n"
             "Detectors: {detector_name}\n"
             "{dashboard_line}"
+            "{help_line}"
             "{mentions_line}"
         )
 
@@ -386,6 +393,7 @@ class WebhookChannel(BaseAlertChannel):
             "Time: {timestamp}\n"
             "Status: query returned no datapoint for the latest interval\n"
             "{dashboard_line}"
+            "{help_line}"
             "{mentions_line}"
         )
 
@@ -396,6 +404,7 @@ class WebhookChannel(BaseAlertChannel):
             "Time: {timestamp}\n"
             "Error: {error_type}: {error_message}\n"
             "{dashboard_line}"
+            "{help_line}"
             "{mentions_line}"
         )
 

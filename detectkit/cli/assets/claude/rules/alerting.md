@@ -151,6 +151,34 @@ gets an inline "Open dashboard" link, and email gets an "Open dashboard" button.
 `links` adds extra `label: url` entries alongside it. Both are also exposed to
 custom templates — see `{dashboard_url}` / `{dashboard_line}` below.
 
+## "How to read this alert" link
+
+Every **default-rendered** alert (anomaly / recovery / no-data / error) on
+**every** channel carries a `How to read this alert` link pointing non-operator
+stakeholders to a plain-language interpretation guide. It defaults to the
+official detectkit guide (`https://dtk.pipelab.dev/guides/reading-alerts/`) — no
+config needed. Control it project-wide with `alert_help_url` in
+`detectkit_project.yml` (tri-state, see `project.md`):
+
+- **unset / null** → the official detectkit guide (default URL above)
+- **a URL string** → your own runbook/wiki page instead
+- **`false`** → hide the link entirely
+
+Per-channel rendering (defaults only; resolved by
+`ProjectConfig.resolve_alert_help_url`):
+
+- **Slack / Mattermost / generic webhook** — a bottom full-width attachment field
+  titled `How to read this alert` whose value is the bare URL (auto-linkified on
+  both platforms).
+- **Telegram** — appended to the links line (after the optional "Open dashboard"
+  link) as an `<a>` link reading `How to read this alert`.
+- **Email** — in the footer, after `Sent by detectkit · <project>` (and any CC),
+  a clay-colored `How to read this alert ->` link.
+
+Exposed to custom templates as `{help_url}` (raw URL, empty when unset/hidden)
+and `{help_line}` (`How to read this alert: <url>\n`, empty when unset/hidden) —
+mirrors `{dashboard_url}` / `{dashboard_line}`. See the template table below.
+
 ## How default messages render
 
 With no custom `template`, each channel renders a structured, branded message
@@ -243,6 +271,8 @@ referenced by path). Key variables:
 | `{mentions}` / `{mentions_line}` | formatted mentions |
 | `{dashboard_url}` | raw `dashboard_url` (empty string when unset) |
 | `{dashboard_line}` | `Dashboard: <url>\n` when set, else empty (appended to default plain-text templates) |
+| `{help_url}` | raw "How to read this alert" URL (empty when unset/hidden via `alert_help_url`) |
+| `{help_line}` | `How to read this alert: <url>\n` when set, else empty (mirrors `{dashboard_line}`) |
 
 > For no-data/error alerts there is no numeric value — avoid `{value:.2f}` in
 > those templates (detectkit falls back to the default template rather than

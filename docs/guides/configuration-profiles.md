@@ -138,10 +138,11 @@ alert_channels:
   mattermost_ops:
     type: mattermost
     webhook_url: "https://mattermost.example.com/hooks/xxx"
-    username: "detectkit"
-    icon_emoji: ":warning:"
     channel: "alerts"          # Explicit channel name
     timeout: 10                 # Request timeout (seconds)
+    # Bot name + avatar default to the detectkit brand (override below).
+    # username: "detectkit"
+    # icon_url: "https://.../bot.png"   # or icon_emoji: ":warning:"
 ```
 
 **Required fields**:
@@ -150,7 +151,8 @@ alert_channels:
 
 **Optional fields**:
 - `username` (default: `"detectkit"`) - Bot display name
-- `icon_emoji` (default: `":warning:"`) - Bot icon
+- `icon_url` (default: detectkit brand avatar) - Bot avatar image URL
+- `icon_emoji` (optional) - Emoji icon, used instead of an avatar image
 - `channel` - Override webhook's default channel
 - `timeout` (default: `10`) - HTTP request timeout
 
@@ -161,9 +163,9 @@ alert_channels:
   slack_ops:
     type: slack
     webhook_url: "https://hooks.slack.com/services/xxx"
-    username: "detectkit"
-    icon_emoji: ":warning:"
     channel: "#alerts"          # Explicit channel
+    # Bot name + avatar default to the detectkit brand; override with
+    # username / icon_url / icon_emoji.
 ```
 
 Same fields as Mattermost (Slack-compatible webhook API).
@@ -214,6 +216,8 @@ alert_channels:
 - `to_emails`: List of recipient email addresses
 
 **Optional fields**:
+- `from_name` (default: `"detectkit"`) - Sender display name in the `From`
+  header (the brand logo is also rendered in the HTML body)
 - `smtp_username`: SMTP authentication username (the channel only logs in when both `smtp_username` and `smtp_password` are set)
 - `smtp_password`: SMTP authentication password
 - `use_tls` (default: `true`) - Use TLS encryption
@@ -231,12 +235,12 @@ alert_channels:
   custom_hook:
     type: webhook
     webhook_url: "https://custom.example.com/webhook"
-    username: "detectk"           # Bot display name (default: "detectk")
-    icon_emoji: ":warning:"       # Bot icon (default: ":warning:")
     channel: "#alerts"            # Target channel (optional, Slack/Mattermost)
     timeout: 10                    # Request timeout in seconds (default: 10)
     extra_headers:                 # Additional HTTP headers (optional)
       Authorization: "Bearer token"
+    # Bot name + avatar default to the detectkit brand; override with
+    # username / icon_url / icon_emoji.
 ```
 
 **Required fields**:
@@ -244,8 +248,9 @@ alert_channels:
 - `webhook_url`: Endpoint URL to POST the JSON payload to
 
 **Optional fields**:
-- `username` (default: `"detectk"`) - Bot display name
-- `icon_emoji` (default: `":warning:"`) - Bot icon
+- `username` (default: `"detectkit"`) - Bot display name
+- `icon_url` (default: detectkit brand avatar) - Bot avatar image URL
+- `icon_emoji` (optional) - Emoji icon, used instead of an avatar image
 - `channel` - Override the receiver's default channel
 - `timeout` (default: `10`) - HTTP request timeout
 - `extra_headers`: Dict of additional HTTP headers to send

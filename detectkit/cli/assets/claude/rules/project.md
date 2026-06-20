@@ -133,17 +133,24 @@ profiles:
 Defined once in `profiles.yml`, referenced by name in each metric's
 `alerting.channels` (and in `error_alerting.channels`).
 
+The bot defaults to the **detectkit brand** name + avatar on every channel.
+Override per channel; Telegram and email brand differently (see their notes).
+
 **Mattermost** / **Slack** (Slack-compatible webhook API, same fields):
 ```yaml
 alert_channels:
   mattermost_ops:
     type: mattermost            # or: slack
     webhook_url: "{{ env_var('MATTERMOST_WEBHOOK_URL') }}"   # required
-    username: "detectkit"       # optional (default: "detectkit")
-    icon_emoji: ":warning:"     # optional
     channel: "alerts"           # optional — override webhook default ("#alerts" for Slack)
     timeout: 10                 # optional HTTP timeout (s)
+    # Bot identity defaults to the detectkit brand; override any of:
+    # username: "detectkit"            # display name
+    # icon_url: "https://.../bot.png"  # avatar image (default: brand avatar)
+    # icon_emoji: ":warning:"          # emoji instead of an avatar image
 ```
+> Icon precedence: `icon_url` (default: brand avatar) wins over `icon_emoji`;
+> set either to opt out of the brand avatar.
 > Slack note: `@username` in a Slack webhook is **display-only** (no real ping).
 > Use Slack user IDs (`U…`) for real pings.
 
@@ -155,6 +162,9 @@ alert_channels:
     bot_token: "{{ env_var('TG_BOT_TOKEN') }}"   # required
     chat_id: "-1001234567890"                    # required
 ```
+> Telegram shows the bot account's own avatar (set in @BotFather, not
+> per-message), so detectkit can't override it. Brand it via `/setuserpic` —
+> the detectkit avatar is at `https://dtk.pipelab.dev/bot-icon.png`.
 
 **Email** (SMTP):
 ```yaml
@@ -165,10 +175,14 @@ alert_channels:
     smtp_port: 587                # required (587 TLS, 465 SSL)
     from_email: "alerts@example.com"   # required
     to_emails: ["ops@example.com"]     # required (list)
+    from_name: "detectkit"        # optional — From display name (default: "detectkit")
     smtp_username: "..."          # optional
     smtp_password: "..."          # optional (use env_var)
     use_tls: true                 # optional (default: true)
 ```
+> Sends as `detectkit <from_email>` with the brand logo in an HTML body (plain
+> text stays the fallback). The avatar mail clients show is set by the sending
+> domain (BIMI), not the message — brand it via `from_name` + your domain.
 
 **Webhook** (generic):
 ```yaml

@@ -4,11 +4,14 @@ Email alert channel implementation.
 Sends anomaly alerts via SMTP email.
 """
 
+import html
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formataddr
 
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
+from detectkit.alerting.channels.branding import BRAND_ICON_URL, BRAND_USERNAME
 
 
 class EmailChannel(BaseAlertChannel):
@@ -55,6 +58,7 @@ class EmailChannel(BaseAlertChannel):
         smtp_password: str | None = None,
         use_tls: bool = True,
         subject_template: str = "⚠ Alert: {metric_name}",
+        from_name: str = BRAND_USERNAME,
         template: str | None = None,
         **kwargs,
     ):
@@ -70,6 +74,9 @@ class EmailChannel(BaseAlertChannel):
             smtp_password: SMTP authentication password (optional)
             use_tls: Whether to use STARTTLS (default: True)
             subject_template: Email subject template with {metric_name} placeholder
+            from_name: Sender display name shown in the ``From`` header — the
+                email equivalent of the bot name (default: "detectkit"). The
+                brand logo is also rendered in the HTML body.
             template: Custom message template (optional)
             **kwargs: Additional parameters (ignored)
 
@@ -93,6 +100,7 @@ class EmailChannel(BaseAlertChannel):
         self.to_emails = to_emails
         self.use_tls = use_tls
         self.subject_template = subject_template
+        self.from_name = from_name
         self.template = template
 
     def send(self, alert_data: AlertData, template: str | None = None) -> bool:
@@ -117,12 +125,17 @@ class EmailChannel(BaseAlertChannel):
 
         # Create email message
         msg = MIMEMultipart("alternative")
-        msg["From"] = self.from_email
+        # Branded From: "detectkit <alerts@example.com>" — the email equivalent
+        # of a bot display name. formataddr quotes the name when required.
+        msg["From"] = formataddr((self.from_name, self.from_email))
         msg["To"] = ", ".join(self.to_emails)
         msg["Subject"] = self.subject_template.format(metric_name=alert_data.metric_name)
 
-        # Attach plain text body
+        # Attach both parts. In multipart/alternative the LAST part is the
+        # preferred one, so HTML (with the brand logo) is shown when supported
+        # and the plain-text body remains the fallback.
         msg.attach(MIMEText(message_body, "plain"))
+        msg.attach(MIMEText(self._build_html_body(message_body), "html"))
 
         try:
             # Connect to SMTP server
@@ -144,6 +157,37 @@ class EmailChannel(BaseAlertChannel):
             raise smtplib.SMTPException(f"Failed to send email alert: {e}") from e
 
         return True
+
+    def _build_html_body(self, message_body: str) -> str:
+        """Wrap the plain-text body in a branded HTML layout.
+
+        Renders a small header with the detectkit brand logo and name above the
+        message (kept in a ``<pre>`` so the alert-centric text layout carries
+        over verbatim). The logo is referenced by URL; clients that block remote
+        images simply fall back to the alt text and the plain-text part.
+
+        Args:
+            message_body: The formatted plain-text alert body.
+
+        Returns:
+            An HTML document string.
+        """
+        safe_body = html.escape(message_body)
+        return (
+            '<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,'
+            'Arial,sans-serif;color:#1b1916;max-width:640px">'
+            '<div style="margin-bottom:12px">'
+            f'<img src="{BRAND_ICON_URL}" width="28" height="28" '
+            f'alt="{html.escape(BRAND_USERNAME)}" '
+            'style="border-radius:6px;vertical-align:middle">'
+            '<span style="font-weight:600;font-size:16px;color:#d15b36;'
+            f'vertical-align:middle;margin-left:8px">{html.escape(BRAND_USERNAME)}</span>'
+            "</div>"
+            '<pre style="white-space:pre-wrap;font-family:JetBrains Mono,'
+            "ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;"
+            f'line-height:1.5;margin:0">{safe_body}</pre>'
+            "</div>"
+        )
 
     def format_mentions(self, mentions: list[str]) -> str:
         """

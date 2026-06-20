@@ -8,6 +8,7 @@ Compatible with Mattermost, Slack, and other webhook-based systems.
 import requests
 
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
+from detectkit.alerting.channels.branding import BRAND_ICON_URL, BRAND_USERNAME
 
 
 class WebhookChannel(BaseAlertChannel):
@@ -24,14 +25,21 @@ class WebhookChannel(BaseAlertChannel):
     {
         "text": "message",
         "username": "bot_name",
-        "icon_emoji": ":emoji:",
+        "icon_url": "https://.../bot-icon.png",   # or "icon_emoji": ":emoji:"
         "channel": "#channel" (optional)
     }
 
+    Branding: the bot defaults to the **detectkit brand avatar** (``icon_url``)
+    and name (``username``). An explicit ``icon_url`` overrides it with a custom
+    image; an explicit ``icon_emoji`` opts out of the avatar in favor of an
+    emoji. Only one icon field is sent (``icon_url`` wins when both are set).
+
     Parameters:
         webhook_url (str): Webhook URL to send alerts to
-        username (str): Bot username to display (default: "detectk")
-        icon_emoji (str): Bot emoji icon (default: ":warning:")
+        username (str): Bot username to display (default: "detectkit")
+        icon_url (str): Bot avatar image URL (default: detectkit brand avatar)
+        icon_emoji (str): Bot emoji icon — use instead of an avatar image
+            (default: None; falls back to the brand avatar)
         channel (str): Target channel (optional, for Slack/Mattermost)
         timeout (int): Request timeout in seconds (default: 10)
         extra_headers (dict): Additional HTTP headers (optional)
@@ -58,8 +66,9 @@ class WebhookChannel(BaseAlertChannel):
     def __init__(
         self,
         webhook_url: str,
-        username: str = "detectk",
-        icon_emoji: str = ":warning:",
+        username: str = BRAND_USERNAME,
+        icon_url: str | None = None,
+        icon_emoji: str | None = None,
         channel: str | None = None,
         timeout: int = 10,
         extra_headers: dict[str, str] | None = None,
@@ -70,6 +79,12 @@ class WebhookChannel(BaseAlertChannel):
 
         self.webhook_url = webhook_url
         self.username = username
+        # Default to the detectkit brand avatar. An explicit icon_url or
+        # icon_emoji opts out of the default; we only fill in the brand avatar
+        # when the user configured neither.
+        if icon_url is None and icon_emoji is None:
+            icon_url = BRAND_ICON_URL
+        self.icon_url = icon_url
         self.icon_emoji = icon_emoji
         self.channel = channel
         self.timeout = timeout
@@ -118,11 +133,17 @@ class WebhookChannel(BaseAlertChannel):
             "text": body,
         }
 
-        payload = {
+        payload: dict[str, object] = {
             "username": self.username,
-            "icon_emoji": self.icon_emoji,
             "attachments": [attachment],
         }
+
+        # Send exactly one icon field: the avatar image (brand default or a
+        # custom override) takes precedence over an emoji.
+        if self.icon_url:
+            payload["icon_url"] = self.icon_url
+        elif self.icon_emoji:
+            payload["icon_emoji"] = self.icon_emoji
 
         # Add channel if specified (for Slack)
         if self.channel:

@@ -116,14 +116,19 @@ If the user wants alerts now, add one channel under `alert_channels:` (it is
 referenced by name from each metric's `alerting.channels`). Pick the type and
 gather its required fields (see `project.md` for the full set per type):
 
+The bot defaults to the **detectkit brand** name + avatar everywhere; the
+identity fields below are optional overrides.
+
 - **mattermost** / **slack** — `webhook_url` (use `env_var`); optional
-  `channel`, `username`, `icon_emoji`.
-- **telegram** — `bot_token` (env_var) + `chat_id`.
+  `channel`, `username`, `icon_url` (avatar; default brand), `icon_emoji`.
+- **telegram** — `bot_token` (env_var) + `chat_id`. (Bot avatar is set in
+  @BotFather, not by detectkit.)
 - **email** — `smtp_host`, `smtp_port`, `from_email`, `to_emails` (list);
+  optional `from_name` (From display name, default `detectkit`);
   `smtp_username` / `smtp_password` via env_var.
 - **webhook** — generic `webhook_url` (required) + optional `extra_headers`
-  (also accepts `username` / `icon_emoji` / `channel`). There is no `url`,
-  `method` or `headers` field.
+  (also accepts `username` / `icon_url` / `icon_emoji` / `channel`). There is
+  no `url`, `method` or `headers` field.
 
 ```yaml
 # at the end of profiles.yml

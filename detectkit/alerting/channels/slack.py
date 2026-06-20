@@ -4,6 +4,7 @@ Slack alert channel.
 Convenience wrapper around WebhookChannel for Slack.
 """
 
+from detectkit.alerting.channels.branding import BRAND_USERNAME
 from detectkit.alerting.channels.webhook import WebhookChannel
 
 
@@ -14,10 +15,15 @@ class SlackChannel(WebhookChannel):
     This is a convenience wrapper around WebhookChannel specifically
     for Slack. Slack and Mattermost use compatible webhook formats.
 
+    The bot defaults to the **detectkit brand avatar** and name; override the
+    avatar with ``icon_url`` (a custom image) or opt out of the avatar with
+    ``icon_emoji``. See :class:`WebhookChannel` for the icon precedence rules.
+
     Parameters:
         webhook_url (str): Slack incoming webhook URL
-        username (str): Bot username to display (default: "detectk")
-        icon_emoji (str): Bot emoji icon (default: ":warning:")
+        username (str): Bot username to display (default: "detectkit")
+        icon_url (str): Bot avatar image URL (default: detectkit brand avatar)
+        icon_emoji (str): Bot emoji icon — use instead of an avatar image
         channel (str): Target Slack channel (optional, e.g., "#alerts")
         timeout (int): Request timeout in seconds (default: 10)
 
@@ -32,8 +38,9 @@ class SlackChannel(WebhookChannel):
     def __init__(
         self,
         webhook_url: str,
-        username: str = "detectk",
-        icon_emoji: str = ":warning:",
+        username: str = BRAND_USERNAME,
+        icon_url: str | None = None,
+        icon_emoji: str | None = None,
         channel: str | None = None,
         timeout: int = 10,
     ):
@@ -41,6 +48,7 @@ class SlackChannel(WebhookChannel):
         super().__init__(
             webhook_url=webhook_url,
             username=username,
+            icon_url=icon_url,
             icon_emoji=icon_emoji,
             channel=channel,
             timeout=timeout,

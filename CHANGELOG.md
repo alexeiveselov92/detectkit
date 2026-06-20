@@ -5,6 +5,36 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-06-20
+
+### Added
+- **Branded alert bot identity by default.** Every alert channel now leads with
+  the **detectkit brand** — display name and avatar — instead of the old
+  `:warning:` emoji, so notifications are instantly recognizable. The defaults
+  live in `detectkit/alerting/channels/branding.py` (`BRAND_USERNAME`,
+  `BRAND_ICON_URL`) and remain fully overridable per channel.
+  - **Slack / Mattermost / generic webhook** send the brand avatar as
+    `icon_url` (a PNG served from the docs site at
+    `https://dtk.pipelab.dev/bot-icon.png`). New `icon_url` parameter for a
+    custom avatar image; `icon_emoji` still works to use an emoji instead. Icon
+    precedence: `icon_url` wins over `icon_emoji`, and setting either opts out
+    of the brand avatar.
+  - **Email** sends as `detectkit <from_email>` (new `from_name` parameter,
+    default `detectkit`) and now ships a multipart **HTML body with the brand
+    logo** in the header — the plain-text body remains the fallback.
+  - **Telegram** shows the bot account's own avatar (set in @BotFather, not
+    per-message), so it can't be overridden by detectkit; the docs explain how
+    to brand it with `/setuserpic`.
+  - New brand asset `website/public/bot-icon.png`, generated from the logo
+    geometry by `website/scripts/make-bot-icon.mjs`.
+
+### Changed
+- **Default webhook/Slack/Mattermost bot name is now `detectkit`** (was
+  `detectk`) and the default icon is the brand avatar (was the `:warning:`
+  emoji). Channels that explicitly set `username` / `icon_emoji` are
+  unaffected. Sent webhook payloads now include `icon_url` (or `icon_emoji`
+  when configured) rather than always sending `icon_emoji`.
+
 ## [0.11.0] - 2026-06-20
 
 ### Added

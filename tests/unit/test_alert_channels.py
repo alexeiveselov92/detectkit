@@ -7,7 +7,10 @@ import numpy as np
 import pytest
 
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
+from detectkit.alerting.channels.branding import BRAND_ICON_URL, BRAND_USERNAME
 from detectkit.alerting.channels.mattermost import MattermostChannel
+from detectkit.alerting.channels.slack import SlackChannel
+from detectkit.alerting.channels.webhook import WebhookChannel
 
 
 # Mock channel for testing BaseAlertChannel
@@ -293,15 +296,17 @@ class TestMattermostChannel:
     """Test MattermostChannel."""
 
     def test_init_valid(self):
-        """Test initialization with valid webhook URL."""
+        """Defaults to the detectkit brand name and avatar."""
         channel = MattermostChannel(webhook_url="https://example.com/hooks/xxx")
 
         assert channel.webhook_url == "https://example.com/hooks/xxx"
-        assert channel.username == "detectk"
-        assert channel.icon_emoji == ":warning:"
+        assert channel.username == "detectkit"
+        # Brand avatar by default; no emoji unless explicitly set.
+        assert channel.icon_url == BRAND_ICON_URL
+        assert channel.icon_emoji is None
 
     def test_init_custom_params(self):
-        """Test initialization with custom parameters."""
+        """An explicit emoji opts out of the brand avatar."""
         channel = MattermostChannel(
             webhook_url="https://example.com/hooks/xxx",
             username="custom_bot",
@@ -311,6 +316,8 @@ class TestMattermostChannel:
 
         assert channel.username == "custom_bot"
         assert channel.icon_emoji == ":fire:"
+        # icon_emoji given → brand avatar is not filled in.
+        assert channel.icon_url is None
         assert channel.timeout == 30
 
     def test_init_missing_webhook(self):
@@ -353,8 +360,10 @@ class TestMattermostChannel:
         attachment = payload["attachments"][0]
         assert attachment["color"] == "#D63232"  # red for anomaly
         assert "cpu_usage" in attachment["title"]
-        assert payload["username"] == "detectk"
-        assert payload["icon_emoji"] == ":warning:"
+        assert payload["username"] == "detectkit"
+        # Brand avatar is sent as icon_url (not an emoji) by default.
+        assert payload["icon_url"] == BRAND_ICON_URL
+        assert "icon_emoji" not in payload
 
     @patch("detectkit.alerting.channels.webhook.requests.post")
     def test_send_with_custom_template(self, mock_post):
@@ -454,3 +463,123 @@ class TestMattermostChannel:
         assert "MattermostChannel" in repr_str
         assert "https://example.com" in repr_str
         assert "bot" in repr_str
+
+
+def _anomaly_alert():
+    return AlertData(
+        metric_name="cpu_usage",
+        timestamp=datetime(2024, 1, 1, 12, 0, 0),
+        timezone="UTC",
+        value=95.0,
+        confidence_lower=70.0,
+        confidence_upper=90.0,
+        detector_name="zscore",
+        detector_params="{}",
+        direction="above",
+        severity=2.5,
+        detection_metadata={},
+    )
+
+
+def _sent_payload(mock_post):
+    return mock_post.call_args[1]["json"]
+
+
+class TestBrandAvatar:
+    """Default bot identity is the detectkit brand; overrides win cleanly."""
+
+    def test_webhook_defaults_to_brand_name_and_avatar(self):
+        channel = WebhookChannel(webhook_url="https://example.com/hooks/xxx")
+        assert channel.username == BRAND_USERNAME
+        assert channel.icon_url == BRAND_ICON_URL
+        assert channel.icon_emoji is None
+
+    def test_slack_inherits_brand_avatar(self):
+        channel = SlackChannel(webhook_url="https://hooks.slack.com/services/xxx")
+        assert channel.username == BRAND_USERNAME
+        assert channel.icon_url == BRAND_ICON_URL
+
+    @patch("detectkit.alerting.channels.webhook.requests.post")
+    def test_payload_sends_brand_icon_url_by_default(self, mock_post):
+        mock_post.return_value = Mock(status_code=200, raise_for_status=Mock())
+        WebhookChannel(webhook_url="https://example.com/hooks/xxx").send(_anomaly_alert())
+        payload = _sent_payload(mock_post)
+        assert payload["icon_url"] == BRAND_ICON_URL
+        assert "icon_emoji" not in payload
+
+    @patch("detectkit.alerting.channels.webhook.requests.post")
+    def test_icon_emoji_override_replaces_avatar(self, mock_post):
+        mock_post.return_value = Mock(status_code=200, raise_for_status=Mock())
+        channel = WebhookChannel(webhook_url="https://example.com/hooks/xxx", icon_emoji=":fire:")
+        channel.send(_anomaly_alert())
+        payload = _sent_payload(mock_post)
+        assert payload["icon_emoji"] == ":fire:"
+        assert "icon_url" not in payload
+
+    @patch("detectkit.alerting.channels.webhook.requests.post")
+    def test_custom_icon_url_override(self, mock_post):
+        mock_post.return_value = Mock(status_code=200, raise_for_status=Mock())
+        custom = "https://example.com/avatar.png"
+        channel = WebhookChannel(webhook_url="https://example.com/hooks/xxx", icon_url=custom)
+        channel.send(_anomaly_alert())
+        payload = _sent_payload(mock_post)
+        assert payload["icon_url"] == custom
+        assert "icon_emoji" not in payload
+
+    @patch("detectkit.alerting.channels.webhook.requests.post")
+    def test_icon_url_wins_when_both_set(self, mock_post):
+        mock_post.return_value = Mock(status_code=200, raise_for_status=Mock())
+        channel = WebhookChannel(
+            webhook_url="https://example.com/hooks/xxx",
+            icon_url="https://example.com/avatar.png",
+            icon_emoji=":fire:",
+        )
+        channel.send(_anomaly_alert())
+        payload = _sent_payload(mock_post)
+        assert payload["icon_url"] == "https://example.com/avatar.png"
+        assert "icon_emoji" not in payload
+
+
+class TestEmailBranding:
+    """Email carries the brand via the From display name and an HTML logo."""
+
+    @staticmethod
+    def _sent_message(mock_smtp):
+        import email as email_lib
+
+        raw_message = mock_smtp.return_value.sendmail.call_args[0][2]
+        return email_lib.message_from_string(raw_message)
+
+    def _channel(self):
+        from detectkit.alerting.channels.email import EmailChannel
+
+        return EmailChannel(
+            smtp_host="h", smtp_port=587, from_email="alerts@example.com", to_emails=["t@x"]
+        )
+
+    @patch("detectkit.alerting.channels.email.smtplib.SMTP")
+    def test_from_header_uses_brand_display_name(self, mock_smtp):
+        self._channel().send(_anomaly_alert())
+        from_header = self._sent_message(mock_smtp)["From"]
+        # "detectkit <alerts@example.com>"
+        assert BRAND_USERNAME in from_header
+        assert "alerts@example.com" in from_header
+
+    @patch("detectkit.alerting.channels.email.smtplib.SMTP")
+    def test_html_alternative_embeds_brand_logo(self, mock_smtp):
+        self._channel().send(_anomaly_alert())
+        msg = self._sent_message(mock_smtp)
+        html_parts = [
+            p.get_payload(decode=True).decode("utf-8")
+            for p in msg.walk()
+            if p.get_content_type() == "text/html"
+        ]
+        assert len(html_parts) == 1
+        assert BRAND_ICON_URL in html_parts[0]
+        # Plain-text alternative is still present as a fallback.
+        assert any(p.get_content_type() == "text/plain" for p in msg.walk())
+
+    def test_build_html_body_escapes_and_brands(self):
+        body = self._channel()._build_html_body("value < 5 & rising")
+        assert BRAND_ICON_URL in body
+        assert "value &lt; 5 &amp; rising" in body  # HTML-escaped

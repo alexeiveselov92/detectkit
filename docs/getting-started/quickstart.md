@@ -203,9 +203,9 @@ alert_channels:
   mattermost_ops:
     type: mattermost
     webhook_url: "https://mattermost.example.com/hooks/your_webhook_id"
-    username: "detectkit"
-    icon_emoji: ":warning:"
     channel: "alerts"
+    # Bot name + avatar default to the detectkit brand. Override per channel
+    # with username / icon_url / icon_emoji (see the Alert Channels guide).
 ```
 
 ## Step 5: Run Your Metric

@@ -248,7 +248,14 @@ sends a direction-aware all-clear once per incident when `notify_on_recovery`;
 
 Channels live in `detectkit/alerting/channels/` behind `BaseAlertChannel`;
 `AlertChannelFactory` builds them with env-var interpolation. Implemented:
-`mattermost`, `slack`, `telegram`, `email`, `webhook`. Project-level error
+`mattermost`, `slack`, `telegram`, `email`, `webhook`. Every channel defaults
+to the **detectkit brand identity** — name + avatar from `channels/branding.py`
+(`BRAND_USERNAME`, `BRAND_ICON_URL`, a PNG served from the docs site, generated
+by `website/scripts/make-bot-icon.mjs`). Webhook-family channels send the brand
+avatar as `icon_url` (override per channel with `icon_url` / `icon_emoji` —
+`icon_url` wins, and setting either opts out of the brand avatar); email sets a
+`From` display name + an HTML body carrying the logo; Telegram can't override
+its bot avatar (set in @BotFather). Project-level error
 alerting (`ProjectConfig.error_alerting` → `error_dispatch.py`) notifies on
 DB-down / DDL / runtime failures, including early CLI failures before any metric
 runs.

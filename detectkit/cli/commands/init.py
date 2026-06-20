@@ -134,20 +134,21 @@ _BUCKET_SQL = {
 _ALERT_CHANNELS = """
 # Alert channels (referenced by name from a metric's alerting.channels)
 alert_channels:
-  # Mattermost. Supported keys: webhook_url, username, icon_emoji, channel,
-  # timeout. NOTE: there is no `icon_url` param — use `icon_emoji`.
+  # Mattermost. Supported keys: webhook_url, username, icon_url, icon_emoji,
+  # channel, timeout. The bot name + avatar default to the detectkit brand;
+  # override the avatar with icon_url (an image URL) or icon_emoji (an emoji).
   mattermost_alerts:
     type: mattermost
     webhook_url: "{{ env_var('MATTERMOST_WEBHOOK_URL') }}"
-    username: detectkit
-    icon_emoji: ":warning:"
+    # username: detectkit              # optional — override the display name
+    # icon_url: "https://.../bot.png"  # optional — override the brand avatar
+    # icon_emoji: ":warning:"          # optional — emoji instead of an avatar
 
   # Slack example (same fields as mattermost)
   # slack_alerts:
   #   type: slack
   #   webhook_url: "{{ env_var('SLACK_WEBHOOK_URL') }}"
   #   channel: "#alerts"
-  #   username: detectkit
 
   # Telegram example (required: bot_token, chat_id)
   # telegram_alerts:
@@ -161,6 +162,7 @@ alert_channels:
   #   smtp_host: smtp.gmail.com
   #   smtp_port: 587
   #   from_email: alerts@example.com
+  #   from_name: detectkit          # optional — From display name (default: detectkit)
   #   to_emails:
   #     - team@example.com
   #   smtp_username: "{{ env_var('SMTP_USERNAME') }}"

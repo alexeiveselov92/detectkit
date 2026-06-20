@@ -9,6 +9,11 @@ sources live in the repo** (no external design files needed):
   usage, color directions, typography, alert styling, landing layouts).
 - `website/src/assets/logo.svg`, `website/public/favicon.svg`,
   `website/src/components/Logo.astro` — the logo / wordmark assets.
+- `website/public/bot-icon.png` — the **alert bot avatar** (raster brand mark
+  on a clay tile), served at `https://dtk.pipelab.dev/bot-icon.png` and used as
+  the default `icon_url` for Slack/Mattermost/webhook channels (see
+  `detectkit/alerting/channels/branding.py`). Regenerate from the logo geometry
+  with `node website/scripts/make-bot-icon.mjs` if the brand mark changes.
 
 `brand.css` is derived **verbatim** from the brand guide — keep the two in sync
 if either changes.

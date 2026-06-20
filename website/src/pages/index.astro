@@ -131,7 +131,7 @@ const linkField: [string, string, boolean, boolean] = [
 ];
 const ALERT = {
   anomaly: {
-    title: '🔴 Alert: api_error_rate',
+    title: '🔴 [payments] Alert: api_error_rate',
     pill: 'ANOMALY',
     lead: 'Rule: min_detectors=1 · direction=same · consecutive=3. Latest 3/3 consecutive points met the quorum.',
     fields: [
@@ -153,7 +153,7 @@ const ALERT = {
     params: '{"threshold": 3.0, "window_size": 2016, "half_life": "1d"}',
   },
   recovery: {
-    title: '🟢 Alert cleared: api_error_rate',
+    title: '🟢 [payments] Alert cleared: api_error_rate',
     pill: 'RECOVERED',
     lead: 'The alert condition no longer holds — the metric is back within expected bounds. Rule: min_detectors=1 · direction=same · consecutive=3.',
     fields: [
@@ -196,7 +196,7 @@ const attachmentHtml = (sev: 'anomaly' | 'recovery') => {
     `<a class="att-title" href="${dashUrl}">${d.title}<span class="ext"> ↗</span></a>` +
     `<div class="att-lead">${d.lead}</div>` +
     fieldsHtml(d.fields) +
-    `<div class="att-footer">${logoSvg(13, '3px')}<span>detectkit</span></div>` +
+    `<div class="att-footer">${logoSvg(13, '3px')}<span>detectkit · payments</span></div>` +
     '</div></div>'
   );
 };
@@ -227,7 +227,7 @@ const tgTextHtml = (sev: 'anomaly' | 'recovery') => {
   const dot = sev === 'anomaly' ? '🔴' : '🟢';
   const word = sev === 'anomaly' ? 'Anomaly' : 'Recovered';
   const head =
-    `${dot} <b>${word} · api_error_rate</b>\n\n` +
+    `${dot} <b>[payments] ${word} · api_error_rate</b>\n\n` +
     (sev === 'anomaly'
       ? '<b>Quorum</b> 1/1 · direction <b>above</b> · <b>3/3</b> consecutive\n'
       : 'The alert condition no longer holds — the metric is back within expected bounds.\n') +
@@ -283,12 +283,13 @@ const emailCardHtml = (sev: 'anomaly' | 'recovery') => {
     '<span class="ec-brand">detectkit</span>' +
     `<span class="ec-pill">${d.pill}</span>` +
     '</div>' +
+    '<div class="ec-eyebrow">payments</div>' +
     '<div class="ec-title">api_error_rate</div>' +
     `<div class="ec-lead">${d.lead}</div>` +
     emailStatsHtml(d.emailStats) +
     paramsBlock +
     `<a class="ec-btn" href="${dashUrl}">Open dashboard →</a>` +
-    '<div class="ec-foot">Sent by detectkit · CC: oncall_engineer</div>' +
+    '<div class="ec-foot">Sent by detectkit · payments · CC: oncall_engineer</div>' +
     '</div>'
   );
 };
@@ -745,7 +746,9 @@ const dxExplainer = (() => {
         <p class="pf-note">
           The same alert, posted by detectkit to each channel — rendered as that channel formats it: a
           fields attachment on Slack/Mattermost, escaped HTML on Telegram, a branded card in email.
-          The <code>dashboard_url</code> below becomes a first-class link on every channel.
+          Each leads with the project name (<code>[payments]</code>) so several projects can share one
+          channel while keeping the brand bot identity. The <code>dashboard_url</code> below becomes a
+          first-class link on every channel.
         </p>
         <div class="pf-surface">
           <div class="pf-panels">

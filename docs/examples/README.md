@@ -620,7 +620,7 @@ alerting:
   # No-data alert — fires if the previous full hour has no row
   no_data_alert: true
   template_no_data: |
-    🟠 hourly_revenue stopped reporting
+    hourly_revenue stopped reporting
     Last expected hour: {timestamp} ({timezone})
     Likely cause: orders ETL is hung. Check the upstream job.
     {mentions}
@@ -672,7 +672,7 @@ error_alerting:
   mentions: [oncall_engineer, here]
   timezone: "Europe/Moscow"
   template: |
-    🔥 detectkit pipeline failure
+    detectkit pipeline failure
     Metric: {metric_name}
     {error_type}: {error_message}
     Time: {timestamp} ({timezone})

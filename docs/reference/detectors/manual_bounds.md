@@ -199,7 +199,7 @@ detectors:
 
 ## When to Use Manual Bounds Detector
 
-### ✅ Best For:
+### Best For:
 - **Known thresholds** - Clear business rules or requirements
 - **SLA monitoring** - Contractual limits (response time, uptime)
 - **Hard constraints** - Physical/logical limits (0-100%, positive values)
@@ -207,7 +207,7 @@ detectors:
 - **Simple alerting** - Binary "too high/low" notifications
 - **Real-time detection** - No historical warm-up period needed
 
-### ⚠️ Consider Alternatives:
+### Consider Alternatives:
 - **No clear threshold** → Statistical detectors (MAD, Z-Score, IQR)
 - **Dynamic patterns** → MAD with seasonality
 - **Relative anomalies** → Z-Score or MAD (detect deviations from normal)
@@ -215,7 +215,7 @@ detectors:
 
 ## Advantages and Disadvantages
 
-### ✅ Advantages:
+### Advantages:
 - **Instant detection** - No warm-up period, works from first point
 - **Simple** - Easy to understand and explain to stakeholders
 - **Predictable** - No statistical variability
@@ -223,7 +223,7 @@ detectors:
 - **Transparent** - Clear why something is anomalous
 - **Domain knowledge** - Leverages expert knowledge of acceptable ranges
 
-### ❌ Disadvantages:
+### Disadvantages:
 - **Manual tuning** - Requires domain knowledge to set bounds
 - **No adaptation** - Doesn't learn from data patterns
 - **Static** - Can't handle seasonality or trends
@@ -332,14 +332,14 @@ specified`).
 
 | Feature | Manual Bounds | MAD | Z-Score | IQR |
 |---------|---------------|-----|---------|-----|
-| Historical data | ❌ Not needed | ✅ Required | ✅ Required | ✅ Required |
-| Warm-up period | ✅ None | ⚠️ min_samples | ⚠️ min_samples | ⚠️ min_samples |
-| Adaptivity | ❌ Static | ✅ Adapts | ✅ Adapts | ✅ Adapts |
-| Seasonality | ❌ No | ✅ Excellent | ✅ Yes | ✅ Yes |
-| Domain knowledge | ✅ Required | ❌ Not needed | ❌ Not needed | ❌ Not needed |
-| Setup effort | ⚠️ Manual tuning | ✅ Auto | ✅ Auto | ✅ Auto |
-| Performance | ✅ Fastest | ✅ Fast | ✅ Fast | ✅ Fast |
-| Transparency | ✅ Very clear | ⚠️ Statistical | ⚠️ Statistical | ⚠️ Statistical |
+| Historical data | Not needed | Required | Required | Required |
+| Warm-up period | None | min_samples | min_samples | min_samples |
+| Adaptivity | Static | Adapts | Adapts | Adapts |
+| Seasonality | No | Excellent | Yes | Yes |
+| Domain knowledge | Required | Not needed | Not needed | Not needed |
+| Setup effort | Manual tuning | Auto | Auto | Auto |
+| Performance | Fastest | Fast | Fast | Fast |
+| Transparency | Very clear | Statistical | Statistical | Statistical |
 
 ## Use Cases
 
@@ -403,13 +403,13 @@ detectors:
 
 ### 1. Use for Well-Defined Limits
 
-✅ Good:
+Good:
 ```yaml
 # Clear business rule
 upper_bound: 100  # Max 100 concurrent users
 ```
 
-❌ Avoid:
+Avoid:
 ```yaml
 # Arbitrary threshold without justification
 upper_bound: 42.7  # Why 42.7?

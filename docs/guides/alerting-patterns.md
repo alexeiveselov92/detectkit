@@ -81,11 +81,11 @@ alerting:
 ### No Alerts Received
 
 **Checklist**:
-1. ✅ `alerting.enabled: true` in metric config
-2. ✅ Channels exist in `profiles.yml`
-3. ✅ Recent anomalies detected (check `_dtk_detections` table)
-4. ✅ Consecutive anomaly threshold met
-5. ✅ Direction filter not blocking alerts
+1. `alerting.enabled: true` in metric config
+2. Channels exist in `profiles.yml`
+3. Recent anomalies detected (check `_dtk_detections` table)
+4. Consecutive anomaly threshold met
+5. Direction filter not blocking alerts
 
 **Debug**:
 ```bash

@@ -108,7 +108,7 @@ error_alerting:
   mentions: [oncall_engineer, here]   # optional, same syntax as metric mentions
   timezone: "Europe/Moscow"           # optional, used for {timestamp} display
   template: |                         # optional, see template variables below
-    🔥 detectkit pipeline failed
+    detectkit pipeline failed
     Metric: {metric_name}
     {error_type}: {error_message}
     Time: {timestamp} ({timezone})

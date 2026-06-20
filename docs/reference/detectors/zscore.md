@@ -239,14 +239,14 @@ detectors:
 
 ## When to Use Z-Score Detector
 
-### ✅ Best For:
+### Best For:
 - **Normally distributed data** - Symmetric, bell-curve distributions
 - **Clean metrics** - Data without significant outliers
 - **Sensitive detection** - Need to catch small deviations
 - **Real-time systems** - Fast computation with simple statistics
 - **Well-behaved metrics** - Stable mean and variance
 
-### ⚠️ Consider Alternatives:
+### Consider Alternatives:
 - **Data with outliers** → MAD detector (more robust)
 - **Skewed distributions** → IQR or MAD detector
 - **Known bounds** → Manual Bounds for strict thresholds
@@ -254,14 +254,14 @@ detectors:
 
 ## Advantages and Disadvantages
 
-### ✅ Advantages:
+### Advantages:
 - **Fast computation** - Simple mean/std calculations
 - **Well-understood** - 3-sigma rule is widely known
 - **Sensitive** - Catches subtle anomalies in clean data
 - **Memory efficient** - O(window_size) per metric
 - **Mathematical foundation** - Based on normal distribution theory
 
-### ❌ Disadvantages:
+### Disadvantages:
 - **Sensitive to outliers** - Mean and std affected by extreme values
 - **Assumes normality** - May produce false positives on skewed data
 - **Biased by history** - Outliers in window affect future detection
@@ -359,12 +359,12 @@ points — during warm-up or after data gaps:
 
 | Feature | Z-Score | MAD | IQR | Manual |
 |---------|---------|-----|-----|--------|
-| Robust to outliers | ❌ No | ✅ Very | ✅ Very | N/A |
-| Normal distribution | ✅ Required | ❌ Not required | ❌ Not required | N/A |
-| Seasonality support | ✅ Yes | ✅ Excellent | ✅ Yes | ❌ No |
-| Sensitivity | ✅ High | ⚠️ Medium | ⚠️ Medium | ✅ Exact |
-| Performance | ✅ Very Fast | ✅ Fast | ✅ Fast | ✅ Very Fast |
-| Mathematical basis | ✅ Strong | ✅ Good | ✅ Good | ❌ None |
+| Robust to outliers | No | Very | Very | N/A |
+| Normal distribution | Required | Not required | Not required | N/A |
+| Seasonality support | Yes | Excellent | Yes | No |
+| Sensitivity | High | Medium | Medium | Exact |
+| Performance | Very Fast | Fast | Fast | Very Fast |
+| Mathematical basis | Strong | Good | Good | None |
 
 ## Mathematical Background
 

@@ -47,7 +47,7 @@ alerting:
 alerting:
   no_data_alert: true
   template_no_data: |
-    🟠 {metric_name} stopped reporting
+    {metric_name} stopped reporting
     {description_line}Last expected interval: {timestamp} ({timezone})
     Action: check the upstream pipeline / source DB
     {mentions}
@@ -111,7 +111,7 @@ error_alerting:
   mentions: [oncall_engineer, here]
   timezone: "Europe/Moscow"
   template: |                    # optional, defaults documented below
-    🔥 Pipeline failure
+    Pipeline failure
     Metric: {metric_name}
     {error_type}: {error_message}
     Time: {timestamp} ({timezone})
@@ -181,7 +181,7 @@ error_alerting:
   channels: [mattermost_oncall]
   mentions: [oncall_engineer, here]   # critical alert — wake someone up
   template: |
-    {project_name_prefix}🔥 pipeline crashed
+    {project_name_prefix}pipeline crashed
     Metric: {metric_name}
     {error_type}: {error_message}
     Time: {timestamp} ({timezone})

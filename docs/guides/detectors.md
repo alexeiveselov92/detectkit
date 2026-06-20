@@ -8,10 +8,10 @@ detectkit provides several detector types for anomaly detection:
 
 | Detector | Best For | Robustness | Seasonality | Speed |
 |----------|----------|------------|-------------|-------|
-| [MAD](../reference/detectors/mad.md) | General-purpose, seasonal data | ✅ High | ✅ Yes | Fast |
-| [Z-Score](../reference/detectors/zscore.md) | Normal distributions, clean data | ❌ Low | ✅ Yes | Very Fast |
-| [IQR](../reference/detectors/iqr.md) | Skewed distributions, outliers | ✅ High | ✅ Yes | Fast |
-| [Manual Bounds](../reference/detectors/manual_bounds.md) | Known thresholds, SLAs | N/A | ❌ No | Fastest |
+| [MAD](../reference/detectors/mad.md) | General-purpose, seasonal data | High | Yes | Fast |
+| [Z-Score](../reference/detectors/zscore.md) | Normal distributions, clean data | Low | Yes | Very Fast |
+| [IQR](../reference/detectors/iqr.md) | Skewed distributions, outliers | High | Yes | Fast |
+| [Manual Bounds](../reference/detectors/manual_bounds.md) | Known thresholds, SLAs | N/A | No | Fastest |
 
 ## Decision Tree
 
@@ -451,13 +451,13 @@ detectors:
 ### Window Size
 
 **Too small** (< 50 points):
-- ❌ Unstable confidence intervals
-- ❌ Sensitive to recent outliers
-- ✅ Responsive to changes
+- Con: Unstable confidence intervals
+- Con: Sensitive to recent outliers
+- Pro: Responsive to changes
 
 **Too large** (> window with 10+ cycles):
-- ❌ Slow to adapt to changes
-- ✅ Very stable intervals
+- Con: Slow to adapt to changes
+- Pro: Very stable intervals
 
 **Recommended**:
 - Non-seasonal: 100-500 points
@@ -477,12 +477,12 @@ detectors:
 ### Min Samples
 
 **Too small** (< 30):
-- ❌ Unreliable statistics
-- ✅ Faster detection startup
+- Con: Unreliable statistics
+- Pro: Faster detection startup
 
 **Too large** (> 50% of window_size):
-- ❌ Long warm-up period
-- ✅ Very reliable statistics
+- Con: Long warm-up period
+- Pro: Very reliable statistics
 
 **Recommended**: 10-30% of `window_size`
 
@@ -552,12 +552,12 @@ rate.
 **Cause**: Seasonality not configured correctly.
 
 **Checklist**:
-1. ✅ Seasonality features exist — either built-in `seasonality_columns`
+1. Seasonality features exist — either built-in `seasonality_columns`
    (allowed names: `hour`, `day_of_week`, `day_of_month`, `month`,
    `is_weekend`, `is_holiday`) or custom columns returned by the query and
    declared in `query_columns.seasonality`
-2. ✅ `seasonality_components` uses exactly those feature names
-3. ✅ Enough data per group (`min_samples_per_group`)
+2. `seasonality_components` uses exactly those feature names
+3. Enough data per group (`min_samples_per_group`)
 
 **Example (built-in extraction)**:
 ```yaml
@@ -877,11 +877,11 @@ alerting:
 
 | Feature | MAD | Z-Score | IQR | Manual Bounds |
 |---------|-----|---------|-----|---------------|
-| `input_type` | ✅ | ✅ | ✅ | ✅ |
-| `smoothing` / `smoothing_alpha` / `smoothing_window` | ✅ | ✅ | ✅ | ❌ (N/A) |
-| `window_weights` / `half_life` | ✅ | ✅ | ✅ | ❌ (N/A) |
-| `detrend` | ✅ | ✅ | ✅ | ❌ (N/A) |
-| `seasonality_components` | ✅ | ✅ | ✅ | ❌ (N/A) |
+| `input_type` | Yes | Yes | Yes | Yes |
+| `smoothing` / `smoothing_alpha` / `smoothing_window` | Yes | Yes | Yes | No (N/A) |
+| `window_weights` / `half_life` | Yes | Yes | Yes | No (N/A) |
+| `detrend` | Yes | Yes | Yes | No (N/A) |
+| `seasonality_components` | Yes | Yes | Yes | No (N/A) |
 
 **Note**: Manual Bounds uses fixed thresholds with no historical window, so
 window-based features don't apply.

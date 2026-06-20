@@ -45,7 +45,7 @@ error_alerting:
   mentions: [oncall_engineer, here]             # optional
   timezone: "Europe/Moscow"                     # optional, for {timestamp}
   template: |                                   # optional
-    {project_name_prefix}🔥 pipeline crashed
+    {project_name_prefix}pipeline crashed
     Metric: {metric_name}
     {error_type}: {error_message}
     Time: {timestamp} ({timezone})

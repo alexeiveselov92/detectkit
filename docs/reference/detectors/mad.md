@@ -295,14 +295,14 @@ detectors:
 
 ## When to Use MAD Detector
 
-### ✅ Best For:
+### Best For:
 - **General-purpose anomaly detection** - Good default choice
 - **Data with outliers** - More robust than Z-Score
 - **Skewed distributions** - Doesn't assume normality
 - **Metrics with seasonality** - Excellent seasonality support
 - **Production systems** - Stable and predictable behavior
 
-### ⚠️ Consider Alternatives:
+### Consider Alternatives:
 - **Symmetric distributions with no outliers** → Z-Score may be more sensitive
 - **Known bounds** → Manual Bounds for strict thresholds
 - **Extreme skewness** → IQR detector
@@ -348,11 +348,11 @@ Each detection result includes metadata:
 
 | Feature | MAD | Z-Score | IQR | Manual |
 |---------|-----|---------|-----|--------|
-| Robust to outliers | ✅ Very | ❌ No | ✅ Very | N/A |
-| Normal distribution | ❌ Not required | ✅ Required | ❌ Not required | N/A |
-| Seasonality support | ✅ Excellent | ✅ Yes | ✅ Yes | ❌ No |
-| Sensitivity tuning | ✅ Threshold | ✅ Threshold | ✅ Threshold | ✅ Bounds |
-| Performance | ✅ Fast | ✅ Fast | ✅ Fast | ✅ Very Fast |
+| Robust to outliers | Very | No | Very | N/A |
+| Normal distribution | Not required | Required | Not required | N/A |
+| Seasonality support | Excellent | Yes | Yes | No |
+| Sensitivity tuning | Threshold | Threshold | Threshold | Bounds |
+| Performance | Fast | Fast | Fast | Very Fast |
 
 ## References
 

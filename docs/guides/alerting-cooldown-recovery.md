@@ -281,7 +281,7 @@ Use `template_recovery` to customize the recovery message. Supports the same var
 ```yaml
 alerting:
   notify_on_recovery: true
-  template_recovery: "✅ {metric_name} recovered at {timestamp}\nValue: {value} | Interval: {confidence_interval}"
+  template_recovery: "{metric_name} recovered at {timestamp}\nValue: {value} | Interval: {confidence_interval}"
 ```
 
 **Available template variables:**
@@ -356,7 +356,7 @@ alerting:
 
   # Recovery notifications
   notify_on_recovery: true             # Send notification when metric stabilizes
-  template_recovery: "✅ {metric_name} is back to normal at {timestamp}"
+  template_recovery: "{metric_name} is back to normal at {timestamp}"
 
   # Special alerts
   no_data_alert: false

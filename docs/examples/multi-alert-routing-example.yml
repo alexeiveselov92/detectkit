@@ -59,7 +59,7 @@ alerting:
     alert_cooldown: "10min"
     mentions: ["oncall", "here"]
     template_consecutive: |
-      🔴 {metric_name} latency spike
+      {metric_name} latency spike
       Quorum {detector_count}/{min_detectors} · consecutive {consecutive_count}/{consecutive_required}
       Latest: {value_display} | Expected: {expected_range} @ {timestamp}
       {mentions}

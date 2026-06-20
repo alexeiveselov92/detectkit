@@ -361,12 +361,12 @@ Understanding how metric selection works is important to avoid confusion:
 **Best practice**: Keep file names and metric names consistent:
 ```yaml
 # File: metrics/cpu_usage.yml
-name: cpu_usage    # ✅ Matches file name (recommended)
+name: cpu_usage    # Matches file name (recommended)
 ```
 
 ```yaml
 # File: metrics/cpu.yml
-name: server_cpu_usage    # ⚠️ Confusing - file name doesn't match
+name: server_cpu_usage    # Confusing - file name doesn't match
 ```
 
 ##### Uniqueness Requirements
@@ -382,11 +382,11 @@ name: server_cpu_usage    # ⚠️ Confusing - file name doesn't match
 **Example of invalid configuration**:
 ```yaml
 # metrics/api/cpu.yml
-name: cpu_usage          # ❌ Duplicate name!
+name: cpu_usage          # Duplicate name!
 query: "SELECT * FROM api_metrics"
 
 # metrics/system/cpu.yml
-name: cpu_usage          # ❌ Same name causes data corruption!
+name: cpu_usage          # Same name causes data corruption!
 query: "SELECT * FROM system_metrics"
 ```
 
@@ -403,10 +403,10 @@ Please rename one of the metrics to avoid data corruption.
 **Solution - use unique names**:
 ```yaml
 # metrics/api/cpu.yml
-name: api_cpu_usage      # ✅ Unique
+name: api_cpu_usage      # Unique
 
 # metrics/system/cpu.yml
-name: system_cpu_usage   # ✅ Unique
+name: system_cpu_usage   # Unique
 ```
 
 ##### Selector Behavior Summary
@@ -419,9 +419,9 @@ name: system_cpu_usage   # ✅ Unique
 | Tag | `tag:critical` | Recursive search | N/A |
 
 **Common mistakes**:
-- ❌ `dtk run --select cpu_usage.yml` → Won't work (searches for `metrics/cpu_usage.yml.yml`)
-- ✅ `dtk run --select cpu_usage` → Correct (searches for `metrics/cpu_usage.yml`)
-- ✅ `dtk run --select "metrics/cpu_usage.yml"` → Also works (explicit path)
+- `dtk run --select cpu_usage.yml` → Won't work (searches for `metrics/cpu_usage.yml.yml`)
+- `dtk run --select cpu_usage` → Correct (searches for `metrics/cpu_usage.yml`)
+- `dtk run --select "metrics/cpu_usage.yml"` → Also works (explicit path)
 
 #### Examples
 

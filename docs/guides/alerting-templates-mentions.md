@@ -134,7 +134,7 @@ one-sided detector bounds cleanly (e.g. `>= 7.00` for a lower-only
 
 ```jinja2
 # templates/custom_alert.j2
-🚨 Alert: {{ metric_name }}
+Alert: {{ metric_name }}
 
 Current value: {{ value|round(2) }}
 Expected range: [{{ confidence_lower|round(2) }}, {{ confidence_upper|round(2) }}]
@@ -145,7 +145,7 @@ Detected by: {{ detector_name }}
 Time: {{ timestamp }} {{ timezone }}
 
 {% if consecutive_count > 1 %}
-⚠️ Persisting for {{ consecutive_count }} consecutive points!
+Persisting for {{ consecutive_count }} consecutive points!
 {% endif %}
 ```
 

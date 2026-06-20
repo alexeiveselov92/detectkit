@@ -87,7 +87,7 @@ dtk run --select cpu_usage
 
 ## Key Features
 
-### 🎯 Statistical Detectors
+### Statistical Detectors
 
 Multiple detector types for different data patterns:
 
@@ -102,7 +102,7 @@ for metrics with a gradual trend.
 
 [Learn more →](guides/detectors.md)
 
-### 📅 Seasonality Support
+### Seasonality Support
 
 Handle time-based patterns automatically:
 
@@ -120,7 +120,7 @@ detectors:
 
 [Learn more →](reference/detectors/mad.md#with-seasonality-single-component)
 
-### 🔔 Multi-Channel Alerting
+### Multi-Channel Alerting
 
 Send alerts to multiple platforms:
 
@@ -167,7 +167,7 @@ alerting:
 
 [Learn more →](guides/alerting.md)
 
-### ⚡ Efficient Processing
+### Efficient Processing
 
 - **Batch processing** - Handle large datasets efficiently
 - **Incremental loading** - Only load new data
@@ -175,7 +175,7 @@ alerting:
 - **numpy-based detectors** - numpy core, no pandas (windowed detectors use a
   per-point loop — fine incrementally, slower for large backfills)
 
-### 🗄️ Database Support
+### Database Support
 
 Works with your existing data warehouse — all three backends are first-class:
 
@@ -393,10 +393,10 @@ alerting:
 
 | Detector | Best For | Robustness | Seasonality | Speed |
 |----------|----------|------------|-------------|-------|
-| [MAD](reference/detectors/mad.md) | General-purpose, seasonal data | ✅ High | ✅ Yes | Fast |
-| [Z-Score](reference/detectors/zscore.md) | Normal distributions | ❌ Low | ✅ Yes | Very Fast |
-| [IQR](reference/detectors/iqr.md) | Skewed distributions | ✅ High | ✅ Yes | Fast |
-| [Manual Bounds](reference/detectors/manual_bounds.md) | Known thresholds | N/A | ❌ No | Fastest |
+| [MAD](reference/detectors/mad.md) | General-purpose, seasonal data | High | Yes | Fast |
+| [Z-Score](reference/detectors/zscore.md) | Normal distributions | Low | Yes | Very Fast |
+| [IQR](reference/detectors/iqr.md) | Skewed distributions | High | Yes | Fast |
+| [Manual Bounds](reference/detectors/manual_bounds.md) | Known thresholds | N/A | No | Fastest |
 
 [Choosing a Detector →](guides/detectors.md)
 

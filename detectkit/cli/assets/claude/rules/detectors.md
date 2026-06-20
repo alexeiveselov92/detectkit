@@ -152,11 +152,11 @@ alias for `half_life`; prefer `half_life`.)
 
 | Feature | mad | zscore | iqr | manual_bounds |
 |---|---|---|---|---|
-| `input_type` | ✅ | ✅ | ✅ | ✅ |
-| `smoothing` | ✅ | ✅ | ✅ | ❌ |
-| `window_weights` / `half_life` | ✅ | ✅ | ✅ | ❌ |
-| `detrend` | ✅ | ✅ | ✅ | ❌ |
-| `seasonality_components` | ✅ | ✅ | ✅ | ❌ |
+| `input_type` | Yes | Yes | Yes | Yes |
+| `smoothing` | Yes | Yes | Yes | No |
+| `window_weights` / `half_life` | Yes | Yes | Yes | No |
+| `detrend` | Yes | Yes | Yes | No |
+| `seasonality_components` | Yes | Yes | Yes | No |
 
 `manual_bounds` has no window, so window-based features don't apply.
 

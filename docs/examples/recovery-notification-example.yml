@@ -110,14 +110,14 @@ alerting:
 
   # Custom templates
   template_consecutive: |
-    ⚠️ INCIDENT: {metric_name}
+    INCIDENT: {metric_name}
     Time: {timestamp}
     Error rate: {value:.1f}% (normal: {confidence_interval})
     Consecutive: {consecutive_count} intervals
     Detector: {detector_name}
 
   template_recovery: |
-    ✅ RESOLVED: {metric_name}
+    RESOLVED: {metric_name}
     Time: {timestamp}
     Error rate back to: {value:.1f}%
     Normal range: {confidence_interval}
@@ -132,17 +132,17 @@ tags:
 #
 # 14:00 - Error rate: 1.2%  → Normal
 # 14:05 - Error rate: 7.8%  → Anomaly #1
-# 14:10 - Error rate: 9.3%  → Anomaly #2 → ALERT SENT ⚠️
+# 14:10 - Error rate: 9.3%  → Anomaly #2 → ALERT SENT
 #          "INCIDENT: api_error_rate | Error rate: 9.3% (normal: [0.5, 4.0])"
 # 14:15 - Error rate: 11.2% → Skipped (cooldown)
 # 14:20 - Error rate: 8.6%  → Skipped (cooldown)
 # 14:25 - Error rate: 8.1%  → Skipped (cooldown)
-# 14:30 - Error rate: 3.8%  → Normal → RECOVERY SENT ✅
+# 14:30 - Error rate: 3.8%  → Normal → RECOVERY SENT
 #          "RESOLVED: api_error_rate | Error rate back to: 3.8%"
 # 14:35 - Error rate: 1.5%  → Normal (no duplicate recovery)
 # 14:40 - Error rate: 1.2%  → Normal
 # 15:00 - Error rate: 8.4%  → NEW Anomaly #1
-# 15:05 - Error rate: 10.1% → NEW Anomaly #2 → ALERT SENT ⚠️ (new incident)
+# 15:05 - Error rate: 10.1% → NEW Anomaly #2 → ALERT SENT (new incident)
 # ─────────────────────────────────────────────────────────────────────────────
 
 ---
@@ -197,13 +197,13 @@ alerting:
 
   template_consecutive: |
     {mentions}
-    🚨 OUTAGE DETECTED: {metric_name}
+    OUTAGE DETECTED: {metric_name}
     Time: {timestamp} ({timezone})
     Availability: {value:.2f}% (SLA: >= 99%)
     Status: {status}
 
   template_recovery: |
-    ✅ SERVICE RESTORED: {metric_name}
+    SERVICE RESTORED: {metric_name}
     Time: {timestamp} ({timezone})
     Availability: {value:.2f}%
     Status: {status}

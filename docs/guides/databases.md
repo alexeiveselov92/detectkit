@@ -6,7 +6,7 @@ first-class, fully working targets:
 
 | | ClickHouse | PostgreSQL | MySQL |
 |---|---|---|---|
-| **Status** | ✅ Supported | ✅ Supported | ✅ Supported |
+| **Status** | Supported | Supported | Supported |
 | **Install extra** | `detectkit[clickhouse]` | `detectkit[postgres]` | `detectkit[mysql]` |
 | **Driver** | `clickhouse-driver` | `psycopg2-binary` | `pymysql` |
 | **Default port** | `9000` (native) | `5432` | `3306` |

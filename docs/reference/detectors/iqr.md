@@ -247,28 +247,28 @@ detectors:
 
 ## When to Use IQR Detector
 
-### ✅ Best For:
+### Best For:
 - **Skewed distributions** - Asymmetric, heavy-tailed data
 - **Data with outliers** - More robust than Z-Score
 - **Non-parametric detection** - No distribution assumptions
 - **Box plot fans** - Natural visualization match
 - **Percentile-based metrics** - P95, P99, etc.
 
-### ⚠️ Consider Alternatives:
+### Consider Alternatives:
 - **Normally distributed data** → Z-Score (more sensitive)
 - **Symmetric distributions** → MAD may be slightly better
 - **Known bounds** → Manual Bounds for strict thresholds
 
 ## Advantages and Disadvantages
 
-### ✅ Advantages:
+### Advantages:
 - **Robust to outliers** - Uses quartiles, not mean
 - **No distribution assumption** - Works with any data shape
 - **Interpretable** - Box plot visualization
 - **Handles skewness** - Naturally asymmetric bounds
 - **Well-established** - Tukey's fences widely used
 
-### ❌ Disadvantages:
+### Disadvantages:
 - **Less sensitive than MAD** - Quartiles span 50% of data
 - **May be too permissive** - 1.5×IQR captures ~99.3% of normal data, leaving ~0.7% false positives
 - **Slower than MAD** - Percentile calculation slightly more expensive
@@ -408,13 +408,13 @@ interpolation.
 
 | Feature | IQR | MAD | Z-Score | Manual |
 |---------|-----|-----|---------|--------|
-| Robust to outliers | ✅ Very | ✅ Very | ❌ No | N/A |
-| Distribution-free | ✅ Yes | ✅ Yes | ❌ No | N/A |
-| Seasonality support | ✅ Yes | ✅ Excellent | ✅ Yes | ❌ No |
-| Skewed data | ✅ Excellent | ✅ Good | ❌ Poor | N/A |
-| Sensitivity | ⚠️ Medium | ⚠️ Medium | ✅ High | ✅ Exact |
-| Performance | ✅ Fast | ✅ Fast | ✅ Very Fast | ✅ Very Fast |
-| Visualization | ✅ Box plot | ⚠️ N/A | ⚠️ N/A | ⚠️ N/A |
+| Robust to outliers | Very | Very | No | N/A |
+| Distribution-free | Yes | Yes | No | N/A |
+| Seasonality support | Yes | Excellent | Yes | No |
+| Skewed data | Excellent | Good | Poor | N/A |
+| Sensitivity | Medium | Medium | High | Exact |
+| Performance | Fast | Fast | Very Fast | Very Fast |
+| Visualization | Box plot | N/A | N/A | N/A |
 
 ## References
 

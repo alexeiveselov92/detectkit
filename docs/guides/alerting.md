@@ -15,12 +15,12 @@ This guide explains how to configure and customize alerting in detectkit.
 ## Overview
 
 detectkit's alerting system:
-- ✅ Checks only recent data (not historical)
-- ✅ Requires consecutive anomalies (reduces false positives)
-- ✅ Supports multiple channels (Mattermost, Slack, Telegram, Email, generic webhook)
-- ✅ Filters by detector agreement and direction
-- ✅ Customizable templates
-- ✅ @mentions for users and groups (channel-agnostic)
+- Checks only recent data (not historical)
+- Requires consecutive anomalies (reduces false positives)
+- Supports multiple channels (Mattermost, Slack, Telegram, Email, generic webhook)
+- Filters by detector agreement and direction
+- Customizable templates
+- @mentions for users and groups (channel-agnostic)
 
 ## How Alerting Works
 

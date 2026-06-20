@@ -459,7 +459,7 @@ run, which is safe and intended.
 
 ## [0.4.0] - 2026-04-19
 
-### ⚠ Breaking
+### Breaking
 - `DetectionResult` field order changed. The dataclass is now declared as
   `timestamp, value, is_anomaly, processed_value=None, confidence_lower=None,
   confidence_upper=None, detection_metadata=None`. Custom detectors that

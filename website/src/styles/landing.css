@@ -1308,6 +1308,10 @@
   font-size: 12px;
   color: #9a9384;
 }
+.ec-foot-link {
+  color: var(--clay);
+  text-decoration: none;
+}
 
 /* ---------- CTA band ---------- */
 .cta-band {

@@ -22,6 +22,7 @@ def create_mock_alert_data(
     metric_config: MetricConfig,
     alerting_config,
     timezone_display: str = "UTC",
+    help_url: str | None = None,
 ) -> AlertData:
     """
     Create realistic mock AlertData for testing.
@@ -33,6 +34,8 @@ def create_mock_alert_data(
             ``metric_config.alerting`` is a list — the test command
             iterates it and passes one entry at a time.
         timezone_display: Timezone for display
+        help_url: Resolved "how to read this alert" link to preview (the
+            project's ``alert_help_url``); ``None`` renders no help link.
 
     Returns:
         AlertData with mock anomaly data
@@ -89,6 +92,7 @@ def create_mock_alert_data(
         mentions=mentions,
         dashboard_url=getattr(alerting_config, "dashboard_url", None),
         links=dict(getattr(alerting_config, "links", {}) or {}),
+        help_url=help_url,
         min_detectors=min_detectors,
         direction_policy=direction_policy,
         consecutive_required=consecutive_required,
@@ -120,6 +124,12 @@ def run_test_alert(metric_name: str, profile: str | None = None):
         project_data = yaml.safe_load(f)
 
     metrics_dir_name = project_data.get("metrics_path", "metrics")
+
+    # Resolve the "how to read this alert" link so the preview matches what real
+    # alerts would carry (brand default, a custom URL, or hidden via false).
+    from detectkit.config.project_config import resolve_alert_help_url
+
+    help_url = resolve_alert_help_url(project_data.get("alert_help_url"))
 
     # Find metric config
     metrics_dir = project_root / metrics_dir_name
@@ -176,7 +186,9 @@ def run_test_alert(metric_name: str, profile: str | None = None):
         print(f"   Timezone: {timezone_display}")
         print(f"   Channels: {', '.join(alerting_config.channels)}\n")
 
-        alert_data = create_mock_alert_data(metric_config, alerting_config, timezone_display)
+        alert_data = create_mock_alert_data(
+            metric_config, alerting_config, timezone_display, help_url=help_url
+        )
 
         success_count = 0
         for channel_name in alerting_config.channels:

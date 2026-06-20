@@ -48,6 +48,12 @@ class _AlertStepMixin(_TaskManagerBase):
             click.echo("  │ Checking alert conditions...")
             alert_config_id = make_alert_config_id(alerting_config)
 
+            # Resolve the project-level "how to read this alert" link once per
+            # alert config (brand default unless overridden / disabled). Duck-typed
+            # so a stub project_config in tests without the resolver stays safe.
+            help_resolver = getattr(self.project_config, "resolve_alert_help_url", None)
+            help_url = help_resolver() if callable(help_resolver) else None
+
             orchestrator = AlertOrchestrator(
                 metric_name=config.name,
                 interval=interval,
@@ -65,6 +71,7 @@ class _AlertStepMixin(_TaskManagerBase):
                 dashboard_url=alerting_config.dashboard_url,
                 links=alerting_config.links,
                 project_name=getattr(self.project_config, "name", None),
+                help_url=help_url,
             )
 
             last_point = orchestrator.get_last_complete_point()

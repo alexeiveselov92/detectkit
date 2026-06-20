@@ -30,9 +30,30 @@ timeouts:                      # per-step, seconds
   detect: 7200                 # detect step (default 7200)
   alert: 300                   # alert step (default 300)
 
+alert_help_url: null           # optional, see below — "How to read this alert" link
+
 error_alerting:                # optional, see below
   enabled: false
 ```
+
+### `alert_help_url` — "How to read this alert" link
+
+Every default-rendered alert on every channel carries a `How to read this alert`
+link for non-operator stakeholders. Tri-state, resolved by
+`ProjectConfig.resolve_alert_help_url`:
+
+- **unset / null** (default) → the official detectkit guide
+  (`https://dtk.pipelab.dev/guides/reading-alerts/`).
+- **a URL string** → your own runbook/wiki page instead.
+- **`false`** → hide the link entirely.
+
+```yaml
+alert_help_url: https://wiki.ops/how-to-read-alerts   # custom page
+# alert_help_url: false                               # hide the link
+```
+
+Per-channel rendering and the `{help_url}` / `{help_line}` template variables are
+covered in `alerting.md` → "How to read this alert" link.
 
 ### `error_alerting` — project-scoped failure alerts
 

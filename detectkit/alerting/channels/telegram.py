@@ -219,6 +219,11 @@ class TelegramChannel(BaseAlertChannel):
         for label, url in alert_data.links.items():
             href = html.escape(url, quote=True)
             link_parts.append(f'<a href="{href}">{esc(label)}</a>')
+        # "How to read this alert" — always present (unless opted out), so a
+        # stakeholder can click through to the interpretation guide.
+        if ctx["help_url"]:
+            href = html.escape(ctx["help_url"], quote=True)
+            link_parts.append(f'<a href="{href}">{esc(ctx["help_label"])}</a>')
         if link_parts:
             lines.append("")
             lines.append(" · ".join(link_parts))

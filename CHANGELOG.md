@@ -5,6 +5,34 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-06-20
+
+### Added
+- **"How to read this alert" link on every alert.** Every default-rendered alert
+  (anomaly, recovery, no-data, error) on **every** channel now carries a link to
+  a plain-language guide explaining what the alert is and how to interpret it —
+  so non-operator stakeholders (PMs, analysts, on-call) who see a notification
+  can self-serve instead of asking what it means. It points at the new
+  [Reading an alert](https://dtk.pipelab.dev/guides/reading-alerts/) docs page by
+  default.
+  - **New stakeholder docs page** (`docs/guides/reading-alerts.md`, rendered at
+    `/guides/reading-alerts/`): a 10-second TL;DR and status-color key for
+    non-technical readers, then an alert anatomy (value vs expected, severity,
+    quorum, consecutive) for analysts who want the detail.
+  - **Per-channel rendering:** Slack / Mattermost / webhook get a bottom
+    "How to read this alert" attachment field (bare URL, auto-linkified);
+    Telegram appends it to the links line; email adds a clay footer link
+    (`Sent by detectkit · <project> · How to read this alert →`).
+  - **Configurable per project** via `alert_help_url` in `detectkit_project.yml`
+    (tri-state): unset → the official guide (default); a URL → your own
+    runbook/wiki; `false` → hide the link. Resolved by
+    `ProjectConfig.resolve_alert_help_url()` and stamped onto `AlertData.help_url`
+    by the orchestrator (and the project-level error-alert path).
+  - **Templates:** exposed as `{help_url}` (raw URL, empty when unset) and
+    `{help_line}` (`How to read this alert: <url>`), mirroring the existing
+    `{dashboard_url}` / `{dashboard_line}`. Direct library/API callers that don't
+    set `help_url` render unchanged.
+
 ## [0.15.0] - 2026-06-20
 
 ### Added

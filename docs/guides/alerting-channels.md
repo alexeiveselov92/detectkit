@@ -17,7 +17,9 @@ also leads with the **project name** (`[name] `) — see
   project + metric; links to `dashboard_url` when set), a short markdown lead (the
   rule that fired), and a compact fields grid — short fields Value / Expected /
   Quorum / Severity, then full-width Detected at / Detectors / Parameters — plus
-  a branded footer (`detectkit · <project>`) and footer icon. `@mentions` ride in
+  a branded footer (`detectkit · <project>`) and footer icon, then a bottom
+  full-width "How to read this alert" field whose value is the bare URL
+  (auto-linkified). `@mentions` ride in
   the **top-level message text** (not the attachment) so Slack actually notifies.
   A custom `template` renders instead as a plain text-only attachment (status
   color, title and branding kept, no fields grid).
@@ -25,14 +27,16 @@ also leads with the **project name** (`[name] `) — see
   `HTML`) — a colored status dot (red anomaly / green recovery / yellow no-data /
   blue error), a bold headline (`[project] Status · metric`), the rule, then the
   evidence in `<code>` (value / expected / severity / time / detector / params),
-  an inline "Open dashboard" link, then mentions. Custom templates are sent
+  a links line with an inline "Open dashboard" link followed by a "How to read
+  this alert" link, then mentions. Custom templates are sent
   verbatim under the parse mode, so keep them HTML-safe (or set
   `parse_mode: Markdown`).
 - **Email**: a branded HTML card (inline-CSS, table-based, Outlook-safe) — a
   colored accent and status pill, a small project eyebrow above the metric, the
   metric, a 2-column value / expected / severity table, a monospace params box,
   an optional "Open dashboard" button, and a footer (`Sent by detectkit ·
-  <project>`). The subject is prefixed with `[project]` and the plain-text body
+  <project>`) that ends with a clay-colored "How to read this alert ->" link.
+  The subject is prefixed with `[project]` and the plain-text body
   remains the multipart fallback.
 
 ### Dashboard and runbook links
@@ -58,6 +62,27 @@ alerting:
     Runbook: https://runbooks.ops/api-errors
     Grafana: https://grafana.ops/d/api-errors
 ```
+
+### "How to read this alert" link
+
+Every default-rendered alert (anomaly, recovery, no-data, error) on every channel
+also carries a **stakeholder-facing "How to read this alert" link** — a
+plain-language pointer for non-operators who see the alert but don't run the
+pipeline. By default it links to the official detectkit guide,
+[Reading alerts](reading-alerts.md)
+(`https://dtk.pipelab.dev/guides/reading-alerts/`). It renders per channel as the
+bottom field on Slack/Mattermost/webhook, on the Telegram links line (after "Open
+dashboard"), and in the email footer.
+
+The link is controlled project-wide by the `alert_help_url` field in
+`detectkit_project.yml` (tri-state: unset → the official guide, a URL string →
+your own runbook/wiki page, `false` → hide the link entirely). See
+[Configuration → `alert_help_url`](configuration.md#alert_help_url-string--bool-optional).
+
+It is also exposed to custom templates as `{help_url}` (raw URL, empty string
+when unset) and `{help_line}` (`How to read this alert: <url>\n` when set, else
+empty — appended to the default plain-text templates), mirroring `{dashboard_url}`
+/ `{dashboard_line}`.
 
 ## Bot identity (name & avatar)
 

@@ -74,6 +74,11 @@ def dispatch_project_error_alert(
             )
             return False
 
+        # Resolve the project-level "how to read this alert" link (brand default
+        # unless overridden / disabled); duck-typed for stub configs in tests.
+        help_resolver = getattr(project_config, "resolve_alert_help_url", None)
+        help_url = help_resolver() if callable(help_resolver) else None
+
         alert_data = AlertData(
             metric_name=metric_name,
             timestamp=np.datetime64(now_utc_naive(), "ms"),
@@ -93,6 +98,7 @@ def dispatch_project_error_alert(
             description=None,
             mentions=cfg.mentions,
             project_name=getattr(project_config, "name", None),
+            help_url=help_url,
         )
 
         click.echo(

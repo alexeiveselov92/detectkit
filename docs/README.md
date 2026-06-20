@@ -68,6 +68,7 @@ dtk run --select cpu_usage
 - **[Configuration](guides/configuration.md)** - Complete configuration reference
 - **[Detectors](guides/detectors.md)** - Choosing and configuring detectors
 - **[Alerting](guides/alerting.md)** - Setting up alerts and notifications
+- **[Reading an alert](guides/reading-alerts.md)** - For stakeholders who receive alerts: what they mean and what to do
 - **[Visualizing results](guides/visualizing-results.md)** - Build dashboards/charts on the `_dtk_*` tables in any BI tool
 
 ### Reference

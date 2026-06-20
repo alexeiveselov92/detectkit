@@ -36,6 +36,7 @@ const PAGES = [
   { src: 'docs/guides/detectors.md', dest: 'guides/detectors.md' },
   { src: 'docs/guides/alerting.md', dest: 'guides/alerting.md' },
   { src: 'docs/guides/alerting-channels.md', dest: 'guides/alerting-channels.md' },
+  { src: 'docs/guides/reading-alerts.md', dest: 'guides/reading-alerts.md' },
   { src: 'docs/guides/alerting-multiple-blocks.md', dest: 'guides/alerting-multiple-blocks.md' },
   { src: 'docs/guides/alerting-cooldown-recovery.md', dest: 'guides/alerting-cooldown-recovery.md' },
   { src: 'docs/guides/alerting-no-data-errors.md', dest: 'guides/alerting-no-data-errors.md' },

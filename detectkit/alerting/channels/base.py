@@ -9,6 +9,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
+from detectkit.alerting.channels.branding import ALERT_GUIDE_LABEL
+
 
 @dataclass
 class AlertData:
@@ -79,6 +81,12 @@ class AlertData:
     # callers and templates render unchanged.
     dashboard_url: str | None = None
     links: dict[str, str] = field(default_factory=dict)
+    # "How to read this alert" link surfaced on every default-rendered message so
+    # non-operator stakeholders can click through to a plain-language guide. The
+    # orchestrator resolves it from ``ProjectConfig.alert_help_url`` (defaulting to
+    # the official docs); direct-API callers leave it ``None`` and render unchanged.
+    # Exposed to templates as ``{help_url}`` / ``{help_line}``.
+    help_url: str | None = None
     # Alert rule (the parameters the alert fired with) — see class docstring.
     min_detectors: int | None = None
     direction_policy: str | None = None
@@ -300,6 +308,11 @@ class BaseAlertChannel(ABC):
         dashboard_url = alert_data.dashboard_url or ""
         dashboard_line = f"Dashboard: {dashboard_url}\n" if dashboard_url else ""
 
+        # "How to read this alert" link (same shape as dashboard): a raw
+        # placeholder plus a ready-to-drop line, both empty when unset.
+        help_url = alert_data.help_url or ""
+        help_line = f"{ALERT_GUIDE_LABEL}: {help_url}\n" if help_url else ""
+
         # Project name + synth prefix for templates. Prefix is empty when
         # project_name is None so default templates render cleanly for
         # callers that don't set it.
@@ -344,6 +357,9 @@ class BaseAlertChannel(ABC):
             "description_line": description_line,
             "dashboard_url": dashboard_url,
             "dashboard_line": dashboard_line,
+            "help_url": help_url,
+            "help_line": help_line,
+            "help_label": ALERT_GUIDE_LABEL,
             "mentions": mentions_str,
             "mentions_line": mentions_line,
         }
@@ -469,6 +485,7 @@ class BaseAlertChannel(ABC):
             "Detectors: {detector_name}\n"
             "Parameters: {detector_params}\n"
             "{dashboard_line}"
+            "{help_line}"
             "{mentions_line}"
         )
 
@@ -492,6 +509,7 @@ class BaseAlertChannel(ABC):
             "· Value: {value_display} | Expected: {expected_range}\n"
             "Detectors: {detector_name}\n"
             "{dashboard_line}"
+            "{help_line}"
             "{mentions_line}"
         )
 
@@ -528,6 +546,7 @@ class BaseAlertChannel(ABC):
             "Time: {timestamp}\n"
             "Status: query returned no datapoint for the latest interval\n"
             "{dashboard_line}"
+            "{help_line}"
             "{mentions_line}"
         )
 
@@ -543,6 +562,7 @@ class BaseAlertChannel(ABC):
             "Time: {timestamp}\n"
             "Error: {error_type}: {error_message}\n"
             "{dashboard_line}"
+            "{help_line}"
             "{mentions_line}"
         )
 

@@ -71,6 +71,7 @@ export default defineConfig({
               items: [
                 { label: 'How it works', link: '/guides/alerting/' },
                 { label: 'Channels', link: '/guides/alerting-channels/' },
+                { label: 'Reading an alert (for stakeholders)', link: '/guides/reading-alerts/' },
                 { label: 'Multiple alert blocks', link: '/guides/alerting-multiple-blocks/' },
                 { label: 'Cooldown & recovery', link: '/guides/alerting-cooldown-recovery/' },
                 { label: 'No-data & errors', link: '/guides/alerting-no-data-errors/' },

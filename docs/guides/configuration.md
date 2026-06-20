@@ -155,3 +155,40 @@ error_alerting:
 - A flaky channel cannot crash the run — dispatch is wrapped in its
   own `try/except`.
 
+#### `alert_help_url` (string | bool, optional)
+
+Every default-rendered alert (anomaly, recovery, no-data, error) on every
+channel carries a **"How to read this alert"** link that points
+non-operator stakeholders to a plain-language interpretation guide. This
+option controls where that link goes. It is tri-state:
+
+- **unset / `null`** (default) — links to the official detectkit guide,
+  [`/guides/reading-alerts/`](reading-alerts.md)
+  (`https://dtk.pipelab.dev/guides/reading-alerts/`).
+- **a URL string** — links to your own runbook/wiki page instead.
+- **`false`** — hides the link entirely.
+
+```yaml
+# detectkit_project.yml
+
+# Point stakeholders at your own runbook instead of the official guide:
+alert_help_url: https://wiki.example.com/runbooks/reading-detectkit-alerts
+
+# …or hide the "How to read this alert" link on every channel:
+# alert_help_url: false
+```
+
+**Per-channel rendering**:
+
+- **Slack / Mattermost / generic webhook** — a bottom full-width
+  attachment field titled "How to read this alert" whose value is the
+  bare URL (auto-linkified on both platforms).
+- **Telegram** — appended to the links line (after the optional "Open
+  dashboard" link) as a "How to read this alert" link.
+- **Email** — in the footer, after "Sent by detectkit · &lt;project&gt;"
+  (and any CC), a clay-colored "How to read this alert →" link.
+- **Templates** (custom + plain-text defaults) — exposed as `{help_url}`
+  (raw URL, empty when unset) and `{help_line}`
+  (`"How to read this alert: <url>\n"`, empty when unset), mirroring the
+  existing `{dashboard_url}` / `{dashboard_line}`.
+

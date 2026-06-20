@@ -12,7 +12,11 @@ from email.utils import formataddr
 from typing import Any
 
 from detectkit.alerting.channels.base import AlertData, BaseAlertChannel
-from detectkit.alerting.channels.branding import BRAND_ICON_URL, BRAND_USERNAME
+from detectkit.alerting.channels.branding import (
+    ALERT_GUIDE_LABEL,
+    BRAND_ICON_URL,
+    BRAND_USERNAME,
+)
 
 # Brand palette as hex literals. Email clients (Outlook/Word engine) ignore CSS
 # custom properties, so the values from website/src/styles/brand.css are copied
@@ -458,11 +462,20 @@ class EmailChannel(BaseAlertChannel):
         project_html = (
             f" &middot; {html.escape(alert_data.project_name)}" if alert_data.project_name else ""
         )
+        # "How to read this alert" — a clay footer link to the interpretation
+        # guide (empty when opted out via alert_help_url: false).
+        help_html = ""
+        if alert_data.help_url:
+            href = html.escape(alert_data.help_url, quote=True)
+            help_html = (
+                f' &middot; <a href="{href}" style="color:{_CLAY};text-decoration:none;">'
+                f"{html.escape(ALERT_GUIDE_LABEL)} &rarr;</a>"
+            )
         return (
             f'<tr><td bgcolor="{_SURFACE}" style="background-color:{_SURFACE};'
             f"border-top:1px solid {_BORDER};padding:14px 24px;font-family:{_SANS};"
             f'font-size:12px;color:{_FAINT};mso-line-height-rule:exactly;line-height:16px;">'
-            f"Sent by detectkit{project_html}{cc_html}</td></tr>"
+            f"Sent by detectkit{project_html}{cc_html}{help_html}</td></tr>"
         )
 
     def format_mentions(self, mentions: list[str]) -> str:

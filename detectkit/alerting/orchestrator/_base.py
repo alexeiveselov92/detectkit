@@ -26,6 +26,7 @@ class _OrchestratorBase:
         dashboard_url: str | None = None,
         links: dict[str, str] | None = None,
         project_name: str | None = None,
+        help_url: str | None = None,
     ):
         self.metric_name = metric_name
         self.interval = interval
@@ -43,6 +44,10 @@ class _OrchestratorBase:
         # came from — keeps multiple projects sharing one channel distinct
         # while the bot keeps the default brand name + avatar.
         self.project_name = project_name
+        # Resolved "how to read this alert" link (from ProjectConfig.alert_help_url,
+        # defaulting to the official docs; None when opted out). Stamped onto every
+        # AlertData so channels render a guide link for non-operator stakeholders.
+        self.help_url = help_url
 
     @staticmethod
     def _group_by_timestamp(

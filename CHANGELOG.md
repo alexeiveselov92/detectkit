@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default plain-text templates.
 
 ### Changed
+- **Colored status circle leads every alert.** Titles and headlines now open
+  with a status dot — 🔴 anomaly, 🟢 recovery, 🟡 no-data, 🔵 pipeline error —
+  so the status reads at a glance from color alone (replaces the previous
+  `⚠`/`✅` glyphs in the default titles, bodies and email subject).
 - **Telegram default `parse_mode` is now `HTML`** (was `Markdown`). Custom
   Telegram templates are sent verbatim under the configured parse mode, so they
   should be HTML-safe; set `parse_mode: Markdown` on the channel to keep the old

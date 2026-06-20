@@ -74,7 +74,7 @@ class EmailChannel(BaseAlertChannel):
         smtp_username: str | None = None,
         smtp_password: str | None = None,
         use_tls: bool = True,
-        subject_template: str = "⚠ Alert: {metric_name}",
+        subject_template: str = "🔴 Alert: {metric_name}",
         from_name: str = BRAND_USERNAME,
         template: str | None = None,
         **kwargs,

@@ -227,7 +227,7 @@ alert_channels:
 - `smtp_username`: SMTP authentication username (the channel only logs in when both `smtp_username` and `smtp_password` are set)
 - `smtp_password`: SMTP authentication password
 - `use_tls` (default: `true`) - Use TLS encryption
-- `subject_template` (default: `"⚠ Alert: {metric_name}"`) - Email subject, supports `{metric_name}`
+- `subject_template` (default: `"🔴 Alert: {metric_name}"`) - Email subject, supports `{metric_name}`
 - `template`: Custom message body template (falls back to the built-in default)
 
 #### Generic Webhook Channel

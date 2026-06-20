@@ -129,7 +129,7 @@ const linkField: [string, string, boolean, boolean] = [
 ];
 const ALERT = {
   anomaly: {
-    title: '⚠ Alert: api_error_rate',
+    title: '🔴 Alert: api_error_rate',
     pill: 'ANOMALY',
     lead: 'Rule: min_detectors=1 · direction=same · consecutive=3. Latest 3/3 consecutive points met the quorum.',
     fields: [
@@ -151,7 +151,7 @@ const ALERT = {
     params: '{"threshold": 3.0, "window_size": 2016, "half_life": "1d"}',
   },
   recovery: {
-    title: '✓ Alert cleared: api_error_rate',
+    title: '🟢 Alert cleared: api_error_rate',
     pill: 'RECOVERED',
     lead: 'The alert condition no longer holds — the metric is back within expected bounds. Rule: min_detectors=1 · direction=same · consecutive=3.',
     fields: [

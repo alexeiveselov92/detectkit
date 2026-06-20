@@ -264,9 +264,9 @@ Timeline with notify_on_recovery: true and consecutive_anomalies: 3:
 
 10:00 - 1st anomaly
 10:10 - 2nd anomaly
-10:20 - 3rd anomaly  → ALERT sent ("⚠ Alert: cpu_usage")
+10:20 - 3rd anomaly  → ALERT sent ("🔴 Alert: cpu_usage")
 10:30 - Normal point
-10:40 - Normal point → RECOVERY sent ("✅ Alert cleared: cpu_usage")
+10:40 - Normal point → RECOVERY sent ("🟢 Alert cleared: cpu_usage")
 10:50 - Normal point
 11:00 - NEW 1st anomaly
 ...

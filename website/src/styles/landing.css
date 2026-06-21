@@ -325,6 +325,9 @@
 /* ---------- hero visual: live chart + floating alert card ---------- */
 .hero-viz {
   position: relative;
+  /* one master period shared by the line, both markers and both alert cards so
+     the whole "live demo" replays in lockstep (see heroLineLoop below) */
+  --hero-cycle: 8s;
 }
 .hero-chart {
   background: var(--surface);
@@ -367,52 +370,77 @@
   stroke-width: 1.2;
   stroke-dasharray: 3 4;
 }
+/* The hero is a looping "live demo": every cycle the metric line redraws, the
+   anomaly fires, the recovery clears, and the two alert cards arrive — then it
+   fades out and replays. A continuous loop (rather than a play-once intro)
+   keeps the chart visibly alive on mobile, where the old intro was over before
+   most visitors looked. Everything shares --hero-cycle so it stays in lockstep;
+   prefers-reduced-motion freezes the final, fully-drawn state. */
 .hero-svg .hc-line {
   fill: none;
   stroke: var(--ink);
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
-  animation: heroDraw 1.7s cubic-bezier(0.65, 0.05, 0.36, 1) both;
+  /* pathLength=1 normalises the path, so a 1-unit dash + offset draws/erases it */
+  stroke-dasharray: 1;
+  animation: heroLineLoop var(--hero-cycle) infinite;
 }
-.hero-svg .hc-halo {
-  fill: var(--st-anomaly);
-  /* fill-box makes transform-origin relative to the dot's own 12×12 box, so it
-     must be `center` — a user-space coord here scales the ring from far off the
-     element and the halo appears to fly away instead of pulsing on the dot. */
+/* each marker's <g> fades the whole feature in and out with the loop; the halo
+   inside pulses on its own short cycle and is masked by the group's opacity. */
+.hero-svg .hc-anom-g {
   transform-box: fill-box;
   transform-origin: center;
-  animation: heroRing 1.9s ease-out 1.6s infinite both;
+  animation: heroAnomGate var(--hero-cycle) infinite;
+}
+.hero-svg .hc-rec-g {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: heroRecGate var(--hero-cycle) infinite;
 }
 .hero-svg .hc-anom {
   fill: var(--st-anomaly);
 }
-.hero-svg .hc-rec-halo {
-  fill: var(--st-recovery);
-  transform-box: fill-box;
-  transform-origin: center;
-  /* hidden until the dot has popped in (heroRecIn ends ~2.4s) — base opacity:0
-     with no fill-mode so it stays invisible through the delay — then pulses
-     green on the dot, mirroring the anomaly halo so both points read as live. */
-  opacity: 0;
-  animation: heroRing 1.9s ease-out 2.4s infinite;
-}
 .hero-svg .hc-rec {
   fill: var(--st-recovery);
-  /* pop in once the line has drawn past this point (line 1.7s), a beat before
-     the recovery card flies in; then it pulses (see .hc-rec-halo). */
+}
+.hero-svg .hc-halo,
+.hero-svg .hc-rec-halo {
+  /* fill-box makes transform-origin relative to the dot's own box, so it must
+     be `center` — a user-space coord scales the ring from far off the element
+     and the halo appears to fly away instead of pulsing on the dot. base
+     opacity:0 so reduced-motion (animation off) leaves no stray ring. */
   transform-box: fill-box;
   transform-origin: center;
-  animation: heroRecIn 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) 1.9s both;
+  opacity: 0;
+  animation: heroRing 1.9s ease-out infinite;
 }
-@keyframes heroDraw {
-  from {
-    stroke-dasharray: 1;
+.hero-svg .hc-halo {
+  fill: var(--st-anomaly);
+}
+.hero-svg .hc-rec-halo {
+  fill: var(--st-recovery);
+}
+@keyframes heroLineLoop {
+  0% {
     stroke-dashoffset: 1;
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.65, 0.05, 0.36, 1);
   }
-  to {
-    stroke-dasharray: 1;
+  2% {
+    opacity: 1;
+  }
+  20% {
     stroke-dashoffset: 0;
+  }
+  80% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  90%,
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
   }
 }
 @keyframes heroRing {
@@ -425,30 +453,87 @@
     opacity: 0;
   }
 }
-@keyframes heroAlertIn {
-  from {
+/* the spike finishes drawing ~18% in, so the anomaly fades+pops on right after */
+@keyframes heroAnomGate {
+  0%,
+  16% {
+    opacity: 0;
+    transform: scale(0.4);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+  22%,
+  80% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  90%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+/* recovery point is the last drawn — it arrives a beat after the anomaly */
+@keyframes heroRecGate {
+  0%,
+  24% {
+    opacity: 0;
+    transform: scale(0.4);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+  31%,
+  80% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  90%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+/* alert cards: the anomaly flies in just after the spike, the recovery a beat
+   later; both hold, then fade out together as the loop resets. */
+@keyframes heroAnomCard {
+  0%,
+  20% {
     opacity: 0;
     transform: translateY(10px) scale(0.96);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
   }
-  to {
+  28%,
+  80% {
     opacity: 1;
     transform: none;
   }
-}
-@keyframes heroRecIn {
-  from {
+  90%,
+  100% {
     opacity: 0;
-    transform: scale(0.3);
+    transform: translateY(6px) scale(0.98);
   }
-  to {
+}
+@keyframes heroRecCard {
+  0%,
+  37% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+  45%,
+  80% {
     opacity: 1;
-    transform: scale(1);
+    transform: none;
+  }
+  90%,
+  100% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
   }
 }
 .hero-legend {
   display: flex;
   align-items: center;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   margin-top: 6px;
   padding-left: 30px;
 }
@@ -482,14 +567,13 @@
   padding: 13px 16px;
   box-shadow: 0 18px 40px -18px rgba(27, 25, 22, 0.8);
 }
-/* anomaly flies in just as the spike finishes drawing (line 1.7s, ring at 1.6s)
-   so it reads as a reaction; recovery follows a beat later, like the metric
-   settling back and the all-clear arriving. */
+/* both cards ride the shared loop: the anomaly arrives as a reaction to the
+   spike, the recovery a beat later, then both fade out as the demo resets. */
 .hero-alert.ha-anomaly {
-  animation: heroAlertIn 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) 1.5s both;
+  animation: heroAnomCard var(--hero-cycle) infinite;
 }
 .hero-alert.ha-recovery {
-  animation: heroAlertIn 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) 2.9s both;
+  animation: heroRecCard var(--hero-cycle) infinite;
 }
 .ha-body {
   min-width: 0;
@@ -570,10 +654,14 @@
   color: var(--faint);
 }
 @media (prefers-reduced-motion: reduce) {
+  /* freeze the loop on its fully-drawn final state: the line stays solid
+     (dasharray:1 + default offset 0), both markers show, the halos stay
+     hidden (opacity:0), and both cards render in place. */
   .hero-svg .hc-line,
   .hero-svg .hc-halo,
-  .hero-svg .hc-rec,
   .hero-svg .hc-rec-halo,
+  .hero-svg .hc-anom-g,
+  .hero-svg .hc-rec-g,
   /* match the per-card specificity (.hero-alert.ha-* is two classes) so the
      override actually wins and both cards render in their final, visible state */
   .hero-alerts .hero-alert {
@@ -602,6 +690,17 @@
   }
   .hero-alert {
     max-width: none;
+  }
+  /* the 4-item legend won't fit one row on a phone — it used to clip "recovery"
+     past the card edge. Lay it out as a tidy, centred 2×2 grid instead. */
+  .hero-legend {
+    display: grid;
+    grid-template-columns: auto auto;
+    justify-content: center;
+    column-gap: 18px;
+    row-gap: 9px;
+    padding-left: 0;
+    margin-top: 12px;
   }
 }
 

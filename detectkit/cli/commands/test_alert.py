@@ -69,10 +69,17 @@ def create_mock_alert_data(
     else:
         observed_direction = "up"
 
+    # Incident timing for the preview: a real firing reports how long the run
+    # has been going on, so the mock spans ``consecutive_required`` intervals
+    # ending "now" (onset = now − (required − 1) intervals on the grid).
+    interval_seconds = metric_config.get_interval().seconds
+    ts64 = np.datetime64(now, "ms")
+    onset = ts64 - np.timedelta64(interval_seconds, "s") * max(consecutive_required - 1, 0)
+
     # Create realistic mock data
     return AlertData(
         metric_name=metric_config.name,
-        timestamp=np.datetime64(now, "ms"),
+        timestamp=ts64,
         timezone=timezone_display,
         value=0.8532,  # Mock anomalous value
         confidence_lower=0.4521,
@@ -103,6 +110,8 @@ def create_mock_alert_data(
         direction_policy=direction_policy,
         consecutive_required=consecutive_required,
         detector_count=min_detectors,
+        interval_seconds=interval_seconds,
+        onset_timestamp=onset,
     )
 
 

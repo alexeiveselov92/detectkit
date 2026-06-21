@@ -315,42 +315,38 @@ class EmailChannel(BaseAlertChannel):
             parts.append(self._lead_html(ctx["description"]))
 
         if kind == "anomaly":
+            # Description (how long it's been going on) leads; the Rule chip sits
+            # right above the stat grid it explains.
+            parts.append(self._lead_html(ctx["anomaly_lead"]))
             parts.append(self._rule_html(ctx))
-            parts.append(
-                self._lead_html(
-                    f"Latest {ctx['consecutive_count']}/{ctx['consecutive_required']} "
-                    "consecutive points met the quorum."
-                )
-            )
-            parts.append(
-                self._stat_grid(
-                    [
-                        ("Value", ctx["value_display"]),
-                        ("Expected", ctx["expected_range"]),
-                        ("Severity", f"{alert_data.severity:.2f}"),
-                        ("Detected at", ctx["timestamp"]),
-                    ]
-                )
-            )
+            stats = [
+                ("Value", ctx["value_display"]),
+                ("Expected", ctx["expected_range"]),
+                ("Severity", f"{alert_data.severity:.2f}"),
+                ("Quorum", f"{ctx['detector_count']}/{ctx['min_detectors']} · {ctx['direction']}"),
+            ]
+            if ctx["started_display"]:
+                stats.append(("Started", ctx["started_display"]))
+                stats.append(("Latest", ctx["timestamp"]))
+            else:
+                stats.append(("Detected at", ctx["timestamp"]))
+            parts.append(self._stat_grid(stats))
             if ctx["detector_params"]:
                 parts.append(self._params_html(ctx["detector_name"], ctx["detector_params"]))
         elif kind == "recovery":
-            lead = (
-                "The alert condition no longer holds — the metric is back within "
-                "expected bounds."
-            )
-            parts.append(self._lead_html(lead))
+            parts.append(self._lead_html(ctx["recovery_lead"]))
             parts.append(self._rule_html(ctx))
-            parts.append(
-                self._stat_grid(
-                    [
-                        ("Value", ctx["value_display"]),
-                        ("Expected", ctx["expected_range"]),
-                        ("Detector", ctx["detector_name"]),
-                        ("Cleared at", ctx["timestamp"]),
-                    ]
-                )
-            )
+            stats = [
+                ("Value", ctx["value_display"]),
+                ("Expected", ctx["expected_range"]),
+            ]
+            if ctx["started_display"]:
+                stats.append(("Started", ctx["started_display"]))
+                stats.append(("Cleared", ctx["timestamp"]))
+            else:
+                stats.append(("Cleared at", ctx["timestamp"]))
+            stats.append(("Detector", ctx["detector_name"]))
+            parts.append(self._stat_grid(stats))
         elif kind == "no_data":
             lead = "Query returned no datapoint for the latest expected interval."
             parts.append(self._lead_html(lead))

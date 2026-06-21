@@ -58,12 +58,13 @@ one means.
 | Field | Plain-language meaning |
 |---|---|
 | **Metric** (the title) | Which metric fired. This is the thing to investigate. Often a clickable link to a dashboard. |
+| **Lead line** | A one-sentence summary of *how long this has been going on*, e.g. *"Anomalous for 2h 30m — 15 consecutive 10min intervals."* It tells you the metric's measurement interval, how many points in a row have been abnormal, and the total wall-clock duration — so you instantly know whether it just started or has been running for hours. (`over …` means it's been going on at least that long.) |
 | **Value** | The actual measured value at the flagged time. |
 | **Expected** | The range detectkit considered normal for that moment. `[12.0, 40.0]` means "we expected somewhere between 12 and 40". `>= 100` / `<= 5` are one-sided limits. |
-| **Detected at** | The timestamp of the flagged point, in the configured timezone. |
+| **Started / Latest** | The problematic stretch: when the run **started** and the **latest** point in it (on a recovery, **Started / Cleared** — when it began and when it ended). Together with the lead line, this is the "how long / since when" story. |
 | **Severity** | Roughly *how far* outside normal the value was — bigger means more extreme. Use it to prioritize between several alerts, not as an exact unit. |
 | **Quorum** | How many independent checks agreed it was abnormal (e.g. `2/2`), and in which direction (up/down). More agreement = more confidence. |
-| **Rule** | The condition that fired, shown as a chip: `min_detectors=… · direction=… · consecutive=…` — *how many checks had to agree, in which direction, for how many points in a row*. It appears on both 🔴 anomalies and 🟢 recoveries. |
+| **Rule** | The condition that fired, shown as a chip: `min_detectors=… · direction=… · consecutive=…` — *how many checks had to agree, in which direction, for how many points in a row*. It sits right above Value/Expected and appears on both 🔴 anomalies and 🟢 recoveries. |
 | **Detectors / Parameters** | The technical checks that flagged it and their settings. Safe to ignore unless you're tuning the monitoring. |
 | **[name] prefix** | If the title starts with `[something]`, that's the **project** the alert came from — useful when several projects post to the same channel. |
 

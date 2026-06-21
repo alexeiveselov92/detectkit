@@ -51,3 +51,39 @@ def to_aware_utc(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
     return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
+def format_duration(seconds: int | float) -> str:
+    """Format a span of seconds as a compact human string (max two units).
+
+    Used by the alert messages to express "how long an anomaly has been
+    running" / "how long an incident lasted" in plain language:
+
+        >>> format_duration(600)      # 10 minutes
+        '10m'
+        >>> format_duration(9000)     # 2h 30m
+        '2h 30m'
+        >>> format_duration(90000)    # 1d 1h
+        '1d 1h'
+        >>> format_duration(30)
+        '30s'
+
+    Keeps at most the two most-significant non-zero units so the result
+    stays glanceable. Sub-minute spans render in seconds; zero/negative
+    inputs degrade to ``"0m"`` rather than raising.
+    """
+    total = int(round(seconds))
+    if total <= 0:
+        return "0m"
+    if total < 60:
+        return f"{total}s"
+
+    parts: list[str] = []
+    remaining = total
+    for label, size in (("d", 86400), ("h", 3600), ("m", 60)):
+        if remaining >= size:
+            qty, remaining = divmod(remaining, size)
+            parts.append(f"{qty}{label}")
+        if len(parts) == 2:
+            break
+    return " ".join(parts)

@@ -24,9 +24,10 @@ class TelegramChannel(BaseAlertChannel):
 
     Sends formatted messages to a Telegram chat using a bot token. The default
     (no custom ``template``) message is a structured **HTML** layout — a colored
-    status dot, a bold headline, the rule that fired, then the evidence
-    (value / expected / severity / time / detector / params) in ``<code>``,
-    plus an optional "Open dashboard" link and @mentions.
+    status dot, a bold headline, the lead (how long the anomaly has been
+    running) followed by the rule that fired, then the evidence
+    (value / expected / quorum / severity / started → latest / detector /
+    params) in ``<code>``, plus an optional "Open dashboard" link and @mentions.
 
     HTML is the default ``parse_mode`` because the legacy ``Markdown`` mode
     breaks on the detector params JSON (an unmatched ``_`` in e.g.
@@ -161,11 +162,9 @@ class TelegramChannel(BaseAlertChannel):
         lines.append("")  # blank line
 
         if kind == "anomaly":
-            lines.append(
-                f"<b>Quorum</b> {ctx['detector_count']}/{ctx['min_detectors']} · "
-                f"direction <b>{esc(ctx['direction'])}</b> · "
-                f"<b>{ctx['consecutive_count']}/{ctx['consecutive_required']}</b> consecutive"
-            )
+            # Description (how long it's been going on) leads; the Rule chip sits
+            # right above the evidence it explains.
+            lines.append(esc(ctx["anomaly_lead"]))
             lines.append(
                 f"<b>Rule</b> <code>min_detectors={ctx['min_detectors']} · "
                 f"direction={esc(ctx['direction_policy'])} · "
@@ -176,17 +175,24 @@ class TelegramChannel(BaseAlertChannel):
                 f"• Value: <code>{esc(ctx['value_display'])}</code> · "
                 f"Expected: <code>{esc(ctx['expected_range'])}</code>"
             )
+            lines.append(
+                f"• Quorum: <code>{ctx['detector_count']}/{ctx['min_detectors']} · "
+                f"{esc(ctx['direction'])}</code>"
+            )
             lines.append(f"• Severity: <code>{alert_data.severity:.2f}</code>")
-            lines.append(f"• Time: <code>{esc(ctx['timestamp'])}</code>")
+            if ctx["started_display"]:
+                lines.append(
+                    f"• Started: <code>{esc(ctx['started_display'])}</code> · "
+                    f"Latest: <code>{esc(ctx['timestamp'])}</code>"
+                )
+            else:
+                lines.append(f"• Time: <code>{esc(ctx['timestamp'])}</code>")
             lines.append(f"• Detector: <code>{esc(ctx['detector_name'])}</code>")
             if ctx["detector_params"]:
                 params = self._cap(ctx["detector_params"], _PARAMS_CAP)
                 lines.append(f"• Parameters: <code>{esc(params)}</code>")
         elif kind == "recovery":
-            lines.append(
-                "The alert condition no longer holds — the metric is back within "
-                "expected bounds."
-            )
+            lines.append(esc(ctx["recovery_lead"]))
             lines.append(
                 f"<b>Rule</b> <code>min_detectors={ctx['min_detectors']} · "
                 f"direction={esc(ctx['direction_policy'])} · "
@@ -197,7 +203,13 @@ class TelegramChannel(BaseAlertChannel):
                 f"• Value: <code>{esc(ctx['value_display'])}</code> · "
                 f"Expected: <code>{esc(ctx['expected_range'])}</code>"
             )
-            lines.append(f"• Time: <code>{esc(ctx['timestamp'])}</code>")
+            if ctx["started_display"]:
+                lines.append(
+                    f"• Started: <code>{esc(ctx['started_display'])}</code> · "
+                    f"Cleared: <code>{esc(ctx['timestamp'])}</code>"
+                )
+            else:
+                lines.append(f"• Cleared: <code>{esc(ctx['timestamp'])}</code>")
             lines.append(f"• Detector: <code>{esc(ctx['detector_name'])}</code>")
         elif kind == "no_data":
             lines.append("Query returned no datapoint for the latest expected interval.")

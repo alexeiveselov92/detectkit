@@ -821,6 +821,9 @@ class TestRecoveryNotifications:
         internal = Mock()
         internal.get_last_alert_timestamp.return_value = datetime(2024, 1, 1, 11, 0, 0)
         internal.get_last_recovery_timestamp.return_value = None
+        # No prior detections to reconstruct the incident span from (recovery
+        # still fires; it just omits the "Incident lasted …" duration).
+        internal.get_recent_detections.return_value = []
 
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",
@@ -849,6 +852,7 @@ class TestRecoveryNotifications:
         internal = Mock()
         internal.get_last_alert_timestamp.return_value = datetime(2024, 1, 1, 14, 0, 0)
         internal.get_last_recovery_timestamp.return_value = datetime(2024, 1, 1, 12, 0, 0)
+        internal.get_recent_detections.return_value = []
 
         orchestrator = AlertOrchestrator(
             metric_name="cpu_usage",

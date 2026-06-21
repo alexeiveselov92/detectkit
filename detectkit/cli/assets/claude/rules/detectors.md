@@ -126,7 +126,8 @@ every point starts to look "below" → false alerts. Two shared params fix this:
 - `window_weights: exponential` + `half_life: "3d"` — recent points weigh more,
   so the interval follows the new normal. `half_life` is the age at which a
   point's weight halves (int = points; `"3d"`/`"12h"` converted via the grid
-  step; default `window_size/20`). `linear` weighting is also available.
+  step; default `max(window_size/20, min_samples/2)`). `linear` weighting is
+  also available.
 - `detrend: linear` — removes a robust in-window linear trend before computing
   statistics; gradual drift no longer pulls the metric out of its interval,
   while sharp deviations are still caught.

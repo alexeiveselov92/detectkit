@@ -600,7 +600,7 @@ detectors:
       smoothing_alpha: 0.3     # EMA factor, 0 < alpha <= 1
       smoothing_window: 10     # SMA window in points
       window_weights: null     # null (uniform) | exponential | linear
-      half_life: null          # exponential half-life: int points or "3d"/"12h"; default window_size/20
+      half_life: null          # exponential half-life: int points or "3d"/"12h"; default max(window_size/20, min_samples/2)
       weight_decay: null       # DEPRECATED alias for half_life
       detrend: null            # null | linear
 ```
@@ -737,7 +737,11 @@ detectors:
 - `window_weights: exponential` — `w(age) = 0.5^(age / half_life)`.
   `half_life` is the age at which a point's weight halves: an integer means
   points, a duration string (`"3d"`, `"12h"`) is converted using the metric's
-  data grid step. Default when unset: `window_size / 20`.
+  data grid step. Default when unset: `max(window_size / 20, min_samples / 2)`
+  — the `window/20` adaptation horizon (≈ `"3d"` on the large trending windows
+  it is tuned for), floored at `min_samples / 2` so on small/default windows
+  the effective weighted sample size never drops below the raw `min_samples`
+  gate.
 - `window_weights: linear` — weight decreases linearly with age:
   `w(age) = (window_size + 1 - age) / window_size`.
 

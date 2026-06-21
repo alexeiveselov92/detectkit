@@ -73,7 +73,9 @@ class WindowedStatDetector(BaseDetector):
         half_life (int | str | None): For exponential weights: the age at
             which a point's weight halves. Integer = points, string =
             duration ("1d", "12h", parsed against the data grid step).
-            Default None = window_size / 20.
+            Default None = max(window_size / 20, min_samples / 2) points —
+            the window/20 adaptation horizon, floored so the effective
+            (weighted) sample size never drops below the raw min_samples gate.
         weight_decay (float | None): Deprecated alias for half_life:
             per-point multiplier in (0, 1); decay d is equivalent to
             half_life = ln(0.5)/ln(d) points. Mutually exclusive with
@@ -99,7 +101,10 @@ class WindowedStatDetector(BaseDetector):
     # v2: σ-equivalent MAD scaling, Hazen-midpoint weighted percentiles,
     # unified severity convention — same params now produce different
     # bounds than v1, so the ID must change to force recomputation.
-    ALGORITHM_VERSION = 2
+    # v3: default half_life floored at min_samples/2 (was window_size/20
+    # unconditionally) — exponential weighting with an unset half_life now
+    # produces different bounds, so the ID must change to recompute.
+    ALGORITHM_VERSION = 3
 
     def __init__(
         self,
@@ -291,7 +296,14 @@ class WindowedStatDetector(BaseDetector):
             # decay d per point  <=>  half-life ln(0.5)/ln(d) points
             return math.log(0.5) / math.log(weight_decay)
         if half_life is None:
-            return max(window_size / 20.0, 1.0)
+            # /20 preserves the adaptation horizon the large-window trending
+            # recipe is tuned for (window 8640 -> 432 pts ≈ "3d"); the
+            # min_samples/2 floor keeps the effective (Kish) sample size at
+            # parity with the raw min_samples gate (exponential-window ESS
+            # ≈ 2.9·half_life), so small/default windows aren't more
+            # trigger-happy than the legacy weight_decay=0.95 default this
+            # replaced (window 100: 5 pts/ESS≈14 -> 15 pts/ESS≈42).
+            return max(window_size / 20.0, self.params["min_samples"] / 2.0, 1.0)
         if isinstance(half_life, int):
             return float(half_life)
 

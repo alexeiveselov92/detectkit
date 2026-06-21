@@ -387,10 +387,20 @@
 .hero-svg .hc-anom {
   fill: var(--st-anomaly);
 }
+.hero-svg .hc-rec-halo {
+  fill: var(--st-recovery);
+  transform-box: fill-box;
+  transform-origin: center;
+  /* hidden until the dot has popped in (heroRecIn ends ~2.4s) — base opacity:0
+     with no fill-mode so it stays invisible through the delay — then pulses
+     green on the dot, mirroring the anomaly halo so both points read as live. */
+  opacity: 0;
+  animation: heroRing 1.9s ease-out 2.4s infinite;
+}
 .hero-svg .hc-rec {
   fill: var(--st-recovery);
   /* pop in once the line has drawn past this point (line 1.7s), a beat before
-     the recovery card flies in — the calm resolution after the red pulse. */
+     the recovery card flies in; then it pulses (see .hc-rec-halo). */
   transform-box: fill-box;
   transform-origin: center;
   animation: heroRecIn 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) 1.9s both;
@@ -563,6 +573,7 @@
   .hero-svg .hc-line,
   .hero-svg .hc-halo,
   .hero-svg .hc-rec,
+  .hero-svg .hc-rec-halo,
   /* match the per-card specificity (.hero-alert.ha-* is two classes) so the
      override actually wins and both cards render in their final, visible state */
   .hero-alerts .hero-alert {

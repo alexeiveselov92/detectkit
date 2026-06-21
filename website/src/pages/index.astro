@@ -646,13 +646,19 @@ const dxExplainer = (() => {
               pathLength="1"
               d="M30,178 L60,182 L90,175 L120,184 L150,176 L180,186 L210,178 L240,182 L270,176 L300,184 L330,179 L360,188 L388,182 L405,178 L420,150 L435,96 L450,58 L466,120 L480,168 L500,178"
             />
-            <circle class="hc-halo" cx="450" cy="58" r="6" />
-            <circle class="hc-anom" cx="450" cy="58" r="6" />
-            <!-- recovery: first point back inside the corridor (480,168) — pops
+            <!-- each marker is grouped so the looping replay can fade the whole
+                 feature in/out (the <g>) while the halo pulses inside it -->
+            <g class="hc-anom-g">
+              <circle class="hc-halo" cx="450" cy="58" r="6" />
+              <circle class="hc-anom" cx="450" cy="58" r="6" />
+            </g>
+            <!-- recovery: first point back inside the corridor (480,168) — fades
                  in once the line has drawn past it, then pulses green like the
                  anomaly, just before the green card -->
-            <circle class="hc-rec-halo" cx="480" cy="168" r="6" />
-            <circle class="hc-rec" cx="480" cy="168" r="5.5" />
+            <g class="hc-rec-g">
+              <circle class="hc-rec-halo" cx="480" cy="168" r="6" />
+              <circle class="hc-rec" cx="480" cy="168" r="5.5" />
+            </g>
           </svg>
           <div class="hero-legend">
             <span><i class="dx-sw dx-sw-line"></i>metric</span>

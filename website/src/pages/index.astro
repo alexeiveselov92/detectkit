@@ -171,13 +171,17 @@ const ALERT = {
     title: '🔴 [payments] Alert: api_error_rate',
     pill: 'ANOMALY',
     rule: 'min_detectors=1 · direction=same · consecutive=3',
-    lead: 'Latest 3/3 consecutive points met the quorum.',
+    // The lead leads with "how long has this been going on" — the metric
+    // interval, the streak length and the wall-clock duration — so a reader
+    // knows immediately whether the corridor was breached just now or hours ago.
+    lead: 'Anomalous for 1h — 6 consecutive 10min intervals.',
     fields: [
       ['Value', '4.2', true, true],
       ['Expected', '&lt;= 1.1', true, true],
       ['Quorum', '1/1 · above', true, false],
       ['Severity', '3.40', true, false],
-      ['Detected at', '2026-06-19 12:04:00 (Europe/Moscow)', false, false],
+      ['Started', '2026-06-19 11:14:00 (Europe/Moscow)', true, false],
+      ['Latest', '2026-06-19 12:04:00 (Europe/Moscow)', true, false],
       ['Detectors', 'mad', false, true],
       ['Parameters', '{"threshold": 3.0, "window_size": 2016, "half_life": "1d"}', false, true],
       linkField,
@@ -186,7 +190,9 @@ const ALERT = {
       ['Value', '4.2'],
       ['Expected', '&lt;= 1.1'],
       ['Severity', '3.40'],
-      ['Detected at', '2026-06-19 12:04:00 (Europe/Moscow)'],
+      ['Quorum', '1/1 · above'],
+      ['Started', '2026-06-19 11:14:00 (Europe/Moscow)'],
+      ['Latest', '2026-06-19 12:04:00 (Europe/Moscow)'],
     ] as [string, string][],
     params: '{"threshold": 3.0, "window_size": 2016, "half_life": "1d"}',
   },
@@ -194,31 +200,34 @@ const ALERT = {
     title: '🟢 [payments] Alert cleared: api_error_rate',
     pill: 'RECOVERED',
     rule: 'min_detectors=1 · direction=same · consecutive=3',
-    lead: 'The alert condition no longer holds — the metric is back within expected bounds.',
+    lead: 'The alert condition no longer holds — the metric is back within expected bounds. Incident lasted 1h (6 consecutive 10min intervals).',
     fields: [
       ['Value', '1.0', true, true],
       ['Expected', '&lt;= 1.1', true, true],
-      ['Detected at', '2026-06-19 12:36:00 (Europe/Moscow)', false, false],
+      ['Started', '2026-06-19 11:36:00 (Europe/Moscow)', true, false],
+      ['Cleared', '2026-06-19 12:36:00 (Europe/Moscow)', true, false],
       ['Detectors', 'mad', false, true],
       linkField,
     ] as [string, string, boolean, boolean][],
     emailStats: [
       ['Value', '1.0'],
       ['Expected', '&lt;= 1.1'],
+      ['Started', '2026-06-19 11:36:00 (Europe/Moscow)'],
+      ['Cleared', '2026-06-19 12:36:00 (Europe/Moscow)'],
       ['Detector', 'mad'],
-      ['Cleared at', '2026-06-19 12:36:00 (Europe/Moscow)'],
     ] as [string, string][],
     params: '',
   },
 };
 
-// The firing rule, set apart as a bold "Rule" label + an inline-code chip
-// (the way every channel now renders it), followed by the plain explanation —
-// rule-first for anomaly, lead-first for recovery, mirroring the real channels.
+// Description first, then the firing rule set apart as a bold "Rule" label + an
+// inline-code chip sitting right above the value/expected fields it explains —
+// the same description → Rule → evidence order on every channel (anomaly and
+// recovery alike), mirroring the real channels.
 const ruleLead = (sev: 'anomaly' | 'recovery') => {
   const d = ALERT[sev];
   const chip = `<strong>Rule</strong> <code>${d.rule}</code>`;
-  return sev === 'anomaly' ? `${chip}<br>${d.lead}` : `${d.lead}<br>${chip}`;
+  return `${d.lead}<br>${chip}`;
 };
 
 // Slack / Mattermost — one fields-based attachment (the metric name is the
@@ -277,18 +286,19 @@ const tgTextHtml = (sev: 'anomaly' | 'recovery') => {
   const head =
     `${dot} <b>[payments] ${word} · api_error_rate</b>\n\n` +
     (sev === 'anomaly'
-      ? '<b>Quorum</b> 1/1 · direction <b>above</b> · <b>3/3</b> consecutive\n'
-      : 'The alert condition no longer holds — the metric is back within expected bounds.\n') +
+      ? 'Anomalous for 1h — 6 consecutive 10min intervals.\n'
+      : 'The alert condition no longer holds — the metric is back within expected bounds. Incident lasted 1h (6 consecutive 10min intervals).\n') +
     '<b>Rule</b> <code>min_detectors=1 · direction=same · consecutive=3</code>\n\n';
   const evidence =
     sev === 'anomaly'
       ? '• Value: <code>4.2</code> · Expected: <code>&lt;= 1.1</code>\n' +
+        '• Quorum: <code>1/1 · above</code>\n' +
         '• Severity: <code>3.40</code>\n' +
-        '• Time: <code>2026-06-19 12:04:00 (Europe/Moscow)</code>\n' +
+        '• Started: <code>2026-06-19 11:14:00 (Europe/Moscow)</code> · Latest: <code>2026-06-19 12:04:00 (Europe/Moscow)</code>\n' +
         '• Detector: <code>mad</code>\n' +
         '• Parameters: <code>{"threshold": 3.0, "window_size": 2016, "half_life": "1d"}</code>\n'
       : '• Value: <code>1.0</code> · Expected: <code>&lt;= 1.1</code>\n' +
-        '• Time: <code>2026-06-19 12:36:00 (Europe/Moscow)</code>\n' +
+        '• Started: <code>2026-06-19 11:36:00 (Europe/Moscow)</code> · Cleared: <code>2026-06-19 12:36:00 (Europe/Moscow)</code>\n' +
         '• Detector: <code>mad</code>\n';
   return (
     head +

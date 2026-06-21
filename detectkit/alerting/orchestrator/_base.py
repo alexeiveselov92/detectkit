@@ -10,6 +10,15 @@ from detectkit.alerting.orchestrator._types import (
 )
 from detectkit.core.interval import Interval
 
+# How far back the orchestrator looks to reconstruct the *true* length of an
+# anomalous run when an alert fires / clears. The decision itself only needs
+# ``consecutive_anomalies`` points, but the message reports "how long has this
+# been going on", which needs the full streak. Bounded so a metric stuck
+# anomalous for a very long time never loads unboundedly — past this the run is
+# reported as a lower bound ("over …"). Only queried on fire/recovery, never on
+# the hot no-alert path.
+STREAK_LOOKBACK_POINTS = 1000
+
 
 class _OrchestratorBase:
     def __init__(

@@ -276,35 +276,56 @@ with the brand name (`detectkit · <project>`). Direct-API callers leave it
 
 - **Slack / Mattermost / generic webhook** (all via `WebhookChannel`) render one
   message *attachment* — a status-colored accent bar, a clickable title (the
-  metric, linking to `dashboard_url` when set), a short markdown lead (the rule
-  that fired), and a compact fields grid: short fields Value / Expected /
-  Quorum / Severity, then full-width Detected-at / Detectors / Parameters, plus
-  a branded footer + footer_icon. `@mentions` ride in the **top-level** message
-  text so they notify on Slack. A custom `template` still renders as a plain
-  text-only attachment (color/title/branding kept, no fields grid).
+  metric, linking to `dashboard_url` when set), a short markdown lead (the
+  duration sentence, see "Incident timing" below) with the **Rule** chip beneath
+  it, and a compact fields grid: short fields Value / Expected / Quorum /
+  Severity / Started / Latest (Started / Cleared on recovery), then full-width
+  Detectors / Parameters, plus a branded footer + footer_icon. `@mentions` ride
+  in the **top-level** message text so they notify on Slack. A custom `template`
+  still renders as a plain text-only attachment (color/title/branding kept, no
+  fields grid).
 - **Telegram** defaults to `parse_mode: HTML` (was Markdown). The default
   message is structured and HTML-escaped: a colored status dot (red anomaly /
-  green recovery / yellow no-data / blue error), a bold headline, the rule, then
-  evidence in `<code>` (value / expected / severity / time / detector / params),
-  an inline "Open dashboard" link, then mentions. This fixes a real bug — the
-  old Markdown mode raised `can't parse entities` on params JSON containing
-  underscores (e.g. `window_size`). Custom templates are sent verbatim under the
-  parse mode (so keep them HTML-safe; set `parse_mode: Markdown` for the old
-  behavior).
+  green recovery / yellow no-data / blue error), a bold headline, the lead +
+  rule, then evidence in `<code>` (value / expected / quorum / severity /
+  started → latest / detector / params), an inline "Open dashboard" link, then
+  mentions. This fixes a real bug — the old Markdown mode raised `can't parse
+  entities` on params JSON containing underscores (e.g. `window_size`). Custom
+  templates are sent verbatim under the parse mode (so keep them HTML-safe; set
+  `parse_mode: Markdown` for the old behavior).
 - **Email** sends a branded HTML card (inline-CSS, table-based, Outlook-safe) —
-  colored accent + status pill, the metric, a 2-col value/expected/severity
-  table, a monospace params box, an optional "Open dashboard" button, and a
-  footer; the plain-text body remains the multipart fallback.
+  colored accent + status pill, the metric, the lead + Rule chip, a 2-col stat
+  grid (value / expected / severity / quorum / started / latest), a monospace
+  params box, an optional "Open dashboard" button, and a footer; the plain-text
+  body remains the multipart fallback.
 
-On anomaly **and** recovery alerts the **firing rule is set apart uniformly**:
-a bold **Rule** label + an inline-code chip (`min_detectors=… · direction=… ·
-consecutive=…`), with the quorum explanation on its own line. Bold is
-platform-aware on webhook channels (`*Rule*` Slack mrkdwn vs `**Rule**`
-Mattermost/generic CommonMark, via `WebhookChannel._bold`, mirroring
-`_link_markup`); Telegram renders `<b>Rule</b> <code>…</code>`; email renders
-the same bold-label + monospace chip via `EmailChannel._rule_html` (it had no
-explicit rule line before). The backtick/`<code>` chip renders identically
-everywhere; custom templates and the plain-text fallbacks are unchanged.
+**Message order is uniform** — `description → Rule → Value/Expected` on every
+channel and for both anomaly and recovery (previously the anomaly led with the
+Rule, recovery with the description; now both lead with the description). The
+**firing rule is set apart uniformly**: a bold **Rule** label + an inline-code
+chip (`min_detectors=… · direction=… · consecutive=…`). Bold is platform-aware
+on webhook channels (`*Rule*` Slack mrkdwn vs `**Rule**` Mattermost/generic
+CommonMark, via `WebhookChannel._bold`, mirroring `_link_markup`); Telegram
+renders `<b>Rule</b> <code>…</code>`; email renders the same bold-label +
+monospace chip via `EmailChannel._rule_html`. The backtick/`<code>` chip renders
+identically everywhere; custom templates and the plain-text fallbacks follow the
+same order.
+
+**Incident timing — "how long has this been going on".** Every default-rendered
+anomaly leads with a plain-language sentence — `Anomalous for 2h 30m — 15
+consecutive 10min intervals.` — that surfaces the metric **interval**, the
+**true streak length** and the wall-clock **duration**; the Started/Latest
+fields bound the span. Recovery is symmetric (`Incident lasted …`, Started /
+Cleared). The decision only needs `consecutive_anomalies` points, so the *true*
+streak/onset is resolved **only when an alert fires/clears**: `_decision.py`
+(`_resolve_streak`) and `_recovery.py` (`_resolve_incident`) load up to
+`STREAK_LOOKBACK_POINTS` (`_base.py`) detections and re-walk the same
+direction-aware quorum logic; a run older than the window renders as `over …`.
+The result rides on `AlertData.interval_seconds` / `onset_timestamp` /
+`streak_capped` (`consecutive_count` now carries the *true* streak), and
+`BaseAlertChannel.build_context` turns it into the shared `anomaly_lead` /
+`recovery_lead` / `window_line` / `duration_display` values. The hot no-alert
+path is untouched (no extra query).
 
 Two `AlertConfig` fields (`detectkit/config/metric_config.py`) drive the action
 links, surfaced as first-class actions on every channel: **`dashboard_url`** (a

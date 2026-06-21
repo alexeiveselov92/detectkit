@@ -5,6 +5,48 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-06-21
+
+### Added
+- **Alert messages now answer "how long has this been going on?"** Every
+  default-rendered anomaly leads with a plain-language sentence —
+  `Anomalous for 2h 30m — 15 consecutive 10min intervals.` — surfacing the
+  metric **interval**, the **true consecutive streak length**, and the
+  wall-clock **duration**. New `Started` / `Latest` fields bound the
+  problematic span. Recovery alerts are symmetric:
+  `Incident lasted 2h 30m (…)` with `Started` / `Cleared`.
+  - The true streak length and onset are resolved **only when an alert
+    fires/clears** — `_decision.py` (`_resolve_streak`) and `_recovery.py`
+    (`_resolve_incident`) look back over the detection history (bounded by
+    `STREAK_LOOKBACK_POINTS`, default 1000) and re-walk the same
+    direction-aware quorum logic. A run older than the window renders as
+    `over …`. The hot no-alert path issues no extra query.
+  - New `AlertData` fields `interval_seconds` / `onset_timestamp` /
+    `streak_capped`; `consecutive_count` now carries the **true** streak
+    length (no longer capped at the rule threshold). New template variables:
+    `{anomaly_lead}` / `{recovery_lead}` / `{interval_display}` /
+    `{duration_display}` / `{onset_display}` / `{started_display}` /
+    `{window_line}`. New `detectkit.utils.datetime_utils.format_duration`.
+
+### Changed
+- **Uniform message order: `description → Rule → Value/Expected`** on every
+  channel and for both anomaly and recovery. Previously the anomaly message
+  led with the **Rule** chip (description below it) while recovery led with the
+  description; now both lead with the description and place the Rule chip right
+  above the value/expected evidence it explains.
+- The default anomaly/recovery text templates and the webhook / Telegram /
+  email native layouts were reworked to the new lead + `Started`/`Latest`
+  fields and now also show **Quorum** on Telegram and email (previously
+  webhook-only). The webhook/email **Detected at** field is replaced by the
+  `Started` → `Latest` (or `Cleared`) pair.
+- `dtk test-alert` previews now carry the incident-timing fields, so the mock
+  matches what a real firing renders.
+
+### Notes
+- Custom templates keep working unchanged; the new placeholders are additive.
+  Direct-API callers that don't set `interval_seconds` fall back to the
+  previous `Latest X/Y consecutive points met the quorum.` lead.
+
 ## [0.16.4] - 2026-06-20
 
 ### Fixed

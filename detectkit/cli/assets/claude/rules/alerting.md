@@ -194,33 +194,47 @@ leads with a colored **status circle** — 🔴 anomaly, 🟢 recovery, 🟡 no-
 
 - **Slack / Mattermost / generic webhook** — one message *attachment* with a
   status-colored accent bar, a clickable title (the metric; links to
-  `dashboard_url` when set), a short markdown lead (the rule), and a compact
-  fields grid: short fields Value / Expected / Quorum / Severity, then full-width
-  Detected-at / Detectors / Parameters, plus a branded footer + footer icon.
-  @mentions ride in the **top-level** message text so they notify. A custom
-  `template` instead renders as a plain text-only attachment (color/title/
-  branding kept, no fields grid).
+  `dashboard_url` when set), a short markdown lead (the duration sentence — see
+  "Incident timing" below) with the **Rule** chip beneath it, and a compact
+  fields grid: short fields Value / Expected / Quorum / Severity / Started /
+  Latest (Started / Cleared on recovery), then full-width Detectors / Parameters,
+  plus a branded footer + footer icon. @mentions ride in the **top-level**
+  message text so they notify. A custom `template` instead renders as a plain
+  text-only attachment (color/title/ branding kept, no fields grid).
 - **Telegram** — default `parse_mode` is now **HTML**. The default message is
   structured and HTML-escaped: a colored status dot (red anomaly / green
-  recovery / yellow no-data / blue error), a bold headline, the rule, then
-  evidence in `<code>` (value/expected/severity/time/detector/params), an inline
-  "Open dashboard" link, then mentions. This fixes the old Markdown mode raising
-  "can't parse entities" on params JSON containing underscores (e.g.
-  `window_size`). Custom templates are sent verbatim under the parse mode, so
-  they must be HTML-safe; set `parse_mode: Markdown` to keep the old behavior.
+  recovery / yellow no-data / blue error), a bold headline, the lead + rule, then
+  evidence in `<code>` (value/expected/quorum/severity/started → latest/detector/
+  params), an inline "Open dashboard" link, then mentions. This fixes the old
+  Markdown mode raising "can't parse entities" on params JSON containing
+  underscores (e.g. `window_size`). Custom templates are sent verbatim under the
+  parse mode, so they must be HTML-safe; set `parse_mode: Markdown` to keep the
+  old behavior.
 - **Email** — a branded HTML card (inline-CSS, table-based, Outlook-safe):
-  colored accent + status pill, the metric, a 2-col value/expected/severity
-  table, a monospace params box, an optional "Open dashboard" button, and a
-  footer. The plain-text body remains the multipart fallback.
+  colored accent + status pill, the metric, the lead + Rule chip, a 2-col stat
+  grid (value/expected/severity/quorum/started/latest), a monospace params box,
+  an optional "Open dashboard" button, and a footer. The plain-text body remains
+  the multipart fallback.
 
-On anomaly **and** recovery alerts the **firing rule is set apart uniformly** in
-every default-rendered channel: a bold **Rule** label + an inline-code chip
-(`min_detectors=… · direction=… · consecutive=…`), with the quorum explanation
-on its own line, so the rule reads as "this is the config that fired" at a
-glance. Bold is platform-aware (`*Rule*` on Slack, `**Rule**` on
-Mattermost/generic; `<b>Rule</b>` on Telegram; `<strong>` in email), while the
-code chip is identical everywhere. Custom templates and the plain-text fallbacks
-are unchanged.
+**Message order is uniform** — `description → Rule → Value/Expected` on every
+channel, for both anomaly and recovery. The **firing rule is set apart
+uniformly**: a bold **Rule** label + an inline-code chip (`min_detectors=… ·
+direction=… · consecutive=…`) sitting right above the value/expected evidence.
+Bold is platform-aware (`*Rule*` on Slack, `**Rule**` on Mattermost/generic;
+`<b>Rule</b>` on Telegram; `<strong>` in email), while the code chip is
+identical everywhere.
+
+**Incident timing — "how long has this been going on".** Each default anomaly
+leads with `Anomalous for 2h 30m — 15 consecutive 10min intervals.` (metric
+interval + true streak length + wall-clock duration); Started/Latest bound the
+span. Recovery is symmetric (`Incident lasted …`, Started / Cleared). The true
+streak/onset is resolved only when an alert fires/clears (a bounded lookback over
+the detection history; a run older than the window shows `over …`), so the hot
+no-alert path stays cheap. Exposed to templates as `{anomaly_lead}` /
+`{recovery_lead}` / `{duration_display}` / `{interval_display}` /
+`{started_display}` / `{window_line}` — and `{consecutive_count}` now carries the
+*true* streak length. Custom templates and the plain-text fallbacks follow the
+same order.
 
 ## Project label (multi-project channels)
 
@@ -277,7 +291,10 @@ referenced by path). Key variables:
 | `{expected_range}` | one-sided-aware band (`>= 7.00`, `<= 1.10`, `[lo, hi]`, `N/A`) |
 | `{detector_name}`, `{detector_count}` | who fired (`"N detectors"` for multi) |
 | `{min_detectors}` / `{direction_policy}` / `{consecutive_required}` | the configured rule |
-| `{direction}`, `{consecutive_count}`, `{severity}` | observed values |
+| `{direction}`, `{severity}` | observed values |
+| `{consecutive_count}` | **true** streak length (resolved at fire time, not capped at the rule) |
+| `{anomaly_lead}` / `{recovery_lead}` | ready-made "how long" lead sentence |
+| `{interval_display}` / `{duration_display}` / `{started_display}` / `{window_line}` | incident-timing bits (interval, duration, onset, `Started… \| Latest…` line) |
 | `{status}` | `ANOMALY` / `RECOVERED` / `NO_DATA` / `ERROR` |
 | `{mentions}` / `{mentions_line}` | formatted mentions |
 | `{dashboard_url}` | raw `dashboard_url` (empty string when unset) |

@@ -34,8 +34,8 @@ from datetime import datetime, timezone
 import numpy as np
 
 from detectkit.alerting.channels.base import AlertData
-from detectkit.alerting.orchestrator._base import _OrchestratorBase
-from detectkit.alerting.orchestrator._types import DetectionRecord
+from detectkit.alerting.orchestrator._base import STREAK_LOOKBACK_POINTS, _OrchestratorBase
+from detectkit.alerting.orchestrator._types import DetectionRecord, hydrate_detection_records
 from detectkit.utils.datetime_utils import now_utc, to_aware_utc
 
 
@@ -70,7 +70,46 @@ class _DecisionMixin(_OrchestratorBase):
         if not latest_quorum or consecutive < self.conditions.consecutive_anomalies:
             return False, None
 
-        return True, self._build_alert_data(latest_quorum, consecutive, direction)
+        # The decision is made; now resolve the *true* streak length/onset for
+        # the message (the shallow alert window caps ``consecutive`` at the rule
+        # threshold, which can't answer "how long has this been going on").
+        streak, onset_ts, capped = self._resolve_streak(latest_quorum[0].timestamp)
+        return True, self._build_alert_data(latest_quorum, streak, direction, onset_ts, capped)
+
+    def _resolve_streak(self, latest_ts: np.datetime64) -> tuple[int, np.datetime64, bool]:
+        """Resolve the full anomalous run ending at *latest_ts*.
+
+        Loads up to :data:`STREAK_LOOKBACK_POINTS` detections and re-walks the
+        same direction-aware quorum logic used to fire, so the message can report
+        the real onset/duration rather than the shallow alert-window count.
+        Returns ``(streak_count, onset_timestamp, capped)`` — ``capped`` is True
+        when the run fills the whole lookback window (onset is older than we saw).
+        Only runs when an alert actually fires, so the hot no-alert path is
+        untouched.
+        """
+        step = np.timedelta64(self.interval.seconds, "s")
+        if not self.internal:
+            # Direct-API path with no DB to walk: report the rule's required
+            # length so the message still carries a duration.
+            n = max(self.conditions.consecutive_anomalies, 1)
+            return n, latest_ts - step * (n - 1), False
+
+        last_point = latest_ts.astype("datetime64[ms]").astype(datetime)
+        rows = self.internal.get_recent_detections(
+            metric_name=self.metric_name,
+            last_point=last_point,
+            num_points=STREAK_LOOKBACK_POINTS,
+        )
+        records = hydrate_detection_records(rows)
+        if not records:
+            return 1, latest_ts, False
+
+        by_time = self._group_by_timestamp(records)
+        timestamps_sorted = sorted(by_time.keys(), reverse=True)
+        count, _, _ = self._count_consecutive_anomalies(by_time, timestamps_sorted)
+        count = max(count, 1)
+        capped = count >= STREAK_LOOKBACK_POINTS
+        return count, latest_ts - step * (count - 1), capped
 
     def _quorum_at(
         self,
@@ -185,6 +224,8 @@ class _DecisionMixin(_OrchestratorBase):
         anomalies: list[DetectionRecord],
         consecutive_count: int,
         direction: str | None,
+        onset_timestamp: np.datetime64 | None = None,
+        streak_capped: bool = False,
     ) -> AlertData:
         primary = self._primary_record(anomalies)
 
@@ -249,6 +290,10 @@ class _DecisionMixin(_OrchestratorBase):
             direction_policy=self.conditions.direction,
             consecutive_required=self.conditions.consecutive_anomalies,
             detector_count=len(anomalies),
+            # Incident timing for the "how long has this been going on" line.
+            interval_seconds=self.interval.seconds,
+            onset_timestamp=onset_timestamp,
+            streak_capped=streak_capped,
         )
 
     def should_alert_no_data(
@@ -304,6 +349,7 @@ class _DecisionMixin(_OrchestratorBase):
             links=self.links,
             project_name=self.project_name,
             help_url=self.help_url,
+            interval_seconds=self.interval.seconds,
         )
 
     def get_last_complete_point(self, now: datetime | None = None) -> datetime:

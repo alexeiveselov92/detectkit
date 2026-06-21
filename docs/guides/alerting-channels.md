@@ -14,9 +14,11 @@ also leads with the **project name** (`[name] `) — see
 
 - **Slack / Mattermost / generic webhook** (all via `WebhookChannel`): a single
   message *attachment* with a status-colored accent bar, a clickable title (the
-  project + metric; links to `dashboard_url` when set), a short markdown lead (the
-  rule that fired), and a compact fields grid — short fields Value / Expected /
-  Quorum / Severity, then full-width Detected at / Detectors / Parameters, and a
+  project + metric; links to `dashboard_url` when set), a short markdown lead —
+  *how long it has been going on* ("Anomalous for 2h 30m — 15 consecutive 10min
+  intervals.") with the **Rule** chip right beneath it — and a compact fields
+  grid: short fields Value / Expected / Quorum / Severity / Started / Latest
+  (Started / Cleared on recovery), then full-width Detectors / Parameters, and a
   compact **Links** field of clickable labels (Dashboard / any extra links /
   "How to read this alert") — never raw URLs — plus a branded footer
   (`detectkit · <project>`) and footer icon. `@mentions` ride in
@@ -25,19 +27,21 @@ also leads with the **project name** (`[name] `) — see
   color, title and branding kept, no fields grid).
 - **Telegram**: a structured, HTML-escaped message (default `parse_mode` is now
   `HTML`) — a colored status dot (red anomaly / green recovery / yellow no-data /
-  blue error), a bold headline (`[project] Status · metric`), the rule, then the
-  evidence in `<code>` (value / expected / severity / time / detector / params),
+  blue error), a bold headline (`[project] Status · metric`), the lead (how long
+  it has been going on) followed by the rule, then the evidence in `<code>`
+  (value / expected / quorum / severity / started → latest / detector / params),
   a links line with an inline "Open dashboard" link followed by a "How to read
   this alert" link, then mentions. Custom templates are sent
   verbatim under the parse mode, so keep them HTML-safe (or set
   `parse_mode: Markdown`).
 - **Email**: a branded HTML card (inline-CSS, table-based, Outlook-safe) — a
   colored accent and status pill, a small project eyebrow above the metric, the
-  metric, a 2-column value / expected / severity table, a monospace params box,
-  an optional "Open dashboard" button, and a footer (`Sent by detectkit ·
-  <project>`) that ends with a clay-colored "How to read this alert ->" link.
-  The subject is prefixed with `[project]` and the plain-text body
-  remains the multipart fallback.
+  metric, the lead (how long it has been going on) with the **Rule** chip beneath
+  it, a 2-column stat grid (value / expected / severity / quorum / started /
+  latest), a monospace params box, an optional "Open dashboard" button, and a
+  footer (`Sent by detectkit · <project>`) that ends with a clay-colored "How to
+  read this alert ->" link. The subject is prefixed with `[project]` and the
+  plain-text body remains the multipart fallback.
 
 On both anomaly and recovery alerts the **firing rule is set apart the same way
 in every channel**: a bold **Rule** label followed by an inline-code chip

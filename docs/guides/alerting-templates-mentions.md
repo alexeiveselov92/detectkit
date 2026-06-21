@@ -104,33 +104,43 @@ Override default alert message format.
 
 ### Default Template
 
-The default message foregrounds the **alert** (the rule that fired and the
-parameters it fired with); the anomaly appears as supporting evidence below.
+The default message foregrounds the **alert** — first *how long it has been
+going on* (the plain-language lead), then the rule that fired, with the anomaly
+as supporting evidence below. The order is the same on every channel and for
+both anomaly and recovery: **description → Rule → Value/Expected**.
 
 ```
 🔴 {project_name_prefix}Alert: {metric_name}
-{description_line}Quorum {detector_count}/{min_detectors} · direction {direction} (policy {direction_policy}) · consecutive {consecutive_count}/{consecutive_required}
+{description_line}{anomaly_lead}
 Rule: min_detectors={min_detectors} · direction={direction_policy} · consecutive={consecutive_required}
 
-Latest point (evidence):
-· Time: {timestamp}
-· Value: {value_display} | Expected: {expected_range}
-· Severity: {severity:.2f}
-Detectors: {detector_name}
+Value: {value_display} | Expected: {expected_range}
+Quorum: {detector_count}/{min_detectors} · {direction}
+Severity: {severity:.2f}
+{window_line}Detectors: {detector_name}
 Parameters: {detector_params}
-{mentions_line}
+{dashboard_line}{help_line}{mentions_line}
 ```
 
 The first line names the **alert** and the metric, led by the project name as a
 `[name] ` prefix (from `detectkit_project.yml`) so two projects posting to the
 same channel stay distinguishable while keeping the default brand bot name +
 avatar. See [Channels](alerting-channels.md) for where each channel surfaces it.
-The `Quorum … · direction … · consecutive …` line shows the observed match
-against the rule (`actual/required`),
-and the `Rule:` line restates the configured thresholds. The detector value,
-expected range and severity follow as evidence. `{expected_range}` renders
-one-sided detector bounds cleanly (e.g. `>= 7.00` for a lower-only
-`manual_bounds`) instead of `[7.00, nan]`.
+`{anomaly_lead}` answers *"when did this start, how long has it been running?"*
+— e.g. `Anomalous for 2h 30m — 15 consecutive 10min intervals.` (the metric
+interval, the true streak length and the wall-clock duration). The `Rule:` line
+sits right above the evidence it explains and restates the configured
+thresholds; `{window_line}` gives the problematic span as
+`Started: … | Latest: …` (and `Started: … | Cleared: …` on recovery).
+`{expected_range}` renders one-sided detector bounds cleanly (e.g. `>= 7.00`
+for a lower-only `manual_bounds`) instead of `[7.00, nan]`.
+
+> **How long is "true"?** The streak length / onset are resolved at fire time by
+> looking back over the detection history until the run breaks (bounded — a run
+> older than the lookback window renders as `over …`), so it reflects the real
+> incident, not just the `consecutive_anomalies` points the rule needs. The
+> recovery message reports the same span the just-cleared incident covered
+> (`Incident lasted …`).
 
 ### Creating Custom Template
 
@@ -181,8 +191,13 @@ alerting:
 | `severity` | Severity score; max across the quorum for multi-detector alerts | anomaly |
 | `direction` | Observed/locked anomaly direction: `"up"` or `"down"`; also `"mixed"` for an `any`-policy quorum spanning both up and down, and `"none"` for no-data/recovery | all |
 | `direction_policy` | Configured direction rule: `"same"`, `"any"`, `"up"`, `"down"` | anomaly, recovery |
-| `consecutive_count` | Observed number of consecutive anomalies | anomaly |
+| `consecutive_count` | **True** consecutive streak length — resolved at fire time by looking back over the detection history, not capped at the rule threshold (recovery: the just-ended incident length) | anomaly, recovery |
 | `consecutive_required` | Configured consecutive threshold the alert fired on (the rule) | anomaly, recovery |
+| `interval_display` | Metric interval as a string (e.g. `"10min"`) (v0.17.0) | all |
+| `duration_display` | How long the streak/incident has run (e.g. `"2h 30m"`; `"over …"` when older than the lookback window) (v0.17.0) | anomaly, recovery |
+| `onset_display` / `started_display` | First timestamp of the run (formatted in `{timezone}`); `started_display` adds `"or earlier"` when the run is capped (v0.17.0) | anomaly, recovery |
+| `anomaly_lead` / `recovery_lead` | Ready-made plain-language lead — `"Anomalous for …"` / `"… Incident lasted …"` (falls back to `"Latest X/Y consecutive points met the quorum."` when no interval is wired in) (v0.17.0) | anomaly, recovery |
+| `window_line` | `"Started: … \| Latest/Cleared: …\n"` (or a single `"Detected at: …"` line when the onset is unknown) (v0.17.0) | all |
 | `status` | `"ANOMALY"`, `"RECOVERED"`, `"NO_DATA"`, or `"ERROR"` | all (v0.5.0 added NO_DATA / ERROR) |
 | `error_type` / `error_message` | Exception details | error only (v0.5.0) |
 | `description` / `description_line` | Metric description | all |
@@ -233,13 +248,13 @@ like — here with the defaults (`min_detectors: 1`, `direction: same`,
 
 ```
 🔴 [my_monitoring] Alert: api_response_time
-Quorum 1/1 · direction up (policy same) · consecutive 3/3
+Anomalous for 30m — 3 consecutive 10min intervals.
 Rule: min_detectors=1 · direction=same · consecutive=3
 
-Latest point (evidence):
-· Time: 2026-06-12 14:30:00 (UTC)
-· Value: 0.8532 | Expected: [0.45, 0.62]
-· Severity: 4.52
+Value: 0.8532 | Expected: [0.45, 0.62]
+Quorum: 1/1 · up
+Severity: 4.52
+Started: 2026-06-12 14:10:00 (UTC) | Latest: 2026-06-12 14:30:00 (UTC)
 Detectors: MADDetector:threshold=3.0
 Parameters: {"threshold": 3.0, "window_size": 8640}
 ```

@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
+
+import numpy as np
 
 from detectkit.alerting.channels.base import AlertData
-from detectkit.alerting.orchestrator._base import _OrchestratorBase
+from detectkit.alerting.orchestrator._base import STREAK_LOOKBACK_POINTS, _OrchestratorBase
 from detectkit.alerting.orchestrator._types import (
     DetectionRecord,
     hydrate_detection_records,
@@ -160,6 +163,10 @@ class _RecoveryMixin(_OrchestratorBase):
                 recovery_ci_lower = last_anomalous.confidence_lower
                 recovery_ci_upper = last_anomalous.confidence_upper
 
+        # Reconstruct the just-ended incident so the recovery message can say how
+        # long it lasted (symmetric with the anomaly alert's onset/duration).
+        incident_count, onset_ts, capped = self._resolve_incident(latest.timestamp)
+
         return AlertData(
             metric_name=self.metric_name,
             timestamp=latest.timestamp,
@@ -172,7 +179,9 @@ class _RecoveryMixin(_OrchestratorBase):
             direction="none",
             severity=0.0,
             detection_metadata={},
-            consecutive_count=0,
+            # The just-ended incident length (0 when it can't be reconstructed,
+            # so the message simply omits the duration).
+            consecutive_count=incident_count,
             is_recovery=True,
             description=self.description,
             mentions=self.mentions,
@@ -185,4 +194,72 @@ class _RecoveryMixin(_OrchestratorBase):
             min_detectors=self.conditions.min_detectors,
             direction_policy=self.conditions.direction,
             consecutive_required=self.conditions.consecutive_anomalies,
+            # Incident timing for the "Incident lasted …" line.
+            interval_seconds=self.interval.seconds,
+            onset_timestamp=onset_ts,
+            streak_capped=capped,
         )
+
+    def _resolve_incident(self, cleared_ts: Any) -> tuple[int, Any, bool]:
+        """Find the anomalous run that just ended before the recovery point.
+
+        Walks back from *cleared_ts* (the latest, now-clean point): skips the
+        clean tail, then counts the contiguous direction-aware quorum run using
+        the same logic that fired the alert. Returns ``(length, onset_timestamp,
+        capped)`` — ``(0, None, False)`` when no run can be reconstructed, so the
+        recovery message just omits the incident duration.
+        """
+        if not self.internal:
+            return 0, None, False
+
+        step = np.timedelta64(self.interval.seconds, "s")
+        if isinstance(cleared_ts, np.datetime64):
+            last_point = cleared_ts.astype("datetime64[ms]").astype(datetime)
+        else:
+            last_point = cleared_ts
+        rows = self.internal.get_recent_detections(
+            metric_name=self.metric_name,
+            last_point=last_point,
+            num_points=STREAK_LOOKBACK_POINTS,
+        )
+        records = hydrate_detection_records(rows)
+        if not records:
+            return 0, None, False
+
+        by_time = self._group_by_timestamp(records)
+        timestamps_sorted = sorted(by_time.keys(), reverse=True)
+
+        locked: str | None = None
+        started = False
+        count = 0
+        onset: Any = None
+        prev: np.datetime64 | None = None
+        for ts in timestamps_sorted:
+            anomalies = [d for d in by_time[ts] if d.is_anomaly]
+            # ``_quorum_at`` lives in _DecisionMixin; both mixins compose into
+            # AlertOrchestrator so the call resolves at runtime.
+            quorum, direction = self._quorum_at(anomalies, locked)
+            if not started:
+                # Skip the clean tail (the recovery point + any clean points)
+                # until the first quorum-satisfying point — the incident's end.
+                if quorum is None:
+                    continue
+                started = True
+                if self.conditions.direction == "same":
+                    locked = direction
+                count = 1
+                onset = ts
+                prev = ts
+                continue
+            if quorum is None or (prev is not None and (prev - ts) != step):
+                break
+            if self.conditions.direction == "same":
+                locked = direction
+            count += 1
+            onset = ts
+            prev = ts
+
+        if count == 0:
+            return 0, None, False
+        capped = count >= STREAK_LOOKBACK_POINTS
+        return count, onset, capped

@@ -27,9 +27,11 @@ class WebhookChannel(BaseAlertChannel):
 
     Rendering: the default (no custom ``template``) payload is a single
     **Slack/Mattermost message attachment** — a colored accent bar, a title,
-    a short markdown lead, and a compact **fields grid** (Value / Expected /
-    Quorum / Severity, then full-width Detected-at / Detectors / Parameters),
-    branded with a ``footer`` + ``footer_icon``. This renders richly on both
+    a short markdown lead (how long the anomaly has been running) with the
+    **Rule** chip beneath it, and a compact **fields grid** (Value / Expected /
+    Quorum / Severity / Started / Latest — Started / Cleared on recovery — then
+    full-width Detectors / Parameters), branded with a ``footer`` +
+    ``footer_icon``. This renders richly on both
     Slack and Mattermost from one payload. A custom ``template`` degrades to a
     plain text-only attachment (the template is one opaque string that can't be
     sliced into fields), keeping the color, title and branding.
@@ -267,27 +269,32 @@ class WebhookChannel(BaseAlertChannel):
         )
 
         if kind == "anomaly":
-            lead = (
-                f"{rule_chip}\n"
-                f"Latest {ctx['consecutive_count']}/{ctx['consecutive_required']} "
-                "consecutive points met the quorum."
-            )
+            # Description (how long it's been going on) leads; the Rule chip sits
+            # right above the value/expected fields it explains.
+            lead = f"{ctx['anomaly_lead']}\n{rule_chip}"
             short("Value", code(ctx["value_display"]))
             short("Expected", code(ctx["expected_range"]))
             short("Quorum", f"{ctx['detector_count']}/{ctx['min_detectors']} · {ctx['direction']}")
             short("Severity", f"{alert_data.severity:.2f}")
-            full("Detected at", ctx["timestamp"])
+            # The problematic span: when it started and the latest point in it.
+            if ctx["started_display"]:
+                short("Started", ctx["started_display"])
+                short("Latest", ctx["timestamp"])
+            else:
+                full("Detected at", ctx["timestamp"])
             full("Detectors", code(ctx["detector_name"]))
             if ctx["detector_params"]:
                 full("Parameters", f"```{ctx['detector_params']}```")
         elif kind == "recovery":
-            lead = (
-                "The alert condition no longer holds — the metric is back within "
-                f"expected bounds.\n{rule_chip}"
-            )
+            lead = f"{ctx['recovery_lead']}\n{rule_chip}"
             short("Value", code(ctx["value_display"]))
             short("Expected", code(ctx["expected_range"]))
-            full("Detected at", ctx["timestamp"])
+            # The incident span: when it started and when it cleared.
+            if ctx["started_display"]:
+                short("Started", ctx["started_display"])
+                short("Cleared", ctx["timestamp"])
+            else:
+                full("Cleared at", ctx["timestamp"])
             full("Detectors", code(ctx["detector_name"]))
         elif kind == "no_data":
             lead = "Query returned no datapoint for the latest expected interval."
@@ -383,16 +390,14 @@ class WebhookChannel(BaseAlertChannel):
         """
         return (
             "{description_line}"
-            "Quorum {detector_count}/{min_detectors} · "
-            "direction {direction} (policy {direction_policy}) · "
-            "consecutive {consecutive_count}/{consecutive_required}\n"
+            "{anomaly_lead}\n"
             "Rule: min_detectors={min_detectors} · "
             "direction={direction_policy} · consecutive={consecutive_required}\n"
             "\n"
-            "Latest point (evidence):\n"
-            "· Time: {timestamp}\n"
-            "· Value: {value_display} | Expected: {expected_range}\n"
-            "· Severity: {severity:.2f}\n"
+            "Value: {value_display} | Expected: {expected_range}\n"
+            "Quorum: {detector_count}/{min_detectors} · {direction}\n"
+            "Severity: {severity:.2f}\n"
+            "{window_line}"
             "Detectors: {detector_name}\n"
             "Parameters: {detector_params}\n"
             "{dashboard_line}"
@@ -406,14 +411,12 @@ class WebhookChannel(BaseAlertChannel):
         """
         return (
             "{description_line}"
-            "The alert condition no longer holds — "
-            "the metric is back within expected bounds.\n"
+            "{recovery_lead}\n"
             "Rule: min_detectors={min_detectors} · "
             "direction={direction_policy} · consecutive={consecutive_required}\n"
             "\n"
-            "Latest point:\n"
-            "· Time: {timestamp}\n"
-            "· Value: {value_display} | Expected: {expected_range}\n"
+            "Value: {value_display} | Expected: {expected_range}\n"
+            "{window_line}"
             "Detectors: {detector_name}\n"
             "{dashboard_line}"
             "{help_line}"

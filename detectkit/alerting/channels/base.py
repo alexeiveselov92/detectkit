@@ -92,6 +92,18 @@ class AlertData:
     direction_policy: str | None = None
     consecutive_required: int | None = None
     detector_count: int = 1
+    # Incident timing — answers "how long has this been going on". The metric
+    # ``interval_seconds`` lets the message express the streak in wall-clock
+    # time; ``onset_timestamp`` is the first timestamp of the current anomalous
+    # run (anomaly) / the just-ended incident (recovery); ``streak_capped`` is
+    # True when the run is at least as long as the orchestrator's lookback
+    # window, so the duration is rendered as a lower bound ("over …"). The
+    # consecutive streak length itself rides on ``consecutive_count`` (the true
+    # run length, resolved at fire time). All default to None/False so
+    # direct-API callers and non-anomaly alerts render unchanged.
+    interval_seconds: int | None = None
+    onset_timestamp: Any | None = None
+    streak_capped: bool = False
 
 
 class BaseAlertChannel(ABC):
@@ -165,8 +177,18 @@ class BaseAlertChannel(ABC):
         - {direction} — observed/locked direction of the anomaly
         - {direction_policy} — configured direction rule ("same"/"any"/...)
         - {min_detectors} — configured quorum threshold (the rule)
-        - {consecutive_count} — observed consecutive points
+        - {consecutive_count} — true consecutive streak length (resolved at
+          fire time, not capped at the rule's threshold)
         - {consecutive_required} — configured consecutive threshold (rule)
+        - {interval_display} — metric interval as a string (e.g. "10min")
+        - {duration_display} — how long the streak/incident lasted
+          (e.g. "2h 30m"; "over …" when it predates the lookback window)
+        - {onset_display} / {started_display} — first timestamp of the run
+          ({started_display} adds "or earlier" when the run is capped)
+        - {anomaly_lead} / {recovery_lead} — the ready-made plain-language
+          lead sentence ("Anomalous for …" / "… Incident lasted …")
+        - {window_line} — "Started: … | Latest/Cleared: …" (or a single
+          "Detected at: …" line when the onset is unknown)
         - {severity}
         - {status}
 
@@ -228,22 +250,27 @@ class BaseAlertChannel(ABC):
         """
         import math
         from datetime import datetime
+        from zoneinfo import ZoneInfo
 
         import numpy as np
 
-        # Format timestamp to string
-        ts = alert_data.timestamp
-        if isinstance(ts, np.datetime64):
-            ts = ts.astype(datetime)
+        def _fmt_ts(value: Any) -> str:
+            """Format a timestamp the same way for the main point and the onset:
+            naive UTC → target timezone, with a ``(tz)`` suffix when set."""
+            if value is None:
+                return ""
+            t = value
+            if isinstance(t, np.datetime64):
+                t = t.astype("datetime64[ms]").astype(datetime)
+            if not isinstance(t, datetime):
+                return str(t)
+            if alert_data.timezone:
+                t = t.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(alert_data.timezone))
+                return f"{t.strftime('%Y-%m-%d %H:%M:%S')} ({alert_data.timezone})"
+            return t.strftime("%Y-%m-%d %H:%M:%S")
 
-        # Convert naive UTC timestamp to target timezone if specified
-        if alert_data.timezone:
-            from zoneinfo import ZoneInfo
-
-            ts = ts.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(alert_data.timezone))
-            ts_str = f"{ts.strftime('%Y-%m-%d %H:%M:%S')} ({alert_data.timezone})"
-        else:
-            ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
+        ts_str = _fmt_ts(alert_data.timestamp)
+        onset_str = _fmt_ts(alert_data.onset_timestamp)
 
         # Format confidence interval
         if alert_data.confidence_lower is not None and alert_data.confidence_upper is not None:
@@ -286,6 +313,66 @@ class BaseAlertChannel(ABC):
             else alert_data.consecutive_count
         )
         direction_policy = alert_data.direction_policy or alert_data.direction
+
+        # Incident timing — the "how long has this been going on" story shared by
+        # every channel. ``consecutive_count`` carries the *true* streak length
+        # (resolved at fire time); together with the metric interval it becomes a
+        # wall-clock duration and a plain-language lead. ``streak_capped`` means
+        # the run is at least as long as the orchestrator's lookback window, so
+        # the duration/started values render as lower bounds. Degrades cleanly to
+        # the legacy "Latest X/Y consecutive points met the quorum." lead when no
+        # interval is wired in (direct-API callers).
+        from detectkit.core.interval import Interval
+        from detectkit.utils.datetime_utils import format_duration
+
+        interval_seconds = alert_data.interval_seconds
+        streak = alert_data.consecutive_count or 0
+        capped = alert_data.streak_capped
+        interval_display = str(Interval(interval_seconds)) if interval_seconds else ""
+
+        if interval_seconds and streak >= 1:
+            duration_display = format_duration(streak * interval_seconds)
+            if capped:
+                duration_display = f"over {duration_display}"
+            streak_display = f"{streak}+" if capped else f"{streak}"
+            started_display = f"{onset_str} or earlier" if (capped and onset_str) else onset_str
+            intervals_word = "interval" if streak == 1 else "intervals"
+            anomaly_lead = (
+                f"Anomalous for {duration_display} — "
+                f"{streak_display} consecutive {interval_display} {intervals_word}."
+            )
+            recovery_lead = (
+                "The alert condition no longer holds — the metric is back within "
+                f"expected bounds. Incident lasted {duration_display} "
+                f"({streak_display} consecutive {interval_display} {intervals_word})."
+            )
+        else:
+            duration_display = ""
+            streak_display = f"{streak}" if streak else ""
+            started_display = onset_str
+            anomaly_lead = (
+                f"Latest {alert_data.consecutive_count}/{consecutive_required} "
+                "consecutive points met the quorum."
+            )
+            recovery_lead = (
+                "The alert condition no longer holds — the metric is back within "
+                "expected bounds."
+            )
+
+        # Kind-aware "window" line for the plain-text templates: the anomalous
+        # span (onset → latest/cleared) when known, else the single point.
+        kind = self.status_kind(alert_data)
+        if started_display and kind == "anomaly":
+            window_line = f"Started: {started_display} | Latest: {ts_str}\n"
+        elif started_display and kind == "recovery":
+            window_line = f"Started: {started_display} | Cleared: {ts_str}\n"
+        else:
+            window_label = {
+                "recovery": "Cleared at",
+                "no_data": "Expected at",
+                "error": "Detected at",
+            }.get(kind, "Detected at")
+            window_line = f"{window_label}: {ts_str}\n"
 
         # Display-safe value: stays usable even when value is None/NaN (no-data).
         raw_value = alert_data.value
@@ -350,6 +437,15 @@ class BaseAlertChannel(ABC):
             "severity": alert_data.severity,
             "consecutive_count": alert_data.consecutive_count,
             "consecutive_required": consecutive_required,
+            "interval_display": interval_display,
+            "duration_display": duration_display,
+            "streak_display": streak_display,
+            "streak_capped": capped,
+            "onset_display": onset_str,
+            "started_display": started_display,
+            "anomaly_lead": anomaly_lead,
+            "recovery_lead": recovery_lead,
+            "window_line": window_line,
             "status": status,
             "error_type": alert_data.error_type or "",
             "error_message": alert_data.error_message or "",
@@ -472,16 +568,14 @@ class BaseAlertChannel(ABC):
         return (
             "🔴 {project_name_prefix}Alert: {metric_name}\n"
             "{description_line}"
-            "Quorum {detector_count}/{min_detectors} · "
-            "direction {direction} (policy {direction_policy}) · "
-            "consecutive {consecutive_count}/{consecutive_required}\n"
+            "{anomaly_lead}\n"
             "Rule: min_detectors={min_detectors} · "
             "direction={direction_policy} · consecutive={consecutive_required}\n"
             "\n"
-            "Latest point (evidence):\n"
-            "· Time: {timestamp}\n"
-            "· Value: {value_display} | Expected: {expected_range}\n"
-            "· Severity: {severity:.2f}\n"
+            "Value: {value_display} | Expected: {expected_range}\n"
+            "Quorum: {detector_count}/{min_detectors} · {direction}\n"
+            "Severity: {severity:.2f}\n"
+            "{window_line}"
             "Detectors: {detector_name}\n"
             "Parameters: {detector_params}\n"
             "{dashboard_line}"
@@ -499,14 +593,12 @@ class BaseAlertChannel(ABC):
         return (
             "🟢 {project_name_prefix}Alert cleared: {metric_name}\n"
             "{description_line}"
-            "The alert condition no longer holds — "
-            "the metric is back within expected bounds.\n"
+            "{recovery_lead}\n"
             "Rule: min_detectors={min_detectors} · "
             "direction={direction_policy} · consecutive={consecutive_required}\n"
             "\n"
-            "Latest point:\n"
-            "· Time: {timestamp}\n"
-            "· Value: {value_display} | Expected: {expected_range}\n"
+            "Value: {value_display} | Expected: {expected_range}\n"
+            "{window_line}"
             "Detectors: {detector_name}\n"
             "{dashboard_line}"
             "{help_line}"

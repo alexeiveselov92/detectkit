@@ -407,6 +407,16 @@
     opacity: 0;
   }
 }
+@keyframes heroAlertIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 .hero-legend {
   display: flex;
   align-items: center;
@@ -434,6 +444,9 @@
   border-radius: 12px;
   padding: 13px 16px;
   box-shadow: 0 18px 40px -18px rgba(27, 25, 22, 0.8);
+  /* fly in just as the spike finishes drawing (line 1.7s, ring at 1.6s) so the
+     alert reads as a reaction to the anomaly, not part of the static layout. */
+  animation: heroAlertIn 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) 1.5s both;
 }
 .ha-body {
   min-width: 0;
@@ -512,7 +525,8 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .hero-svg .hc-line,
-  .hero-svg .hc-halo {
+  .hero-svg .hc-halo,
+  .hero-alert {
     animation: none;
   }
 }

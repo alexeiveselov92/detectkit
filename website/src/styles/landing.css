@@ -387,6 +387,14 @@
 .hero-svg .hc-anom {
   fill: var(--st-anomaly);
 }
+.hero-svg .hc-rec {
+  fill: var(--st-recovery);
+  /* pop in once the line has drawn past this point (line 1.7s), a beat before
+     the recovery card flies in — the calm resolution after the red pulse. */
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: heroRecIn 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) 1.9s both;
+}
 @keyframes heroDraw {
   from {
     stroke-dasharray: 1;
@@ -417,6 +425,16 @@
     transform: none;
   }
 }
+@keyframes heroRecIn {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
 .hero-legend {
   display: flex;
   align-items: center;
@@ -431,10 +449,19 @@
   font-size: 11.5px;
   color: var(--muted);
 }
-.hero-alert {
+/* notification stack anchored to the chart's lower-right. Both card slots are
+   reserved from the start (the recovery card just fades in later), so the
+   anomaly card never reflows when the recovery card arrives. */
+.hero-alerts {
   position: absolute;
   right: 6px;
   bottom: -16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.hero-alert {
   display: flex;
   gap: 11px;
   align-items: center;
@@ -444,9 +471,15 @@
   border-radius: 12px;
   padding: 13px 16px;
   box-shadow: 0 18px 40px -18px rgba(27, 25, 22, 0.8);
-  /* fly in just as the spike finishes drawing (line 1.7s, ring at 1.6s) so the
-     alert reads as a reaction to the anomaly, not part of the static layout. */
+}
+/* anomaly flies in just as the spike finishes drawing (line 1.7s, ring at 1.6s)
+   so it reads as a reaction; recovery follows a beat later, like the metric
+   settling back and the all-clear arriving. */
+.hero-alert.ha-anomaly {
   animation: heroAlertIn 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) 1.5s both;
+}
+.hero-alert.ha-recovery {
+  animation: heroAlertIn 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) 2.9s both;
 }
 .ha-body {
   min-width: 0;
@@ -464,6 +497,9 @@
   border-radius: 50%;
   background: color-mix(in srgb, var(--st-anomaly) 65%, #fff);
   flex: none;
+}
+.ha-dot-rec {
+  background: color-mix(in srgb, var(--st-recovery) 70%, #fff);
 }
 .ha-sub {
   font-family: var(--mono);
@@ -526,7 +562,10 @@
 @media (prefers-reduced-motion: reduce) {
   .hero-svg .hc-line,
   .hero-svg .hc-halo,
-  .hero-alert {
+  .hero-svg .hc-rec,
+  /* match the per-card specificity (.hero-alert.ha-* is two classes) so the
+     override actually wins and both cards render in their final, visible state */
+  .hero-alerts .hero-alert {
     animation: none;
   }
 }
@@ -543,12 +582,15 @@
   }
 }
 @media (max-width: 520px) {
-  .hero-alert {
+  .hero-alerts {
     position: static;
     right: auto;
     bottom: auto;
-    max-width: none;
+    align-items: stretch;
     margin-top: 14px;
+  }
+  .hero-alert {
+    max-width: none;
   }
 }
 
@@ -949,6 +991,12 @@
   height: 11px;
   border-radius: 50%;
   background: var(--st-anomaly);
+}
+.dx-sw-rec {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--st-recovery);
 }
 
 .dx-plot {

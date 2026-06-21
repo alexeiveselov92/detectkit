@@ -10,6 +10,36 @@ const pypi = 'https://pypi.org/project/detectkit/';
 const docsHref = '/overview/';
 const startHref = '/getting-started/installation/';
 
+// ---- live social proof, fetched at build time. No fake fallbacks: if a source
+// is unreachable the stat is simply omitted, so the hero never shows a made-up
+// number. Re-fetched on every build/deploy. ----
+const fmtCompact = (n: unknown): string | null => {
+  if (typeof n !== 'number' || !isFinite(n) || n < 0) return null;
+  if (n < 1000) return String(n);
+  if (n < 1_000_000) return (n / 1000).toFixed(n < 10_000 ? 1 : 0).replace(/\.0$/, '') + 'k';
+  return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+};
+const fetchJson = async (url: string): Promise<any> => {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000);
+    const res = await fetch(url, { headers: { 'User-Agent': 'detectkit-site' }, signal: ctrl.signal });
+    clearTimeout(timer);
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null;
+  }
+};
+const ghData = await fetchJson('https://api.github.com/repos/alexeiveselov92/detectkit');
+const pypiData = await fetchJson('https://pypistats.org/api/packages/detectkit/recent');
+const starsLabel = fmtCompact(ghData?.stargazers_count);
+const installsLabel = fmtCompact(pypiData?.data?.last_month);
+const heroStats = [
+  starsLabel ? { kind: 'stars', label: starsLabel } : null,
+  installsLabel ? { kind: 'installs', label: installsLabel } : null,
+  { kind: 'license', label: '' },
+].filter((s): s is { kind: string; label: string } => s !== null);
+
 const title = 'detectkit — metric monitoring that catches the spike';
 const description =
   'Time-series anomaly detection and alerting with a dbt-like project layout. Write a metric as SQL plus a detector in YAML, run it with one command.';
@@ -548,24 +578,76 @@ const dxExplainer = (() => {
     <section class="wrap hero">
       <div>
         <div class="badge"><span class="dot"></span>open source · python</div>
-        <h1>Metric monitoring that<br /><span class="accent">catches the spike.</span></h1>
+        <h1>Catch the spike<br />before it pages you.</h1>
         <p class="lede">
-          Time-series anomaly detection and alerting with a dbt-like project layout. Write your
-          metric as a SQL query plus a detector in YAML, run it with one command.
+          Time-series anomaly detection and alerting with a dbt-like project layout. A metric is a
+          SQL query plus a detector in YAML — run it with one command.
         </p>
         <div class="cta-row">
           <a class="btn btn-primary" href={startHref}>Get started</a>
-          <a class="btn btn-ghost" href={docsHref}>Read the docs</a>
+          <a class="btn btn-ghost btn-code" href={pypi}>pip install detectkit</a>
+        </div>
+        <div class="hero-stats">
+          {
+            heroStats.map((s, i) => (
+              <Fragment>
+                {i > 0 && <span class="hs-dot" aria-hidden="true" />}
+                {s.kind === 'stars' && (
+                  <a class="hs-item hs-link" href={repo}>
+                    <svg class="hs-star" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 .587l3.668 7.431 8.2 1.193-5.934 5.787 1.401 8.169L12 18.896l-7.335 3.871 1.401-8.169L.132 9.211l8.2-1.193z" />
+                    </svg>
+                    <strong>{s.label}</strong> {s.label === '1' ? 'star' : 'stars'}
+                  </a>
+                )}
+                {s.kind === 'installs' && (
+                  <span class="hs-item">
+                    <strong>{s.label}</strong> installs/mo
+                  </span>
+                )}
+                {s.kind === 'license' && <span class="hs-item">MIT licensed</span>}
+              </Fragment>
+            ))
+          }
         </div>
       </div>
-      <div class="term">
-        <div class="term-bar">
-          <span class="b" style="background:#E5675B"></span>
-          <span class="b" style="background:#E0A23B"></span>
-          <span class="b" style="background:#2E9E73"></span>
-          <span class="title">metrics/api_errors.yml</span>
+      <div class="hero-viz">
+        <div class="hero-chart">
+          <div class="hero-chart-head">
+            <span class="hc-name">api_error_rate</span>
+            <span class="hc-meta">last 24h · 5min</span>
+          </div>
+          <svg class="hero-svg" viewBox="0 0 520 300" aria-hidden="true">
+            <line class="hc-grid" x1="30" y1="90" x2="500" y2="90" />
+            <line class="hc-grid" x1="30" y1="150" x2="500" y2="150" />
+            <line class="hc-grid" x1="30" y1="210" x2="500" y2="210" />
+            <path
+              class="hc-band"
+              d="M30,150 L80,148 L130,150 L180,147 L230,150 L280,148 L330,151 L380,149 L430,150 L500,149 L500,206 L430,205 L380,206 L330,204 L280,206 L230,205 L180,206 L130,204 L80,206 L30,205 Z"
+            />
+            <path class="hc-bound" d="M30,150 L500,149" />
+            <path class="hc-bound" d="M30,205 L500,206" />
+            <path
+              class="hc-line"
+              pathLength="1"
+              d="M30,178 L60,182 L90,175 L120,184 L150,176 L180,186 L210,178 L240,182 L270,176 L300,184 L330,179 L360,188 L388,182 L405,178 L420,150 L435,96 L450,58 L466,120 L480,168 L500,178"
+            />
+            <circle class="hc-halo" cx="450" cy="58" r="6" />
+            <circle class="hc-anom" cx="450" cy="58" r="6" />
+          </svg>
+          <div class="hero-legend">
+            <span><i class="dx-sw dx-sw-line"></i>metric</span>
+            <span><i class="dx-sw dx-sw-band"></i>expected range</span>
+            <span><i class="dx-sw dx-sw-anom"></i>anomaly</span>
+          </div>
         </div>
-        <div class="body code" set:html={yamlHtml}></div>
+        <div class="hero-alert">
+          <Logo size={30} />
+          <div class="ha-body">
+            <div class="ha-title"><span class="ha-dot"></span>Anomaly · api_error_rate</div>
+            <div class="ha-sub">value 4.2 · expected ≤ 1.1 → Slack</div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -581,16 +663,30 @@ const dxExplainer = (() => {
     <section class="wrap" style="padding-bottom:8px">
       <div class="features">
         <div class="feature">
+          <div class="feat-ico feat-ico-query">
+            <span class="fq-a">SELECT</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            <span class="fq-b">numpy[]</span>
+          </div>
           <div class="tag">// query</div>
           <h3>SQL → numpy</h3>
           <p>Any query on ClickHouse · PostgreSQL · MySQL — the foundation of every metric.</p>
         </div>
         <div class="feature">
+          <div class="feat-ico feat-ico-grid" aria-hidden="true">
+            <span class="fd-band"></span>
+            <span class="fd-dot"></span>
+          </div>
           <div class="tag">// detectors</div>
           <h3>Z-Score · MAD · IQR</h3>
           <p>Seasonality, trends, recency weighting.</p>
         </div>
         <div class="feature">
+          <div class="feat-ico feat-ico-ch">
+            <svg viewBox="0 0 24 24"><path fill="#E01E5A" d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z"/><path fill="#36C5F0" d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z"/><path fill="#2EB67D" d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.685 8.834a2.528 2.528 0 0 1-2.521 2.521 2.528 2.528 0 0 1-2.521-2.521V2.522A2.528 2.528 0 0 1 15.164 0a2.528 2.528 0 0 1 2.521 2.522v6.312z"/><path fill="#ECB22E" d="M15.164 18.956a2.528 2.528 0 0 1 2.521 2.522A2.528 2.528 0 0 1 15.164 24a2.528 2.528 0 0 1-2.521-2.522v-2.522h2.521zM15.164 17.685a2.528 2.528 0 0 1-2.521-2.521 2.528 2.528 0 0 1 2.521-2.521h6.313A2.528 2.528 0 0 1 24 15.164a2.528 2.528 0 0 1-2.523 2.521h-6.313z"/></svg>
+            <svg viewBox="0 0 24 24" fill="#E8EDF2"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#D15B36" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4.5" width="20" height="15" rx="2.5"/><path d="m3 6 9 6 9-6"/></svg>
+          </div>
           <div class="tag">// channels</div>
           <h3>Slack · Mattermost · TG</h3>
           <p>@mentions, cooldown, recovery, no-data.</p>
@@ -598,26 +694,7 @@ const dxExplainer = (() => {
       </div>
     </section>
 
-    <!-- ===== run output ===== -->
-    <section class="wrap section">
-      <div class="eyebrow">dtk run</div>
-      <h2>A load → detect → alert run, in one tree.</h2>
-      <p class="sub">
-        The real output of <code>dtk run</code> — a load → detect → alert tree with cyan step
-        headers and colored status lines. Idempotent: it resumes from the last saved point.
-      </p>
-      <div class="term">
-        <div class="term-bar">
-          <span class="b" style="background:#E5675B"></span>
-          <span class="b" style="background:#E0A23B"></span>
-          <span class="b" style="background:#2E9E73"></span>
-          <span class="title">dtk run --select api_error_rate</span>
-        </div>
-        <div class="body" set:html={logHtml}></div>
-      </div>
-    </section>
-
-    <!-- ===== AI-native onboarding ===== -->
+    <!-- ===== AI-native onboarding (lead with it — it's a core differentiator) ===== -->
     <section class="wrap section">
       <div class="eyebrow">dtk init-claude</div>
       <h2>AI-native: build metrics with an assistant, out of the box.</h2>
@@ -638,6 +715,115 @@ const dxExplainer = (() => {
           <span class="title">dtk init-claude</span>
         </div>
         <div class="body" set:html={claudeHtml}></div>
+      </div>
+    </section>
+
+    <!-- ===== configuration: a SQL query → a caught anomaly ===== -->
+    <section class="wrap section">
+      <div class="eyebrow">configuration</div>
+      <div class="cfg-head">
+        <h2>From a SQL query to a caught anomaly.</h2>
+        <p>
+          A metric is just a query plus a detector in YAML. <code>dtk run</code> handles the
+          corridor, the quorum and the alert — nothing else to wire up.
+        </p>
+      </div>
+
+      <div class="cfg-term">
+        <div class="cfg-bar">
+          <span class="b" style="background:#E5675B"></span>
+          <span class="b" style="background:#E0A23B"></span>
+          <span class="b" style="background:#2E9E73"></span>
+          <span class="cfg-file">metrics/api_errors.yml</span>
+          <span class="cfg-lang">YAML</span>
+        </div>
+
+        <div class="cfg-grid">
+          <div class="cfg-config code" set:html={yamlHtml}></div>
+
+          <div class="cfg-output">
+            <div class="cfg-cmd">
+              <span class="cfg-prompt">$</span> dtk run --select <span class="cfg-arg">api_error_rate</span><span class="cfg-caret">▋</span>
+            </div>
+            <div class="cfg-result">
+              <div><span class="cfg-load">LOAD</span>   12 points · resumed</div>
+              <div><span class="cfg-detect">DETECT</span> 1 anomaly · detector mad</div>
+              <div><span class="cfg-alert">ALERT</span>  ✓ sent to mattermost_ops</div>
+            </div>
+            <div class="cfg-card">
+              <div class="cfg-card-head">
+                <span class="cfg-metric">api_error_rate</span>
+                <span class="cfg-anom"><span class="cfg-anom-dot"></span>anomaly</span>
+              </div>
+              <svg class="cfg-svg" viewBox="0 0 320 96" aria-hidden="true">
+                <path class="cfg-band" d="M8,56 L312,55 L312,72 L8,73 Z" />
+                <path class="cfg-bound" d="M8,56 L312,55" />
+                <path class="cfg-bound" d="M8,73 L312,72" />
+                <path
+                  class="cfg-line"
+                  d="M8,64 L40,66 L72,62 L104,67 L136,63 L168,68 L196,64 L220,62 L240,30 L256,12 L272,52 L296,64 L312,63"
+                />
+                <circle class="cfg-halo" cx="256" cy="12" r="9" />
+                <circle class="cfg-anom-pt" cx="256" cy="12" r="5" />
+              </svg>
+              <div class="cfg-card-foot">
+                value <span class="cfg-val">4.2</span> · expected ≤ 1.1 · severity 3.40
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cfg-status">
+          <span class="cfg-ok">✓ pipeline completed</span>
+          <span class="cfg-dim">1 metric · 1 detector · 0.4s</span>
+          <span class="cfg-dim cfg-right">idempotent · resumable</span>
+        </div>
+      </div>
+
+      <div class="cfg-chips">
+        <span class="cfg-chip">SQL on your warehouse</span>
+        <span class="cfg-chip">detector in YAML</span>
+        <span class="cfg-chip">one command</span>
+        <span class="cfg-chip">version-controlled</span>
+      </div>
+    </section>
+
+    <!-- ===== run output ===== -->
+    <section class="wrap section">
+      <div class="eyebrow">dtk run</div>
+      <h2>A load → detect → alert run, in one tree.</h2>
+      <p class="sub">
+        The real output of <code>dtk run</code> — a load → detect → alert tree with cyan step
+        headers and colored status lines. Idempotent: it resumes from the last saved point.
+      </p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-h"><span class="step-dot step-load"></span>LOAD</div>
+          <p>Run the SQL on your warehouse, in batches, from the last checkpoint.</p>
+        </div>
+        <div class="step-arrow" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </div>
+        <div class="step">
+          <div class="step-h"><span class="step-dot step-detect"></span>DETECT</div>
+          <p>Each detector scores points against its learned corridor of normal.</p>
+        </div>
+        <div class="step-arrow" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </div>
+        <div class="step">
+          <div class="step-h"><span class="step-dot step-alert"></span>ALERT</div>
+          <p>Quorum met → post to chat with the rule up top, recovery on the way back.</p>
+        </div>
+      </div>
+      <div class="term">
+        <div class="term-bar">
+          <span class="b" style="background:#E5675B"></span>
+          <span class="b" style="background:#E0A23B"></span>
+          <span class="b" style="background:#2E9E73"></span>
+          <span class="title">dtk run --select api_error_rate</span>
+        </div>
+        <div class="body" set:html={logHtml}></div>
       </div>
     </section>
 

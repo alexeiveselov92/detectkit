@@ -160,7 +160,7 @@ for detailed explanations and recipes.
 | `smoothing_alpha` | float | `0.3` | EMA factor, 0 < alpha ≤ 1 |
 | `smoothing_window` | int | `10` | SMA window in points |
 | `window_weights` | str/null | `null` | `null` (uniform), `"exponential"` or `"linear"` recency weighting |
-| `half_life` | int/str/null | `null` | Exponential half-life: int points or duration string (`"3d"`, `"12h"`). Default when unset: `window_size / 20` |
+| `half_life` | int/str/null | `null` | Exponential half-life: int points or duration string (`"3d"`, `"12h"`). Default when unset: `max(window_size / 20, min_samples / 2)` |
 | `weight_decay` | float/null | `null` | **Deprecated** alias for `half_life` (per-point multiplier in (0, 1)); mutually exclusive with `half_life` |
 | `detrend` | str/null | `null` | `null` or `"linear"` — robust in-window detrending |
 

@@ -67,16 +67,18 @@ class TestSinglePointBatchWithDurationHalfLife:
 
 
 class TestAlgorithmVersionInDetectorId:
-    def test_windowed_detectors_carry_v2_tag(self):
-        """The σ-scaling/percentile-convention change must produce different
-        detector IDs than v1 so old detections recompute instead of mixing."""
+    def test_windowed_detectors_carry_version_tag(self):
+        """Algorithm changes (v2: σ-scaling/percentile convention; v3: default
+        half_life floored at min_samples/2) must produce different detector IDs
+        than earlier versions so old detections recompute instead of mixing."""
         det = MADDetector()
-        assert det.ALGORITHM_VERSION == 2
+        assert det.ALGORITHM_VERSION == 3
         # v1 hash had no version tag — reproduce it and ensure inequality
         import hashlib
 
         v1_hash = hashlib.sha256(b"MADDetector[]").hexdigest()[:16]
-        assert det.get_detector_id() != v1_hash
+        v2_hash = hashlib.sha256(b"MADDetector@v2[]").hexdigest()[:16]
+        assert det.get_detector_id() not in (v1_hash, v2_hash)
 
 
 class TestSeverityConvention:

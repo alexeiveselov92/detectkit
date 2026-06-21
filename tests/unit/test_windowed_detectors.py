@@ -160,6 +160,27 @@ class TestRecencyWeighting:
             np.log(0.5) / np.log(0.95)
         )
 
+    @pytest.mark.parametrize("cls", ALL_DETECTORS)
+    def test_default_half_life_floored_at_min_samples(self, cls):
+        """An unset half_life resolves to max(window/20, min_samples/2, 1):
+        window/20 alone (5 pts on the default 100-pt window) is more
+        aggressive than the legacy weight_decay=0.95 default it replaced, so
+        the min_samples/2 floor keeps the effective sample size at parity."""
+        ts = make_data(trending_series(n=200))["timestamp"]
+
+        # Default window: window/20 = 5 but min_samples/2 = 15 wins.
+        det = cls(window_size=100, min_samples=30, window_weights="exponential")
+        assert det._resolve_half_life_points(ts) == pytest.approx(15.0)
+
+        # Large trending window: window/20 (432 pts ≈ "3d") dominates the
+        # floor (150), so the documented trending recipe is preserved.
+        big = cls(window_size=8640, min_samples=300, window_weights="exponential")
+        assert big._resolve_half_life_points(ts) == pytest.approx(432.0)
+
+        # An explicit half_life is never overridden by the floor.
+        explicit = cls(window_size=100, min_samples=30, window_weights="exponential", half_life=3)
+        assert explicit._resolve_half_life_points(ts) == pytest.approx(3.0)
+
     def test_weights_are_age_based_not_position_based(self):
         """A NaN gap must not compress the decay: the weight of a point
         depends on how long ago it was, not on how many valid points sit

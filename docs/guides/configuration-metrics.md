@@ -248,7 +248,7 @@ detectors:
       window_weights: null        # null (uniform) | exponential | linear
       half_life: null             # for exponential weights: age at which a point's
                                   # weight halves; int = points or duration string ("3d")
-                                  # (default when unset: window_size / 20)
+                                  # (default when unset: max(window_size / 20, min_samples / 2))
       detrend: null               # null | linear (robust in-window detrending)
 
       # Execution parameters (not part of the detector ID)

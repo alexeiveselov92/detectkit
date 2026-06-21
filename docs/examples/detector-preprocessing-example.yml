@@ -37,7 +37,7 @@
 # half_life: int (points) | duration string ("3d", "12h") | null
 #   For exponential weights: the age at which a point's weight halves.
 #   Duration strings are converted via the metric's data grid step.
-#   Default when unset: window_size / 20.
+#   Default when unset: max(window_size / 20, min_samples / 2).
 #   (weight_decay is a deprecated alias: decay 0.95 ~ half_life 13.5 points;
 #   mutually exclusive with half_life.)
 #

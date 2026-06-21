@@ -5,6 +5,30 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-06-21
+
+### Changed
+- **Default `half_life` is now floored at `min_samples / 2`** (windowed
+  detectors: mad/zscore/iqr). When `window_weights: exponential` is set with
+  `half_life` unset, the default was `window_size / 20` unconditionally. On the
+  default 100-point window that resolved to `5` points — an effective (Kish)
+  sample size of ~14, **more aggressive** than the legacy `weight_decay=0.95`
+  default (~13.5 points, ESS ~38) that this very feature was redesigned to
+  avoid. The default is now `max(window_size / 20, min_samples / 2, 1)`:
+  - It keeps the `window/20` adaptation horizon the large-window trending recipe
+    is tuned for (window `8640` → `432` points ≈ `"3d"`).
+  - On small/default windows the `min_samples / 2` floor keeps the effective
+    weighted sample size at parity with the raw `min_samples` gate (window `100`,
+    `min_samples=30` → `15` points, ESS ~42), instead of silently honoring only
+    half of it.
+  - Only affects detectors that set `window_weights: exponential` **and** leave
+    `half_life` unset; an explicit `half_life` (or `weight_decay`) is unchanged.
+- **`ALGORITHM_VERSION` of the windowed detectors bumped to v3.** Because the
+  resolved default changes the confidence bounds for the same config, the
+  detector IDs change so affected detections recompute cleanly under the new id
+  rather than mixing two regimes in `_dtk_detections` (same mechanism as the
+  v1→v2 bump). Detections for all windowed detectors recompute on the next run.
+
 ## [0.17.0] - 2026-06-21
 
 ### Added

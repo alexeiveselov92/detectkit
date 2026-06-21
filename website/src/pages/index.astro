@@ -7,12 +7,16 @@ import '../styles/landing.css';
 
 const repo = 'https://github.com/alexeiveselov92/detectkit';
 const pypi = 'https://pypi.org/project/detectkit/';
+const pypiStats = 'https://pypistats.org/packages/detectkit';
 const docsHref = '/overview/';
 const startHref = '/getting-started/installation/';
 
 // ---- live social proof, fetched at build time. No fake fallbacks: if a source
 // is unreachable the stat is simply omitted, so the hero never shows a made-up
-// number. Re-fetched on every build/deploy. ----
+// number. Re-fetched on every build/deploy. The PyPI figure is pypistats'
+// trailing-30-day download count (mirror-excluded) — raw PyPI *downloads*
+// (CI/bots included, as with every download badge), not distinct installs, so
+// it's labelled "downloads/mo" and links to the source for verification. ----
 const fmtCompact = (n: unknown): string | null => {
   if (typeof n !== 'number' || !isFinite(n) || n < 0) return null;
   if (n < 1000) return String(n);
@@ -33,10 +37,10 @@ const fetchJson = async (url: string): Promise<any> => {
 const ghData = await fetchJson('https://api.github.com/repos/alexeiveselov92/detectkit');
 const pypiData = await fetchJson('https://pypistats.org/api/packages/detectkit/recent');
 const starsLabel = fmtCompact(ghData?.stargazers_count);
-const installsLabel = fmtCompact(pypiData?.data?.last_month);
+const downloadsLabel = fmtCompact(pypiData?.data?.last_month);
 const heroStats = [
   starsLabel ? { kind: 'stars', label: starsLabel } : null,
-  installsLabel ? { kind: 'installs', label: installsLabel } : null,
+  downloadsLabel ? { kind: 'downloads', label: downloadsLabel } : null,
   { kind: 'license', label: '' },
 ].filter((s): s is { kind: string; label: string } => s !== null);
 
@@ -600,10 +604,10 @@ const dxExplainer = (() => {
                     <strong>{s.label}</strong> {s.label === '1' ? 'star' : 'stars'}
                   </a>
                 )}
-                {s.kind === 'installs' && (
-                  <span class="hs-item">
-                    <strong>{s.label}</strong> installs/mo
-                  </span>
+                {s.kind === 'downloads' && (
+                  <a class="hs-item hs-link" href={pypiStats}>
+                    <strong>{s.label}</strong> downloads/mo
+                  </a>
                 )}
                 {s.kind === 'license' && <span class="hs-item">MIT licensed</span>}
               </Fragment>

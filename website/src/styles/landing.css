@@ -810,99 +810,6 @@
   }
 }
 
-/* ---------- feature strip ---------- */
-.features {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  overflow: hidden;
-  background: var(--surface);
-}
-.feature {
-  padding: 28px 30px;
-  border-right: 1px solid var(--border);
-}
-.feature:last-child {
-  border-right: none;
-}
-.feature .tag {
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--clay);
-  margin-bottom: 10px;
-}
-.feature h3 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 6px;
-}
-.feature p {
-  font-size: 14px;
-  color: var(--muted);
-  line-height: 1.5;
-  margin: 0;
-}
-/* feature card visuals — a small dark tile per card. The detectors tile is a
-   grid "corridor of normal" (band + the point that steps outside), not a chart. */
-.feat-ico {
-  height: 60px;
-  border-radius: 10px;
-  background: var(--term-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  margin-bottom: 18px;
-  overflow: hidden;
-  position: relative;
-}
-.feat-ico-query {
-  font-family: var(--mono);
-  font-size: 13px;
-}
-.feat-ico-query .fq-a {
-  color: #9fb8c4;
-}
-.feat-ico-query .fq-b {
-  color: #7bc9a6;
-}
-.feat-ico-query svg {
-  stroke: var(--clay);
-}
-.feat-ico-grid {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-  background-size: 16px 16px;
-}
-.feat-ico-grid .fd-band {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 18px;
-  background: color-mix(in srgb, var(--clay) 15%, transparent);
-  border-top: 1.2px dashed color-mix(in srgb, var(--clay) 55%, transparent);
-  border-bottom: 1.2px dashed color-mix(in srgb, var(--clay) 55%, transparent);
-}
-.feat-ico-grid .fd-dot {
-  position: absolute;
-  left: 74%;
-  top: 22%;
-  transform: translate(-50%, -50%);
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--st-anomaly);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--st-anomaly) 22%, transparent);
-}
-.feat-ico-ch svg {
-  width: 22px;
-  height: 22px;
-}
-
 /* ---------- works-with databases (brand logos) ---------- */
 .db-strip {
   display: flex;
@@ -2113,16 +2020,6 @@
   }
   .hero .cta-row .btn {
     text-align: center;
-  }
-  .features {
-    grid-template-columns: 1fr;
-  }
-  .feature {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-  .feature:last-child {
-    border-bottom: none;
   }
   .footer-grid {
     grid-template-columns: 1fr 1fr;

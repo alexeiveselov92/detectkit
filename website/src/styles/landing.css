@@ -377,8 +377,11 @@
 }
 .hero-svg .hc-halo {
   fill: var(--st-anomaly);
-  transform-origin: 450px 58px;
+  /* fill-box makes transform-origin relative to the dot's own 12×12 box, so it
+     must be `center` — a user-space coord here scales the ring from far off the
+     element and the halo appears to fly away instead of pulsing on the dot. */
   transform-box: fill-box;
+  transform-origin: center;
   animation: heroRing 1.9s ease-out 1.6s infinite both;
 }
 .hero-svg .hc-anom {

@@ -638,18 +638,34 @@ const dxExplainer = (() => {
             />
             <circle class="hc-halo" cx="450" cy="58" r="6" />
             <circle class="hc-anom" cx="450" cy="58" r="6" />
+            <!-- recovery: first point back inside the corridor (480,168) — pops
+                 in once the line has drawn past it, just before the green card -->
+            <circle class="hc-rec" cx="480" cy="168" r="5.5" />
           </svg>
           <div class="hero-legend">
             <span><i class="dx-sw dx-sw-line"></i>metric</span>
             <span><i class="dx-sw dx-sw-band"></i>expected range</span>
             <span><i class="dx-sw dx-sw-anom"></i>anomaly</span>
+            <span><i class="dx-sw dx-sw-rec"></i>recovery</span>
           </div>
         </div>
-        <div class="hero-alert">
-          <Logo size={30} />
-          <div class="ha-body">
-            <div class="ha-title"><span class="ha-dot"></span>Anomaly · api_error_rate</div>
-            <div class="ha-sub">value 4.2 · expected ≤ 1.1 → Slack</div>
+        <!-- two notifications, arriving like real Slack messages: the anomaly
+             fires first, the recovery clears it a beat later. Both stay on
+             screen so the looping hero tells the whole story at a glance. -->
+        <div class="hero-alerts">
+          <div class="hero-alert ha-anomaly">
+            <Logo size={30} />
+            <div class="ha-body">
+              <div class="ha-title"><span class="ha-dot"></span>Anomaly · api_error_rate</div>
+              <div class="ha-sub">value 4.2 · expected ≤ 1.1 → Slack</div>
+            </div>
+          </div>
+          <div class="hero-alert ha-recovery">
+            <Logo size={30} />
+            <div class="ha-body">
+              <div class="ha-title"><span class="ha-dot ha-dot-rec"></span>Recovered · api_error_rate</div>
+              <div class="ha-sub">value 1.0 · back within range → Slack</div>
+            </div>
           </div>
         </div>
       </div>

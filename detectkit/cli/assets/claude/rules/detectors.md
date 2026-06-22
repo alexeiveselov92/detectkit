@@ -25,6 +25,10 @@ Quick decision: known bounds → `manual_bounds`; seasonal → `mad` with
 `seasonality_components`; normal & clean → `zscore`; skewed/heavy-tailed →
 `mad` or `iqr`; unsure → `mad`.
 
+To choose and tune the detector automatically from the data (and labeled
+incidents), use `dtk autotune` — it runs this same decision tree per seasonality
+group plus a hyperparameter search. See `autotune.md`.
+
 You can combine detectors — e.g. a `manual_bounds` hard cap plus a `mad`
 pattern detector. The alerting `min_detectors` quorum then decides how many
 must agree (see `alerting.md`).

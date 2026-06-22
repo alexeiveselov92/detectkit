@@ -13,6 +13,11 @@ detectkit provides several detector types for anomaly detection:
 | [IQR](../reference/detectors/iqr.md) | Skewed distributions, outliers | High | Yes | Fast |
 | [Manual Bounds](../reference/detectors/manual_bounds.md) | Known thresholds, SLAs | N/A | No | Fastest |
 
+> **Don't want to choose by hand?** `dtk autotune` can pick the detector type,
+> hyperparameters and seasonality grouping for you from the metric's data (and
+> labeled incidents, if you have them), then write a ready-to-run, annotated
+> config. See [Auto-tuning a Detector](autotuning.md).
+
 ## Decision Tree
 
 ### 1. Do you know the acceptable bounds?

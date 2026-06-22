@@ -10,6 +10,7 @@ The `dtk` CLI provides dbt-like commands for managing metric monitoring:
 dtk init <project>              # Initialize new project
 dtk init-claude                 # Set up Claude Code context for this folder
 dtk run --select <selector>     # Run metric pipeline
+dtk autotune --select <sel>     # Auto-configure a metric's detector from data
 dtk test-alert <metric>         # Test alert channels
 dtk unlock --select <selector>  # Clear a stuck pipeline lock
 dtk clean --select <selector>   # Prune data that no longer matches configs
@@ -541,6 +542,124 @@ Processing metric: cpu_usage
 
 On failure the tree ends with a red `✗ Failed: …` line instead of
 `✓ Pipeline completed successfully`.
+
+---
+
+### `dtk autotune`
+
+Automatically configure a metric's detector from its data — and, if you supply
+them, from labeled incidents. Searches detector type × hyperparameters ×
+seasonality grouping × history window (× alert window, when supervised),
+cross-validates each candidate with walk-forward folds, and writes a **new,
+annotated** metric YAML. It is a separate pipeline from `load → detect → alert`:
+it never edits the original config and never sends alerts.
+
+#### Syntax
+
+```bash
+dtk autotune --select <selector> [OPTIONS]
+```
+
+#### Options
+
+##### `--select`, `-s` (required)
+
+Metric selector — same semantics as [`dtk run`](#dtk-run) (metric name, path
+pattern, or `tag:<name>`). Tuning reads the metric's **already-loaded**
+`_dtk_datapoints`; if it has none yet, load it first (optionally backfill more
+history, which tunes better):
+
+```bash
+dtk run --select api_error_rate --steps load --from "2026-01-01"
+```
+
+##### `--incidents` (optional)
+
+Path to a labels file of known incidents → **supervised** tuning. Without it
+(and without an `autotune.labels_file` in the metric config), tuning falls back
+to an **unsupervised** objective (low false-positive rate + stable cross-fold
+separation). The file is YAML or JSON, all times UTC, each incident an interval
+(`{start, end}`) or a point (`{at}`):
+
+```yaml
+metric: api_error_rate          # optional; must match the metric being tuned
+timezone: UTC                   # optional; interprets the naive times below
+incidents:
+  - {start: "2026-05-02 14:00:00", end: "2026-05-02 16:30:00"}
+  - {at: "2026-05-11 09:05:00"}
+```
+
+```bash
+dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml
+```
+
+##### `--label` (flag)
+
+Emit a self-contained HTML chart of the metric's series so you can mark incidents
+visually; it exports a labels file in the format above. **Generate-and-exit** —
+no DB writes, no search.
+
+```bash
+dtk autotune --select api_error_rate --label
+```
+
+##### `--scoring` (default: `mcc`)
+
+The metric the search maximizes across folds: `mcc` (default), `f1`, `f_beta`,
+`balanced_accuracy`, `roc_auc`, `pr_auc`. MCC uses the whole confusion matrix and
+suits rare anomalies.
+
+```bash
+dtk autotune --select api_error_rate \
+  --incidents incidents/api_error_rate.yml \
+  --scoring f_beta
+```
+
+##### `--from` (optional)
+
+Lower bound of the training window (`YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`, UTC).
+
+##### `--to` (optional)
+
+Upper bound of the training window (`YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`, UTC).
+
+##### `--profile` (optional)
+
+Override the default profile from the project config.
+
+##### `--force` (flag)
+
+Ignore an existing task lock and run anyway (same lock semantics as
+[`dtk run --force`](#-force-flag)).
+
+##### `--dry-run` (flag)
+
+Run the search but **persist nothing** — no config, no detections, no
+`_dtk_autotune_runs` row. Previews what autotune would choose.
+
+#### Behavior
+
+On success (without `--dry-run`), one run:
+
+- writes `metrics/<name>__tuned_<id>.yml` — a normal, ready-to-run config led by
+  a `#` comment header explaining every decision (training period, labels,
+  seasonality rationale, detector votes, grid-search winner + CV score +
+  per-fold scores, window choice). The `<id>` is a deterministic hash of the run.
+- records one row in the `_dtk_autotune_runs` audit table;
+- persists the winning detector's detections to `_dtk_detections`;
+- prunes the superseded winners from prior autotune runs of the same metric.
+
+The tuned config is an ordinary metric. **Hand-editing its detector changes the
+`detector_id`**, orphaning the old detections — recompute and prune:
+
+```bash
+dtk run --select <name>__tuned_<id> --steps detect --full-refresh
+dtk clean --select <name>__tuned_<id> --execute
+```
+
+See the [Auto-tuning guide](../guides/autotuning.md) and the
+[Auto-tune reference](autotune.md) for the labels schema, the `autotune:` config
+block, the scoring-metrics catalog, and the `_dtk_autotune_runs` columns.
 
 ---
 
@@ -1079,5 +1198,7 @@ clickhouse-client --host=<host> --port=<port>
 
 - [Configuration Guide](../guides/configuration.md) - Configure metrics
 - [Detectors Guide](../guides/detectors.md) - Configure detectors
+- [Auto-tuning Guide](../guides/autotuning.md) - Auto-configure a detector with `dtk autotune`
+- [Auto-tune Reference](autotune.md) - `dtk autotune` flags, labels schema, scoring metrics
 - [Alerting Guide](../guides/alerting.md) - Configure alerts
 - [Quickstart Guide](../getting-started/quickstart.md) - Getting started tutorial

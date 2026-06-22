@@ -5,6 +5,47 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-06-22
+
+### Added
+- **`dtk autotune` — automatic detector configuration.** A new pipeline that,
+  given a metric's loaded datapoints (and optionally labeled incidents),
+  automatically chooses the seasonality grouping, detector type,
+  hyperparameters and history window, cross-validates the choice, and writes a
+  ready-to-run, fully annotated config named `<metric>__tuned_<id>`. The comment
+  header walks every decision (seasonality, detector votes, grid-search winner +
+  CV score, window). It reads `_dtk_datapoints`, never edits the original config
+  and never sends alerts.
+  - **Seasonality** is greedily searched over the metric's columns; the
+    **detector type** is chosen by a distribution decision tree that votes per
+    seasonality group (Gaussian → `zscore`, heavy-tailed/outliers → `mad`,
+    skewed → `iqr`); **hyperparameters** come from a bounded coordinate grid
+    search; the **history window** prefers more context on near-ties.
+  - **Supervised** tuning scores against a labels file (`--incidents`, YAML/JSON
+    of incident intervals/points); with no labels it falls back to an
+    **unsupervised** objective (low false-positive rate + cross-fold stability).
+    Cross-validation is automatic walk-forward folds — no split ratios to set.
+  - **Scoring metric** defaults to **MCC** (uses the whole confusion matrix,
+    robust to rare anomalies); configurable via `--scoring`
+    (`f1`/`f_beta`/`balanced_accuracy`/`roc_auc`/`pr_auc`).
+  - **`--label`** emits a self-contained HTML chart to mark incidents visually
+    and export a labels file. **`--dry-run`** searches without writing anything.
+- **`_dtk_autotune_runs` internal table.** One row per autotune run (inputs +
+  outputs: training period, labels, scoring metric, chosen seasonality/detector/
+  params, CV score, decision log, generated config). An audit trail — created by
+  `ensure_tables()`, never read by the pipeline and never pruned by
+  `dtk clean --orphaned-metrics`.
+- **Optional `autotune:` block on a metric config.** Lets experts constrain the
+  search (restrict detector types / seasonality columns, pin hyperparameters,
+  set the scoring metric, point at a labels file, cap history/folds). Fully
+  optional — absent means fully automatic.
+- **`dtk init-claude` ships a `dtk-autotune` skill + `autotune.md` rule.** The
+  skill drives the whole flow conversationally — seasonality interview, writing
+  the labels file from the user's words, running `dtk autotune`, presenting the
+  annotated result, and generating a per-backend DB query to inspect the tuned
+  detector's behavior — including the "build a working alert from a request"
+  hand-off to `dtk-new-metric`.
+
 ## [0.18.0] - 2026-06-21
 
 ### Changed

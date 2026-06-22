@@ -281,6 +281,148 @@ class TablesConfig(BaseModel):
     detections: str | None = Field(default=None, description="Custom detections table name")
 
 
+# Detector types the autotune engine can select between (statistical, windowed).
+# ``manual_bounds`` is excluded — it needs domain thresholds, not tuning.
+_AUTOTUNE_DETECTOR_TYPES = {"mad", "zscore", "iqr"}
+# Scoring metrics the grid search can optimize. MCC is the default.
+_AUTOTUNE_SCORING_METRICS = {
+    "mcc",
+    "f1",
+    "f_beta",
+    "balanced_accuracy",
+    "roc_auc",
+    "pr_auc",
+}
+# Seasonality columns the search may consider (mirrors MetricConfig).
+_AUTOTUNE_SEASONALITY_COLUMNS = {
+    "hour",
+    "day_of_week",
+    "day_of_month",
+    "month",
+    "is_weekend",
+    "is_holiday",
+}
+
+
+class AutoTuneConfig(BaseModel):
+    """
+    Optional per-metric auto-tuning constraints (for ``dtk autotune``).
+
+    The block is entirely optional: when absent, ``dtk autotune`` tunes the
+    metric fully automatically. Experts use it to narrow the search — restrict
+    the candidate detectors, pin some hyperparameters, point at a labels file,
+    or change the scoring metric.
+
+    Example YAML:
+        ```yaml
+        autotune:
+          enabled: true
+          detector_types: [mad, zscore]   # restrict candidates
+          scoring_metric: mcc              # optimization target
+          beta: 1.0                        # only for scoring_metric: f_beta
+          labels_file: incidents/orders.yml
+          seasonality_candidates: [hour, day_of_week]
+          fixed_params:                    # pinned, not searched
+            window_size: 4320
+          folds: 5
+          max_history: 50000               # cap training points
+        ```
+    """
+
+    enabled: bool = Field(default=True, description="Set false to refuse autotuning this metric")
+    detector_types: list[str] | None = Field(
+        default=None, description="Restrict candidate detector types (subset of mad/zscore/iqr)"
+    )
+    scoring_metric: str | None = Field(
+        default=None,
+        description="Optimization target: mcc (default), f1, f_beta, balanced_accuracy, "
+        "roc_auc, pr_auc",
+    )
+    beta: float = Field(
+        default=1.0, description="Beta for scoring_metric: f_beta (recall weight); >0"
+    )
+    labels_file: str | None = Field(
+        default=None, description="Project-relative path to a canonical labels file"
+    )
+    seasonality_candidates: list[str] | None = Field(
+        default=None, description="Restrict the seasonality columns the search may use"
+    )
+    fixed_params: dict[str, Any] = Field(
+        default_factory=dict, description="Hyperparameters pinned across the whole search"
+    )
+    folds: int = Field(default=5, description="Cross-validation folds")
+    max_history: int | None = Field(
+        default=None, description="Cap on training points used during the search"
+    )
+
+    @field_validator("detector_types")
+    @classmethod
+    def validate_detector_types(cls, v: list[str] | None) -> list[str] | None:
+        """Restrict to detector types the engine can actually tune."""
+        if v is None:
+            return v
+        if not v:
+            raise ValueError("detector_types cannot be empty (omit it to allow all)")
+        bad = [t for t in v if t not in _AUTOTUNE_DETECTOR_TYPES]
+        if bad:
+            raise ValueError(
+                f"Invalid autotune detector_types: {bad}. "
+                f"Allowed: {', '.join(sorted(_AUTOTUNE_DETECTOR_TYPES))}"
+            )
+        return v
+
+    @field_validator("scoring_metric")
+    @classmethod
+    def validate_scoring_metric(cls, v: str | None) -> str | None:
+        """Validate the optimization target."""
+        if v is None:
+            return v
+        if v not in _AUTOTUNE_SCORING_METRICS:
+            raise ValueError(
+                f"Invalid scoring_metric: '{v}'. "
+                f"Allowed: {', '.join(sorted(_AUTOTUNE_SCORING_METRICS))}"
+            )
+        return v
+
+    @field_validator("beta")
+    @classmethod
+    def validate_beta(cls, v: float) -> float:
+        """Beta must be positive (only meaningful for f_beta)."""
+        if v <= 0:
+            raise ValueError("beta must be positive")
+        return v
+
+    @field_validator("seasonality_candidates")
+    @classmethod
+    def validate_seasonality_candidates(cls, v: list[str] | None) -> list[str] | None:
+        """Restrict to the same allowed columns as MetricConfig.seasonality_columns."""
+        if v is None:
+            return v
+        bad = [c for c in v if c not in _AUTOTUNE_SEASONALITY_COLUMNS]
+        if bad:
+            raise ValueError(
+                f"Invalid autotune seasonality_candidates: {bad}. "
+                f"Allowed: {', '.join(sorted(_AUTOTUNE_SEASONALITY_COLUMNS))}"
+            )
+        return v
+
+    @field_validator("folds")
+    @classmethod
+    def validate_folds(cls, v: int) -> int:
+        """Need at least 2 folds for cross-validation."""
+        if v < 2:
+            raise ValueError("folds must be at least 2")
+        return v
+
+    @field_validator("max_history")
+    @classmethod
+    def validate_max_history(cls, v: int | None) -> int | None:
+        """A history cap, if set, must be positive."""
+        if v is not None and v < 1:
+            raise ValueError("max_history must be at least 1")
+        return v
+
+
 class MetricConfig(BaseModel):
     """
     Configuration for a single metric.
@@ -382,6 +524,9 @@ class MetricConfig(BaseModel):
 
     tables: TablesConfig | None = Field(
         default=None, description="Custom table names (overrides defaults)"
+    )
+    autotune: AutoTuneConfig | None = Field(
+        default=None, description="Optional auto-tuning constraints (for `dtk autotune`)"
     )
     enabled: bool = Field(default=True, description="Whether metric is enabled")
 

@@ -82,6 +82,11 @@ detectkit/
 ├── orchestration/
 │   ├── task_manager/            # TaskManager: run-level lock + _load/_detect/_alert steps
 │   └── error_dispatch.py        # project-level error alert (shared by CLI + TaskManager)
+├── autotune/                    # `dtk autotune` engine (separate from load/detect/alert)
+│   ├── autotuner.py             # AutoTuner facade + run_autotune_engine + alert-window sweep
+│   ├── labels.py / scoring.py / distribution.py / crossval.py   # ground truth, metrics, CV
+│   ├── seasonality_search.py / detector_select.py / grid_search.py / window_select.py  # stages
+│   └── result.py / config_emitter.py / html_labeler.py / settings.py / _types.py / _base.py
 └── utils/                       # datetime, json (sorted/orjson), env interpolation, stats
 ```
 
@@ -165,6 +170,14 @@ keyed by `metric_name`, so removing a metric's YAML leaves orphan rows that
 - **`_dtk_metrics`** — **informational only** (for dashboards; does not affect
   logic). Mirrors each metric's config (interval, loading params, alert settings,
   tags, enabled). Rewritten every run via DELETE+INSERT. Engine `MergeTree`.
+- **`_dtk_autotune_runs`** — one row per `dtk autotune` run (audit trail; does
+  **not** affect logic). Inputs + outputs of the whole tuning pipeline: training
+  period, `labels_json`, `mode`, `scoring_metric`, `score`,
+  `chosen_seasonality_json`, `chosen_detector_type`/`chosen_detector_params_json`,
+  `winning_detector_id`, `candidate_detector_ids_json`, `decision_log_json`,
+  `generated_config_text`, `status`. PK `(metric_name, run_id)`, engine
+  `ReplacingMergeTree(created_at)`. Deliberately excluded from
+  `dtk clean --orphaned-metrics` (`_maintenance.METRIC_KEYED_TABLES`).
 
 Dedup strategy: PRIMARY KEY + `INSERT IGNORE` semantics. For datapoints /
 detections / alert-states this is reinforced by `ReplacingMergeTree`, which
@@ -348,6 +361,48 @@ own runbook, `false` → hide). `resolve_alert_help_url()` resolves it; the
 orchestrator (and the error-dispatch path) stamps the result onto
 `AlertData.help_url`. Unlike `dashboard_url`/`links`, it is a project-level
 constant rather than per-`AlertConfig`.
+
+## Auto-tuning (`dtk autotune`)
+
+`detectkit/autotune/` is a **separate offline pipeline** from load/detect/alert,
+invoked by `dtk autotune --select <metric>` (`cli/commands/autotune.py`). Given a
+metric's already-loaded `_dtk_datapoints` (and optional labeled incidents), it
+chooses the best detector configuration and emits an annotated tuned config; it
+never edits the original metric and never alerts.
+
+The engine is **pure and DB-free** — it operates on the in-memory `data` dict and
+reuses `WindowedStatDetector`/`DetectorFactory`/`detector_id` unchanged. The
+command loads data, threads it into `run_autotune_engine(...)`, then persists the
+run, emits the config, persists the winner's detections, and prunes superseded
+prior winners. Stages (`AutoTuner.tune()`), each appending to a decision log:
+
+1. **Seasonality search** (`seasonality_search.py`) — greedy over the metric's
+   seasonality columns (single-add or merge-into-last to form conjunctive
+   groups), scored with a cheap MAD probe; rejects groupings that would
+   under-fill a group.
+2. **Detector selection** (`detector_select.py`) — a distribution suitability
+   spec **keyed by detector type name** (kept here, NOT on the detector classes,
+   so detectors stay untouched and the feature is easy to remove) votes per
+   seasonality group; quorum + the global winner form the candidate shortlist.
+3. **Grid search** (`grid_search.py`) — bounded coordinate sweep (threshold →
+   recency weighting → detrend, gated by a trend test → window size) maximizing
+   the cross-validated score.
+4. **Window selection** (`window_select.py`) — window grid in natural seasonal
+   units; on near-ties prefers the **larger** window ("more history is better").
+   Supervised runs also sweep `consecutive_anomalies` for the alert window.
+5. **Cross-validation + scoring** (`crossval.py`, `scoring.py`) — walk-forward
+   expanding-window folds; because the windowed detector is causal, `detect()`
+   runs **once** per candidate and each fold is scored by slicing the results (no
+   leakage, no per-fold recompute). Metrics are pure numpy (MCC default, plus
+   `f_beta`/`balanced_accuracy`/`roc_auc`/`pr_auc`); no labels → an unsupervised
+   objective (low flag-rate + cross-fold stability). No scipy/sklearn dependency.
+
+`config_emitter.py` builds `metrics/<name>__tuned_<id>.yml` (deterministic
+`run_id`) with a `#`-comment header rendering the decision log, validated through
+`MetricConfig` before write. An optional `MetricConfig.autotune` block
+(`config/metric_config.py`) constrains the search; resolved into `TuneSettings`
+by the command. `dtk autotune` takes the same pipeline lock as `dtk run` (so the
+two are mutually exclusive and `dtk unlock` clears a stuck autotune lock).
 
 ## Idempotency & locking
 

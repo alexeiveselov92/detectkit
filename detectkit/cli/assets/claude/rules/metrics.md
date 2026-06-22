@@ -94,7 +94,8 @@ Two ways to provide seasonality keys that detectors group by:
 
 A detector references these names in `seasonality_components` (see
 `detectors.md`). Built-in `seasonality_columns` only accepts the names above;
-custom names must come from the query.
+custom names must come from the query. `dtk autotune` searches subsets of these
+columns and bakes the best grouping into the tuned config (see `autotune.md`).
 
 ## Initial load and batching
 

@@ -19,6 +19,7 @@ detectkit/
 │   ├── detectors/        # Anomaly detectors (statistical/ + factory)
 │   ├── alerting/         # Alert orchestration + channels
 │   ├── orchestration/    # Task management & load→detect→alert pipeline
+│   ├── autotune/         # `dtk autotune` engine (seasonality/detector/grid search)
 │   └── utils/            # Numpy/stats helpers, env interpolation
 ├── tests/                # Unit (numpy/mock) + integration (testcontainers)
 └── docs/                 # User-facing docs (guides, reference, examples)
@@ -120,6 +121,29 @@ Every parameter that changes detection output is hashed into the detector ID,
 so reusing `WindowedStatDetector` gets you correct identity/recompute behavior
 automatically — do not add per-detector params that bypass the hash.
 
+For `dtk autotune` to consider the new detector, add a one-line entry to the
+suitability spec in `detectkit/autotune/detector_select.py`
+(`detector_suitability(type, features)`) and, if its hyperparameters differ, a
+threshold grid / axis in `grid_search.py`. The spec is keyed by type name (not
+on the detector class) on purpose, so the detector stays autotune-agnostic; an
+unlisted type just gets a neutral suitability.
+
+### Add a scoring metric
+
+Autotune optimizes a binary-classification metric chosen via
+`--scoring` / the `autotune:` block. To add one:
+
+1. Implement it as a pure-numpy function in `detectkit/autotune/scoring.py`
+   (binary metrics take `(y_true, y_pred)`; ranking metrics take
+   `(y_true, y_score)`). **No scipy/sklearn** — the engine has no such runtime
+   dependency.
+2. Add the name to `ScoringMetric` (`detectkit/autotune/_types.py`) and a branch
+   in `score_predictions()`.
+3. Add the name to `_AUTOTUNE_SCORING_METRICS` in
+   `detectkit/config/metric_config.py` so the `autotune.scoring_metric` validator
+   accepts it.
+4. Add unit tests under `tests/unit/test_autotune_scoring.py`.
+
 ### Add an alert channel
 
 Channels live in `detectkit/alerting/channels/`. The base class
@@ -166,7 +190,10 @@ pick accents with `status_color(alert_data)` so status reads from color.
    records the version — users are told to re-run after upgrading, so stale
    assets surface directly in their assistant. The command lives in
    `detectkit/cli/commands/init_claude.py` (tests:
-   `tests/unit/test_init_claude.py`).
+   `tests/unit/test_init_claude.py`). Adding a new shipped rule or skill (e.g.
+   `rules/autotune.md`, `skills/dtk-autotune/`) also means extending
+   `test_init_claude.py` — `RULE_FILES` is matched as an **exact set** and each
+   skill is asserted present.
 5. **Run the gate** — `python3 -m pytest tests/unit` and
    `pre-commit run --all-files` must pass.
 6. **Build & publish** the wheel/sdist.

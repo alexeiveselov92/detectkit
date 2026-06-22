@@ -58,6 +58,10 @@ EOF
 dtk run --select cpu_usage
 ```
 
+> **Not sure which detector or threshold to use?** After loading some history,
+> let `dtk autotune` pick the detector type, hyperparameters and seasonality for
+> you — see [Auto-tuning](guides/autotuning.md).
+
 ## Documentation Structure
 
 ### Getting Started
@@ -67,12 +71,14 @@ dtk run --select cpu_usage
 ### Guides
 - **[Configuration](guides/configuration.md)** - Complete configuration reference
 - **[Detectors](guides/detectors.md)** - Choosing and configuring detectors
+- **[Auto-tuning](guides/autotuning.md)** - Let `dtk autotune` pick the detector, params and seasonality for you
 - **[Alerting](guides/alerting.md)** - Setting up alerts and notifications
 - **[Reading an alert](guides/reading-alerts.md)** - For stakeholders who receive alerts: what they mean and what to do
 - **[Visualizing results](guides/visualizing-results.md)** - Build dashboards/charts on the `_dtk_*` tables in any BI tool
 
 ### Reference
 - **[CLI Reference](reference/cli.md)** - Command-line interface documentation
+- **[Auto-tune Reference](reference/autotune.md)** - `dtk autotune` flags, labels schema, `autotune:` block, scoring metrics
 - **[Detectors](reference/detectors/)** - Detector-specific documentation
   - [MAD Detector](reference/detectors/mad.md)
   - [Z-Score Detector](reference/detectors/zscore.md)

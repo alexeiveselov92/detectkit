@@ -72,6 +72,10 @@ Pick with the user (see `detectors.md` for the decision table):
 - **Clean & normally distributed** → `zscore`. **Skewed / percentiles** → `iqr`.
 - **Unsure** → `mad` (robust default), `threshold: 3.0`.
 
+If you don't yet know the right detector or parameters, scaffold a robust starter
+(`mad`, `threshold: 3.0`) and let the **`dtk-autotune`** skill pick the detector
+and tune it on real data / labeled incidents after this metric loads.
+
 Set `window_size` to fit the data cadence (non-seasonal 100–500 points; seasonal
 several full cycles) and `min_samples` ≈ 10–30% of it. For a metric with a
 gradual trend, add `window_weights: exponential` + `half_life` (and optionally
@@ -159,4 +163,6 @@ dtk run --select <name> --steps detect    # confirm the detector runs
 dtk test-alert <name>                      # confirm channels work (if alerting)
 ```
 
-Report the created file path and the commands to run it for real.
+Report the created file path and the commands to run it for real. If the user
+wants the detector chosen or tuned automatically (rather than the starter
+config), hand off to the **`dtk-autotune`** skill now.

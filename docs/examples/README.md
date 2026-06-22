@@ -32,6 +32,10 @@ This directory contains practical examples for common monitoring scenarios.
 - **[Recovery Notifications Example](recovery-notification-example.yml)** - "All clear" messages when metric stabilizes
 - **[Detector Preprocessing Example](detector-preprocessing-example.yml)** - input_type, smoothing, window weighting, detrending
 
+### Auto-tuning
+- **[Auto-tune Incidents Example](autotune-incidents-example.yml)** - A labels file (intervals + points) for supervised `dtk autotune`
+- **[Auto-tuned Metric Example](autotuned-metric-example.yml)** - A metric with an `autotune:` block constraining the search
+
 ---
 
 ## Example 1: CPU Usage Monitoring

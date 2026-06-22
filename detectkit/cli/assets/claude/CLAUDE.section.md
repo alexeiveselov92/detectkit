@@ -25,6 +25,7 @@ version — **read the relevant one on demand** instead of guessing:
 | A metric YAML: query, interval, seasonality, loading | `.claude/rules/detectkit/metrics.md` |
 | Choosing/tuning detectors, preprocessing, trends, seasonality | `.claude/rules/detectkit/detectors.md` |
 | Alert rules (quorum/direction/consecutive), cooldown, recovery, templates | `.claude/rules/detectkit/alerting.md` |
+| Auto-tuning a detector (`dtk autotune`), labels file, the `autotune:` block, `_dtk_autotune_runs` | `.claude/rules/detectkit/autotune.md` |
 
 ### Skills
 
@@ -34,6 +35,9 @@ version — **read the relevant one on demand** instead of guessing:
   channel.
 - **A new metric** — use the **`dtk-new-metric`** skill; it walks the config out
   to a YAML file that validates and is ready to run.
+- **Tune / pick a detector, or build an alert from scratch and tune it** — use
+  the **`dtk-autotune`** skill; it gathers seasonality + incidents, runs
+  `dtk autotune`, and explains the chosen, annotated config.
 - **Hit a detectkit bug, or have feedback** — once you've ruled out a local
   config fix (see the gotchas below), use the **`dtk-feedback`** skill to file a
   redacted bug report, feature request, or comment as a GitHub issue on the

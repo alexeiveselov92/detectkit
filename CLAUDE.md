@@ -29,5 +29,9 @@ rendered on the docs site under **For developers**). Read the relevant one:
 - Keep the library **detector-agnostic** (new statistical detectors reuse
   `WindowedStatDetector`) and use the **generic** database manager
   (`insert_batch(table_name=...)`, never hardcoded per-table logic).
+- **Auto-tuning** lives in `detectkit/autotune/` (the `dtk autotune` command,
+  separate from load/detect/alert), records each run in the `_dtk_autotune_runs`
+  internal table, and ships a `dtk-autotune` skill + `autotune.md` rule — keep
+  those in sync on release.
 
 Repo: https://github.com/alexeiveselov92/detectkit

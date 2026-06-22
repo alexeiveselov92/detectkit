@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from detectkit.database.internal_tables._alert_states import _AlertStatesMixin
+from detectkit.database.internal_tables._autotune_runs import _AutotuneRunsMixin
 from detectkit.database.internal_tables._datapoints import _DatapointsMixin
 from detectkit.database.internal_tables._detections import _DetectionsMixin
 from detectkit.database.internal_tables._maintenance import _MaintenanceMixin
@@ -18,6 +19,7 @@ class InternalTablesManager(
     _TasksMixin,
     _MetricsMixin,
     _AlertStatesMixin,
+    _AutotuneRunsMixin,
     _MaintenanceMixin,
 ):
     """High-level façade over a :class:`BaseDatabaseManager` for ``_dtk_*`` tables.

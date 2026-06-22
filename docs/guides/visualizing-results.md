@@ -88,6 +88,20 @@ One row per **(metric, alert config block)** tracking cooldown / recovery state:
 `metric_name` + `alert_config_id`. Useful for an "alert activity" panel. Reads
 should use `FINAL` to collapse `ReplacingMergeTree` versions (ClickHouse).
 
+### `_dtk_autotune_runs` — auto-tune audit trail
+
+One row per [`dtk autotune`](../reference/cli.md#dtk-autotune) run, keyed by
+`metric_name` + `run_id`. It records what the search chose — `mode`,
+`scoring_metric`, `score`, `chosen_detector_type`, `chosen_detector_params_json`,
+`winning_detector_id`, the decision log, and the full generated config text. It
+is an **audit trail only**: the `load → detect → alert` pipeline never reads it,
+and `dtk clean --orphaned-metrics` never prunes it. The most common use is to
+pull a run's `winning_detector_id`, then chart that detector's rows in
+`_dtk_detections` (see [the recipes below](#chart-recipes) and
+[Reading the tuned detector's results](../guides/autotuning.md#see-how-it-behaves)).
+The full column list is in the
+[Auto-tune reference](../reference/autotune.md#_dtk_autotune_runs-table).
+
 ## Connecting a BI tool
 
 1. Add a database connection pointing at your **`internal_database`** (the
@@ -410,6 +424,8 @@ inflates anomaly counts. Pick the detector you want from the listing query in
   [IQR](../reference/detectors/iqr.md),
   [Manual Bounds](../reference/detectors/manual_bounds.md)
 - [Alerting guide](alerting.md) — the alert rule that interprets these detections
+- [Auto-tuning guide](autotuning.md) — inspecting the detector `dtk autotune`
+  chose (uses these same recipes with the run's `winning_detector_id`)
 - [Profiles configuration](configuration-profiles.md) — where the
   `internal_database` lives
 - [CLI reference](../reference/cli.md) — running the pipeline that fills these

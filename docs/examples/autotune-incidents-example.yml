@@ -1,0 +1,49 @@
+# Example: Incidents (labels) file for supervised `dtk autotune`
+#
+# Hand this file to autotune with:
+#   dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml
+#
+# It tells autotune WHICH points were real incidents, so it can pick the
+# detector, threshold, seasonality and alert window that catch them while
+# keeping false positives down. Without labels, autotune falls back to an
+# unsupervised objective (low false-positive rate + stable cross-fold
+# separation).
+#
+# Format notes:
+# - YAML or JSON (this is YAML; the same keys work as JSON).
+# - ALL times are UTC. The optional `timezone:` below interprets the naive
+#   timestamps if your incidents are recorded in a local zone.
+# - Each incident is EITHER an interval ({start, end}) for a sustained
+#   incident OR a point ({at}) for a single spike — never both keys.
+# - `end` is inclusive of the grid points it covers.
+# - `label` is optional free text and is only documentation.
+#
+# Tip: can't enumerate incidents from memory? Run
+#   dtk autotune --select api_error_rate --label
+# to get a clickable HTML chart of the series; mark incidents visually and it
+# exports a labels file in exactly this shape.
+
+# Optional: the metric these labels belong to. If present, it MUST match the
+# `name:` of the metric you tune — autotune refuses a mismatch.
+metric: api_error_rate
+
+# Optional: timezone used to interpret the naive timestamps below.
+# Defaults to UTC. Set it if your incident log is in a local zone.
+timezone: UTC
+
+incidents:
+  # --- Interval incidents (sustained problems) -----------------------------
+  - start: "2026-05-02 14:00:00"
+    end:   "2026-05-02 16:30:00"
+    label: payment-gateway outage     # errors elevated for ~2.5h
+
+  - start: "2026-05-09 03:00:00"
+    end:   "2026-05-09 03:40:00"
+    label: nightly batch job overran
+
+  # --- Point incidents (single anomalous timestamps) -----------------------
+  - at: "2026-05-11 09:05:00"
+    label: deploy spike                # one-off error burst right after a deploy
+
+  - at: "2026-05-18 21:15:00"
+    label: dependency timeout          # single bad interval, recovered next tick

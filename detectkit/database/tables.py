@@ -229,12 +229,82 @@ def get_metrics_table_model() -> TableModel:
     )
 
 
+def get_autotune_runs_table_model() -> TableModel:
+    """
+    Get TableModel for _dtk_autotune_runs table.
+
+    Records one row per ``dtk autotune`` run: the inputs (training period,
+    labels, scoring metric, mode) and the outputs (chosen seasonality,
+    detector type + params, CV score, decision log, candidate detector ids,
+    the generated config) of the whole tuning pipeline. This is an audit
+    trail — informational, never read by the load/detect/alert logic — so it
+    is deliberately NOT pruned by ``dtk clean --orphaned-metrics``.
+
+    Schema:
+        - metric_name: Metric the run tuned
+        - run_id: Deterministic short id (hash of the run inputs/outputs)
+        - created_at: When the run completed (UTC, millisecond precision)
+        - training_period_start/end: Training span bounds (nullable)
+        - interval_seconds: Metric interval in seconds
+        - labels_json: Canonical incident labels (JSON)
+        - mode: "supervised" | "unsupervised"
+        - scoring_metric: Optimization target (e.g. "mcc")
+        - score: Cross-validated score of the winner (nullable)
+        - chosen_seasonality_json: Chosen seasonality_components (JSON)
+        - chosen_detector_type: Winning detector type (nullable on failure)
+        - chosen_detector_params_json: Winning detector params (JSON)
+        - winning_detector_id: Hash of the winning detector (nullable)
+        - candidate_detector_ids_json: All evaluated detector ids (JSON)
+        - decision_log_json: Ordered human-readable rationale entries (JSON)
+        - generated_config_path: Path of the emitted tuned config (nullable)
+        - generated_config_text: Full text of the emitted tuned config
+        - status: "success" | "failed"
+        - error_message: Error detail when failed (nullable)
+
+    Primary Key: (metric_name, run_id)
+    Engine: ReplacingMergeTree(created_at)
+    """
+    return TableModel(
+        columns=[
+            ColumnDefinition("metric_name", "String"),
+            ColumnDefinition("run_id", "String"),
+            ColumnDefinition("created_at", "DateTime64(3, 'UTC')"),
+            ColumnDefinition(
+                "training_period_start", "Nullable(DateTime64(3, 'UTC'))", nullable=True
+            ),
+            ColumnDefinition(
+                "training_period_end", "Nullable(DateTime64(3, 'UTC'))", nullable=True
+            ),
+            ColumnDefinition("interval_seconds", "Int32"),
+            ColumnDefinition("labels_json", "String"),
+            ColumnDefinition("mode", "String"),
+            ColumnDefinition("scoring_metric", "String"),
+            ColumnDefinition("score", "Nullable(Float64)", nullable=True),
+            ColumnDefinition("chosen_seasonality_json", "String"),
+            ColumnDefinition("chosen_detector_type", "Nullable(String)", nullable=True),
+            ColumnDefinition("chosen_detector_params_json", "String"),
+            ColumnDefinition("winning_detector_id", "Nullable(String)", nullable=True),
+            ColumnDefinition("candidate_detector_ids_json", "String"),
+            ColumnDefinition("decision_log_json", "String"),
+            ColumnDefinition("generated_config_path", "Nullable(String)", nullable=True),
+            ColumnDefinition("generated_config_text", "String"),
+            ColumnDefinition("status", "String"),
+            ColumnDefinition("error_message", "Nullable(String)", nullable=True),
+        ],
+        primary_key=["metric_name", "run_id"],
+        engine="ReplacingMergeTree(created_at)",
+        order_by=["metric_name", "run_id"],
+        version_column="created_at",
+    )
+
+
 # Table names as constants
 TABLE_DATAPOINTS = "_dtk_datapoints"
 TABLE_DETECTIONS = "_dtk_detections"
 TABLE_TASKS = "_dtk_tasks"
 TABLE_METRICS = "_dtk_metrics"
 TABLE_ALERT_STATES = "_dtk_alert_states"
+TABLE_AUTOTUNE_RUNS = "_dtk_autotune_runs"
 
 # Map of table names to model factories
 INTERNAL_TABLES = {
@@ -243,4 +313,5 @@ INTERNAL_TABLES = {
     TABLE_TASKS: get_tasks_table_model,
     TABLE_METRICS: get_metrics_table_model,
     TABLE_ALERT_STATES: get_alert_states_table_model,
+    TABLE_AUTOTUNE_RUNS: get_autotune_runs_table_model,
 }

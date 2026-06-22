@@ -1,0 +1,102 @@
+# Example: A metric with an `autotune:` block (+ a chosen detector)
+#
+# This shows two things side by side:
+#   1. The optional `autotune:` block that CONSTRAINS `dtk autotune`'s search.
+#   2. A normal detector + alerting config to run in the meantime.
+#
+# `dtk autotune` never edits this file. It reads the metric's already-loaded
+# datapoints, searches for the best configuration (within the constraints in
+# the `autotune:` block), and writes a NEW annotated file:
+#   metrics/api_error_rate__tuned_<id>.yml
+# whose comment header explains every decision. You then review and run that.
+#
+# Workflow:
+#   dtk run --select api_error_rate --steps load --from "2026-01-01"   # load history
+#   dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml
+#   # ...read metrics/api_error_rate__tuned_<id>.yml, then:
+#   dtk run --select api_error_rate__tuned_<id>
+#
+# The `autotune:` block is entirely OPTIONAL. Omit it to "tune everything
+# automatically". Command-line flags win over the block (--scoring over
+# scoring_metric, --incidents over labels_file).
+
+name: api_error_rate
+description: 5xx error rate, monitored and auto-tuned
+interval: "5min"
+
+query: |
+  SELECT
+    toStartOfFiveMinutes(timestamp) AS timestamp,
+    countIf(status_code >= 500) / count() AS value
+  FROM http_requests
+  WHERE timestamp >= '{{ dtk_start_time }}'
+    AND timestamp < '{{ dtk_end_time }}'
+  GROUP BY timestamp
+  ORDER BY timestamp
+
+# Built-in seasonality features extracted from the timestamp.
+# (Add query-provided columns via query_columns.seasonality for custom signals
+# like league_day or deploy_day.)
+seasonality_columns:
+  - hour
+  - day_of_week
+
+# ---------------------------------------------------------------------------
+# AUTOTUNE: constrain the search (all fields optional)
+# ---------------------------------------------------------------------------
+autotune:
+  enabled: true
+
+  # Only consider these detector candidates (subset of mad / zscore / iqr).
+  # Omit to let the distribution decision tree shortlist them automatically.
+  detector_types: [mad, zscore]
+
+  # Default optimization target. MCC (default) uses the whole confusion matrix
+  # and suits rare anomalies. Overridden by `dtk autotune --scoring ...`.
+  scoring_metric: mcc
+
+  # Only used when scoring_metric is f_beta (beta > 1 favors recall).
+  beta: 1.0
+
+  # Default labels file for supervised tuning. Overridden by --incidents.
+  labels_file: incidents/api_error_rate.yml
+
+  # Restrict the seasonality dimensions the search may group on.
+  seasonality_candidates: [hour, day_of_week]
+
+  # Pin specific hyperparameters — these are EXCLUDED from the search.
+  fixed_params: {window_size: 4320}   # 15 days of 5-min points
+
+  # Number of walk-forward (expanding-window) cross-validation folds.
+  folds: 5
+
+  # Cap on training points (protects very long histories).
+  max_history: 50000
+
+# ---------------------------------------------------------------------------
+# A working detector + alert to run while you tune (autotune writes its own
+# chosen detector into the generated __tuned_<id> file; this one is yours).
+# ---------------------------------------------------------------------------
+detectors:
+  - type: mad
+    params:
+      threshold: 3.0
+      window_size: 4320       # 15 days of 5-min points
+      min_samples: 200
+      seasonality_components:
+        - "hour"
+
+alerting:
+  enabled: true
+  channels:
+    - slack_ops
+  min_detectors: 1
+  direction: "up"             # only alert when errors rise
+  consecutive_anomalies: 3
+  alert_cooldown: "30min"
+  notify_on_recovery: true
+
+tags:
+  - api
+  - critical
+  - autotune

@@ -190,6 +190,104 @@ def run(
 
 
 @cli.command()
+@click.option(
+    "--select",
+    "-s",
+    help="Selector for metrics to tune (metric name, path, or tag)",
+    required=True,
+)
+@click.option(
+    "--incidents",
+    "incidents_path",
+    type=click.Path(),
+    help="Canonical labels file marking real incidents (enables supervised tuning)",
+)
+@click.option(
+    "--label",
+    is_flag=True,
+    help="Emit a self-contained HTML labeler for the series and exit",
+)
+@click.option(
+    "--scoring",
+    "scoring_override",
+    help="Optimization target: mcc (default), f1, f_beta, balanced_accuracy, roc_auc, pr_auc",
+)
+@click.option(
+    "--from",
+    "from_date",
+    help="Training span start (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)",
+)
+@click.option(
+    "--to",
+    "to_date",
+    help="Training span end (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)",
+)
+@click.option(
+    "--profile",
+    help="Profile to use (default: from project config)",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Ignore the pipeline lock (use with caution)",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Run the search but persist nothing and write no config",
+)
+def autotune(
+    select: str,
+    incidents_path: str,
+    label: bool,
+    scoring_override: str,
+    from_date: str,
+    to_date: str,
+    profile: str,
+    force: bool,
+    dry_run: bool,
+):
+    """
+    Automatically configure a metric's anomaly detector.
+
+    Loads the metric's datapoints and (optionally) labeled incidents, then
+    searches seasonality, detector type, hyperparameters and history window —
+    cross-validating each choice — and writes a ready-to-run, fully annotated
+    tuned config named <metric>__tuned_<id>. Each run is recorded in
+    _dtk_autotune_runs.
+
+    Mark real incidents for supervised tuning via --incidents (a labels file);
+    without it, tuning falls back to an unsupervised objective.
+
+    Examples:
+        # Supervised tuning against labeled incidents
+        dtk autotune --select checkout_errors --incidents incidents/checkout.yml
+
+        # Unsupervised (no labels)
+        dtk autotune --select checkout_errors
+
+        # Emit an HTML labeler to mark incidents visually
+        dtk autotune --select checkout_errors --label
+
+        # Search only, change nothing
+        dtk autotune --select checkout_errors --dry-run
+    """
+    from detectkit.cli.commands.autotune import run_autotune
+
+    run_autotune(
+        select=select,
+        incidents_path=incidents_path,
+        label=label,
+        scoring_override=scoring_override,
+        from_date=from_date,
+        to_date=to_date,
+        profile=profile,
+        force=force,
+        dry_run=dry_run,
+    )
+
+
+@cli.command()
 @click.argument("metric_name")
 @click.option(
     "--profile",

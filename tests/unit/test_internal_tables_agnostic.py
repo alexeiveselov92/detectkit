@@ -154,6 +154,30 @@ def test_every_mixin_method_is_backend_agnostic():
     it.check_lock("cpu", "load", "load")
     it.release_lock("cpu", "load", "load", status="completed")
 
+    # autotune runs
+    it.save_autotune_run(
+        metric_name="cpu",
+        run_id="r1",
+        training_period_start=now,
+        training_period_end=now,
+        interval_seconds=60,
+        labels={"intervals": [], "points": []},
+        mode="supervised",
+        scoring_metric="mcc",
+        score=0.5,
+        chosen_seasonality=["hour"],
+        chosen_detector_type="mad",
+        chosen_detector_params={"threshold": 3.0},
+        winning_detector_id="d1",
+        candidate_detector_ids=["d1", "d2"],
+        decision_log=[],
+        generated_config_path="metrics/cpu__tuned_ab12cd.yml",
+        generated_config_text="name: cpu__tuned_ab12cd\n",
+        status="success",
+    )
+    it.get_autotune_runs("cpu")
+    it.get_last_autotune_run("cpu")
+
     # maintenance
     it.list_known_metric_names()
     it.count_metric_rows("cpu")

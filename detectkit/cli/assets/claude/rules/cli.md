@@ -10,6 +10,7 @@ Run all commands from a project directory (the one containing
 | `dtk init <name>` | Scaffold a new project directory |
 | `dtk init-claude` | (Re)generate this Claude context (CLAUDE.md + `.claude/rules/detectkit/` + skills) |
 | `dtk run --select <sel>` | Run the load → detect → alert pipeline |
+| `dtk autotune --select <sel>` | Auto-configure a metric's detector (see `autotune.md`) |
 | `dtk test-alert <metric>` | Send a mock alert to the metric's channels |
 | `dtk unlock --select <sel>` | Clear a stuck pipeline lock |
 | `dtk clean --select <sel>` | Prune internal data that no longer matches the config |
@@ -50,6 +51,15 @@ dtk run --select <sel> [--steps load,detect,alert] [--from DATE] [--to DATE] \
 - `--force` — ignore a held lock and run anyway (also releases it on exit).
   Risky with concurrent runs; usually `dtk unlock` is the better recovery.
 - `--profile` — override the project's default profile (e.g. run against staging).
+
+## `dtk autotune --select <sel>`
+
+Automatically chooses a metric's seasonality, detector type, hyperparameters and
+history window, then writes an annotated `metrics/<name>__tuned_<id>.yml`. Reads
+the metric's loaded datapoints (run `dtk run --steps load` first if empty), never
+edits the original, never alerts. `--incidents FILE` enables supervised tuning
+against labeled incidents; without it, an unsupervised objective is used.
+`--dry-run` searches without writing. Full reference: `autotune.md`.
 
 ## `dtk test-alert <metric>`
 

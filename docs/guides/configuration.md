@@ -1,4 +1,4 @@
-# Configuration Guide
+# Configuration
 
 This guide explains all configuration options in detectkit.
 

@@ -1,4 +1,4 @@
-# Quickstart Guide
+# Quickstart
 
 This guide will walk you through creating your first detectkit project and monitoring a metric.
 

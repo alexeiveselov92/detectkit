@@ -97,6 +97,7 @@ export default defineConfig({
               // Renamed from "Detectors" to disambiguate from the Guides > Detectors page.
               label: 'Detector reference',
               items: [
+                { label: 'Shared parameters', link: '/reference/detectors/shared-parameters/' },
                 { label: 'MAD', link: '/reference/detectors/mad/' },
                 { label: 'Z-Score', link: '/reference/detectors/zscore/' },
                 { label: 'IQR', link: '/reference/detectors/iqr/' },

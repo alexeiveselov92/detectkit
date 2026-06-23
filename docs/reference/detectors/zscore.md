@@ -110,59 +110,22 @@ Groups below this threshold fall back to global statistics.
 
 ### Shared Parameters (Preprocessing, Weighting, Detrending)
 
-These parameters are shared by MAD, Z-Score and IQR and behave identically.
-See the [Detectors Guide](../../guides/detectors.md#advanced-detector-features)
-for detailed explanations and recipes.
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `input_type` | str | `"values"` | `"values"`, `"changes"`, `"absolute_changes"` or `"log_changes"` |
-| `smoothing` | str/null | `null` | `null`, `"ema"` or `"sma"` — applied before `input_type` |
-| `smoothing_alpha` | float | `0.3` | EMA factor, 0 < alpha ≤ 1 |
-| `smoothing_window` | int | `10` | SMA window in points |
-| `window_weights` | str/null | `null` | `null` (uniform), `"exponential"` or `"linear"` recency weighting |
-| `half_life` | int/str/null | `null` | Exponential half-life: int points or duration string (`"3d"`, `"12h"`). Default when unset: `max(window_size / 20, min_samples / 2)` |
-| `weight_decay` | float/null | `null` | **Deprecated** alias for `half_life` (per-point multiplier in (0, 1)); mutually exclusive with `half_life` |
-| `detrend` | str/null | `null` | `null` or `"linear"` — robust in-window detrending |
+`input_type`, `smoothing`, `window_weights` / `half_life`, and `detrend` behave
+identically across MAD, Z-Score and IQR. See
+[Shared Detector Parameters](shared-parameters.md) for the full reference,
+defaults, and tuning recipes.
 
 ### Execution Parameters
 
-Execution parameters control how detection runs; they don't affect results
-and are **not** part of the detector ID hash.
-
-#### `start_time` (string, optional)
-Start detecting anomalies from this timestamp. Data before is used only for building history.
-
-**Format**: `"YYYY-MM-DD HH:MM:SS"`
-
-**Example:**
-```yaml
-detectors:
-  - type: zscore
-    params:
-      threshold: 3.0
-      window_size: 288
-      start_time: "2024-03-01 00:00:00"  # Start detection after 2 days
-```
-
-#### `batch_size` (int, optional)
-Number of points to process per batch. Useful for large datasets.
-
-**Example:**
-```yaml
-detectors:
-  - type: zscore
-    params:
-      batch_size: 1440  # Process 10 days at a time (10-min intervals)
-```
+`start_time` and `batch_size` control how detection runs without affecting
+results (they are not part of the detector ID). See
+[Shared Detector Parameters → Execution Parameters](shared-parameters.md#execution-parameters).
 
 ### Detector Identity
 
 All result-affecting parameters (everything except `start_time` and
-`batch_size`) are hashed into the `detector_id` (non-default values only).
-Changing any of them creates a new detector ID and detections are recomputed
-from scratch on the next run; old rows stay under the previous ID
-(`--full-refresh` purges them).
+`batch_size`) are hashed into the `detector_id`. See
+[Shared Detector Parameters → Detector Identity and Recomputation](shared-parameters.md#detector-identity-and-recomputation).
 
 ## Configuration Examples
 

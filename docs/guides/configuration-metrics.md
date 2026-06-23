@@ -256,13 +256,12 @@ detectors:
       batch_size: 500                     # detection batch size
 ```
 
-Notes:
-- MAD is scaled by the normal-consistency constant (1.4826), so `threshold` is expressed in σ-equivalents for all three detectors; `threshold: 3.0` ≈ 3-sigma.
-- Every algorithm parameter (non-default values) participates in the detector ID hash. Changing one creates a new detector ID, and detections for that detector recompute from scratch on the next run.
-- `weight_decay` (float in (0, 1)) is a deprecated alias for `half_life`; the two are mutually exclusive.
-- Parameters are validated when the detector is constructed at the start of the detect step — invalid `input_type`, `smoothing`, `window_weights`, `detrend` or `half_life` values fail fast for that run with a clear error (not at config load).
+Parameter semantics — the σ-equivalent `threshold` scaling (MAD is scaled by
+1.4826), detector-identity hashing, the deprecated `weight_decay` alias, and
+fail-fast validation timing — are documented once in
+[Shared Detector Parameters](../reference/detectors/shared-parameters.md).
 
-See [Detectors Guide](detectors.md) for detailed detector documentation.
+See the [Detectors Guide](detectors.md) for choosing and tuning a detector.
 
 ### Alerting
 

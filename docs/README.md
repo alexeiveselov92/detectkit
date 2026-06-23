@@ -81,6 +81,7 @@ dtk run --select cpu_usage
 - **[Auto-tune Reference](reference/autotune.md)** - `dtk autotune` flags, labels schema, `autotune:` block, scoring metrics
 - **[Internal Tables](reference/internal-tables.md)** - Schema of the `_dtk_*` tables (columns, primary keys, engines)
 - **[Detectors](reference/detectors/)** - Detector-specific documentation
+  - [Shared Parameters](reference/detectors/shared-parameters.md) — preprocessing, weighting, detrending, identity (MAD/Z-Score/IQR)
   - [MAD Detector](reference/detectors/mad.md)
   - [Z-Score Detector](reference/detectors/zscore.md)
   - [IQR Detector](reference/detectors/iqr.md)
@@ -212,7 +213,7 @@ for the per-backend breakdown.
       │
       ▼
    ┌──────────────────────────────────────────────────┐
-   │  Internal tables (ClickHouse)                    │
+   │  Internal _dtk_* tables                          │
    │    _dtk_datapoints   loaded points               │
    │    _dtk_detections   detection results           │
    │    _dtk_tasks        run / lock state            │

@@ -79,7 +79,7 @@ The `detection_metadata` JSON commonly carries:
   `trend_slope_per_point` (when `detrend: linear` is on), `preprocessing`,
   `window_size`, and `global_*` / `adjusted_*` window statistics.
 
-See the [Detectors guide](../guides/detectors.md#debugging-preprocessed-detections)
+See [Shared Detector Parameters](detectors/shared-parameters.md#debugging-preprocessed-detections)
 for the full metadata contract.
 
 ## `_dtk_tasks` — pipeline locks & resume state
@@ -174,7 +174,7 @@ Every pipeline stage also resumes from the last persisted timestamp, so re-runni
 ## See also
 
 - [Visualizing Results](../guides/visualizing-results.md) — SQL recipes that chart these tables.
-- [Detectors guide](../guides/detectors.md#debugging-preprocessed-detections) — the full `detection_metadata` contract.
+- [Shared Detector Parameters](detectors/shared-parameters.md#debugging-preprocessed-detections) — the full `detection_metadata` contract.
 - [Profiles configuration](../guides/configuration-profiles.md) — where `internal_database` / `internal_schema` is set.
 - [Auto-tune reference](autotune.md#_dtk_autotune_runs-table) — the full `_dtk_autotune_runs` schema.
 - For the internals (DDL in `tables.py`, dedup mechanics, maintenance) see the [Architecture](../../.claude/rules/architecture.md) reference.

@@ -48,7 +48,7 @@ metric with two detectors writes two rows per timestamp (see
 `detection_metadata` JSON carries the per-point `severity` / `direction` /
 `reason` detail — see
 [Internal Tables → detection_metadata](../reference/internal-tables.md#the-detection_metadata-json)
-and the [Detectors guide](detectors.md#debugging-preprocessed-detections).
+and [Shared Detector Parameters](../reference/detectors/shared-parameters.md#debugging-preprocessed-detections).
 
 ## Connecting a BI tool
 

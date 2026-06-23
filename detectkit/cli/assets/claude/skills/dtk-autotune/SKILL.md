@@ -77,8 +77,10 @@ incidents:
 ```
 
 The same schema works as JSON. If the user can't enumerate incidents, say so and
-go to Step 3 unsupervised — or offer `dtk autotune --select <name> --label` to
-get a clickable HTML chart they mark visually, which exports this exact file.
+go to Step 3 unsupervised — or offer `dtk autotune --select <name> --label`,
+which writes a clickable HTML chart to `metrics/<name>__labeler.html`; they mark
+incidents in a browser and its Export button downloads a labels file in this
+exact format to feed back via `--incidents`.
 
 ## Step 3 — Run autotune
 

@@ -20,8 +20,9 @@
 #
 # Tip: can't enumerate incidents from memory? Run
 #   dtk autotune --select api_error_rate --label
-# to get a clickable HTML chart of the series; mark incidents visually and it
-# exports a labels file in exactly this shape.
+# It writes a clickable HTML chart to metrics/api_error_rate__labeler.html; open
+# it in a browser, mark incidents visually, and its Export button downloads a
+# labels file in exactly this shape.
 
 # Optional: the metric these labels belong to. If present, it MUST match the
 # `name:` of the metric you tune — autotune refuses a mismatch.

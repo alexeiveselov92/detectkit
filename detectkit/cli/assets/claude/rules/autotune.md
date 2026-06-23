@@ -35,9 +35,12 @@ dtk autotune --select <sel> [--incidents FILE] [--label] [--scoring METRIC] \
              [--from DATE] [--to DATE] [--profile NAME] [--force] [--dry-run]
 ```
 
-- `--incidents FILE` — a labels file (below) → **supervised** tuning.
-- `--label` — emit a self-contained HTML chart of the series to mark incidents
-  visually; it exports a labels file. Generate-and-exit (no DB writes).
+- `--incidents FILE` — a labels file (below) → **supervised** tuning. With no
+  labels file, an interactive terminal prompts to enter incidents inline;
+  declining (or running non-interactively) tunes **unsupervised**.
+- `--label` — write a self-contained HTML chart of the series to
+  `metrics/<name>__labeler.html`; the user marks incidents in a browser and its
+  **Export** button downloads a labels file. Generate-and-exit (no DB writes).
 - `--scoring` — `mcc` (default), `f1`, `f_beta`, `balanced_accuracy`, `roc_auc`,
   `pr_auc`. MCC uses the whole confusion matrix and suits rare anomalies.
 - `--dry-run` — run the search but persist nothing and write no config.

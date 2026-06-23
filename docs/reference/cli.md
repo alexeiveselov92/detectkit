@@ -576,10 +576,13 @@ dtk run --select api_error_rate --steps load --from "2026-01-01"
 ##### `--incidents` (optional)
 
 Path to a labels file of known incidents → **supervised** tuning. Without it
-(and without an `autotune.labels_file` in the metric config), tuning falls back
-to an **unsupervised** objective (low false-positive rate + stable cross-fold
-separation). The file is YAML or JSON, all times UTC, each incident an interval
-(`{start, end}`) or a point (`{at}`):
+(and without an `autotune.labels_file` in the metric config), an interactive
+terminal first prompts to enter incidents inline; declining — or running
+non-interactively (cron/CI/piped input) — falls back to an **unsupervised**
+objective (low false-positive rate + stable cross-fold separation). Supervised
+mode engages only if labeled timestamps land on **loaded** grid points. The file
+is YAML or JSON, all times UTC, each incident an interval (`{start, end}`) or a
+point (`{at}`):
 
 ```yaml
 metric: api_error_rate          # optional; must match the metric being tuned
@@ -595,8 +598,10 @@ dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml
 
 ##### `--label` (flag)
 
-Emit a self-contained HTML chart of the metric's series so you can mark incidents
-visually; it exports a labels file in the format above. **Generate-and-exit** —
+Write a self-contained HTML chart of the metric's series to
+`metrics/<metric>__labeler.html` so you can mark incidents visually. Open it in a
+browser, mark each incident, and use its **Export** button to download a labels
+file in the format above — then re-run with `--incidents`. **Generate-and-exit** —
 no DB writes, no search.
 
 ```bash

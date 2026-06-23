@@ -66,6 +66,7 @@ export default defineConfig({
               ],
             },
             { label: 'Detectors', link: '/guides/detectors/' },
+            { label: 'Auto-tuning a detector', link: '/guides/autotuning/' },
             {
               label: 'Alerting',
               items: [
@@ -86,6 +87,7 @@ export default defineConfig({
           label: 'Reference',
           items: [
             { label: 'CLI', link: '/reference/cli/' },
+            { label: 'Auto-tune', link: '/reference/autotune/' },
             {
               label: 'Detectors',
               items: [

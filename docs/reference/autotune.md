@@ -35,9 +35,14 @@ dtk run --select my_metric --steps load   # optionally --from <date> for more hi
 ### `--incidents` (optional)
 
 Path to a [labels file](#labels-file-format) of known incidents → **supervised**
-tuning. Without it (and without an `autotune.labels_file` in the config), tuning
-falls back to the **unsupervised** objective (low false-positive rate + stable
-cross-fold separation).
+tuning. Without it (and without an `autotune.labels_file` in the config), an
+**interactive** terminal first prompts whether to enter incidents inline
+(`No incident labels provided. Enter them now?`); decline — or run
+non-interactively (cron/CI/piped input, no prompt) — and tuning falls back to the
+**unsupervised** objective (low false-positive rate + stable cross-fold
+separation). Supervised mode engages only if labeled timestamps land on **loaded**
+grid points; labels entirely outside the loaded series mark nothing and the run
+proceeds unsupervised.
 
 ```bash
 dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml
@@ -45,8 +50,11 @@ dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml
 
 ### `--label` (flag)
 
-Emit a self-contained HTML chart of the metric's series so you can mark incidents
-visually; it exports a labels file in the format below. **Generate-and-exit** — it
+Write a self-contained HTML chart of the metric's series to
+`metrics/<metric>__labeler.html` so you can mark incidents visually. Open it in a
+browser, click-drag across the chart to mark each incident, and use its
+**Export** button to download a labels file in the [format below](#labels-file-format)
+— then re-run with `--incidents`. **Generate-and-exit** — the command itself
 writes no rows to the database and runs no search.
 
 ```bash
@@ -169,7 +177,7 @@ autotune:
 | `scoring_metric` | string | Default optimization target (see [Scoring metrics](#scoring-metrics)); overridden by `--scoring` |
 | `beta` | float | The β for `scoring_metric: f_beta` (β > 1 favors recall, β < 1 favors precision) |
 | `labels_file` | string | Path to a default [labels file](#labels-file-format); overridden by `--incidents` |
-| `seasonality_candidates` | list | Restrict the seasonality dimensions the search may group on |
+| `seasonality_candidates` | list | Restrict the seasonality dimensions the search may group on — a subset of `hour` / `day_of_week` / `day_of_month` / `month` / `is_weekend` (plus any query-declared columns). `is_holiday` is accepted but never used (the holiday calendar is unimplemented — always `false`) |
 | `fixed_params` | map | Pin specific hyperparameters (they are excluded from the search) |
 | `folds` | int | Number of walk-forward (expanding-window) cross-validation folds |
 | `max_history` | int | Cap on the number of training points used |
@@ -227,25 +235,25 @@ Primary key: `(metric_name, run_id)`.
 | Column | Type | Meaning |
 |---|---|---|
 | `metric_name` | String | Metric identifier |
-| `run_id` | String | Deterministic id of this run (matches the `<id>` in the generated filename) |
+| `run_id` | String | Deterministic id of this run (matches the `<id>` in the generated filename; `failed` for a failed run) |
 | `created_at` | DateTime64(3, UTC) | When the run completed |
-| `training_period_start` | DateTime64(3, UTC) | Start of the data window the search used |
-| `training_period_end` | DateTime64(3, UTC) | End of the data window the search used |
+| `training_period_start` | Nullable(DateTime64(3, UTC)) | Start of the data window the search used (null on a failed run) |
+| `training_period_end` | Nullable(DateTime64(3, UTC)) | End of the data window the search used (null on a failed run) |
 | `interval_seconds` | Int32 | The metric's grid step, in seconds |
 | `labels_json` | String (JSON) | The resolved incident labels (supervised runs) |
 | `mode` | String | `supervised` or `unsupervised` |
 | `scoring_metric` | String | The metric that was maximized |
-| `score` | Float64 | The winning cross-validated score |
+| `score` | Nullable(Float64) | The winning cross-validated score (null on a failed run) |
 | `chosen_seasonality_json` | String (JSON) | The chosen `seasonality_components` grouping |
-| `chosen_detector_type` | String | The chosen detector type (`mad` / `zscore` / `iqr`) |
+| `chosen_detector_type` | Nullable(String) | The chosen detector type (`mad` / `zscore` / `iqr`; null on a failed run) |
 | `chosen_detector_params_json` | String (JSON) | The chosen detector parameters |
-| `winning_detector_id` | String | The `detector_id` of the chosen detector |
+| `winning_detector_id` | Nullable(String) | The `detector_id` of the chosen detector (null on a failed run) |
 | `candidate_detector_ids_json` | String (JSON) | The detector ids evaluated during the search |
 | `decision_log_json` | String (JSON) | The structured decision log behind the annotated header |
-| `generated_config_path` | String | Path of the written tuned config |
+| `generated_config_path` | Nullable(String) | Path of the written tuned config (null on a failed run) |
 | `generated_config_text` | String | Full text of the written tuned config |
-| `status` | String | Run status (e.g. `completed` / `failed`) |
-| `error_message` | String | Failure detail when `status` is not successful |
+| `status` | String | Run status — `success` or `failed` |
+| `error_message` | Nullable(String) | Failure detail when `status` is `failed` (null otherwise) |
 
 Inspect the latest runs for a metric:
 

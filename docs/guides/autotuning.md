@@ -23,8 +23,10 @@ Autotune searches four (or five, when supervised) dimensions and cross-validates
 every choice:
 
 1. **Seasonality** — greedily builds the best `seasonality_components` grouping
-   from the metric's available seasonality columns (the built-ins plus any
-   columns your query declares).
+   from the metric's available seasonality columns: the built-ins
+   (`hour`, `day_of_week`, `day_of_month`, `month`, `is_weekend`) plus any
+   columns your query declares. (`is_holiday` is skipped — the holiday calendar
+   isn't implemented yet, so it is always `false` and carries no signal.)
 2. **Detector type** — a distribution decision tree votes per seasonality group:
    Gaussian / light-tailed → `zscore`; heavy tails or outliers → `mad`; skewed →
    `iqr`. The winners are shortlisted.
@@ -56,6 +58,22 @@ dtk run --select api_error_rate --steps load --from "2026-01-01"
 
 Then tune.
 
+### Restricting the training window (optional)
+
+By default autotune searches **all** loaded datapoints (capped at the most
+recent 50,000 points unless you raise `autotune.max_history`). To tune against a
+specific slice of history — without re-loading — pass `--from` / `--to` to the
+`autotune` command itself (UTC, `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`):
+
+```bash
+# Tune only on spring 2026, even if years of history are loaded
+dtk autotune --select api_error_rate --from "2026-03-01" --to "2026-06-01" \
+  --incidents incidents/api_error_rate.yml
+```
+
+This is useful when an old regime no longer reflects current behavior and you
+want the search to learn only from recent patterns.
+
 ## The Supervised Path (Recommended)
 
 When you can tell autotune *which* points were real incidents, it optimizes
@@ -85,9 +103,11 @@ for a fully commented file, and the [reference](../reference/autotune.md#labels-
 for the complete schema.
 
 > Can't enumerate the incidents from memory? Run
-> `dtk autotune --select api_error_rate --label` to get a self-contained HTML
-> chart of the series; mark the incidents visually and it exports a labels file
-> in exactly this format (it generates and exits, writing nothing to the DB).
+> `dtk autotune --select api_error_rate --label`. It writes a self-contained
+> HTML chart of the series to `metrics/api_error_rate__labeler.html` and exits
+> (it touches no database). Open that file in a browser, click-drag across the
+> chart to mark each real incident, then click **Export** to download a labels
+> file in exactly this format — point `--incidents` at it on the next run.
 
 ### 2. Run it
 
@@ -97,6 +117,47 @@ dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml
 
 Autotune searches, cross-validates against your incidents, and writes
 `metrics/api_error_rate__tuned_<id>.yml`.
+
+### What you'll see
+
+The command streams its search as a stage tree — one block per dimension, then a
+`RESULT` summary — so you can watch the decisions in real time:
+
+```text
+Found 1 metric(s) to tune
+Tuning metric: api_error_rate
+  Config file: metrics/api_error_rate.yml
+  Training span: 26,208 points (interval 300s)
+  Labels: file incidents/api_error_rate.yml
+  ┌─ LABELS
+  │   2 interval(s) + 1 point(s) → supervised mode (31 labeled grid point(s)); scoring=mcc
+  ┌─ SEASONALITY
+  │   chose hour, day_of_week (score 0.41 → 0.58)
+  ┌─ DETECTOR SELECT
+  │   votes — mad:2.0, zscore:1.0; shortlist: mad, zscore
+  ┌─ GRID SEARCH
+  │   mad: best score 0.78 (threshold=3.0, window_size=4320)
+  │   zscore: best score 0.71 (threshold=3.5, window_size=4320)
+  ┌─ WINDOW
+  │   consecutive_anomalies=3 (max mcc=0.78 on labeled incidents)
+  ┌─ RESULT
+  │   Winner: mad(threshold=3.0, window_size=4320)  mcc=0.781
+  │   Seasonality: ['hour', 'day_of_week']  |  CV folds: 0.74 0.79 0.77 0.81 0.80
+  │   Wrote metrics/api_error_rate__tuned_3f9c1a2b.yml  (run_id=3f9c1a2b)
+  │   Evaluated 9 candidate(s); persisted winner, pruned 0 superseded run(s)
+  └─ Re-run with: dtk run --select api_error_rate__tuned_3f9c1a2b
+
+Done. Tuned 1 metric(s), 1 succeeded.
+```
+
+Reading it top to bottom: the **LABELS** line confirms how many of your incidents
+landed on loaded grid points (and whether the run is supervised); **SEASONALITY**
+/ **DETECTOR SELECT** / **GRID SEARCH** / **WINDOW** show each chosen dimension
+with its cross-validated score; **RESULT** names the winning detector, its
+per-fold CV scores, and the file it wrote. An **unsupervised** run looks the same
+minus the `WINDOW` block (no labeled incidents to sweep the alert window against).
+Add `--dry-run` to print this whole tree **without** writing the config, the
+detections, or the audit row — handy to preview what autotune would choose.
 
 ## The Unsupervised Fallback
 
@@ -111,6 +172,19 @@ dtk autotune --select api_error_rate
 This still picks a detector, hyperparameters, seasonality and window; it just
 cannot optimize for *your* notion of an incident. Use it to get a sane starting
 configuration, then refine with labels later.
+
+> **In an interactive terminal**, before falling back, autotune first asks
+> whether you want to enter the incidents now (`No incident labels provided.
+> Enter them now?`) — answer **No** for the unsupervised path above, or type
+> incident windows at the prompt for a quick supervised run without writing a
+> file. In a **non-interactive** context (cron, CI, piped input) there is no
+> prompt: it goes straight to unsupervised.
+>
+> Note also that supervised mode only engages if your labeled incidents actually
+> land on **loaded** datapoints. If every labeled timestamp falls outside the
+> loaded series (e.g. the history wasn't backfilled far enough), no grid point
+> is marked and autotune silently runs unsupervised — load the incident window
+> first (see below).
 
 ## Choosing the Scoring Metric
 

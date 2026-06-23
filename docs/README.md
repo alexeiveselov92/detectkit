@@ -79,6 +79,7 @@ dtk run --select cpu_usage
 ### Reference
 - **[CLI Reference](reference/cli.md)** - Command-line interface documentation
 - **[Auto-tune Reference](reference/autotune.md)** - `dtk autotune` flags, labels schema, `autotune:` block, scoring metrics
+- **[Internal Tables](reference/internal-tables.md)** - Schema of the `_dtk_*` tables (columns, primary keys, engines)
 - **[Detectors](reference/detectors/)** - Detector-specific documentation
   - [MAD Detector](reference/detectors/mad.md)
   - [Z-Score Detector](reference/detectors/zscore.md)

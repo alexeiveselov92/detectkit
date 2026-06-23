@@ -12,7 +12,22 @@ import math
 
 import numpy as np
 
-from detectkit.autotune._types import ScoringMetric
+from detectkit.autotune._types import CVPlan, ScoringMetric
+from detectkit.utils.stats import weighted_mad, weighted_mean, weighted_median, weighted_std
+
+# Unsupervised objective weights (see :func:`unsupervised_objective`). They sum
+# to 1.0 and are deliberately balanced: the *budget* keeps false positives in
+# check, *sharpness* rewards a tight/well-calibrated band (the term the old
+# ratio-only objective lacked), and *separation* rewards isolating genuine
+# extremes. Kept here as named constants rather than user YAML — they are an
+# engine-internal calibration, not a per-metric knob.
+_UNSUP_W_BUDGET = 0.4
+_UNSUP_W_SHARPNESS = 0.3
+_UNSUP_W_SEPARATION = 0.3
+
+# Clip on the standardized squared residual in the seasonality NLL probe, so a
+# single wild held-out point (~>7 sigma) cannot dominate a fold's mean.
+_NLL_Z2_CLIP = 50.0
 
 
 def confusion(y_true: np.ndarray, y_pred: np.ndarray) -> tuple[int, int, int, int]:
@@ -144,13 +159,37 @@ def unsupervised_objective(
     y_pred: np.ndarray,
     y_score: np.ndarray,
     fpr_target: float = 0.01,
+    *,
+    w_budget: float = _UNSUP_W_BUDGET,
+    w_sharpness: float = _UNSUP_W_SHARPNESS,
+    w_separation: float = _UNSUP_W_SEPARATION,
 ) -> float:
-    """No-label objective: reward a low flag rate + clean separation.
+    """No-label objective: a *tight, well-calibrated* band that flags only extremes.
 
-    With no ground truth, every flag is a *potential* false positive, so we
-    reward keeping the flag rate at/under ``fpr_target`` and reward flagged
-    points sitting clearly farther from their band than normal points
-    (so the detector flags genuine extremes, not borderline noise).
+    ``y_score`` is the band-relative distance ``|value - center| / half_width`` —
+    ``<= 1`` for points inside the band (``y_pred`` False), ``> 1`` outside
+    (``y_pred`` True). Three bounded, complementary terms (weights sum to 1):
+
+    - **budget** — keeps the flag rate near/under ``fpr_target``. Smoothly
+      decreasing in the flag rate (``1 / (1 + max(0, (f - t) / t))``): full
+      credit at/under target, *no flat cliff* so there is always gradient back
+      toward fewer flags, and — being one-sided — it never *rewards* flagging
+      below target, so a genuinely clean metric is not pushed to manufacture
+      anomalies.
+    - **sharpness** — the median ``y_score`` of the *normal* points. A tight,
+      well-calibrated band leaves normal points near its edge (``-> 1``); a slack
+      or all-suppress band leaves them near the center (``-> 0``). This is **not**
+      a ratio, so it directly rewards a narrow interval and fixes the old
+      objective's blindness to band width (its ratio-only ``separation`` was
+      scale-invariant, scoring a snug band and a hugely slack one identically).
+    - **separation** — flagged points should sit clearly farther outside the band
+      than normal points (a clean partition; the scale-invariant ratio of
+      medians, retained for its partition-quality signal).
+
+    The all-suppress detector (huge band → no flags, normals near center) now
+    scores only ``w_budget`` (sharpness and separation both collapse to 0),
+    so a tight band that isolates real extremes strictly beats doing nothing —
+    removing the old ``0.6`` all-suppress plateau that made the tuner timid.
     """
     yp = np.asarray(y_pred, dtype=bool)
     ys = np.asarray(y_score, dtype=float)
@@ -159,12 +198,18 @@ def unsupervised_objective(
 
     flag_rate = float(np.mean(yp))
     if fpr_target > 0:
-        fpr_term = 1.0 - min(flag_rate / fpr_target, 1.0)
+        budget = 1.0 / (1.0 + max(0.0, (flag_rate - fpr_target) / fpr_target))
     else:
-        fpr_term = 1.0 if flag_rate == 0.0 else 0.0
+        budget = 1.0 if flag_rate == 0.0 else 0.0
 
     flagged = ys[yp]
     normal = ys[~yp]
+
+    if normal.size == 0:
+        sharpness = 0.0
+    else:
+        sharpness = max(0.0, min(1.0, float(np.median(normal))))
+
     if flagged.size == 0 or normal.size == 0:
         separation = 0.0
     else:
@@ -174,4 +219,112 @@ def unsupervised_objective(
         separation = (med_flagged - med_normal) / denom if denom > 0 else 0.0
         separation = max(0.0, min(1.0, separation))
 
-    return 0.6 * fpr_term + 0.4 * separation
+    return w_budget * budget + w_sharpness * sharpness + w_separation * separation
+
+
+def _center_spread(vals: np.ndarray, wts: np.ndarray, center: str) -> tuple[float, float]:
+    """Robust (or moment) center + spread, matching the detector's stat family."""
+    if center == "mean":
+        c = weighted_mean(vals, wts)
+        s = weighted_std(vals, wts, center=c, ddof=1)
+    else:
+        c = weighted_median(vals, wts)
+        s = 1.4826 * weighted_mad(vals, wts, center=c)
+    return c, s
+
+
+def oof_residual_reduction(
+    values: np.ndarray,
+    weights: np.ndarray,
+    keys: np.ndarray,
+    plan: CVPlan,
+    *,
+    center: str = "median",
+    min_group: int = 10,
+    stability_lambda: float = 0.5,
+    trim: float = 0.10,
+) -> tuple[float, list[float]]:
+    """Held-out fit gain from conditioning on a seasonal grouping.
+
+    A leak-free, walk-forward measure of how much a candidate seasonal grouping
+    improves the band the windowed detector would actually build — which applies
+    seasonality as per-group center/scale ratios on the global statistics
+    (``adjusted = global * group/global``, falling back to global for groups below
+    ``min_group``). Both of the detector's seasonal effects — a per-group
+    **center** shift and, crucially, a per-group **spread** (confidence-interval
+    width) — must be rewarded; a plain residual ratio standardized by each
+    model's own spread cancels them out. So each held-out point is scored by a
+    robustified Gaussian **negative log-likelihood** in units of the global
+    spread:
+
+    - ``nll_global(z)   = 0.5 * z^2``                with ``z = (v - mu0) / s0``,
+    - ``nll_seasonal(z) = 0.5 * ((v - mu_g)/s_g)^2 + log(s_g / s0)``.
+
+    The ``log(s_g/s0)`` term rewards a *tighter* per-group interval and the
+    squared term rewards better centering — so this criterion is band-width
+    aware, mirroring how the detector consumes seasonality. The group falls back
+    to global when unseen/too-sparse in train (exactly the detector's behavior),
+    so an over-fragmented grouping contributes 0 and cannot win mechanically; an
+    overfit group that does not generalize gets a *worse* held-out NLL and is
+    rejected.
+
+    The per-fold gain ``rho = 1 - mean(nll_seasonal) / mean(nll_global)`` (on the
+    inlier points — the most baseline-anomalous ``trim`` fraction is dropped from
+    *both* models so a real outlier cannot flatter either) is aggregated as
+    ``mean(rho) - stability_lambda * std(rho)``. The no-seasonality baseline
+    scores exactly 0, so any positive score is a genuine generalizing improvement.
+
+    Returns ``(score, per_fold_rho)``.
+    """
+    v = np.asarray(values, dtype=float)
+    w = np.asarray(weights, dtype=float)
+    finite_v = v[np.isfinite(v)]
+    eps = 1e-9 * float(np.median(np.abs(finite_v))) + 1e-12 if finite_v.size else 1e-12
+
+    per_fold: list[float] = []
+    for lo, hi in plan.fold_bounds:
+        tr = np.arange(0, lo)
+        ho = np.arange(lo, hi)
+        tr = tr[np.isfinite(v[tr])]
+        ho = ho[np.isfinite(v[ho])]
+        if tr.size < min_group or ho.size == 0:
+            continue
+
+        mu0, s0 = _center_spread(v[tr], w[tr], center)
+        s0 = max(s0, eps)
+
+        # Per-group train stats; only groups with >= min_group points are trusted
+        # (mirrors the detector's per-group fallback to global).
+        group_stats: dict[object, tuple[float, float]] = {}
+        buckets: dict[object, list[int]] = {}
+        for idx in tr.tolist():
+            buckets.setdefault(keys[idx], []).append(idx)
+        for key, idxs in buckets.items():
+            if len(idxs) < min_group:
+                continue
+            arr = np.asarray(idxs, dtype=np.int64)
+            cg, sg = _center_spread(v[arr], w[arr], center)
+            group_stats[key] = (cg, max(sg, eps))
+
+        z = (v[ho] - mu0) / s0
+        nll_0 = 0.5 * np.minimum(z * z, _NLL_Z2_CLIP)
+        nll_g = np.empty(ho.size, dtype=float)
+        for pos, idx in enumerate(ho.tolist()):
+            cg, sg = group_stats.get(keys[idx], (mu0, s0))
+            zg = (v[ho[pos]] - cg) / sg
+            nll_g[pos] = 0.5 * min(zg * zg, _NLL_Z2_CLIP) + math.log(sg / s0)
+
+        # Drop the most baseline-anomalous `trim` fraction from BOTH models so a
+        # genuine outlier can't make either look better; score fit on the bulk.
+        keep = nll_0.size - int(math.floor(trim * nll_0.size))
+        if keep <= 0:
+            keep = nll_0.size
+        inliers = np.argsort(z * z, kind="mergesort")[:keep]
+        mean_nll_0 = float(np.mean(nll_0[inliers]))
+        mean_nll_g = float(np.mean(nll_g[inliers]))
+        per_fold.append(1.0 - mean_nll_g / max(mean_nll_0, eps))
+
+    if not per_fold:
+        return 0.0, []
+    arr = np.asarray(per_fold, dtype=float)
+    return float(np.mean(arr) - stability_lambda * np.std(arr)), per_fold

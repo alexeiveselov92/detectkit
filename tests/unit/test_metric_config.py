@@ -523,3 +523,15 @@ class TestAutoTuneInlineIncidents:
                 incidents=[{"at": "2026-05-11 09:05:00"}],
                 incidents_timezone="Mars/Phobos",
             )
+
+    def test_force_seasonality_valid(self):
+        cfg = AutoTuneConfig(force_seasonality=["hour", ["day_of_week", "hour"]])
+        assert cfg.force_seasonality == ["hour", ["day_of_week", "hour"]]
+
+    def test_force_seasonality_invalid_column_rejected(self):
+        with pytest.raises(ValueError, match="force_seasonality"):
+            AutoTuneConfig(force_seasonality=["not_a_column"])
+
+    def test_force_seasonality_empty_rejected(self):
+        with pytest.raises(ValueError, match="cannot be empty"):
+            AutoTuneConfig(force_seasonality=[])

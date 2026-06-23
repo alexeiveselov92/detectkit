@@ -1,10 +1,12 @@
 """Stage 4: history-window selection.
 
-"More history is better, don't be greedy": evaluate a small grid of window
-sizes expressed in natural seasonal units, and among windows whose score is
-within a tie margin of the best, prefer the *largest* one (more context →
-steadier statistics). Also exposes the trend pre-test that gates the detrend
-toggle in the grid search.
+Evaluate a small grid of window sizes expressed in natural seasonal units, and
+among windows whose score is within a tie margin of the best, break the tie on
+the trend pre-test: when the series is stationary prefer the *largest* window
+(more context → steadier statistics); when a trend / regime shift is present
+prefer the *smallest* (a fresher baseline that tracks the current level rather
+than averaging in stale history). Also exposes the trend pre-test that gates the
+detrend toggle in the grid search.
 """
 
 from __future__ import annotations
@@ -76,5 +78,11 @@ def select_window(
     best_score = max(ev.score for _w, ev in evals)
     margin = tuner.settings.window_tie_margin
     within = [(w, ev) for w, ev in evals if ev.score >= best_score - margin]
-    _w_chosen, ev_chosen = max(within, key=lambda item: item[0])
+    if trend_present(tuner):
+        # Regime shift / trend present: prefer a SHORTER window so the baseline
+        # tracks the current level instead of averaging in stale pre-shift history.
+        _w_chosen, ev_chosen = min(within, key=lambda item: item[0])
+    else:
+        # Stationary: "more history is better" — prefer the LARGER window.
+        _w_chosen, ev_chosen = max(within, key=lambda item: item[0])
     return ev_chosen

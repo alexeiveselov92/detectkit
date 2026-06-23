@@ -5,6 +5,56 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2026-06-24
+
+### Changed
+- **`dtk autotune` now works well out of the box without labels — every stage of
+  the unsupervised pipeline was reworked so the no-label baseline is good on its
+  own (labels remain a bonus that further improves it).** This recomputes tuned
+  configs; per detectkit's policy that is acceptable. Specifically:
+  - **Seasonality selection is decoupled from the flag-objective.** The old probe
+    scored a candidate grouping with the same low-flag-rate objective used for
+    detection, which is structurally biased *against* seasonality (finer groups →
+    tighter bands → more flags → worse score), so genuinely seasonal metrics were
+    rejected with "chose none". It now uses a leak-free, walk-forward,
+    **band-width-aware** Gaussian-NLL probe (`oof_residual_reduction`) that
+    measures how much conditioning on a seasonal key tightens the per-group
+    center/scale the detector actually applies, evaluated on *held-out* folds.
+    Over-fragmented groupings fall back to global and can't win mechanically; the
+    no-seasonality baseline scores 0; a move is accepted only on a margin **and**
+    an improvement in the majority of folds.
+  - **The unsupervised detector objective now rewards a tight confidence
+    interval.** `unsupervised_objective` is now `0.4·budget + 0.3·sharpness +
+    0.3·separation`: a smooth flag-rate **budget** (no flat cliff; one-sided so a
+    clean metric isn't pushed to flag), **sharpness** (rewards a narrow,
+    well-calibrated band — the old ratio-only objective was scale-invariant and
+    blind to band width), and **separation**. All-suppress no longer sits at a
+    timid `0.6` plateau — it scores only `w_budget`, so a tight band that isolates
+    real extremes strictly beats doing nothing.
+  - **Detector selection no longer excludes a type by heuristic.** The
+    distribution suitability vote is now advisory (it only orders the candidates);
+    the grid search evaluates **all** windowed statistical detectors and lets
+    cross-validation pick the winner.
+  - **Grid search fixes the threshold↔window coupling** with a final threshold
+    re-sweep at the chosen window, and the threshold grid gained high
+    "near-suppress" rungs (5/6σ, 4/6 Tukey) so a heavy-tailed metric can widen the
+    band under the budget instead of being trapped flagging its tail.
+  - **Window selection is trend-gated**: stationary series still prefer the larger
+    window, but under a trend / regime shift the tie-break now prefers the
+    *smaller* window (a fresher baseline) instead of averaging in stale history.
+- **Honest unsupervised header.** Emitted tuned configs (and the CLI log) no
+  longer label an unsupervised run's score as `mcc = …` (it never computed MCC);
+  they read `Objective : unsupervised (band-fit + flag-budget) = …`.
+
+### Added
+- **`autotune.force_seasonality`** — pin the seasonality grouping (a column or a
+  conjunctive `[col, col]` group) and skip the search, for experts who already
+  know a metric's seasonality. Complements `seasonality_candidates`, which only
+  *restricts* the search.
+- **Per-candidate transparency in the seasonality decision log** — each tested
+  component now records its held-out residual reduction (e.g.
+  `hour:5.70, day_of_week:-0.00`), so a "chose none" is never opaque.
+
 ## [0.20.0] - 2026-06-23
 
 ### Added

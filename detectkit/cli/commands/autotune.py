@@ -161,6 +161,7 @@ def _build_settings(*, scoring: ScoringMetric, autotune_cfg: AutoTuneConfig) -> 
         fold_count=autotune_cfg.folds,
         allowed_detector_types=autotune_cfg.detector_types,
         allowed_seasonality=autotune_cfg.seasonality_candidates,
+        force_seasonality=autotune_cfg.force_seasonality,
         fixed_params=dict(autotune_cfg.fixed_params),
         max_history=autotune_cfg.max_history,
     )

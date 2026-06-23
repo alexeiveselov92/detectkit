@@ -361,6 +361,12 @@ class AutoTuneConfig(BaseModel):
     seasonality_candidates: list[str] | None = Field(
         default=None, description="Restrict the seasonality columns the search may use"
     )
+    force_seasonality: list[str | list[str]] | None = Field(
+        default=None,
+        description="Pin the seasonality grouping instead of searching it. Each entry is a "
+        "column name or a list of columns for a conjunctive group "
+        "(e.g. [hour] or [[day_of_week, hour]]).",
+    )
     fixed_params: dict[str, Any] = Field(
         default_factory=dict, description="Hyperparameters pinned across the whole search"
     )
@@ -416,6 +422,27 @@ class AutoTuneConfig(BaseModel):
         if bad:
             raise ValueError(
                 f"Invalid autotune seasonality_candidates: {bad}. "
+                f"Allowed: {', '.join(sorted(_AUTOTUNE_SEASONALITY_COLUMNS))}"
+            )
+        return v
+
+    @field_validator("force_seasonality")
+    @classmethod
+    def validate_force_seasonality(
+        cls, v: list[str | list[str]] | None
+    ) -> list[str | list[str]] | None:
+        """Validate the pinned grouping against the allowed seasonality columns."""
+        if v is None:
+            return v
+        if not v:
+            raise ValueError("force_seasonality cannot be empty (omit it to search)")
+        cols: list[str] = []
+        for comp in v:
+            cols.extend([comp] if isinstance(comp, str) else list(comp))
+        bad = [c for c in cols if c not in _AUTOTUNE_SEASONALITY_COLUMNS]
+        if bad:
+            raise ValueError(
+                f"Invalid autotune force_seasonality: {bad}. "
                 f"Allowed: {', '.join(sorted(_AUTOTUNE_SEASONALITY_COLUMNS))}"
             )
         return v

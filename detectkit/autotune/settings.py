@@ -26,15 +26,21 @@ class TuneSettings:
     fold_count: int = 5
     stability_lambda: float = 0.5  # aggregate = mean - lambda * std(folds)
 
-    # Detector selection (per-group distribution votes)
-    candidate_quorum: int = 1  # min group-wins for a type to be a candidate
-    max_candidate_types: int = 2  # cap the grid-searched detector types
+    # Detector selection: by default the grid search evaluates ALL windowed
+    # statistical detectors and lets cross-validation pick the winner; the
+    # distribution suitability vote only ORDERS them (most promising first) and is
+    # never used to exclude a type. The cap is a cost backstop, set above the
+    # current number of statistical detectors so none is dropped.
+    max_candidate_types: int = 4
 
     # Grid search
     min_improvement: float = 1e-3  # accept a move only if it beats by this margin
     max_candidates: int = 200  # hard ceiling on candidate evaluations
-    threshold_grid_sigma: tuple[float, ...] = (2.5, 3.0, 3.5, 4.0)  # mad / zscore
-    threshold_grid_iqr: tuple[float, ...] = (1.5, 2.0, 3.0)  # iqr (Tukey)
+    # The high rungs (5/6 sigma, 4/6 Tukey) act as a "near-suppress" option so a
+    # heavy-tailed metric can widen the band under the flag-rate budget instead of
+    # being trapped flagging its legitimate tail.
+    threshold_grid_sigma: tuple[float, ...] = (2.5, 3.0, 3.5, 4.0, 5.0, 6.0)  # mad / zscore
+    threshold_grid_iqr: tuple[float, ...] = (1.5, 2.0, 3.0, 4.0, 6.0)  # iqr (Tukey)
 
     # History / window selection
     window_tie_margin: float = 0.01  # prefer a larger window within this score gap
@@ -45,6 +51,7 @@ class TuneSettings:
     # Constraints injected from the YAML autotune: block / CLI flags
     allowed_detector_types: list[str] | None = None
     allowed_seasonality: list[str] | None = None
+    force_seasonality: list[str | list[str]] | None = None  # pin the grouping (skip the search)
     fixed_params: dict[str, object] = field(default_factory=dict)
     max_history: int | None = None
 

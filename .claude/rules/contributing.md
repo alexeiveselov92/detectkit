@@ -182,6 +182,12 @@ pick accents with `status_color(alert_data)` so status reads from color.
 2. **Update `CHANGELOG.md`** — Keep a Changelog format; it is the authoritative
    record of behavior changes.
 3. **Update `docs/`** — keep user-facing guides/reference in sync with behavior.
+   If you changed the autotune HTML labeler
+   (`detectkit/autotune/html_labeler.py`), regenerate the doc's live demo with
+   `python website/scripts/gen-labeler-example.py` (it rewrites
+   `docs/examples/autotune-labeler.html` from the real template, which the
+   autotune reference page embeds — same generated-asset pattern as
+   `website/scripts/make-bot-icon.mjs`).
 4. **Update the `dtk init-claude` assets** in `detectkit/cli/assets/claude/`
    (`rules/*.md`, `skills/*/SKILL.md`, `CLAUDE.section.md`) so a freshly-run
    `dtk init-claude` matches the shipped version. These assets are user-facing

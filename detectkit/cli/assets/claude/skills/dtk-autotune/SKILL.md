@@ -57,10 +57,13 @@ If there are no extra signals, the built-ins are enough — continue.
 ## Step 2 — Gather incident history → write the labels file
 
 Supervised tuning needs known incidents. The labels file is the contract; you
-fill it from the user's plain-language description. Resolve each incident to
-**UTC** and classify it as an interval (`{start, end}`) for a sustained incident
-or a point (`{at}`) for a spike. Read the resolved times back to confirm, then
-write `incidents/<metric>.yml` (create `incidents/` beside `metrics/`):
+fill it from the user's plain-language description. (If you have read access to
+the database — e.g. a database MCP — query the metric's series yourself to spot
+candidate incidents and propose them for confirmation, rather than relying only
+on memory.) Resolve each incident to **UTC** and classify it as an interval
+(`{start, end}`) for a sustained incident or a point (`{at}`) for a spike. Read
+the resolved times back to confirm, then write `incidents/<metric>.yml` (the
+`dtk init` scaffold already created `incidents/` beside `metrics/`):
 
 ```yaml
 # incidents/<metric>.yml — known anomalies for supervised autotuning.
@@ -76,11 +79,24 @@ incidents:
     label: deploy spike
 ```
 
-The same schema works as JSON. If the user can't enumerate incidents, say so and
-go to Step 3 unsupervised — or offer `dtk autotune --select <name> --label`,
-which writes a clickable HTML chart to `metrics/<name>__labeler.html`; they mark
-incidents in a browser and its Export button downloads a labels file in this
-exact format to feed back via `--incidents`.
+The same schema works as JSON. **Inline alternative:** for just one or two
+incidents, declare the same entries directly under the metric's `autotune:` block
+(`incidents:` + optional `incidents_timezone:`) instead of a separate file —
+mutually exclusive with `labels_file`, and `--incidents` still overrides it:
+
+```yaml
+autotune:
+  incidents:
+    - {start: "2026-05-02 14:00:00", end: "2026-05-02 16:30:00", label: outage}
+    - {at: "2026-05-11 09:05:00", label: deploy spike}
+  incidents_timezone: UTC   # optional; default UTC
+```
+
+If the user can't enumerate incidents, say so and go to Step 3 unsupervised — or
+offer `dtk autotune --select <name> --label`, which writes a clickable HTML chart
+to `metrics/<name>__labeler.html`; they mark incidents in a browser and its
+Export button downloads a labels file in this exact format to feed back via
+`--incidents`.
 
 ## Step 3 — Run autotune
 

@@ -164,6 +164,69 @@ def test_tune_one_supervised_with_incidents_file(tmp_path, monkeypatch):
     assert fake.runs[0]["mode"] == "supervised"
 
 
+def test_tune_one_supervised_with_inline_incidents(tmp_path, monkeypatch):
+    """Incidents declared inline in the metric's autotune block tune supervised."""
+    monkeypatch.setattr(autotune_cmd.sys.stdin, "isatty", lambda: False)
+    data = _series()
+    fake = FakeInternal(data)
+    (tmp_path / "metrics").mkdir()
+    metric_path = tmp_path / "metrics" / "demo.yml"
+    config = MetricConfig(
+        name="demo",
+        interval="1h",
+        query="SELECT 1",
+        seasonality_columns=["hour"],
+        autotune={
+            "enabled": True,
+            "incidents": [{"at": _to_dt(data["timestamp"], i)} for i in (300, 301, 600)],
+        },
+    )
+
+    ok = autotune_cmd._tune_one(
+        metric_path=metric_path,
+        config=config,
+        project_root=tmp_path,
+        internal_manager=fake,
+        incidents_path=None,
+        label=False,
+        scoring_override=None,
+        from_dt=None,
+        to_dt=None,
+        force=False,
+        dry_run=False,
+    )
+    assert ok is True
+    assert fake.runs[0]["mode"] == "supervised"
+
+
+def test_resolve_labels_precedence(tmp_path):
+    """`--incidents` flag wins; else labels_file; else inline incidents; else none."""
+    from detectkit.config.metric_config import AutoTuneConfig
+
+    cfg_inline = AutoTuneConfig(incidents=[{"at": "2026-01-13 12:00:00"}])
+    labels, source = autotune_cmd._resolve_labels(
+        metric_name="demo",
+        interval_seconds=3600,
+        incidents_path=None,
+        autotune_cfg=cfg_inline,
+        project_root=tmp_path,
+    )
+    assert "inline config" in source
+    assert len(labels.points) == 1
+
+    # flag overrides inline incidents
+    flag_file = tmp_path / "flag.yml"
+    flag_file.write_text("incidents:\n  - {at: '2026-01-14 12:00:00'}\n")
+    labels, source = autotune_cmd._resolve_labels(
+        metric_name="demo",
+        interval_seconds=3600,
+        incidents_path=str(flag_file),
+        autotune_cfg=cfg_inline,
+        project_root=tmp_path,
+    )
+    assert source.startswith("file ")
+
+
 def test_tune_one_no_datapoints_skips(tmp_path, monkeypatch):
     monkeypatch.setattr(autotune_cmd.sys.stdin, "isatty", lambda: False)
     empty = {

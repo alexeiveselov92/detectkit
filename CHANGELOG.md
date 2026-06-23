@@ -5,6 +5,30 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`dtk init` now scaffolds an `incidents/` directory** beside `metrics/`, with
+  a commented example labels file (`incidents/example_cpu_usage.yml`) and a
+  commented `autotune:` block in the example metric. This makes the documented
+  `incidents/<metric>.yml` convention for supervised `dtk autotune` ready to fill
+  in on a fresh project.
+- **Inline incidents on the `autotune:` block.** Labeled incidents can now be
+  declared directly in a metric config via `autotune.incidents` (the same
+  `{start, end}` / `{at}` entries as a labels file) plus an optional
+  `autotune.incidents_timezone`, as an alternative to `autotune.labels_file` —
+  handy for a metric with one or two known incidents. `incidents` and
+  `labels_file` are mutually exclusive (validated at config load). Label
+  resolution precedence is now: `--incidents` flag → `labels_file` → inline
+  `incidents` → interactive prompt → none (unsupervised).
+
+### Changed
+- **`dtk init-claude` context** now recommends (optionally) giving the assistant
+  read access to the database — e.g. a database MCP — so it can inspect series,
+  find incidents to label, and verify queries itself. Made explicit that
+  detectkit's pipeline never needs an MCP (it connects via its DB drivers); the
+  access is an assistant convenience, not a runtime requirement.
+
 ## [0.19.0] - 2026-06-22
 
 ### Added

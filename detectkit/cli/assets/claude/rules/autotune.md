@@ -79,14 +79,20 @@ autotune:
   detector_types: [mad, zscore]   # restrict candidates (subset of mad/zscore/iqr)
   scoring_metric: mcc             # default optimization target
   beta: 1.0                       # only for scoring_metric: f_beta
-  labels_file: incidents/orders.yml
+  labels_file: incidents/orders.yml   # external labels file, OR inline (below)
+  # incidents:                    # inline labels — mutually exclusive with labels_file
+  #   - {start: "2026-05-02 14:00:00", end: "2026-05-02 16:30:00", label: outage}
+  #   - {at: "2026-05-11 09:05:00", label: deploy spike}
+  # incidents_timezone: UTC       # interprets the naive times above (default UTC)
   seasonality_candidates: [hour, day_of_week]
   fixed_params: {window_size: 4320}  # pin hyperparameters (excluded from search)
   folds: 5
   max_history: 50000              # cap training points
 ```
 
-Precedence: `--scoring`/`--incidents` flags override the block.
+Label precedence (highest first): `--incidents` flag → `labels_file` → inline
+`incidents` → interactive prompt → none. `labels_file` and `incidents` are
+mutually exclusive. `--scoring` likewise overrides `scoring_metric`.
 
 ## The annotated config
 

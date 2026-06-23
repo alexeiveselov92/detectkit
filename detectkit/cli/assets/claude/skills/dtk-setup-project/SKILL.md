@@ -38,6 +38,15 @@ the nearest ancestor that has it). If there is none, ask for a project name and
 run `dtk init <name>`, then work inside that folder. If several projects sit
 side by side, ask which one to set up.
 
+> **Recommended (optional): give _yourself_ read access to the database.**
+> detectkit connects to the DB directly via its drivers and never needs an MCP
+> to run — the `profiles.yml` connection you set up below is all the *tool*
+> needs. But you'll help much better with read access to the same database (e.g.
+> a database MCP): you can inspect metric series, find incidents to label for
+> `dtk autotune`, sanity-check queries, and confirm detections yourself. Suggest
+> the user connect one if they haven't; if they can't, you can still do
+> everything by asking them to run queries and by using `dtk autotune --label`.
+
 ## Step 1 — Pick the database backend
 
 **ClickHouse, PostgreSQL and MySQL are all fully supported.** Ask which one the

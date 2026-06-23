@@ -87,6 +87,8 @@ my_monitoring/
 ├── metrics/                   # Metric definitions
 │   ├── .gitkeep
 │   └── example_cpu_usage.yml  # Example metric to copy/edit
+├── incidents/                 # Labeled incidents for supervised `dtk autotune`
+│   └── example_cpu_usage.yml  # Example labels file to copy/edit
 └── sql/                       # SQL query files
     └── .gitkeep
 ```

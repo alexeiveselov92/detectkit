@@ -102,6 +102,24 @@ See [autotune-incidents-example.yml](../examples/autotune-incidents-example.yml)
 for a fully commented file, and the [reference](../reference/autotune.md#labels-file-format)
 for the complete schema.
 
+`dtk init` scaffolds an `incidents/` directory beside `metrics/` with an example
+labels file, so the layout above is ready to fill in.
+
+> **Prefer to keep labels in the metric config?** Declare the same incidents
+> inline under the metric's `autotune:` block instead of a separate file — handy
+> for a metric with one or two known incidents:
+>
+> ```yaml
+> autotune:
+>   incidents:
+>     - {start: "2026-05-02 14:00:00", end: "2026-05-02 16:30:00", label: outage}
+>     - {at: "2026-05-11 09:05:00", label: deploy spike}
+>   incidents_timezone: UTC   # optional; interprets the naive times above
+> ```
+>
+> `incidents` and `labels_file` are mutually exclusive. The `--incidents` flag
+> still overrides either.
+
 > Can't enumerate the incidents from memory? Run
 > `dtk autotune --select api_error_rate --label`. It writes a self-contained
 > HTML chart of the series to `metrics/api_error_rate__labeler.html` and exits
@@ -271,7 +289,11 @@ autotune:
   detector_types: [mad, zscore]      # restrict candidates (subset of mad/zscore/iqr)
   scoring_metric: mcc                # default optimization target
   beta: 1.0                          # only used for scoring_metric: f_beta
-  labels_file: incidents/orders.yml  # default labels (supervised)
+  labels_file: incidents/orders.yml  # external labels file, OR inline (below)
+  # incidents:                       # inline labels — mutually exclusive with labels_file
+  #   - {start: "2026-05-02 14:00:00", end: "2026-05-02 16:30:00", label: outage}
+  #   - {at: "2026-05-11 09:05:00", label: deploy spike}
+  # incidents_timezone: UTC          # interprets the naive times above (default UTC)
   seasonality_candidates: [hour, day_of_week]
   fixed_params: {window_size: 4320}  # pin hyperparameters (excluded from the search)
   folds: 5                           # number of walk-forward folds
@@ -279,7 +301,7 @@ autotune:
 ```
 
 Command-line flags win: `--scoring` and `--incidents` override the block's
-`scoring_metric` / `labels_file`. See
+`scoring_metric` / `labels_file` / `incidents`. See
 [autotuned-metric-example.yml](../examples/autotuned-metric-example.yml) for a
 worked block, and the [reference](../reference/autotune.md#autotune-config-block)
 for every field.

@@ -91,11 +91,16 @@ self-contained file `metrics/<name>__labeler.html`. Walk the user through it:
 
 1. Open `metrics/<name>__labeler.html` in any browser — just double-click it,
    it's self-contained (inline chart + data, no server, no internet).
-2. **Click-drag across the chart** over each real incident: it appears as a red
-   band and a row in the list below (use *remove* / *Clear all* to fix mistakes).
-3. Click **Export incidents-<name>.yml** — the browser downloads a labels file in
-   the canonical schema.
-4. Feed it back: `dtk autotune --select <name> --incidents incidents-<name>.yml`.
+2. Navigate a long/dense series: **scroll to zoom**, double-click to reset, drag
+   the **navigator strip** to move the view (window = pan, edges = stretch).
+3. **Click-drag across the chart** over each real incident (red band + a row
+   below with an optional **description**); *remove* / *Clear all* fix mistakes.
+4. Click **Export** — the browser downloads a *versioned* `<name>-<UTC>.yml`. A
+   browser can't write into the project, so **move it into `incidents/<name>/`**.
+   Re-labeling later adds another versioned file — nothing is overwritten, so the
+   whole history is kept. Do this move for the user (you have filesystem access).
+5. Tune on the latest version by pointing at the folder:
+   `dtk autotune --select <name> --incidents incidents/<name>/`.
 
 Prefer this whenever the user can *recognise* incidents on a chart but doesn't
 have exact timestamps — it is far easier than dictating times, and they label

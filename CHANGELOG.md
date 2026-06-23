@@ -5,6 +5,29 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.22.0] - 2026-06-24
+
+### Changed
+- **Interactive incident labeler (`dtk autotune --label`) overhauled.** The
+  self-contained HTML chart is now zoomable/pannable so narrow incidents are
+  markable even on a long span with a small step: scroll to zoom at the cursor,
+  double-click to reset, and a navigator strip below the chart to move the view
+  (drag the window to pan, drag its edges to stretch/squeeze). Large series stay
+  fast and spike-faithful via min/max decimation. Each incident now takes an
+  optional **description**, exported as the canonical `label:` field. Restyled on
+  the detectkit brand (palette/fonts/logo, axes, hover tooltip, live summary).
+- **Versioned, never-overwriting exports.** Export downloads a timestamped file
+  `<metric>-<UTC>.yml` (a browser can't write to the project), so keep every
+  labeling round under `incidents/<metric>/`.
+
+### Added
+- **Directory-aware label resolution.** `--incidents` (and `autotune.labels_file`)
+  may point at a directory; the newest versioned file in it is used —
+  `dtk autotune --select <m> --incidents incidents/<m>/` always tunes on the
+  latest labels while the full history stays on disk.
+- **Landing + docs** showcase the labeler with a live, embedded demo generated
+  from the real template (`website/scripts/gen-labeler-example.py`).
+
 ## [0.21.0] - 2026-06-24
 
 ### Changed

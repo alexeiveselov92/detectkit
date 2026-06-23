@@ -93,6 +93,25 @@ def _resolve_scoring(scoring_override: str | None, autotune_cfg: AutoTuneConfig)
         raise click.BadParameter(f"Invalid scoring metric '{value}'. Allowed: {allowed}") from exc
 
 
+_LABELS_GLOBS = ("*.yml", "*.yaml", "*.json")
+
+
+def _newest_labels_file(directory: Path) -> Path | None:
+    """Newest labels file in *directory*.
+
+    The labeler exports versioned, ISO-stamped names (``<metric>-<UTC>.yml``)
+    which sort chronologically, so we pick the lexicographically-greatest name
+    (tie-broken by mtime). This lets ``--incidents incidents/<metric>/`` keep
+    every labeling round on disk while always tuning on the latest one.
+    """
+    files: list[Path] = []
+    for pattern in _LABELS_GLOBS:
+        files.extend(directory.glob(pattern))
+    if not files:
+        return None
+    return max(files, key=lambda p: (p.name, p.stat().st_mtime))
+
+
 def _resolve_labels(
     *,
     metric_name: str,
@@ -104,13 +123,24 @@ def _resolve_labels(
     """Resolve labels by precedence.
 
     ``--incidents`` flag > config ``labels_file`` > config inline ``incidents`` >
-    interactive prompt > none (unsupervised).
+    interactive prompt > none (unsupervised). A directory may be given for the
+    flag or ``labels_file``; its newest versioned file is used.
     """
     path = incidents_path or autotune_cfg.labels_file
     if path:
         file_path = Path(path)
         if not file_path.is_absolute():
             file_path = project_root / file_path
+        if file_path.is_dir():
+            chosen = _newest_labels_file(file_path)
+            if chosen is None:
+                raise FileNotFoundError(
+                    f"No labels files (*.yml / *.yaml / *.json) found in {file_path}"
+                )
+            labels = parse_labels_file(
+                chosen, interval_seconds=interval_seconds, metric_name=metric_name
+            )
+            return labels, f"file {chosen} (newest in {file_path}/)"
         labels = parse_labels_file(
             file_path, interval_seconds=interval_seconds, metric_name=metric_name
         )

@@ -51,7 +51,7 @@ export default defineConfig({
             {
               label: 'Configuration',
               items: [
-                { label: 'Overview & project', link: '/guides/configuration/' },
+                { label: 'Overview', link: '/guides/configuration/' },
                 { label: 'Profiles', link: '/guides/configuration-profiles/' },
                 { label: 'Metrics', link: '/guides/configuration-metrics/' },
               ],
@@ -65,21 +65,25 @@ export default defineConfig({
                 { label: 'MySQL', link: '/guides/databases-mysql/' },
               ],
             },
-            { label: 'Detectors', link: '/guides/detectors/' },
-            { label: 'Auto-tuning a detector', link: '/guides/autotuning/' },
             {
               label: 'Alerting',
               items: [
-                { label: 'How it works', link: '/guides/alerting/' },
+                { label: 'Overview', link: '/guides/alerting/' },
                 { label: 'Channels', link: '/guides/alerting-channels/' },
-                { label: 'Reading an alert (for stakeholders)', link: '/guides/reading-alerts/' },
                 { label: 'Multiple alert blocks', link: '/guides/alerting-multiple-blocks/' },
                 { label: 'Cooldown & recovery', link: '/guides/alerting-cooldown-recovery/' },
                 { label: 'No-data & errors', link: '/guides/alerting-no-data-errors/' },
                 { label: 'Templates & mentions', link: '/guides/alerting-templates-mentions/' },
                 { label: 'Patterns', link: '/guides/alerting-patterns/' },
+                { label: 'Reading an alert', link: '/guides/reading-alerts/' },
               ],
             },
+            // Single-page topics — kept as standalone leaves after the multi-page groups
+            // (a child is a group iff it owns 2+ pages). "Auto-tuning" stays a peer of
+            // "Detectors", not nested: it's a separate command/workflow with its own
+            // Reference entry, and nesting would collide with the Reference "Detectors" group.
+            { label: 'Detectors', link: '/guides/detectors/' },
+            { label: 'Auto-tuning', link: '/guides/autotuning/' },
             { label: 'Visualizing results', link: '/guides/visualizing-results/' },
           ],
         },
@@ -89,7 +93,8 @@ export default defineConfig({
             { label: 'CLI', link: '/reference/cli/' },
             { label: 'Auto-tune', link: '/reference/autotune/' },
             {
-              label: 'Detectors',
+              // Renamed from "Detectors" to disambiguate from the Guides > Detectors page.
+              label: 'Detector reference',
               items: [
                 { label: 'MAD', link: '/reference/detectors/mad/' },
                 { label: 'Z-Score', link: '/reference/detectors/zscore/' },

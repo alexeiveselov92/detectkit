@@ -2,9 +2,11 @@
 
 Not a Cartesian product — a greedy coordinate sweep per candidate type:
 threshold → recency weighting → detrend (gated by a trend test) → window size
-(the final axis, with the large-window tie-bias from window_select). The
-objective is the cross-validated score (settings.metric). Total evaluations
-stay in the low tens per type and are capped by settings.max_candidates.
+(with the trend-gated window tie-bias from window_select) → a final threshold
+re-sweep at the chosen window (the threshold↔window coupling fix). The objective
+is the cross-validated score (settings.metric, or the unsupervised objective when
+there are no labels). Total evaluations stay in the low tens per type and are
+capped by settings.max_candidates.
 """
 
 from __future__ import annotations
@@ -87,10 +89,23 @@ def grid_search(
                 if ev is not None and ev.score > best.score + eps:
                     best, accepted["detrend"] = ev, detrend
 
-        # Axis 4: window size (final; large-window tie-bias).
+        # Axis 4: window size (large-window tie-bias, trend-gated in select_window).
         window_best = select_window(tuner, detector_type, accepted, best, grid)
         if window_best.score >= best.score - tuner.settings.window_tie_margin:
             best = window_best
+
+        # Axis 5: re-sweep threshold at the now-fixed window. The optimal threshold
+        # depends on window size (a longer window gives a steadier spread estimate),
+        # but threshold was chosen first against the seed window — without this pass
+        # a large window swing can leave it stranded. Strict improvement only.
+        accepted = dict(best.params)
+        for threshold in tuner.settings.threshold_grid(detector_type):
+            if threshold == accepted.get("threshold"):
+                continue
+            ev = tuner.safe_evaluate(detector_type, {**accepted, "threshold": threshold})
+            if ev is not None and ev.score > best.score:
+                best = ev
+                accepted["threshold"] = threshold
 
         tuner.log(
             "grid_search",

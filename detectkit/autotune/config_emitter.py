@@ -120,9 +120,14 @@ def _build_comments(result: AutoTuneResult, source_label: str, run_id: str) -> s
         f"{summary.get('positive_grid_points', 0)} labeled grid point(s)"
     )
     folds = " ".join(f"{f:.2f}" for f in result.cv_per_fold) or "—"
-    lines.append(
-        f"# Scoring metric  : {result.scoring_metric} = {result.score:.3f}  (CV folds: {folds})"
-    )
+    if result.mode == "supervised":
+        obj_label, objective = "Scoring metric", result.scoring_metric
+    else:
+        # Unsupervised runs never optimize the labelled metric (MCC etc.); they use
+        # the no-label objective. Label it honestly so the header doesn't claim an
+        # "mcc =" score it never computed (and contradict the Labels line).
+        obj_label, objective = "Objective", "unsupervised (band-fit + flag-budget)"
+    lines.append(f"# {obj_label:<16}: {objective} = {result.score:.3f}  (CV folds: {folds})")
     lines.append("#")
     for entry in result.decision_log:
         label = _STAGE_LABELS.get(entry.get("stage", ""))

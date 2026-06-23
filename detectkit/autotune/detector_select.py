@@ -1,11 +1,13 @@
-"""Stage 2: pick candidate detector type(s) from the data distribution.
+"""Stage 2: order the candidate detector types by distribution suitability.
 
 The "decision tree" is a small suitability spec keyed by detector *type name*
 (kept here, not on the detector classes, so existing detectors stay untouched
 and the whole feature is easy to remove). Each seasonality group votes for the
-type that best fits its distribution; types meeting the vote quorum (plus the
-global-group winner) become the candidates the grid search then sweeps —
-because different seasonal groups may favor different algorithms.
+type that best fits its distribution. The vote is **advisory only** — it ranks
+the types (most promising first) for the grid search, which then evaluates *all*
+of them and lets the cross-validated objective pick the winner. A hand-tuned
+heuristic therefore never excludes a type; it only decides who is tried first
+(and is recorded in the decision log for transparency).
 """
 
 from __future__ import annotations
@@ -140,16 +142,20 @@ def select_detector_types(
         if label == "global":
             global_winner = ranked[0][0]
 
-    quorum = tuner.settings.candidate_quorum
-    chosen = {t for t, v in votes.items() if v >= quorum}
-    chosen.add(global_winner)
-    ranked_chosen = sorted(chosen, key=lambda t: total_suit[t], reverse=True)
-    final = ranked_chosen[: tuner.settings.max_candidate_types]
+    # Evaluate ALL candidate types in the grid search and let the cross-validated
+    # objective pick the winner — the suitability vote only ORDERS them (most
+    # promising first) and is logged for transparency; it never excludes a type,
+    # so a hand-tuned heuristic can't drop the detector that would have scored
+    # best. The cap is a pure cost backstop (default ≥ the number of detectors).
+    final = sorted(candidate_types, key=lambda t: total_suit[t], reverse=True)
+    final = final[: tuner.settings.max_candidate_types]
+    if global_winner not in final:
+        final.append(global_winner)
 
     tally = ", ".join(f"{t}:{votes[t]:.1f}" for t in candidate_types)
     tuner.log(
         "detector_select",
-        f"votes — {tally}; shortlist: {', '.join(final)}",
+        f"suitability votes — {tally}; evaluating (best-first): {', '.join(final)}",
         votes=votes,
         shortlist=final,
         n_groups=len(groups),

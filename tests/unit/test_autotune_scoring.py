@@ -77,16 +77,54 @@ def test_score_predictions_dispatch():
     assert score_predictions(yt, yt, ys, ScoringMetric.PR_AUC) == 1.0
 
 
-def test_unsupervised_objective_rewards_low_flag_rate():
-    # No flags at all → no false positives → fpr term maxed (0.6 floor)
+def test_unsupervised_objective_is_bounded():
+    n = 100
+    rng = np.arange(n) / n
+    flags = rng > 0.95
+    assert 0.0 <= unsupervised_objective(flags, rng * 2.0, 0.01) <= 1.0
+    assert unsupervised_objective(np.zeros(0, dtype=bool), np.zeros(0), 0.01) == 0.0
+
+
+def test_unsupervised_objective_catching_extreme_beats_all_suppress():
+    # All-suppress: no flags, normals sit near the band center (slack band).
     n = 100
     no_flags = np.zeros(n, dtype=bool)
-    scores = np.full(n, 0.3)
-    assert unsupervised_objective(no_flags, scores, fpr_target=0.01) == 0.6
+    slack = np.full(n, 0.1)
+    all_suppress = unsupervised_objective(no_flags, slack, fpr_target=0.01)
 
-    # A few well-separated flags beat over-flagging
+    # A tight band that isolates a single genuine extreme, normals near the edge.
     few = np.zeros(n, dtype=bool)
-    few[:1] = True
+    few[0] = True
+    tight_scores = np.full(n, 0.85)
+    tight_scores[0] = 8.0
+    catching = unsupervised_objective(few, tight_scores, 0.01)
+
+    assert catching > all_suppress
+    # all-suppress no longer scores the old 0.6 plateau; it is bounded by w_budget.
+    assert all_suppress < 0.5
+
+
+def test_unsupervised_objective_rewards_tight_band_same_flags():
+    # Same flag set, different band width: the tighter band (normals near the
+    # edge) must score higher even though the slack band has larger separation.
+    n = 100
+    flags = np.zeros(n, dtype=bool)
+    flags[0] = True
+
+    tight = np.full(n, 0.9)
+    tight[0] = 1.5
+    slack = np.full(n, 0.2)
+    slack[0] = 1.5
+
+    assert unsupervised_objective(flags, tight, 0.01) > unsupervised_objective(flags, slack, 0.01)
+
+
+def test_unsupervised_objective_penalizes_over_flagging():
+    # A few well-separated flags beat flagging everything.
+    n = 100
+    scores = np.full(n, 0.3)
+    few = np.zeros(n, dtype=bool)
+    few[0] = True
     few_scores = scores.copy()
     few_scores[0] = 5.0
     over = np.ones(n, dtype=bool)

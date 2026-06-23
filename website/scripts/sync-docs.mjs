@@ -109,8 +109,8 @@ function resolveLink(target, srcRel) {
     const route = SRC_TO_ROUTE.get(abs);
     return route ? route + anchor : undefined; // undefined => known-shaped but unmapped
   }
-  // raw config examples shipped as static downloads under /examples/
-  if (/^docs\/examples\/.+\.(ya?ml|sql|json|toml)$/i.test(abs)) {
+  // raw config examples + the generated labeler demo, shipped under /examples/
+  if (/^docs\/examples\/.+\.(ya?ml|sql|json|toml|html)$/i.test(abs)) {
     return '/examples/' + path.posix.basename(abs) + anchor;
   }
   // directory link (with or without trailing slash)
@@ -163,7 +163,7 @@ async function main() {
   const exDir = path.join(ROOT, 'docs', 'examples');
   const pubEx = path.join(WEBSITE, 'public', 'examples');
   await fs.rm(pubEx, { recursive: true, force: true });
-  const exFiles = (await fs.readdir(exDir)).filter((f) => /\.(ya?ml|sql|json|toml)$/i.test(f));
+  const exFiles = (await fs.readdir(exDir)).filter((f) => /\.(ya?ml|sql|json|toml|html)$/i.test(f));
   if (exFiles.length) {
     await fs.mkdir(pubEx, { recursive: true });
     for (const f of exFiles) await fs.copyFile(path.join(exDir, f), path.join(pubEx, f));

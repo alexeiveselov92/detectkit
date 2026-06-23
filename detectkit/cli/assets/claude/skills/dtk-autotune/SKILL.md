@@ -54,21 +54,62 @@ promo flights, school terms, or market-specific holidays. If yes:
 
 If there are no extra signals, the built-ins are enough — continue.
 
-## Step 2 — Gather incident history → write the labels file
+**How autotune picks seasonality.** The search no longer judges a seasonal key
+by its flag rate (which was biased against seasonality and often landed on
+"none"). It now uses a leak-free, walk-forward, **band-width-aware held-out
+residual-reduction probe** (Gaussian NLL): a key is accepted only if conditioning
+on it actually tightens the per-group band on *held-out* folds — baseline is 0,
+and a key wins only on a margin **and** a majority-of-folds improvement. So if a
+real seasonal cycle exists, it now gets chosen on its merits; a key that doesn't
+generalize is rejected.
 
-Supervised tuning needs known incidents. The labels file is the contract; you
-fill it from the user's plain-language description. (If you have read access to
-the database — e.g. a database MCP — query the metric's series yourself to spot
-candidate incidents and propose them for confirmation, rather than relying only
-on memory.) Resolve each incident to **UTC** and classify it as an interval
-(`{start, end}`) for a sustained incident or a point (`{at}`) for a spike. Read
-the resolved times back to confirm, then write `incidents/<metric>.yml` (the
+**To steer it** via the metric's `autotune:` block (these complement each other):
+
+- `seasonality_candidates: [hour, day_of_week]` — **restrict** the column set the
+  search may group on (still searches within that subset).
+- `force_seasonality:` — **pin** a grouping and skip the search entirely. Give a
+  single column (`force_seasonality: hour`), a flat list of columns to use as
+  separate components (`force_seasonality: [hour, day_of_week]`), or a nested list
+  for a conjunctive group (`force_seasonality: [[day_of_week, hour]]`, i.e. group
+  by the day_of_week×hour combination). If a forced column is absent from the
+  data, the search runs normally instead.
+
+## Step 2 — Get incident labels (optional, but it improves tuning)
+
+Labels turn tuning from a good unsupervised default into a config optimised
+against *your* real incidents (it then optimises MCC and also tunes the alert
+window `consecutive_anomalies`). **The easiest, most reliable way to produce them
+is the interactive HTML labeler — offer this first**, before asking the user to
+recall timestamps:
+
+```bash
+dtk autotune --select <name> --label
+```
+
+This is offline (no DB writes): it renders the metric's series into one
+self-contained file `metrics/<name>__labeler.html`. Walk the user through it:
+
+1. Open `metrics/<name>__labeler.html` in any browser — just double-click it,
+   it's self-contained (inline chart + data, no server, no internet).
+2. **Click-drag across the chart** over each real incident: it appears as a red
+   band and a row in the list below (use *remove* / *Clear all* to fix mistakes).
+3. Click **Export incidents-<name>.yml** — the browser downloads a labels file in
+   the canonical schema.
+4. Feed it back: `dtk autotune --select <name> --incidents incidents-<name>.yml`.
+
+Prefer this whenever the user can *recognise* incidents on a chart but doesn't
+have exact timestamps — it is far easier than dictating times, and they label
+against the same series the detector sees. Tell the user plainly that you're
+giving them an interactive chart to mark incidents on.
+
+**If the user already knows the exact incident times** (or you found them via a
+database MCP), you can write the labels directly instead of using the chart.
+Resolve each to **UTC**; an interval `{start, end}` is a sustained incident, a
+point `{at}` is a single spike. Either as a file `incidents/<metric>.yml` (the
 `dtk init` scaffold already created `incidents/` beside `metrics/`):
 
 ```yaml
 # incidents/<metric>.yml — known anomalies for supervised autotuning.
-# All times are UTC. Use an interval for a sustained incident or a point for a
-# single spike. `end` is inclusive of the grid points it covers.
 metric: api_error_rate          # must match the metric `name` it labels
 timezone: UTC                   # optional; interprets the naive times below
 incidents:
@@ -79,24 +120,19 @@ incidents:
     label: deploy spike
 ```
 
-The same schema works as JSON. **Inline alternative:** for just one or two
-incidents, declare the same entries directly under the metric's `autotune:` block
-(`incidents:` + optional `incidents_timezone:`) instead of a separate file —
-mutually exclusive with `labels_file`, and `--incidents` still overrides it:
+…or, for one or two incidents, inline under the metric's `autotune:` block
+(`incidents:` + optional `incidents_timezone:`; mutually exclusive with
+`labels_file`, and `--incidents` overrides it):
 
 ```yaml
 autotune:
   incidents:
     - {start: "2026-05-02 14:00:00", end: "2026-05-02 16:30:00", label: outage}
-    - {at: "2026-05-11 09:05:00", label: deploy spike}
   incidents_timezone: UTC   # optional; default UTC
 ```
 
-If the user can't enumerate incidents, say so and go to Step 3 unsupervised — or
-offer `dtk autotune --select <name> --label`, which writes a clickable HTML chart
-to `metrics/<name>__labeler.html`; they mark incidents in a browser and its
-Export button downloads a labels file in this exact format to feed back via
-`--incidents`.
+**If there are no known incidents**, skip to Step 3 — the unsupervised baseline
+is good on its own; it just can't learn *which* spikes you specifically care about.
 
 ## Step 3 — Run autotune
 
@@ -111,21 +147,39 @@ dtk autotune --select <name>
 `dtk autotune` reads the metric's **already-loaded** datapoints. If there are
 none yet, load first: `dtk run --select <name> --steps load` (optionally
 `--from <date>` to backfill history — more history tunes better). The default
-scoring metric is **MCC** (robust to rare anomalies). Override only with reason:
-`--scoring recall` when a miss is worse than a false page, `--scoring f1`, etc.
-Run `dtk autotune --help` to confirm the live flags. Use `--dry-run` to search
-without writing anything.
+**supervised** scoring metric is **MCC** (robust to rare anomalies). Override
+only with reason: `--scoring recall` when a miss is worse than a false page,
+`--scoring f1`, etc. Run `dtk autotune --help` to confirm the live flags. Use
+`--dry-run` to search without writing anything.
+
+**Unsupervised runs** (no labels) do **not** optimize MCC or any labeled metric —
+`--scoring` is ignored. They optimize a no-label objective
+`0.4·budget + 0.3·sharpness + 0.3·separation`: it rewards a **tight, well-calibrated
+confidence band** (sharpness) under a controlled flag rate (budget) plus clean
+separation of the flagged extremes. Practically this means the unsupervised tuner
+now prefers a snug band that isolates real extremes rather than the old timid
+"flag almost nothing" default. With no labels it cannot learn *which* spikes
+matter, so confirm the result against real history (Step 5) and add incidents
+later for a sharper tune.
 
 ## Step 4 — Study and present the result
 
 Read the emitted `metrics/<name>__tuned_<id>.yml` (do not re-run the search).
 The `#` comment header walks the whole decision; summarize for the user:
 
-- which **detector** won and why (the distribution votes),
-- the chosen **seasonality** grouping and `seasonality_columns`,
+- which **detector** won. All statistical detectors (mad / zscore / iqr) are
+  grid-searched and **cross-validation picks the winner** — the distribution
+  suitability vote only *orders* which is tried first, it never excludes one. So
+  describe the winner as "highest CV score", and mention the vote only as the
+  ordering hint it is.
+- the chosen **seasonality** grouping and `seasonality_columns` (or "none" — a
+  legitimate result when no key tightened the held-out band; see Step 1).
 - key params (`threshold`, `window_size`, `min_samples`, weighting/detrend) and
-  the alert `consecutive_anomalies`,
-- the **CV score** + metric, and the per-fold spread.
+  the alert `consecutive_anomalies`.
+- the score line. For a **supervised** run the header reads
+  `Scoring metric : <metric> = …`; for an **unsupervised** run it reads
+  `Objective : unsupervised (band-fit + flag-budget) = …` (it never claims an
+  `mcc =` score it didn't compute). Read off the value + the per-fold CV spread.
 
 Offer alternatives: a re-run with a different `--scoring` (e.g. precision vs
 recall trade-off) or a nudged parameter. See `autotune.md` for the

@@ -20,6 +20,76 @@ alerts**.
 dtk autotune --select <selector> [OPTIONS]
 ```
 
+## How the Search Works
+
+The search runs as a sequence of stages, each recorded in the
+[annotated header](#the-annotated-config) and the
+[decision log](#_dtk_autotune_runs-table):
+
+1. **Seasonality selection** — greedily builds the best seasonality grouping
+   (single columns or conjunctive groups like `[day_of_week, hour]`). It is
+   scored by a leak-free, walk-forward **held-out residual reduction** probe: for
+   each candidate grouping it measures how much conditioning on that seasonal key
+   tightens the per-group center/scale the detector actually applies, using a
+   band-width-aware Gaussian negative-log-likelihood evaluated on held-out CV
+   folds. The no-seasonality baseline scores exactly `0`; a grouping is accepted
+   only if it improves by a margin **and** improves in the majority of folds.
+   Over-fragmented groupings fall back to the global statistics and so cannot win
+   mechanically. (This replaces the old flag-rate detection objective, which was
+   biased against seasonality and often chose "none" even on genuinely seasonal
+   metrics.) `force_seasonality` pins the grouping and skips this stage;
+   `seasonality_candidates` restricts which columns it may use.
+2. **Detector ordering** — a distribution-suitability vote orders the candidate
+   detector types most-promising-first. The vote is **advisory only**: it never
+   excludes a type. The grid search evaluates **all** windowed statistical
+   detectors (`mad` / `zscore` / `iqr`) and cross-validation picks the winner, so
+   a heuristic can no longer drop the detector that would have scored best.
+3. **Grid search** — a bounded coordinate sweep per detector type
+   (threshold → recency weighting → detrend, gated by a trend test → window size),
+   followed by a **final threshold re-sweep at the chosen window** that fixes the
+   threshold↔window coupling (the optimal threshold depends on window size, but
+   threshold is chosen first against a seed window). The threshold grid includes
+   high "near-suppress" rungs — sigma `2.5 / 3 / 3.5 / 4 / 5 / 6` (mad / zscore)
+   and Tukey `1.5 / 2 / 3 / 4 / 6` (iqr) — so a heavy-tailed metric can widen its
+   band under the flag-rate budget instead of being trapped flagging its
+   legitimate tail.
+4. **Window selection** — sweeps window sizes in natural seasonal units; on a
+   near-tie the choice is **trend-gated**. A stationary series prefers the
+   **larger** window ("more history is better"); under a detected trend / regime
+   shift it prefers the **smaller** window (a fresher baseline that tracks the
+   current level instead of averaging in stale history). Supervised runs also
+   sweep `consecutive_anomalies` for the alert window.
+
+Cross-validation is walk-forward (expanding-window) throughout; because the
+windowed detector is causal, `detect()` runs once per candidate and each fold is
+scored by slicing the results (no leakage, no per-fold recompute).
+
+### Unsupervised tuning (no labels)
+
+Without labels the search cannot optimize a labelled metric (MCC etc.), so it
+maximizes a **band-fit** objective composed of three bounded terms (weights sum
+to 1):
+
+```
+objective = 0.4·budget + 0.3·sharpness + 0.3·separation
+```
+
+- **budget** (`0.4`) — smooth flag-rate control toward the target rate. There is
+  no hard cliff, so there is always gradient back toward fewer flags, and it is
+  **one-sided**: a genuinely clean metric is never pushed to manufacture
+  anomalies.
+- **sharpness** (`0.3`) — rewards a **tight, well-calibrated** confidence
+  interval, where normal points sit near the band edge rather than bunched at the
+  center. This is the term the old objective lacked (it was blind to band width).
+- **separation** (`0.3`) — flagged points sit clearly outside the band relative
+  to normal points (a clean partition).
+
+The all-suppress detector (a huge band that flags nothing) is no longer a strong
+baseline — it scores only the `budget` term, so a tight band that isolates real
+extremes strictly beats doing nothing. (The previous objective was
+`0.6·fpr_term + 0.4·separation`, which was scale-invariant and so scored a snug
+band and a hugely slack one identically.)
+
 ## Options
 
 ### `--select`, `-s` (required)
@@ -39,8 +109,9 @@ tuning. Without it (and without an `autotune.labels_file` in the config), an
 **interactive** terminal first prompts whether to enter incidents inline
 (`No incident labels provided. Enter them now?`); decline — or run
 non-interactively (cron/CI/piped input, no prompt) — and tuning falls back to the
-**unsupervised** objective (low false-positive rate + stable cross-fold
-separation). Supervised mode engages only if labeled timestamps land on **loaded**
+**unsupervised** objective (a tight, well-calibrated band — see
+[Unsupervised tuning](#unsupervised-tuning-no-labels)). Supervised mode engages
+only if labeled timestamps land on **loaded**
 grid points; labels entirely outside the loaded series mark nothing and the run
 proceeds unsupervised.
 
@@ -50,21 +121,48 @@ dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml
 
 ### `--label` (flag)
 
-Write a self-contained HTML chart of the metric's series to
-`metrics/<metric>__labeler.html` so you can mark incidents visually. Open it in a
-browser, click-drag across the chart to mark each incident, and use its
-**Export** button to download a labels file in the [format below](#labels-file-format)
-— then re-run with `--incidents`. **Generate-and-exit** — the command itself
-writes no rows to the database and runs no search.
+The easiest way to produce labels — mark incidents **visually on the chart**
+instead of dictating timestamps. It writes a self-contained HTML chart of the
+metric's series to `metrics/<metric>__labeler.html` and exits. **Generate-and-exit**:
+the command writes no rows to the database and runs no search.
 
 ```bash
 dtk autotune --select api_error_rate --label
+```
+
+Then:
+
+1. Open `metrics/api_error_rate__labeler.html` in any browser — just double-click
+   it. The file is fully self-contained (the series and the chart are inlined; no
+   server, no internet).
+2. **Click-drag across the chart** over each real incident. Each span shows as a
+   red band and a row in the list below; *remove* / *Clear all* fix mistakes.
+3. Click **Export incidents-<metric>.yml** — your browser downloads a labels file
+   in the [canonical format](#labels-file-format).
+4. Re-run supervised with that file:
+   `dtk autotune --select api_error_rate --incidents incidents-api_error_rate.yml`.
+
+The labeler looks like this (a live copy of the real output — try dragging on it):
+
+<iframe src="/examples/autotune-labeler.html" title="Interactive incident labeler — live example" style="width:100%;height:440px;border:1px solid var(--sl-color-gray-5);border-radius:8px;background:#211e1a"></iframe>
+
+> Open it directly: [examples/autotune-labeler.html](../examples/autotune-labeler.html).
+
+Each exported span/point uses the canonical schema, e.g.:
+
+```yaml
+metric: api_error_rate
+timezone: UTC
+incidents:
+  - {start: "2026-05-07 06:00:00", end: "2026-05-07 13:00:00"}
 ```
 
 ### `--scoring` (optional, default: `mcc`)
 
 The metric the search maximizes across folds. One of `mcc`, `f1`, `f_beta`,
 `balanced_accuracy`, `roc_auc`, `pr_auc` — see [Scoring metrics](#scoring-metrics).
+It applies only to **supervised** runs; without labels the search maximizes the
+no-label [band-fit objective](#unsupervised-tuning-no-labels) instead.
 
 ```bash
 dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml --scoring f_beta
@@ -168,7 +266,9 @@ autotune:
   #   - {start: "2026-05-02 14:00:00", end: "2026-05-02 16:30:00", label: outage}
   #   - {at: "2026-05-11 09:05:00", label: deploy spike}
   # incidents_timezone: UTC           # interprets the naive times above (default UTC)
-  seasonality_candidates: [hour, day_of_week]
+  seasonality_candidates: [hour, day_of_week]   # RESTRICT which columns the search may group on
+  # force_seasonality: [hour]                    # OR pin the grouping and skip the search
+  # force_seasonality: [[day_of_week, hour]]     #    (a nested list is one conjunctive group)
   fixed_params: {window_size: 4320}
   folds: 5
   max_history: 50000
@@ -183,7 +283,8 @@ autotune:
 | `labels_file` | string | Path to a default [labels file](#labels-file-format); overridden by `--incidents`. Mutually exclusive with `incidents` |
 | `incidents` | list | Inline labels — the same `{start, end}` / `{at}` entries as a [labels file](#labels-file-format), declared directly in the metric config. Mutually exclusive with `labels_file`; overridden by `--incidents` |
 | `incidents_timezone` | string | Timezone interpreting the naive times in `incidents` (default `UTC`). Only valid alongside `incidents` |
-| `seasonality_candidates` | list | Restrict the seasonality dimensions the search may group on — a subset of `hour` / `day_of_week` / `day_of_month` / `month` / `is_weekend` (plus any query-declared columns). `is_holiday` is accepted but never used (the holiday calendar is unimplemented — always `false`) |
+| `seasonality_candidates` | list | **Restrict** the seasonality dimensions the search may group on — a subset of `hour` / `day_of_week` / `day_of_month` / `month` / `is_weekend` (plus any query-declared columns). It narrows the search space; it does not pin a grouping. `is_holiday` is accepted but never used (the holiday calendar is unimplemented — always `false`) |
+| `force_seasonality` | list | **Pin** the seasonality grouping and **skip** the search. Each entry is a column name, or a list of columns for one conjunctive group — `[hour]` groups by `hour`; `[[day_of_week, hour]]` groups by the `day_of_week`×`hour` combination; `[day_of_week, hour]` is two separate components. Complements `seasonality_candidates` (which only restricts the search). If a forced column is absent from the data, the search runs normally instead |
 | `fixed_params` | map | Pin specific hyperparameters (they are excluded from the search) |
 | `folds` | int | Number of walk-forward (expanding-window) cross-validation folds |
 | `max_history` | int | Cap on the number of training points used |
@@ -197,8 +298,10 @@ A worked block is in
 
 ## Scoring Metrics
 
-The search maximizes one scoring metric across the walk-forward folds. The
-default, `mcc`, suits rare anomalies because it uses the whole confusion matrix.
+In a **supervised** run the search maximizes one scoring metric across the
+walk-forward folds. The default, `mcc`, suits rare anomalies because it uses the
+whole confusion matrix. (An unsupervised run has no labels and instead maximizes
+the [band-fit objective](#unsupervised-tuning-no-labels).)
 
 | Metric | Definition |
 |---|---|
@@ -222,6 +325,13 @@ walks every decision before the real config: the **training period**, the
 **window choice**. Below the header is an ordinary metric config — a single
 chosen detector with the chosen seasonality, copying over the metric's
 query/alerting.
+
+The objective line is mode-aware. A **supervised** run reports the labelled
+metric it maximized (`Scoring metric : mcc = …`); an **unsupervised** run never
+computes a labelled metric, so it reports the no-label objective instead —
+`Objective : unsupervised (band-fit + flag-budget) = …`. The seasonality line
+lists the per-candidate held-out residual reduction so a rejection is never
+opaque, e.g. `hour:5.70, day_of_week:-0.00`.
 
 **Hand-editing the detector below the header changes its `detector_id`**, so its
 old detections orphan. After editing, recompute and prune:

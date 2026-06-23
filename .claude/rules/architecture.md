@@ -378,24 +378,44 @@ prior winners. Stages (`AutoTuner.tune()`), each appending to a decision log:
 
 1. **Seasonality search** (`seasonality_search.py`) — greedy over the metric's
    seasonality columns (single-add or merge-into-last to form conjunctive
-   groups), scored with a cheap MAD probe; rejects groupings that would
-   under-fill a group.
+   groups), rejecting groupings that would under-fill a group. The criterion is
+   **decoupled from the flag-objective** (which is structurally biased *against*
+   seasonality): a leak-free, walk-forward, **band-width-aware** Gaussian-NLL
+   probe (`scoring.oof_residual_reduction`) scores how much conditioning on a
+   seasonal key tightens the per-group center/scale the detector actually applies
+   — measured on *held-out* folds, so over-fragmented groups fall back to global
+   and can't win mechanically; the no-seasonality baseline scores 0, a move is
+   accepted only on a margin **and** improvement in the majority of folds.
+   `autotune.force_seasonality` pins the grouping and skips the search.
 2. **Detector selection** (`detector_select.py`) — a distribution suitability
    spec **keyed by detector type name** (kept here, NOT on the detector classes,
-   so detectors stay untouched and the feature is easy to remove) votes per
-   seasonality group; quorum + the global winner form the candidate shortlist.
+   so detectors stay untouched and the feature is easy to remove). The vote is
+   **advisory only**: it *orders* the types (most promising first); the grid
+   search then evaluates **all** of them and lets cross-validation pick the
+   winner, so a hand-tuned heuristic never excludes a detector.
 3. **Grid search** (`grid_search.py`) — bounded coordinate sweep (threshold →
-   recency weighting → detrend, gated by a trend test → window size) maximizing
-   the cross-validated score.
+   recency weighting → detrend, gated by a trend test → window size → a **final
+   threshold re-sweep** at the chosen window, since the optimal threshold depends
+   on window size) maximizing the cross-validated score. The threshold grid
+   carries high "near-suppress" rungs so a heavy-tailed metric can widen the band
+   under the flag-rate budget instead of being trapped flagging its tail.
 4. **Window selection** (`window_select.py`) — window grid in natural seasonal
-   units; on near-ties prefers the **larger** window ("more history is better").
-   Supervised runs also sweep `consecutive_anomalies` for the alert window.
+   units; the tie-break is **trend-gated**: stationary → prefer the **larger**
+   window ("more history is better"); trend / regime shift present → prefer the
+   **smaller** (fresher baseline). Supervised runs also sweep
+   `consecutive_anomalies` for the alert window.
 5. **Cross-validation + scoring** (`crossval.py`, `scoring.py`) — walk-forward
    expanding-window folds; because the windowed detector is causal, `detect()`
    runs **once** per candidate and each fold is scored by slicing the results (no
-   leakage, no per-fold recompute). Metrics are pure numpy (MCC default, plus
-   `f_beta`/`balanced_accuracy`/`roc_auc`/`pr_auc`); no labels → an unsupervised
-   objective (low flag-rate + cross-fold stability). No scipy/sklearn dependency.
+   leakage, no per-fold recompute). Supervised metrics are pure numpy (MCC
+   default, plus `f_beta`/`balanced_accuracy`/`roc_auc`/`pr_auc`). With no labels
+   the objective is `unsupervised_objective` = `0.4·budget + 0.3·sharpness +
+   0.3·separation`: a smooth flag-rate **budget** (no flat cliff, one-sided so a
+   clean metric isn't pushed to flag), **sharpness** (median band-relative
+   distance of the *normal* points — directly rewards a **tight** interval, the
+   term the old ratio-only objective lacked), and **separation** (flagged points
+   clearly outside vs normal). All-suppress now scores only `w_budget`, so a tight
+   band that isolates real extremes strictly beats doing nothing. No scipy/sklearn.
 
 `config_emitter.py` builds `metrics/<name>__tuned_<id>.yml` (deterministic
 `run_id`) with a `#`-comment header rendering the decision log, validated through

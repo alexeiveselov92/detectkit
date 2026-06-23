@@ -65,10 +65,15 @@ class AutoTuner(_AutoTuneBase):
             )
 
         gt = self.ground_truth
+        objective = (
+            f"scoring={self.settings.metric.value}"
+            if gt.mode == TuneMode.SUPERVISED
+            else "objective=unsupervised (band-fit + flag-budget)"
+        )
         self.log(
             "labels",
             f"{gt.n_intervals} interval(s) + {gt.n_points} point(s) → {gt.mode.value} mode "
-            f"({gt.n_positive} labeled grid point(s)); scoring={self.settings.metric.value}",
+            f"({gt.n_positive} labeled grid point(s)); {objective}",
             mode=gt.mode.value,
             n_positive=gt.n_positive,
         )

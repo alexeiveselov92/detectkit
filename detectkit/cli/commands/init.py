@@ -130,6 +130,48 @@ _BUCKET_SQL = {
     ),
 }
 
+# Example incidents (labels) file for supervised `dtk autotune`. Lives in
+# incidents/ beside metrics/; pointed at via `--incidents` or a metric's
+# `autotune.labels_file`. See docs/guides/autotuning.md.
+_EXAMPLE_INCIDENTS = """# Example incidents (labels) file for supervised `dtk autotune`.
+#
+# Tell autotune WHICH points were real incidents so it can pick the detector,
+# threshold, seasonality and alert window that catch them while keeping false
+# positives down. Hand it to autotune with:
+#
+#   dtk autotune --select example_cpu_usage --incidents incidents/example_cpu_usage.yml
+#
+# ...or reference it from the metric's `autotune.labels_file:` (see
+# metrics/example_cpu_usage.yml). Without any labels, autotune falls back to an
+# unsupervised objective (low false-positive rate + stable cross-fold separation).
+#
+# Format:
+# - YAML or JSON. ALL times are UTC unless `timezone:` says otherwise.
+# - Each incident is EITHER an interval ({start, end}) for a sustained problem
+#   OR a point ({at}) for a single spike — never both keys. `end` is inclusive.
+# - `label` is optional free text (documentation only).
+#
+# Tip: can't list incidents from memory? Run
+#   dtk autotune --select example_cpu_usage --label
+# to get a clickable HTML chart; mark incidents in a browser and export this file.
+
+# Optional — must match the metric `name:` it labels (autotune refuses a mismatch).
+metric: example_cpu_usage
+
+# Optional — interprets the naive times below (defaults to UTC).
+timezone: UTC
+
+incidents:
+  # Interval incident (a sustained problem):
+  - start: "2026-05-02 14:00:00"
+    end:   "2026-05-02 16:30:00"
+    label: example sustained spike      # optional, free text
+
+  # Point incident (a single anomalous timestamp):
+  - at: "2026-05-11 09:05:00"
+    label: example one-off spike
+"""
+
 # Alert-channel section (backend-independent); appended after the profiles.
 _ALERT_CHANNELS = """
 # Alert channels (referenced by name from a metric's alerting.channels)
@@ -190,7 +232,9 @@ def run_init(project_name: str, target_dir: str, db_type: str = "clickhouse"):
         ├── detectkit_project.yml
         ├── profiles.yml
         ├── metrics/
-        │   └── .gitkeep
+        │   └── example_cpu_usage.yml
+        ├── incidents/
+        │   └── example_cpu_usage.yml   # labels for supervised `dtk autotune`
         └── sql/
             └── .gitkeep
     """
@@ -216,11 +260,15 @@ def run_init(project_name: str, target_dir: str, db_type: str = "clickhouse"):
 
     # Create subdirectories
     (target_path / "metrics").mkdir(exist_ok=True)
+    (target_path / "incidents").mkdir(exist_ok=True)
     (target_path / "sql").mkdir(exist_ok=True)
 
-    # Create .gitkeep files
+    # Create .gitkeep files (incidents/ is kept by its example file below)
     (target_path / "metrics" / ".gitkeep").touch()
     (target_path / "sql" / ".gitkeep").touch()
+
+    # Example incidents (labels) file for supervised `dtk autotune`
+    (target_path / "incidents" / "example_cpu_usage.yml").write_text(_EXAMPLE_INCIDENTS)
 
     # Create detectkit_project.yml
     project_config = f"""# detectkit project configuration
@@ -337,6 +385,19 @@ alerting:
   no_data_alert: false        # alert when the latest interval has no data
   # alert_cooldown: "2h"      # recommended: suppress repeats of a persisting anomaly
 
+# Auto-tuning (optional) — `dtk autotune --select example_cpu_usage` picks the
+# detector config for you. Supply known incidents to tune supervised; either
+# point at a labels file OR declare them inline (the two are mutually exclusive).
+# autotune:
+#   enabled: true
+#   # (a) external labels file (see incidents/example_cpu_usage.yml):
+#   labels_file: incidents/example_cpu_usage.yml
+#   # (b) — or — inline incidents:
+#   # incidents:
+#   #   - {start: "2026-05-02 14:00:00", end: "2026-05-02 16:30:00", label: outage}
+#   #   - {at: "2026-05-11 09:05:00", label: deploy spike}
+#   # incidents_timezone: UTC   # interprets the naive times above (default UTC)
+
 # Tags for selection
 tags:
   - critical
@@ -368,6 +429,7 @@ detectkit monitoring project.
 - `detectkit_project.yml` - Project configuration
 - `profiles.yml` - Database connection profiles
 - `metrics/` - Metric definitions (YAML files)
+- `incidents/` - Labeled incidents for supervised `dtk autotune` (optional)
 - `sql/` - SQL query files (optional)
 
 ## Commands

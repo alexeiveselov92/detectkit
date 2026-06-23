@@ -320,7 +320,11 @@ class AutoTuneConfig(BaseModel):
           detector_types: [mad, zscore]   # restrict candidates
           scoring_metric: mcc              # optimization target
           beta: 1.0                        # only for scoring_metric: f_beta
-          labels_file: incidents/orders.yml
+          labels_file: incidents/orders.yml   # external labels file, OR inline:
+          incidents:                          # inline labels (mutually exclusive)
+            - {start: "2026-05-02 14:00:00", end: "2026-05-02 16:30:00"}
+            - {at: "2026-05-11 09:05:00"}
+          incidents_timezone: UTC          # interprets the naive times above
           seasonality_candidates: [hour, day_of_week]
           fixed_params:                    # pinned, not searched
             window_size: 4320
@@ -343,6 +347,16 @@ class AutoTuneConfig(BaseModel):
     )
     labels_file: str | None = Field(
         default=None, description="Project-relative path to a canonical labels file"
+    )
+    incidents: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Inline labeled incidents (alternative to labels_file). Each entry is "
+        "{start, end} for a sustained incident or {at} for a single point; an optional "
+        "'label' is free-text documentation.",
+    )
+    incidents_timezone: str | None = Field(
+        default=None,
+        description="Timezone that interprets the naive times in `incidents` (default UTC)",
     )
     seasonality_candidates: list[str] | None = Field(
         default=None, description="Restrict the seasonality columns the search may use"
@@ -421,6 +435,34 @@ class AutoTuneConfig(BaseModel):
         if v is not None and v < 1:
             raise ValueError("max_history must be at least 1")
         return v
+
+    @model_validator(mode="after")
+    def validate_inline_incidents(self) -> "AutoTuneConfig":
+        """Validate inline incidents: not alongside labels_file, and well-formed.
+
+        Reuses the canonical labels parser so an inline block is validated by the
+        same rules as a labels file (timestamp formats, interval-vs-point shape,
+        timezone), failing fast at config load.
+        """
+        if self.labels_file and self.incidents:
+            raise ValueError(
+                "Set either 'labels_file' or 'incidents', not both "
+                "(inline incidents and an external labels file are mutually exclusive)"
+            )
+        if self.incidents_timezone and not self.incidents:
+            raise ValueError("incidents_timezone has no effect without 'incidents'")
+        if self.incidents is not None:
+            # Local import to avoid a config <-> autotune import cycle at module load.
+            from detectkit.autotune.labels import parse_incident_labels
+
+            try:
+                parse_incident_labels(
+                    {"incidents": self.incidents, "timezone": self.incidents_timezone},
+                    interval_seconds=1,
+                )
+            except Exception as exc:  # ValueError, bad timezone (KeyError), etc.
+                raise ValueError(f"invalid 'incidents': {exc}") from exc
+        return self
 
 
 class MetricConfig(BaseModel):

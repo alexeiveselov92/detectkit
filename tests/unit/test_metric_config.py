@@ -7,6 +7,7 @@ import pytest
 
 from detectkit.config.metric_config import (
     AlertConfig,
+    AutoTuneConfig,
     DetectorConfig,
     MetricConfig,
 )
@@ -475,3 +476,50 @@ class TestAlertConfigDashboardLinks:
     def test_dangerous_link_url_rejected(self):
         with pytest.raises(ValueError, match="http"):
             AlertConfig(links={"x": "data:text/html,<script>"})
+
+
+class TestAutoTuneInlineIncidents:
+    """Inline incidents on the autotune block (alternative to labels_file)."""
+
+    def test_inline_incidents_valid(self):
+        cfg = AutoTuneConfig(
+            incidents=[
+                {"start": "2026-05-02 14:00:00", "end": "2026-05-02 16:30:00", "label": "x"},
+                {"at": "2026-05-11 09:05:00"},
+            ]
+        )
+        assert len(cfg.incidents) == 2
+
+    def test_inline_incidents_with_timezone(self):
+        cfg = AutoTuneConfig(
+            incidents=[{"at": "2026-05-11 09:05:00"}],
+            incidents_timezone="Europe/Moscow",
+        )
+        assert cfg.incidents_timezone == "Europe/Moscow"
+
+    def test_labels_file_and_incidents_mutually_exclusive(self):
+        with pytest.raises(ValueError, match="not both"):
+            AutoTuneConfig(
+                labels_file="incidents/x.yml",
+                incidents=[{"at": "2026-05-11 09:05:00"}],
+            )
+
+    def test_timezone_without_incidents_rejected(self):
+        with pytest.raises(ValueError, match="incidents_timezone"):
+            AutoTuneConfig(incidents_timezone="UTC")
+
+    def test_malformed_incident_rejected(self):
+        # neither 'at' nor 'start'+'end'
+        with pytest.raises(ValueError):
+            AutoTuneConfig(incidents=[{"label": "missing keys"}])
+
+    def test_bad_timestamp_rejected(self):
+        with pytest.raises(ValueError):
+            AutoTuneConfig(incidents=[{"at": "not-a-date"}])
+
+    def test_bad_timezone_rejected(self):
+        with pytest.raises(ValueError):
+            AutoTuneConfig(
+                incidents=[{"at": "2026-05-11 09:05:00"}],
+                incidents_timezone="Mars/Phobos",
+            )

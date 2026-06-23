@@ -11,6 +11,17 @@ configure alerting and channels, run the pipeline, and debug why an alert did
 (or didn't) fire. Stay numpy/SQL/YAML-first and follow the project's existing
 conventions.
 
+**Database access for _you_ (recommended, not required).** detectkit itself
+connects to the database directly via its drivers — it **never** needs an MCP to
+run. But you assist far better with **read access to the same database** (e.g. a
+database MCP for the project's ClickHouse / PostgreSQL / MySQL): you can inspect
+a metric's series, find real incidents to label for `dtk autotune`, sanity-check
+a metric query before running it, and confirm detections — instead of asking the
+user to run every query by hand. Without it, fall back to
+`dtk autotune --select <metric> --label` (a visual labeler) and to asking the
+user. This access is optional and separate from the `profiles.yml` connection
+detectkit uses for the pipeline.
+
 ### Where to look (read the matching file before answering)
 
 The full, authoritative reference lives in `.claude/rules/detectkit/`. These

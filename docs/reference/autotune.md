@@ -163,7 +163,11 @@ autotune:
   detector_types: [mad, zscore]
   scoring_metric: mcc
   beta: 1.0
-  labels_file: incidents/orders.yml
+  labels_file: incidents/orders.yml   # external labels file, OR inline (below)
+  # incidents:                        # inline labels — mutually exclusive with labels_file
+  #   - {start: "2026-05-02 14:00:00", end: "2026-05-02 16:30:00", label: outage}
+  #   - {at: "2026-05-11 09:05:00", label: deploy spike}
+  # incidents_timezone: UTC           # interprets the naive times above (default UTC)
   seasonality_candidates: [hour, day_of_week]
   fixed_params: {window_size: 4320}
   folds: 5
@@ -176,11 +180,17 @@ autotune:
 | `detector_types` | list | Restrict candidate detectors to a subset of `mad` / `zscore` / `iqr` |
 | `scoring_metric` | string | Default optimization target (see [Scoring metrics](#scoring-metrics)); overridden by `--scoring` |
 | `beta` | float | The β for `scoring_metric: f_beta` (β > 1 favors recall, β < 1 favors precision) |
-| `labels_file` | string | Path to a default [labels file](#labels-file-format); overridden by `--incidents` |
+| `labels_file` | string | Path to a default [labels file](#labels-file-format); overridden by `--incidents`. Mutually exclusive with `incidents` |
+| `incidents` | list | Inline labels — the same `{start, end}` / `{at}` entries as a [labels file](#labels-file-format), declared directly in the metric config. Mutually exclusive with `labels_file`; overridden by `--incidents` |
+| `incidents_timezone` | string | Timezone interpreting the naive times in `incidents` (default `UTC`). Only valid alongside `incidents` |
 | `seasonality_candidates` | list | Restrict the seasonality dimensions the search may group on — a subset of `hour` / `day_of_week` / `day_of_month` / `month` / `is_weekend` (plus any query-declared columns). `is_holiday` is accepted but never used (the holiday calendar is unimplemented — always `false`) |
 | `fixed_params` | map | Pin specific hyperparameters (they are excluded from the search) |
 | `folds` | int | Number of walk-forward (expanding-window) cross-validation folds |
 | `max_history` | int | Cap on the number of training points used |
+
+**Label resolution precedence** (highest first): the `--incidents` flag → the
+config's `labels_file` → the config's inline `incidents` → an interactive prompt
+(only on a TTY) → none (unsupervised).
 
 A worked block is in
 [autotuned-metric-example.yml](../examples/autotuned-metric-example.yml).

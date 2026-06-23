@@ -101,7 +101,11 @@ def _resolve_labels(
     autotune_cfg: AutoTuneConfig,
     project_root: Path,
 ) -> tuple[IncidentLabels, str]:
-    """Resolve labels by precedence: --incidents > config.labels_file > interactive > none."""
+    """Resolve labels by precedence.
+
+    ``--incidents`` flag > config ``labels_file`` > config inline ``incidents`` >
+    interactive prompt > none (unsupervised).
+    """
     path = incidents_path or autotune_cfg.labels_file
     if path:
         file_path = Path(path)
@@ -111,6 +115,15 @@ def _resolve_labels(
             file_path, interval_seconds=interval_seconds, metric_name=metric_name
         )
         return labels, f"file {file_path}"
+
+    if autotune_cfg.incidents:
+        labels = parse_incident_labels(
+            {"incidents": autotune_cfg.incidents, "timezone": autotune_cfg.incidents_timezone},
+            interval_seconds=interval_seconds,
+            metric_name=metric_name,
+        )
+        n = len(autotune_cfg.incidents)
+        return labels, f"inline config ({n} incident{'s' if n != 1 else ''})"
 
     if sys.stdin.isatty():
         return _prompt_labels(interval_seconds=interval_seconds), "interactive"

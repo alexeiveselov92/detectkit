@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timedelta
 
 import numpy as np
+import pytest
 
 from detectkit.cli.commands import autotune as autotune_cmd
 from detectkit.config.metric_config import MetricConfig
@@ -225,6 +226,46 @@ def test_resolve_labels_precedence(tmp_path):
         project_root=tmp_path,
     )
     assert source.startswith("file ")
+
+
+def test_resolve_labels_directory_uses_newest(tmp_path):
+    """A directory resolves to its newest versioned labels file."""
+    from detectkit.config.metric_config import AutoTuneConfig
+
+    inc = tmp_path / "incidents" / "demo"
+    inc.mkdir(parents=True)
+    (inc / "demo-20260101T000000Z.yml").write_text("incidents:\n  - {at: '2026-01-01 00:00:00'}\n")
+    (inc / "demo-20260315T120000Z.yml").write_text(
+        "incidents:\n"
+        "  - {start: '2026-03-15 10:00:00', end: '2026-03-15 14:00:00'}\n"
+        "  - {at: '2026-03-16 09:00:00'}\n"
+    )
+    labels, source = autotune_cmd._resolve_labels(
+        metric_name="demo",
+        interval_seconds=3600,
+        incidents_path=str(inc),
+        autotune_cfg=AutoTuneConfig(),
+        project_root=tmp_path,
+    )
+    assert "newest in" in source
+    assert "demo-20260315T120000Z.yml" in source
+    # the newer file has one interval + one point, not the older single point
+    assert len(labels.intervals) == 1 and len(labels.points) == 1
+
+
+def test_resolve_labels_empty_directory_errors(tmp_path):
+    from detectkit.config.metric_config import AutoTuneConfig
+
+    empty = tmp_path / "incidents" / "demo"
+    empty.mkdir(parents=True)
+    with pytest.raises(FileNotFoundError):
+        autotune_cmd._resolve_labels(
+            metric_name="demo",
+            interval_seconds=3600,
+            incidents_path=str(empty),
+            autotune_cfg=AutoTuneConfig(),
+            project_root=tmp_path,
+        )
 
 
 def test_tune_one_no_datapoints_skips(tmp_path, monkeypatch):

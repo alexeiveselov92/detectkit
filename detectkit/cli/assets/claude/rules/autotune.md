@@ -46,12 +46,14 @@ dtk autotune --select <sel> [--incidents FILE] [--label] [--scoring METRIC] \
              [--from DATE] [--to DATE] [--profile NAME] [--force] [--dry-run]
 ```
 
-- `--incidents FILE` — a labels file (below) → **supervised** tuning. With no
-  labels file, an interactive terminal prompts to enter incidents inline;
-  declining (or running non-interactively) tunes **unsupervised**.
-- `--label` — write a self-contained HTML chart of the series to
-  `metrics/<name>__labeler.html`; the user marks incidents in a browser and its
-  **Export** button downloads a labels file. Generate-and-exit (no DB writes).
+- `--incidents FILE|DIR` — a labels file (below) → **supervised** tuning. May be a
+  **directory** (e.g. `incidents/<name>/`) — the newest versioned file in it is
+  used. With nothing given, an interactive terminal prompts to enter incidents
+  inline; declining (or running non-interactively) tunes **unsupervised**.
+- `--label` — write a self-contained, zoomable/pannable HTML chart of the series
+  to `metrics/<name>__labeler.html`; the user marks incidents in a browser (with
+  optional per-incident descriptions) and **Export** downloads a *versioned*
+  labels file `<name>-<UTC>.yml`. Generate-and-exit (no DB writes).
 - `--scoring` — `mcc` (default), `f1`, `f_beta`, `balanced_accuracy`, `roc_auc`,
   `pr_auc`. MCC uses the whole confusion matrix and suits rare anomalies.
 - `--dry-run` — run the search but persist nothing and write no config.
@@ -82,11 +84,15 @@ user to recall timestamps** — it is the easiest, most reliable path:
 
 1. Run `dtk autotune --select <name> --label` (offline; writes no DB rows). It
    renders the series to a self-contained `metrics/<name>__labeler.html`.
-2. Tell the user to open that file in a browser and **click-drag across the chart**
-   to mark each real incident (red bands; *remove* / *Clear all* to fix), then
-   click **Export incidents-<name>.yml** to download a labels file in the format
-   above.
-3. Feed it back: `dtk autotune --select <name> --incidents incidents-<name>.yml`.
+2. Tell the user to open it in a browser and mark incidents on the chart: scroll
+   to zoom, drag the navigator strip to move, **click-drag** to mark each span
+   (add an optional description), then **Export**.
+3. Persist with versioning: a browser can't write into the project, so Export
+   downloads a versioned `<name>-<UTC>.yml`. **Move it into `incidents/<name>/`**
+   — re-labeling adds a new file, never overwrites, so every round is kept. You
+   (the assistant, with filesystem access) do this move.
+4. Tune on the latest: point `--incidents` at the folder so the newest version is
+   used — `dtk autotune --select <name> --incidents incidents/<name>/`.
 
 Prefer this whenever the user can *recognise* incidents on a chart but doesn't
 have exact times. If they already know the times (or you found them via a DB

@@ -920,6 +920,27 @@ const dxExplainer = (() => {
       </p>
     </section>
 
+    <!-- ===== visual labeling ===== -->
+    <section class="wrap section">
+      <div class="eyebrow">autotune · labeling</div>
+      <h2>Teach it your incidents — point, drag, done.</h2>
+      <p class="sub">
+        Autotune already tunes well with <strong>zero labels</strong>. To optimise against your
+        <em>real</em> incidents, run <code>dtk autotune --select &lt;metric&gt; --label</code> — it opens
+        this chart. Drag across each incident, add a note, and <strong>Export</strong>. One
+        self-contained file: offline, nothing leaves your browser, and every round is versioned, so
+        drop it in <code>incidents/&lt;metric&gt;/</code> and re-run. It's live below — scroll to zoom,
+        drag the navigator to move, drag its edges to stretch the view.
+      </p>
+      <div class="labeler-embed">
+        <iframe
+          src="/examples/autotune-labeler.html"
+          title="detectkit interactive incident labeler — live demo"
+          loading="lazy"
+        ></iframe>
+      </div>
+    </section>
+
     <!-- ===== alerting ===== -->
     <section class="wrap section">
       <div class="eyebrow">alerting</div>

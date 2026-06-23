@@ -115,8 +115,15 @@ only if labeled timestamps land on **loaded**
 grid points; labels entirely outside the loaded series mark nothing and the run
 proceeds unsupervised.
 
+`--incidents` (and `autotune.labels_file`) may also point at a **directory** — the
+newest versioned file in it is used. Pair this with the labeler's versioned
+exports (below) to keep every labeling round on disk and always tune on the
+latest:
+
 ```bash
 dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml
+# …or point at the folder of versions and use the newest:
+dtk autotune --select api_error_rate --incidents incidents/api_error_rate/
 ```
 
 ### `--label` (flag)
@@ -133,28 +140,38 @@ dtk autotune --select api_error_rate --label
 Then:
 
 1. Open `metrics/api_error_rate__labeler.html` in any browser — just double-click
-   it. The file is fully self-contained (the series and the chart are inlined; no
-   server, no internet).
-2. **Click-drag across the chart** over each real incident. Each span shows as a
-   red band and a row in the list below; *remove* / *Clear all* fix mistakes.
-3. Click **Export incidents-<metric>.yml** — your browser downloads a labels file
-   in the [canonical format](#labels-file-format).
-4. Re-run supervised with that file:
-   `dtk autotune --select api_error_rate --incidents incidents-api_error_rate.yml`.
+   it. The file is fully self-contained (series + chart inlined; no server, no
+   internet, nothing leaves your browser).
+2. **Navigate**: scroll to zoom where you point, double-click to reset, and drag
+   the **navigator strip** below the chart to move the view (drag the window to
+   pan, drag its edges to stretch/squeeze). This makes narrow incidents markable
+   even on a long span with a small step.
+3. **Click-drag across the chart** over each real incident — it shows as a red
+   band and a row below, with an optional **description** field (exported as the
+   `label:`); *remove* / *Clear all* fix mistakes.
+4. Click **Export labels** — your browser downloads a **versioned** file
+   `<metric>-<UTC-timestamp>.yml` in the [canonical format](#labels-file-format).
+   A browser can't write into your project, so move it under
+   `incidents/<metric>/`. Re-labeling later just adds another versioned file —
+   **nothing is overwritten**, so the full history is preserved.
+5. Tune on it — point `--incidents` at the file, or at the folder to use the
+   newest version automatically:
+   `dtk autotune --select api_error_rate --incidents incidents/api_error_rate/`.
 
-The labeler looks like this (a live copy of the real output — try dragging on it):
+The labeler looks like this (a live copy of the real output — scroll, drag the
+navigator, mark a span):
 
-<iframe src="/examples/autotune-labeler.html" title="Interactive incident labeler — live example" style="width:100%;height:440px;border:1px solid var(--sl-color-gray-5);border-radius:8px;background:#211e1a"></iframe>
+<iframe src="/examples/autotune-labeler.html" title="Interactive incident labeler — live example" style="width:100%;height:560px;border:1px solid var(--sl-color-gray-5);border-radius:8px;background:#211e1a"></iframe>
 
 > Open it directly: [examples/autotune-labeler.html](../examples/autotune-labeler.html).
 
-Each exported span/point uses the canonical schema, e.g.:
+Each exported incident uses the canonical schema (with the optional description), e.g.:
 
 ```yaml
 metric: api_error_rate
 timezone: UTC
 incidents:
-  - {start: "2026-05-07 06:00:00", end: "2026-05-07 13:00:00"}
+  - {start: "2026-05-07 06:00:00", end: "2026-05-07 13:00:00", label: "checkout 5xx spike"}
 ```
 
 ### `--scoring` (optional, default: `mcc`)

@@ -76,3 +76,26 @@
   font-weight: 700;
   letter-spacing: -0.02em;
 }
+
+/*
+ * Sidebar: standalone pages that sit alongside sub-groups should read as peers,
+ * not as children of the group above them. Starlight only gives a link the bold
+ * ".large" treatment at the top level (`class:list={{ large: !nested }}` in
+ * SidebarSublist.astro), while a group label always renders `.large`. So inside a
+ * section like "Guides", the sub-group labels (Configuration, Databases, Alerting)
+ * are bold/white but standalone links (Detectors, Auto-tuning, Visualizing results)
+ * render as muted leaf links — making them look nested under "Databases". Promote any
+ * standalone link whose list also contains sub-groups to the same level styling,
+ * mirroring Starlight's responsive `.large` sizing. Unlayered, so it wins over the
+ * `@layer starlight.core` leaf-link rules; the active page keeps its accent styling.
+ */
+.top-level ul:has(> li > details) > li > a:not([aria-current='page']) {
+  font-size: var(--sl-text-lg);
+  font-weight: 600;
+  color: var(--sl-color-white);
+}
+@media (min-width: 50rem) {
+  .top-level ul:has(> li > details) > li > a:not([aria-current='page']) {
+    font-size: var(--sl-text-base);
+  }
+}

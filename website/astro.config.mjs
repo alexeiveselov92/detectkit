@@ -92,6 +92,7 @@ export default defineConfig({
           items: [
             { label: 'CLI', link: '/reference/cli/' },
             { label: 'Auto-tune', link: '/reference/autotune/' },
+            { label: 'Internal tables', link: '/reference/internal-tables/' },
             {
               // Renamed from "Detectors" to disambiguate from the Guides > Detectors page.
               label: 'Detector reference',

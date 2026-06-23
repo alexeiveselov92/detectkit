@@ -455,6 +455,9 @@ tables:
 
 **Note**: `tasks` table cannot be overridden (shared across all metrics).
 
+See the [Internal Tables reference](../reference/internal-tables.md) for the full
+schema (columns, primary keys, engines) of every `_dtk_*` table.
+
 ## Complete Examples
 
 ### Simple Metric

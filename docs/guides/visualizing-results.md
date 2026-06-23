@@ -27,80 +27,28 @@ your profile — the same place the pipeline writes to, separate from the
 `data_database` your metric queries read from. See the
 [Profiles configuration](configuration-profiles.md) for where these live.
 
-### `_dtk_datapoints` — the loaded metric points
+detectkit writes everything into the `_dtk_*` tables. The full column / primary
+key / engine schema of all six lives in the
+[Internal Tables reference](../reference/internal-tables.md); at a glance:
 
-One row per metric per timestamp on the metric's time grid (gaps are filled with
-`NULL`, never `0`).
+| Table | Holds |
+|---|---|
+| `_dtk_datapoints` | the loaded metric series — one row per point on the time grid |
+| `_dtk_detections` | per-point detection results — one row per (metric, detector, timestamp) |
+| `_dtk_tasks` | pipeline locks & resume cursors |
+| `_dtk_alert_states` | per-alert-block cooldown / recovery bookkeeping |
+| `_dtk_metrics` | a config mirror for dashboards (informational) |
+| `_dtk_autotune_runs` | [`dtk autotune`](../reference/cli.md#dtk-autotune) audit trail |
 
-| Column | Type | Meaning |
-|---|---|---|
-| `metric_name` | String | Metric identifier |
-| `timestamp` | DateTime64(3, UTC) | Point on the metric's time grid |
-| `value` | Nullable(Float64) | Metric value (`NULL` = missing / gap-filled) |
-| `seasonality_data` | String (JSON) | Extracted seasonality features for the point |
-| `interval_seconds` | Int32 | The metric's grid step, in seconds |
-| `seasonality_columns` | String | Comma-separated names of the seasonality features |
-| `created_at` | DateTime64(3, UTC) | When the row was written |
-
-### `_dtk_detections` — per-point detection results
-
-One row per **(metric, detector, timestamp)**. A metric with two detectors
-produces two rows per timestamp, so always filter or group by `detector_id`
-(see [Avoid mixing detectors](#joining-tables-and-avoiding-mixed-detectors)).
-
-| Column | Type | Meaning |
-|---|---|---|
-| `metric_name` | String | Metric identifier |
-| `detector_id` | String | Detector identity (hash of its parameters) |
-| `detector_name` | String | Detector class name (`MADDetector`, `ZScoreDetector`, `IQRDetector`, `ManualBoundsDetector`) |
-| `timestamp` | DateTime64(3, UTC) | The point that was scored |
-| `is_anomaly` | Bool | `true`/`1` if flagged anomalous |
-| `confidence_lower` | Nullable(Float64) | Lower edge of the expected range |
-| `confidence_upper` | Nullable(Float64) | Upper edge of the expected range |
-| `value` | Nullable(Float64) | Original metric value (matches `_dtk_datapoints.value`) |
-| `processed_value` | Nullable(Float64) | What the detector actually analyzed (after smoothing / `input_type`) |
-| `detector_params` | String (JSON) | The detector's non-default parameters |
-| `detection_metadata` | String (JSON) | Per-point detail: `severity`, `direction`, `distance`, `reason`, … |
-| `created_at` | DateTime64(3, UTC) | When the detection was written |
-
-The `detection_metadata` JSON commonly carries:
-
-- `reason` — set only when a point could **not** be scored: `"missing_data"`
-  (value was `NULL`) or `"insufficient_data"` (fewer than `min_samples` points
-  in the window). For real, scored points this key is absent. Filter it out to
-  drop these "technical" rows (see the recipes below).
-- `direction` — `"above"` / `"below"` (present only on anomalies).
-- `severity` — distance past the breached bound in units of spread
-  (σ-equivalents for MAD/Z-Score, IQR-units for IQR); `0` = exactly on the
-  bound. Comparable across MAD and Z-Score.
-- `distance` — raw distance from the value to the breached bound.
-- Optional: `ess` (effective sample size, when window weighting is on),
-  `trend_slope_per_point` (when `detrend: linear` is on), `preprocessing`,
-  `window_size`, and `global_*` / `adjusted_*` window statistics.
-
-See the [Detectors guide](detectors.md#debugging-preprocessed-detections) for
-the full metadata contract.
-
-### `_dtk_alert_states` — alert bookkeeping
-
-One row per **(metric, alert config block)** tracking cooldown / recovery state:
-`last_alert_sent`, `last_recovery_sent`, `alert_count`, `updated_at`, keyed by
-`metric_name` + `alert_config_id`. Useful for an "alert activity" panel. Reads
-should use `FINAL` to collapse `ReplacingMergeTree` versions (ClickHouse).
-
-### `_dtk_autotune_runs` — auto-tune audit trail
-
-One row per [`dtk autotune`](../reference/cli.md#dtk-autotune) run, keyed by
-`metric_name` + `run_id`. It records what the search chose — `mode`,
-`scoring_metric`, `score`, `chosen_detector_type`, `chosen_detector_params_json`,
-`winning_detector_id`, the decision log, and the full generated config text. It
-is an **audit trail only**: the `load → detect → alert` pipeline never reads it,
-and `dtk clean --orphaned-metrics` never prunes it. The most common use is to
-pull a run's `winning_detector_id`, then chart that detector's rows in
-`_dtk_detections` (see [the recipes below](#chart-recipes) and
-[Reading the tuned detector's results](../guides/autotuning.md#see-how-it-behaves)).
-The full column list is in the
-[Auto-tune reference](../reference/autotune.md#_dtk_autotune_runs-table).
+The two you chart most are **`_dtk_datapoints`** (the series) and
+**`_dtk_detections`** (the confidence band + anomaly flags) — the recipes below
+use them. Always filter or group `_dtk_detections` by `detector_id`, since a
+metric with two detectors writes two rows per timestamp (see
+[Avoid mixing detectors](#joining-tables-and-avoiding-mixed-detectors)). The
+`detection_metadata` JSON carries the per-point `severity` / `direction` /
+`reason` detail — see
+[Internal Tables → detection_metadata](../reference/internal-tables.md#the-detection_metadata-json)
+and the [Detectors guide](detectors.md#debugging-preprocessed-detections).
 
 ## Connecting a BI tool
 

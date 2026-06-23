@@ -289,3 +289,5 @@ and the [Visualizing Results](../guides/visualizing-results.md) guide.
   the search ranges over
 - [Visualizing Results](../guides/visualizing-results.md) — chart the tuned
   detector in any BI tool
+- [Internal Tables](internal-tables.md) — the `_dtk_autotune_runs` table and the
+  rest of the `_dtk_*` schema

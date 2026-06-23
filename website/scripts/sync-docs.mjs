@@ -46,6 +46,7 @@ const PAGES = [
   { src: 'docs/guides/visualizing-results.md', dest: 'guides/visualizing-results.md' },
   { src: 'docs/reference/cli.md', dest: 'reference/cli.md' },
   { src: 'docs/reference/autotune.md', dest: 'reference/autotune.md' },
+  { src: 'docs/reference/internal-tables.md', dest: 'reference/internal-tables.md' },
   { src: 'docs/reference/detectors/mad.md', dest: 'reference/detectors/mad.md' },
   { src: 'docs/reference/detectors/zscore.md', dest: 'reference/detectors/zscore.md' },
   { src: 'docs/reference/detectors/iqr.md', dest: 'reference/detectors/iqr.md' },

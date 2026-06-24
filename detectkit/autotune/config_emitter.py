@@ -103,9 +103,17 @@ def _build_body(original: MetricConfig, result: AutoTuneResult, new_name: str) -
         elif original.seasonality_columns:
             body["seasonality_columns"] = original.seasonality_columns
 
-    body["detectors"] = [
-        {"type": result.chosen_detector_type, "params": result.chosen_detector_params}
-    ]
+    # Pin the detector's detection start to the load start so the first
+    # `dtk run` on the generated config detects across all loaded history. A
+    # fresh detector that omits `start_time` has no lower bound (no prior
+    # detections, no --from); DETECT falls back to loading_start_time, but
+    # emitting it keeps the generated config explicit and self-sufficient on
+    # older detectkit. `start_time` is execution-level and excluded from the
+    # detector_id hash, so it never changes detector identity.
+    detector_params = dict(result.chosen_detector_params)
+    if "start_time" not in detector_params and body.get("loading_start_time"):
+        detector_params["start_time"] = body["loading_start_time"]
+    body["detectors"] = [{"type": result.chosen_detector_type, "params": detector_params}]
     alerting = _build_alerting(original, result)
     if alerting is not None:
         body["alerting"] = alerting

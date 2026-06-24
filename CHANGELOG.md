@@ -5,6 +5,31 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.2] - 2026-06-24
+
+### Fixed
+- **`dtk run` now detects on the first run of a detector that has no
+  `start_time` — every `dtk autotune`-generated config.** `DETECT` builds its
+  lower bound from `--from`, the resume point (last persisted detection), and the
+  detector's `start_time` param. When all three were absent — exactly the case
+  for a freshly-created tuned metric (no `--from`, no prior detections, and the
+  emitter never wrote `start_time`) — the lower bound was left unset and the step
+  mistook "no lower bound" for "nothing to do", printing **"Nothing to detect
+  (already up to date)"** and writing **zero detections**. The alert step then
+  reported "No recent detections found" and dashboards showed an empty detections
+  chart, while loading worked normally. `DETECT` now falls back to the metric's
+  `loading_start_time` (then its earliest stored datapoint) so the first run
+  detects across all loaded history. Hand-written metrics that set `start_time`
+  were unaffected, which is why this only bit autotuned configs.
+
+### Changed
+- **`dtk autotune` now writes `start_time` into the generated detector's
+  params** (pinned to `loading_start_time`), so the emitted
+  `metrics/<name>__tuned_<id>.yml` is explicit and self-sufficient — it detects
+  correctly even on an older detectkit that lacks the `DETECT` fallback above.
+  `start_time` is execution-level and excluded from the detector-id hash, so it
+  never changes detector identity or forces recomputation.
+
 ## [0.24.1] - 2026-06-24
 
 ### Changed

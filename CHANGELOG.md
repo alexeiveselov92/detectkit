@@ -5,6 +5,45 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.31.0] - 2026-06-25
+
+### Added
+- **`dtk tune`: zoom, pan and a navigator on the chart.** The interactive tuning
+  chart is now navigable — scroll to zoom where you point, drag to pan,
+  double-click to reset, and drag the **navigator strip** below the chart (the
+  whole series in miniature, with the current-view window, the **alert firings as
+  red ticks**, and a time axis). On a long, dense metric you can now zoom into a
+  region to inspect alert quality instead of reading the whole series at once.
+  Adaptive **time gridlines** now label both the chart and the strip.
+- **`dtk tune`: a "Points shown" trim slider.** Above the chart, it shortens the
+  active sample to the most-recent N points. Live recompute cost grows with
+  *points × window*, so trimming a long series (e.g. 10k → 2k points) makes every
+  knob-drag several times faster and the period easier to read. Trimming only
+  affects the live view — it never changes what **Apply** writes.
+- **`dtk tune`: flexible seasonality groups.** Each seasonality column is now
+  assigned to a group (Off / G1 / G2 / …): columns in the **same** group are
+  conjoined into one seasonal key, **separate** groups apply independent
+  corrections. You can now express the full `seasonality_components` grouping
+  (e.g. one `dow`×`hour` group plus a standalone `is_holiday`), not only
+  "all-separate" or "all-in-one".
+- **`dtk tune`: chart legend, control tooltips and a recompute spinner.** A legend
+  labels the metric line / expected-range band / band center / anomalies / alert
+  markers; every control carries an **ⓘ** tooltip explaining it; and a
+  **computing…** spinner shows while a recompute is in flight (replacing the bare
+  status text).
+- **Autotune incident labeler: marked incidents now show on the navigator.** The
+  red incident bands you mark are drawn on the bottom navigator strip too — at a
+  minimum width so even a single-point incident stays visible on a long span — and
+  the strip gained a **time axis**. The main chart gained adaptive vertical **time
+  gridlines**, so a point's place in real time reads off the grid instead of only
+  by chasing the cursor.
+
+### Fixed
+- **Labeler x-axis date labels on high-DPR displays.** The labeler's bottom time
+  labels were positioned with a doubled `devicePixelRatio` factor, pushing them
+  off-canvas on retina / 2× screens; they now sit correctly under the chart at any
+  DPR.
+
 ## [0.30.1] - 2026-06-24
 
 ### Fixed

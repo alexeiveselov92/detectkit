@@ -527,7 +527,19 @@ DB round-trip. The renderer (`website/src/scripts/report/tune.ts`) is bundled to
 the committed `detectkit/tuning/assets/tune.js` by
 `website/scripts/gen-tune-bundle.mjs` and ships in the wheel — regenerate it when
 the renderer TS changes; the detector port is the parity-checked
-(`npm run check:demo-parity`) shared core.
+(`npm run check:demo-parity`) shared core. `demo/chart.ts` exposes an **opt-in
+`navigable` mode** (a `ChartOptions` flag the playground leaves off): when set,
+the chart gains mouse-wheel zoom, drag-to-pan, double-click reset and a bottom
+**navigator strip** (full series + current-view window + alert ticks + an adaptive
+time axis). `dtk tune` turns it on so a dense metric can be zoomed region-by-region
+to inspect alert quality; the chart's other rendering is unchanged when the flag is
+off, so the landing demo is untouched. On top of the chart, `tune.ts` adds a
+**"Points shown" trim slider** (re-slices the active series to the most-recent N
+points and re-posts to the worker, so recompute — cost ∝ points × window — speeds
+up; view-only, never written), a **legend**, per-control **ⓘ tooltips**, a
+recompute **spinner**, and a **per-column seasonality group** selector that emits
+the full `seasonality_components` `string[][]` (columns in one group are conjoined,
+separate groups apply independent corrections).
 
 Three pure-ish pieces + a server:
 

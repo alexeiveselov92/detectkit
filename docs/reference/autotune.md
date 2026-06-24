@@ -194,7 +194,9 @@ Then, in the browser:
 1. **Navigate** a long/dense series: scroll to zoom where you point, double-click
    to reset, and drag the **navigator strip** below the chart to move the view
    (window = pan, edges = stretch/squeeze) — so narrow incidents are markable even
-   on a long span with a small step.
+   on a long span with a small step. Adaptive **time gridlines** label both the
+   chart and the strip, and your marked incidents show as **red ticks on the
+   navigator** too, so you can spot and jump to them at a glance.
 2. **Mark**: click-drag across the chart to mark each incident (red band + a row
    below with an optional **description**, exported as `label:`). **Adjust** an
    existing incident by dragging its **edges**, or its **middle** to move it.

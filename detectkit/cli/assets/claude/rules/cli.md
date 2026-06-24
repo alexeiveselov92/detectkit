@@ -78,8 +78,10 @@ Full reference: `autotune.md`.
 The **manual, interactive** sibling of `dtk autotune`. Opens a localhost browser
 view of the metric's **real** persisted series and lets you turn the detector's
 knobs (type, threshold, window, recency weighting + half-life, detrend, smoothing,
-seasonality conditioning, alert `consecutive_anomalies`) while the confidence band
-and flagged anomalies **recompute live**. Clicking **Apply** writes the chosen
+**seasonality groups**, alert `consecutive_anomalies`) while the confidence band
+and flagged anomalies **recompute live**. The chart is **zoomable** (scroll/drag +
+a navigator strip) and a **"Points shown"** slider trims the active sample to speed
+up recompute on a long metric. Clicking **Apply** writes the chosen
 config back into the metric YAML **in place** (autotune, by contrast, writes a new
 `__tuned_<id>.yml` and never edits the original). Reads the metric's loaded
 datapoints (run `dtk run --steps load` first if empty); the selector must resolve

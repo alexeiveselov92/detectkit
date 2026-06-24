@@ -30,6 +30,10 @@ _TEMPLATE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>detectkit report — __METRIC__</title>
 <link rel="icon" href="__FAVICON__" />
+<!-- Optional brand webfonts; system fallbacks below keep the report readable offline. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" />
 <style>
 :root{
   --term-bg:#211e1a; --term-border:#332f29; --term-text:#c9c2b4;

@@ -38,6 +38,13 @@ export interface ReportDetector {
   params: Record<string, unknown>;
   points: ReportDetectorPoint[];
   anomaly_count: number;
+  /**
+   * ms timestamp where this detector reaches "full power" — past every warm-up
+   * (min-samples, smoothing/input warm-up, seasonality-group fill). The band /
+   * anomaly dots before it are a degraded lead-in and should be dimmed. `null`
+   * when the whole report window is effective (no warm-up to hide).
+   */
+  effective_start: number | null;
 }
 
 export type AlertKind = 'anomaly' | 'recovery' | 'no_data';

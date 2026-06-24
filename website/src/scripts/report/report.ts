@@ -17,13 +17,16 @@
 // cannot rely on the site's landing.css.
 
 import {
+  type AlertMark,
   type BandPoint,
   type Domain,
   type Margins,
   type Scales,
+  drawAlertMarkers,
   drawAnomalyDots,
   drawGridAndAxes,
   drawSeriesDecimated,
+  drawWarmupOverlay,
   fillBand,
   fit,
   fmtDur,
@@ -77,10 +80,12 @@ const clamp = (x: number, a: number, b: number): number => Math.max(a, Math.min(
 
 interface DetectorView {
   det: ReportDetector;
-  /** chart band points, aligned to det.points */
+  /** chart band points, aligned to det.points (bounds nulled before effectiveStart) */
   band: BandPoint[];
-  /** flagged anomaly marks (t, value-on-the-metric-line) */
+  /** flagged anomaly marks (t, value-on-the-metric-line), effective zone only */
   anomalies: { t: number; v: number }[];
+  /** ms timestamp this detector reaches full power, or null (whole window effective) */
+  effectiveStart: number | null;
   /** brand accent for this detector's band (clay; subsequent ones tinted) */
   color: string;
   shown: boolean;
@@ -109,11 +114,18 @@ function render(payload: ReportPayload, mount: HTMLElement): void {
   for (const p of payload.points) if (p.v !== null) valueAt.set(p.t, p.v);
 
   // --- detector views --------------------------------------------------------
+  // Each detector's band + anomaly dots are drawn only at/after its OWN
+  // effective_start (full-power onset). Before it, the band is a degraded
+  // lead-in (global fallback / partial window) and is suppressed by nulling the
+  // bounds, so scoredRuns / fillBand never paint it.
   const views: DetectorView[] = payload.detectors.map((det, di) => {
-    const band: BandPoint[] = det.points.map((p) => ({ t: p.t, lo: p.lo, hi: p.hi }));
+    const eff = det.effective_start;
+    const band: BandPoint[] = det.points.map((p) =>
+      eff !== null && p.t < eff ? { t: p.t, lo: null, hi: null } : { t: p.t, lo: p.lo, hi: p.hi },
+    );
     const anomalies: { t: number; v: number }[] = [];
     for (const p of det.points) {
-      if (p.a === 1) {
+      if (p.a === 1 && (eff === null || p.t >= eff)) {
         const v = valueAt.get(p.t);
         if (v !== undefined) anomalies.push({ t: p.t, v });
       }
@@ -122,6 +134,7 @@ function render(payload: ReportPayload, mount: HTMLElement): void {
       det,
       band,
       anomalies,
+      effectiveStart: eff,
       color: token(BAND_PALETTE[di % BAND_PALETTE.length]),
       shown: di === 0, // only the primary detector's band shows by default
     };
@@ -404,6 +417,18 @@ function createReportChart(
     vmax = hi + pad;
   }
 
+  // Divider for the warm-up overlay: the primary detector's full-power onset —
+  // the first SHOWN detector with an effective_start, else the first such view.
+  function primaryEffectiveStart(): number | null {
+    for (const v of views) {
+      if (v.shown && v.effectiveStart !== null) return v.effectiveStart;
+    }
+    for (const v of views) {
+      if (v.effectiveStart !== null) return v.effectiveStart;
+    }
+    return null;
+  }
+
   function domain(): Domain {
     return { tmin: viewMin, tmax: viewMax, vmin, vmax };
   }
@@ -523,27 +548,17 @@ function createReportChart(
       drawAnomalyDots(g, view.anomalies, viewMin, viewMax, sc.px, sc.py, token('--st-anomaly'), dpr);
     }
 
-    // alert markers: vertical tick + triangle at each alert.t
-    for (const al of payload.alerts) {
-      if (al.t < viewMin || al.t > viewMax) continue;
-      const col = kindColor(al.kind);
-      const X = sc.px(al.t);
-      g.strokeStyle = rgba(col, 0.85);
-      g.lineWidth = 1.5 * dpr;
-      g.beginPath();
-      g.moveTo(X, top);
-      g.lineTo(X, top + h);
-      g.stroke();
-      // triangle marker at the top
-      const tw = 5 * dpr;
-      g.fillStyle = col;
-      g.beginPath();
-      g.moveTo(X - tw, top);
-      g.lineTo(X + tw, top);
-      g.lineTo(X, top + tw * 1.6);
-      g.closePath();
-      g.fill();
+    // warm-up overlay: dim the lead-in + dashed divider at the primary detector's
+    // full-power onset (the first shown detector, else the first). Drawn over the
+    // bands/line so the degraded region reads as not-yet-detecting.
+    const dividerTs = primaryEffectiveStart();
+    if (dividerTs !== null && dividerTs > viewMin) {
+      drawWarmupOverlay(g, canvas, MARGINS, dpr, sc.px, dividerTs, 'detection at full power →');
     }
+
+    // ALL alerts as chart markers (vertical tick + top triangle, colored by kind)
+    const marks: AlertMark[] = payload.alerts.map((al) => ({ t: al.t, kind: al.kind }));
+    drawAlertMarkers(g, canvas, MARGINS, dpr, sc.px, marks, (kind) => kindColor(kind as AlertKind));
 
     // hover crosshair
     if (hoverTs !== null) drawHover(sc, top, h, faint);
@@ -704,66 +719,81 @@ function injectStyle(): void {
   if (styleInjected) return;
   styleInjected = true;
   const css = `
-.${ROOT_CLASS}{--bg:#211e1a;--clay:#d15b36;--ink:#1b1916;--paper:#f5f1e8;--muted:#6e675b;
-  --faint:#9a9384;--border:#332f29;--term-text:#c9c2b4;--anom:#d63232;--rec:#36a64f;--nod:#f0ad4e;
-  font-family:'Schibsted Grotesk',ui-sans-serif,system-ui,sans-serif;color:var(--paper);}
+.${ROOT_CLASS}{--term-bg:#211e1a;--term-border:#332f29;--term-text:#c9c2b4;
+  --clay:#d15b36;--clay-700:#b4471f;--ink:#1b1916;--paper:#f5f1e8;--surface:#fbf9f3;
+  --border:#e6e0d4;--muted:#6e675b;--faint:#9a9384;
+  --anom:#d63232;--rec:#36a64f;--nod:#f0ad4e;
+  --sans:'Schibsted Grotesk',ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-family:var(--sans);color:var(--ink);}
 .${ROOT_CLASS} *{box-sizing:border-box;}
-.${ROOT_CLASS} .dtk-report-root{max-width:1100px;margin:0 auto;padding:8px;}
-.${ROOT_CLASS} .dtk-header{margin-bottom:14px;}
-.${ROOT_CLASS} .dtk-h-top{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;}
-.${ROOT_CLASS} .dtk-title{font-size:20px;font-weight:700;margin:0;color:var(--paper);
-  font-family:ui-monospace,'JetBrains Mono',monospace;}
-.${ROOT_CLASS} .dtk-meta{font-size:12px;color:var(--faint);
-  font-family:ui-monospace,'JetBrains Mono',monospace;}
-.${ROOT_CLASS} .dtk-desc{margin:6px 0 0;font-size:13px;color:var(--term-text);max-width:760px;}
-.${ROOT_CLASS} .dtk-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
-.${ROOT_CLASS} .dtk-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;
-  background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:14px;font-size:12px;}
+.${ROOT_CLASS} .dtk-report-root{max-width:1100px;margin:0 auto;padding:20px 18px 40px;}
+/* --- header row ----------------------------------------------------------- */
+.${ROOT_CLASS} .dtk-header{margin-bottom:16px;padding-left:12px;
+  border-left:3px solid var(--clay);}
+.${ROOT_CLASS} .dtk-h-top{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;}
+.${ROOT_CLASS} .dtk-title{font-size:21px;font-weight:700;margin:0;color:var(--ink);
+  font-family:var(--sans);letter-spacing:-0.01em;}
+.${ROOT_CLASS} .dtk-meta{font-size:12px;color:var(--muted);font-family:var(--mono);}
+.${ROOT_CLASS} .dtk-desc{margin:8px 0 0;font-size:13px;color:var(--muted);max-width:760px;
+  line-height:1.5;}
+/* --- summary chips (surface cards) ---------------------------------------- */
+.${ROOT_CLASS} .dtk-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+.${ROOT_CLASS} .dtk-chip{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:12px;}
 .${ROOT_CLASS} .dtk-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
-.${ROOT_CLASS} .dtk-chip-n{font-weight:700;font-family:ui-monospace,monospace;}
-.${ROOT_CLASS} .dtk-chip-l{color:var(--faint);}
-.${ROOT_CLASS} .dtk-legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
-.${ROOT_CLASS} .dtk-legend-item{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;
-  background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:6px;cursor:pointer;
-  color:var(--paper);font-size:12px;font-family:inherit;}
-.${ROOT_CLASS} .dtk-legend-item.off{opacity:0.4;}
-.${ROOT_CLASS} .dtk-legend-id{color:var(--faint);font-family:ui-monospace,monospace;font-size:11px;}
-.${ROOT_CLASS} .dtk-legend-n{color:var(--anom);font-weight:700;font-family:ui-monospace,monospace;}
+.${ROOT_CLASS} .dtk-chip-n{font-weight:700;font-family:var(--mono);color:var(--ink);}
+.${ROOT_CLASS} .dtk-chip-l{color:var(--faint);font-family:var(--mono);font-size:11px;
+  text-transform:uppercase;letter-spacing:0.05em;}
+/* --- detector legend ------------------------------------------------------ */
+.${ROOT_CLASS} .dtk-legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+.${ROOT_CLASS} .dtk-legend-item{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;cursor:pointer;
+  color:var(--ink);font-size:12px;font-family:var(--sans);transition:border-color .12s ease;}
+.${ROOT_CLASS} .dtk-legend-item:hover{border-color:var(--clay);}
+.${ROOT_CLASS} .dtk-legend-item.off{opacity:0.45;}
+.${ROOT_CLASS} .dtk-legend-id{color:var(--faint);font-family:var(--mono);font-size:11px;}
+.${ROOT_CLASS} .dtk-legend-n{color:var(--anom);font-weight:700;font-family:var(--mono);}
 .${ROOT_CLASS} .dtk-swatch{width:10px;height:10px;border-radius:2px;display:inline-block;}
+/* --- toolbar (presets + readout) ------------------------------------------ */
 .${ROOT_CLASS} .dtk-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
-  gap:8px;margin-bottom:6px;}
-.${ROOT_CLASS} .dtk-presets{display:flex;gap:4px;}
-.${ROOT_CLASS} .dtk-preset{padding:4px 12px;background:rgba(255,255,255,0.04);
-  border:1px solid var(--border);border-radius:6px;color:var(--term-text);cursor:pointer;
-  font-size:12px;font-family:inherit;}
-.${ROOT_CLASS} .dtk-preset:hover{border-color:var(--clay);color:var(--paper);}
+  gap:8px;margin-bottom:8px;}
+.${ROOT_CLASS} .dtk-presets{display:flex;gap:5px;}
+.${ROOT_CLASS} .dtk-preset{padding:5px 13px;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;
+  font-size:12px;font-family:var(--sans);transition:border-color .12s ease,color .12s ease;}
+.${ROOT_CLASS} .dtk-preset:hover{border-color:var(--clay);color:var(--ink);}
 .${ROOT_CLASS} .dtk-preset.active{background:var(--clay);color:#fff;border-color:var(--clay);}
-.${ROOT_CLASS} .dtk-readout{font-size:11px;color:var(--term-text);
-  font-family:ui-monospace,'JetBrains Mono',monospace;display:flex;flex-wrap:wrap;gap:4px 12px;
-  align-items:center;}
+.${ROOT_CLASS} .dtk-readout{font-size:11px;color:var(--muted);
+  font-family:var(--mono);display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;}
 .${ROOT_CLASS} .dtk-readout .dtk-swatch{margin-right:4px;}
-.${ROOT_CLASS} .dtk-ro-t{font-weight:700;}
-.${ROOT_CLASS} .dtk-chart{position:relative;width:100%;height:360px;background:var(--bg);
-  border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.${ROOT_CLASS} .dtk-ro-t{font-weight:700;color:var(--ink);}
+/* --- chart panel (dark terminal surface) ---------------------------------- */
+.${ROOT_CLASS} .dtk-chart{position:relative;width:100%;height:360px;background:var(--term-bg);
+  border:1px solid var(--term-border);border-radius:12px;overflow:hidden;
+  box-shadow:0 24px 60px -30px rgba(27,25,22,.45);}
 .${ROOT_CLASS} .dtk-chart canvas{width:100%;height:100%;display:block;}
-.${ROOT_CLASS} .dtk-alerts{margin-top:16px;}
-.${ROOT_CLASS} .dtk-alerts-head{font-size:13px;font-weight:700;color:var(--paper);
-  margin-bottom:8px;font-family:ui-monospace,monospace;}
-.${ROOT_CLASS} .dtk-alerts-empty{font-size:13px;color:var(--faint);padding:8px 0;}
-.${ROOT_CLASS} .dtk-alerts-list{display:flex;flex-direction:column;gap:4px;
+/* --- alerts list (surface cards) ------------------------------------------ */
+.${ROOT_CLASS} .dtk-alerts{margin-top:18px;}
+.${ROOT_CLASS} .dtk-alerts-head{font-size:12px;font-weight:600;color:var(--faint);
+  margin-bottom:9px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;}
+.${ROOT_CLASS} .dtk-alerts-empty{font-size:13px;color:var(--muted);padding:8px 0;}
+.${ROOT_CLASS} .dtk-alerts-list{display:flex;flex-direction:column;gap:5px;
   max-height:340px;overflow:auto;}
 .${ROOT_CLASS} .dtk-alert-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
-  padding:7px 10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);
-  border-radius:6px;cursor:pointer;color:var(--paper);font-family:inherit;}
-.${ROOT_CLASS} .dtk-alert-row:hover{border-color:var(--clay);background:rgba(255,255,255,0.06);}
-.${ROOT_CLASS} .dtk-alert-time{font-size:11px;color:var(--faint);
-  font-family:ui-monospace,monospace;white-space:nowrap;min-width:142px;}
+  padding:8px 11px;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;cursor:pointer;color:var(--ink);font-family:var(--sans);
+  transition:border-color .12s ease,box-shadow .12s ease;}
+.${ROOT_CLASS} .dtk-alert-row:hover{border-color:var(--clay);
+  box-shadow:0 4px 14px -8px rgba(27,25,22,.35);}
+.${ROOT_CLASS} .dtk-alert-time{font-size:11px;color:var(--muted);
+  font-family:var(--mono);white-space:nowrap;min-width:142px;}
 .${ROOT_CLASS} .dtk-badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;
   font-weight:700;border:1px solid;text-transform:uppercase;letter-spacing:0.03em;white-space:nowrap;}
 .${ROOT_CLASS} .dtk-alert-body{display:flex;flex-direction:column;gap:2px;min-width:0;}
-.${ROOT_CLASS} .dtk-alert-rule{font-size:12px;color:var(--term-text);
-  font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.${ROOT_CLASS} .dtk-alert-sub{font-size:11px;color:var(--faint);}
+.${ROOT_CLASS} .dtk-alert-rule{font-size:12px;color:var(--ink);
+  font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.${ROOT_CLASS} .dtk-alert-sub{font-size:11px;color:var(--muted);}
 `;
   const style = document.createElement('style');
   style.setAttribute('data-dtk-report', '');

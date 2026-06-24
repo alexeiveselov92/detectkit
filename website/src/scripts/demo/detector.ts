@@ -632,3 +632,56 @@ export function runDetector(series: Series, params: DetectorParams): ScoredPoint
 
   return results;
 }
+
+/**
+ * Distinct seasonal-key cardinality for a grouping set — the binding grouping
+ * (most distinct keys) drives how much history is needed before per-group stats
+ * can engage. Each grouping is a conjunction of columns; we take the max over
+ * groupings.
+ */
+function seasonalityCardinality(series: Series, groups: string[][]): number {
+  const data = series.seasonalityData;
+  if (!data || data.length === 0) return 0;
+  let card = 0;
+  for (const group of groups) {
+    const seen = new Set<string>();
+    for (const row of data) {
+      seen.add(group.map((c) => String(row?.[c] ?? '')).join('|'));
+    }
+    card = Math.max(card, seen.size);
+  }
+  return card;
+}
+
+/**
+ * First index where the detector runs at "full power" for these params — past
+ * every warm-up: the min-samples floor, smoothing / input_type, and (when
+ * seasonality grouping is active AND the trailing window can actually hold
+ * `minSamplesPerGroup` points of every key) the per-group fill. Before this
+ * index the band is a degraded lead-in (global fallback / partial window) that
+ * should not read as real detection. Returns a clamped index in [0, n].
+ */
+export function effectiveStartIndex(series: Series, params: DetectorParams): number {
+  const n = series.timestamps.length;
+  let warm = Math.max(params.minSamples, MIN_SAMPLES_FLOOR[params.type]);
+  if (params.smoothing === 'sma') warm = Math.max(warm, params.smoothingWindow - 1);
+  if (params.smoothing === 'ema') warm = Math.max(warm, Math.ceil(5 / params.smoothingAlpha));
+  if (params.inputType !== 'values') warm = Math.max(warm, 1);
+
+  const seasonalityActive =
+    params.seasonalityComponents !== null &&
+    params.seasonalityComponents.length > 0 &&
+    Array.isArray(series.seasonalityData) &&
+    series.seasonalityData.length > 0;
+  if (seasonalityActive) {
+    const card = seasonalityCardinality(series, params.seasonalityComponents as string[][]);
+    if (card > 0) {
+      const groupWarm = params.minSamplesPerGroup * card;
+      // Groups only ever engage if the window can hold enough same-key points;
+      // otherwise the detector stays in global fallback the whole way and there
+      // is no degraded-then-sharp transition to hide.
+      if (params.windowSize >= groupWarm) warm = Math.max(warm, groupWarm);
+    }
+  }
+  return Math.min(warm, n);
+}

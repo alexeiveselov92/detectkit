@@ -926,217 +926,78 @@ const dxExplainer = (() => {
       </p>
     </section>
 
-    <!-- ===== interactive playground (self-contained, client-side island) =====
-         Removable in one block: this <section>, its `.dkx-*` CSS, and the three
-         demo modules under src/scripts/demo/. It does not touch the CSS-only
-         detector switcher above. -->
+    <!-- ===== interactive playground teaser =====
+         The full live island now lives on /playground. The landing keeps only a
+         light teaser + a static decorative chart, so the page stays fast and the
+         sandbox gets room to breathe at its own route. -->
     <section class="wrap section">
-      <div class="eyebrow">try it · live in your browser</div>
+      <div class="eyebrow">try it · live</div>
       <h2>Shape a metric, then watch detection happen.</h2>
       <p class="sub">
-        Dial in a series that looks like one of yours — its rhythm, its noise, the kind of incident
-        you worry about — then turn the detector's real knobs and see the <strong>corridor of
-        normal</strong>, what gets flagged, and whether an <strong>alert</strong> would fire. The
-        math is the actual detectkit detector, ported to run entirely on this page — nothing is sent
-        anywhere.
+        An interactive sandbox running the <strong>actual detectkit detector</strong> in your
+        browser. Dial in a series that looks like one of yours, turn the detector's real knobs, and
+        watch the <strong>corridor of normal</strong>, what gets flagged, and whether an
+        <strong>alert</strong> would fire — nothing is sent anywhere.
       </p>
 
-      <div id="dkx" class="dkx-card">
-        <!-- chart -->
-        <div class="dkx-chart">
-          <div class="dkx-legend">
-            <span><i class="dkx-sw dkx-sw-line"></i>metric</span>
-            <span><i class="dkx-sw dkx-sw-band"></i>expected range</span>
-            <span><i class="dkx-sw dkx-sw-anom"></i>flagged anomaly</span>
-            <span><i class="dkx-sw dkx-sw-miss"></i>injected (missed)</span>
-            <span class="dkx-legend-hint">hover the chart to see the window a point is judged by</span>
-          </div>
-          <div class="dkx-plot">
-            <canvas id="dkx-canvas"></canvas>
-          </div>
-          <div id="dkx-readout" class="dkx-readout">hover a point to inspect its window &amp; verdict</div>
+      <a class="pg-teaser" href="/playground/">
+        <div class="pg-teaser-chart">
+          <svg class="pg-teaser-svg" viewBox="0 0 520 200" aria-hidden="true">
+            <line class="hc-grid" x1="20" y1="60" x2="500" y2="60" />
+            <line class="hc-grid" x1="20" y1="100" x2="500" y2="100" />
+            <line class="hc-grid" x1="20" y1="140" x2="500" y2="140" />
+            <path
+              class="hc-band"
+              d="M20,96 L90,94 L160,97 L230,93 L300,96 L370,94 L440,97 L500,95 L500,138 L440,139 L370,137 L300,139 L230,137 L160,139 L90,138 L20,137 Z"
+            />
+            <path class="hc-bound" d="M20,96 L500,95" />
+            <path class="hc-bound" d="M20,137 L500,138" />
+            <path
+              class="hc-line"
+              d="M20,118 L55,121 L90,114 L125,123 L160,116 L195,124 L230,117 L265,121 L300,115 L335,123 L360,118 L380,90 L398,44 L416,96 L450,116 L500,118"
+            />
+            <g>
+              <circle class="hc-halo" cx="398" cy="44" r="6" />
+              <circle class="hc-anom" cx="398" cy="44" r="5.5" />
+            </g>
+          </svg>
         </div>
-
-        <!-- scorecard -->
-        <div class="dkx-score">
-          <div class="dkx-stat"><div class="dkx-stat-v" id="dkx-stat-caught">—</div><div class="dkx-stat-k">caught</div></div>
-          <div class="dkx-stat"><div class="dkx-stat-v" id="dkx-stat-fp">—</div><div class="dkx-stat-k">false alarms</div></div>
-          <div class="dkx-stat"><div class="dkx-stat-v" id="dkx-stat-flagged">—</div><div class="dkx-stat-k">flagged pts</div></div>
-          <div class="dkx-stat"><div class="dkx-stat-v" id="dkx-stat-flagrate">—</div><div class="dkx-stat-k">flag rate</div></div>
-          <div class="dkx-stat"><div class="dkx-stat-v" id="dkx-stat-mcc">—</div><div class="dkx-stat-k">MCC</div></div>
-          <div id="dkx-alert" class="dkx-alert"></div>
+        <div class="pg-teaser-cta">
+          <span class="pg-teaser-go">Open the interactive playground →</span>
+          <span class="pg-teaser-sub">mad / zscore / iqr · live corridor · alert preview</span>
         </div>
-
-        <!-- controls -->
-        <div class="dkx-controls">
-          <div class="dkx-group">
-            <div class="dkx-group-h">your metric</div>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">rhythm</span>
-              <span class="dkx-seg" data-control="seasonality">
-                <button data-v="flat" class="on">flat</button>
-                <button data-v="daily">daily</button>
-                <button data-v="weekly">weekly</button>
-                <button data-v="daily_weekly">daily+wk</button>
-                <button data-v="business_hours">business</button>
-                <button data-v="spiky_counts">spiky</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">noise</span>
-              <span class="dkx-seg" data-control="noise">
-                <button data-v="low">low</button>
-                <button data-v="medium" class="on">medium</button>
-                <button data-v="high">high</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">trend</span>
-              <span class="dkx-seg" data-control="trend">
-                <button data-v="none" class="on">none</button>
-                <button data-v="up">up</button>
-                <button data-v="down">down</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">interval</span>
-              <span class="dkx-seg" data-control="interval">
-                <button data-v="10min">10min</button>
-                <button data-v="1h" class="on">1h</button>
-                <button data-v="1d">1d</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">incident</span>
-              <span class="dkx-seg" data-control="anomaly">
-                <button data-v="spike">spike</button>
-                <button data-v="dip">dip</button>
-                <button data-v="step">step</button>
-                <button data-v="drift">drift</button>
-                <button data-v="cluster" class="on">cluster</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">size <b id="dkx-magnitude-val" class="dkx-ctl-v"></b></span>
-              <input id="dkx-magnitude" type="range" min="0" max="100" step="1" value="60" />
-            </label>
-
-            <button id="dkx-reseed" class="dkx-reseed" type="button">↻ new random sample</button>
-          </div>
-
-          <div class="dkx-group">
-            <div class="dkx-group-h">detection</div>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">detector</span>
-              <span class="dkx-seg" data-control="detector">
-                <button data-v="mad" class="on">mad</button>
-                <button data-v="zscore">zscore</button>
-                <button data-v="iqr">iqr</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">threshold <b id="dkx-threshold-val" class="dkx-ctl-v"></b></span>
-              <input id="dkx-threshold" type="range" min="1" max="6" step="0.1" value="3" />
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">window_size <b id="dkx-window-val" class="dkx-ctl-v"></b></span>
-              <input id="dkx-window" type="range" min="20" max="300" step="5" value="100" />
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">recency weighting</span>
-              <span class="dkx-seg" data-control="weights">
-                <button data-v="none" class="on">none</button>
-                <button data-v="exponential">exponential</button>
-                <button data-v="linear">linear</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl hidden" id="dkx-halflife-row">
-              <span class="dkx-ctl-k">half_life <b id="dkx-halflife-val" class="dkx-ctl-v"></b></span>
-              <input id="dkx-halflife" type="range" min="2" max="100" step="1" value="15" />
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">detrend</span>
-              <span class="dkx-seg" data-control="detrend">
-                <button data-v="none" class="on">off</button>
-                <button data-v="linear">linear</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">smoothing</span>
-              <span class="dkx-seg" data-control="smoothing">
-                <button data-v="none" class="on">none</button>
-                <button data-v="ema">ema</button>
-                <button data-v="sma">sma</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">seasonality grouping</span>
-              <span class="dkx-seg" data-control="conditioning">
-                <button data-v="off" class="on">off</button>
-                <button data-v="hour">hour</button>
-                <button data-v="hour_dow">hour+dow</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">consecutive_anomalies <b id="dkx-consecutive-val" class="dkx-ctl-v"></b></span>
-              <input id="dkx-consecutive" type="range" min="1" max="10" step="1" value="3" />
-            </label>
-          </div>
-        </div>
-
-        <div class="dkx-config-row">
-          <span class="dkx-config-k">// effective config</span>
-          <code id="dkx-config"></code>
-        </div>
-      </div>
-
-      <p class="dx-foot">
-        // the same windowed statistics that run in production — current point excluded from its own
-        window, NaN gaps skipped, seasonality &amp; recency applied per point<br />
-        // <strong>caught</strong> = injected incidents a flag landed on · <strong>flag rate</strong>
-        = share of judged points flagged · <strong>MCC</strong> = correlation of flags with the truth ·
-        the <strong>alert</strong> needs <code>consecutive_anomalies</code> grid-adjacent flags
-      </p>
-
-      <script>
-        import '../scripts/demo/main.ts';
-      </script>
+      </a>
     </section>
 
-    <!-- ===== visual labeling ===== -->
+
+    <!-- ===== visual labeling teaser ===== -->
     <section class="wrap section">
       <div class="eyebrow">autotune · labeling</div>
       <h2>Teach it your incidents — point, drag, done.</h2>
       <p class="sub">
         Autotune already tunes well with <strong>zero labels</strong>. To optimise against your
         <em>real</em> incidents, run <code>dtk autotune --select &lt;metric&gt; --label</code> — it opens
-        this chart. Drag across each incident, add a note, and <strong>Export</strong>. One
-        self-contained file: offline, nothing leaves your browser, and every round is versioned, so
-        drop it in <code>incidents/&lt;metric&gt;/</code> and re-run. It's live below — scroll to zoom,
-        drag the navigator to move, drag its edges to stretch the view.
+        a chart where you drag across each incident, add a note, and <strong>Export</strong> one
+        self-contained file: offline, nothing leaves your browser, every round versioned.
       </p>
-      <div class="labeler-embed">
-        <iframe
-          src="/examples/autotune-labeler.html"
-          title="detectkit interactive incident labeler — live demo"
-          loading="lazy"
-        ></iframe>
-      </div>
+      <a class="pg-teaser pg-teaser-labeler" href="/reference/autotune/">
+        <div class="pg-teaser-chart">
+          <svg class="pg-teaser-svg" viewBox="0 0 520 200" aria-hidden="true">
+            <line class="hc-grid" x1="20" y1="60" x2="500" y2="60" />
+            <line class="hc-grid" x1="20" y1="100" x2="500" y2="100" />
+            <line class="hc-grid" x1="20" y1="140" x2="500" y2="140" />
+            <rect class="pg-teaser-sel" x="300" y="30" width="120" height="150" rx="4" />
+            <path
+              class="hc-line"
+              d="M20,120 L60,116 L100,122 L140,114 L180,124 L220,118 L260,121 L300,100 L330,64 L360,72 L390,58 L420,96 L460,120 L500,116"
+            />
+          </svg>
+        </div>
+        <div class="pg-teaser-cta">
+          <span class="pg-teaser-go">Open the labeler demo →</span>
+          <span class="pg-teaser-sub">drag to label · scroll to zoom · export &amp; re-tune</span>
+        </div>
+      </a>
     </section>
 
     <!-- ===== alerting ===== -->

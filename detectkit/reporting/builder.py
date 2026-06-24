@@ -33,12 +33,112 @@ from detectkit.utils.json_utils import json_loads
 # of history, capped so a baked report stays small and fast to open.
 DEFAULT_REPORT_POINTS = 1500
 
+# Detector defaults used to compute the "effective start" (first point past every
+# warm-up). The stored detector_params JSON holds only NON-DEFAULT params, so we
+# fill these before mirroring the TS effectiveStartIndex (detector.ts). Keep in
+# lockstep with the detector classes' class-level defaults / floors.
+_WINDOW_SIZE_DEFAULT = 100
+_MIN_SAMPLES_DEFAULT = 30
+_SMOOTHING_WINDOW_DEFAULT = 10
+_SMOOTHING_ALPHA_DEFAULT = 0.3
+
+# Per-detector-type floors / per-group defaults, keyed by the lowercase type.
+_MIN_SAMPLES_FLOOR: dict[str, int] = {"mad": 1, "zscore": 2, "iqr": 4}
+_MIN_SAMPLES_PER_GROUP_DEFAULT: dict[str, int] = {"mad": 10, "zscore": 3, "iqr": 4}
+
+
+def _detector_type(detector_name: str) -> str:
+    """Map a stored detector class name (e.g. ``MADDetector``) to its type key.
+
+    Falls back to ``"mad"`` floors when the class is unrecognized (a foreign /
+    future detector) so the warm-up estimate stays conservative rather than
+    raising.
+    """
+    name = detector_name.lower()
+    if name.startswith("zscore"):
+        return "zscore"
+    if name.startswith("iqr"):
+        return "iqr"
+    return "mad"
+
+
+def _effective_start_index(
+    *,
+    detector_name: str,
+    params: dict,
+    seasonality_rows: list[dict],
+    n_points: int,
+) -> int:
+    """Mirror ``effectiveStartIndex`` (website detector.ts) over the report window.
+
+    ``seasonality_rows`` is the parsed ``seasonality_data`` for every datapoint in
+    the report window (in grid order). Returns a warm-up point count clamped to
+    ``[0, n_points]``; the timestamp at this index is the band's "full power"
+    onset.
+    """
+    dtype = _detector_type(detector_name)
+    window_size = int(params.get("window_size", _WINDOW_SIZE_DEFAULT) or _WINDOW_SIZE_DEFAULT)
+    min_samples = int(params.get("min_samples", _MIN_SAMPLES_DEFAULT) or _MIN_SAMPLES_DEFAULT)
+    min_samples_per_group = int(
+        params.get("min_samples_per_group", _MIN_SAMPLES_PER_GROUP_DEFAULT[dtype])
+        or _MIN_SAMPLES_PER_GROUP_DEFAULT[dtype]
+    )
+    smoothing = params.get("smoothing", "none") or "none"
+    smoothing_window = int(
+        params.get("smoothing_window", _SMOOTHING_WINDOW_DEFAULT) or _SMOOTHING_WINDOW_DEFAULT
+    )
+    smoothing_alpha = float(
+        params.get("smoothing_alpha", _SMOOTHING_ALPHA_DEFAULT) or _SMOOTHING_ALPHA_DEFAULT
+    )
+    input_type = params.get("input_type", "values") or "values"
+    seasonality_components = params.get("seasonality_components")
+
+    warm = max(min_samples, _MIN_SAMPLES_FLOOR[dtype])
+    if smoothing == "sma":
+        warm = max(warm, smoothing_window - 1)
+    elif smoothing == "ema":
+        warm = max(warm, math.ceil(5.0 / smoothing_alpha))
+    if input_type != "values":
+        warm = max(warm, 1)
+
+    groups = seasonality_components if isinstance(seasonality_components, list) else None
+    if groups and seasonality_rows:
+        # Cardinality = max distinct value-tuple count across the groupings.
+        card = 0
+        for group in groups:
+            cols = group if isinstance(group, list) else [group]
+            seen: set[tuple] = set()
+            for row in seasonality_rows:
+                seen.add(tuple(str((row or {}).get(c, "")) for c in cols))
+            card = max(card, len(seen))
+        if card > 0:
+            group_warm = min_samples_per_group * card
+            # Groups only engage if the window can hold enough same-key points;
+            # otherwise the detector stays in global fallback the whole way.
+            if window_size >= group_warm:
+                warm = max(warm, group_warm)
+
+    return min(warm, n_points)
+
 
 def _ms(value: Any) -> int:
     """Coerce a datetime / datetime64 to integer ms-epoch (UTC)."""
     if isinstance(value, datetime):
         value = to_naive_utc(value)
     return int(np.datetime64(value, "ms").astype("int64"))
+
+
+def _parse_seasonality(value: Any) -> dict:
+    """Parse a stored ``seasonality_data`` cell (JSON string or dict) to a dict."""
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str) and value:
+        try:
+            parsed = json_loads(value)
+        except (ValueError, TypeError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
 
 
 def _num_or_none(value: Any) -> float | None:
@@ -167,16 +267,25 @@ def build_report_payload(
     dp = internal.load_datapoints(name, start, to_exclusive)
     ts_arr = dp["timestamp"]
     val_arr = dp["value"]
+    raw_seas = dp.get("seasonality_data")
+    seas_arr: Any = raw_seas if raw_seas is not None else [None] * len(ts_arr)
     end_ms = _ms(end)
     points: list[dict] = []
     value_at: dict[np.datetime64, float | None] = {}
-    for ts, v in zip(ts_arr, val_arr, strict=False):
+    # Parallel grid arrays restricted to the report window, in order — used to map
+    # each detector's warm-up point count to a "full power" onset timestamp and to
+    # measure seasonality cardinality over the actual report datapoints.
+    grid_ms: list[int] = []
+    seasonality_rows: list[dict] = []
+    for ts, v, sd in zip(ts_arr, val_arr, seas_arr, strict=False):
         t_ms = _ms(ts)
         if t_ms > end_ms:
             continue
         fv = None if (v is None or (isinstance(v, float) and math.isnan(v))) else float(v)
         points.append({"t": t_ms, "v": fv})
         value_at[np.datetime64(ts, "ms")] = fv
+        grid_ms.append(t_ms)
+        seasonality_rows.append(_parse_seasonality(sd))
 
     # ---- detector band series (grouped from the stored rows) ------------------
     det_rows = internal.load_detections(name, None, start, to_exclusive)
@@ -198,6 +307,7 @@ def build_report_payload(
                 "params": params if isinstance(params, dict) else {},
                 "points": [],
                 "anomaly_count": 0,
+                "effective_start": None,
             }
             detectors[det_id] = slot
         metadata = _parse_detection_metadata(row.get("detection_metadata"))
@@ -216,6 +326,20 @@ def build_report_payload(
         if is_anom:
             slot["anomaly_count"] += 1
             anomalous_timestamps.add(t_ms)
+
+    # ---- effective-start onset (warm-up boundary) per detector ----------------
+    # The band before this timestamp is a degraded lead-in (global fallback /
+    # partial window); the renderer dims it. None means the whole window is past
+    # warm-up — nothing to hide.
+    n_grid = len(grid_ms)
+    for slot in detectors.values():
+        warm = _effective_start_index(
+            detector_name=slot["name"],
+            params=slot["params"],
+            seasonality_rows=seasonality_rows,
+            n_points=n_grid,
+        )
+        slot["effective_start"] = grid_ms[warm] if 0 < warm < n_grid else None
 
     # ---- alerts: replay every active alert config over the period -------------
     records = [_record_from_row(r) for r in det_rows]

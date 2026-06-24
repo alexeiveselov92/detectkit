@@ -14,13 +14,16 @@
 
 import {
   type Margins,
+  drawAlertMarkers,
   drawSeriesDecimated,
+  drawWarmupOverlay,
   fit as fitCanvas,
   fmtTick,
   fmtVal,
   rgba,
   token,
 } from '../core/canvas';
+import { effectiveStartIndex } from './detector';
 import type { ChartData, ChartHandle, ChartOptions, HoverInfo, ScoredPoint, Series } from './types';
 
 const MARGINS: Margins = { l: 52, r: 14, t: 14, b: 26 };
@@ -114,10 +117,12 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
 
   // Contiguous runs of scored points with finite band bounds (warm-up / NaN-band
   // gaps break a run), so the corridor polygon never bridges un-scored regions.
-  function scoredRuns(scored: ScoredPoint[]): Array<[number, number]> {
+  // Only points at/after `from` (the effective-zone start) are eligible, so the
+  // degraded lead-in never gets a corridor.
+  function scoredRuns(scored: ScoredPoint[], from: number): Array<[number, number]> {
     const runs: Array<[number, number]> = [];
     let start = -1;
-    for (let i = 0; i < scored.length; i++) {
+    for (let i = Math.max(0, from); i < scored.length; i++) {
       const p = scored[i];
       const ok = p.scored && isFinite(p.lower) && isFinite(p.upper);
       if (ok) {
@@ -135,7 +140,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   function paint(): void {
     raf = 0;
     if (!data || canvas.width === 0 || canvas.height === 0) return;
-    const { series, scored, params } = data;
+    const { series, scored, params, alerts } = data;
     if (series.timestamps.length === 0) {
       g.fillStyle = token('--term-bg');
       g.fillRect(0, 0, canvas.width, canvas.height);
@@ -181,7 +186,15 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     g.rect(MARGINS.l * dpr, MARGINS.t * dpr, plotW(), plotH());
     g.clip();
 
-    const runs = scoredRuns(scored);
+    // Effective-zone start: the first index where the detector runs at full
+    // power. Everything before it (the degraded warm-up lead-in) gets no band,
+    // no center line and no anomaly dots — only the dimming overlay + the
+    // context metric line. effTs is the divider timestamp (undefined if the
+    // whole series is in the effective zone).
+    const n = scored.length;
+    const eff = Math.min(effectiveStartIndex(series, params), n);
+    const effTs = eff < n ? series.timestamps[eff] : undefined;
+    const runs = scoredRuns(scored, eff);
 
     // 2. confidence corridor — one filled polygon per contiguous scored run
     g.fillStyle = rgba(clay, 0.13);
@@ -227,11 +240,22 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     }
     g.setLineDash([]);
 
-    // 4. metric line
-    drawSeries(series.values, clay, 1.5);
+    // 4. metric line(s).
+    // With smoothing on, the detector judges the PROCESSED (smoothed) series, so
+    // draw that as the active clay line and the raw values as a faint ghost
+    // behind it (so a viewer sees both what the metric did and what the band
+    // sees). With no smoothing the processed value equals the raw value, so a
+    // single clay line is all that's needed.
+    if (params.smoothing !== 'none') {
+      drawSeries(series.values, rgba(clay, 0.28), 1.25);
+      const processed = scored.map((p) => p.processedValue);
+      drawSeries(processed, clay, 1.6);
+    } else {
+      drawSeries(series.values, clay, 1.5);
+    }
 
-    // 5. anomaly markers (flagged dots) + missed-truth rings
-    for (let i = 0; i < scored.length; i++) {
+    // 5. anomaly markers (flagged dots) + missed-truth rings — effective zone only
+    for (let i = eff; i < n; i++) {
       const p = scored[i];
       if (!p.scored || !isFinite(p.value)) continue;
       const X = px(p.timestamp);
@@ -255,9 +279,26 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       }
     }
 
-    // 6. window overlay (hover)
+    // 6. warm-up overlay: dim the lead-in + label where detection reaches full
+    // power. Drawn before the hover overlay so the window box stays crisp on top.
+    if (effTs !== undefined) {
+      drawWarmupOverlay(g, canvas, MARGINS, dpr, px, effTs, 'detection at full power →');
+    }
+
+    // 7. window overlay (hover) — works across the whole series for context
     if (hoverIndex >= 0 && hoverIndex < scored.length) {
       drawWindowOverlay(hoverIndex, params.windowSize, scored, series, faint);
+    }
+
+    // 8. alert markers — one per fired incident, along the top axis
+    if (alerts && alerts.length) {
+      drawAlertMarkers(g, canvas, MARGINS, dpr, px, alerts, (k) =>
+        k === 'anomaly'
+          ? token('--st-anomaly')
+          : k === 'recovery'
+            ? token('--st-recovery')
+            : token('--st-nodata'),
+      );
     }
 
     g.restore();

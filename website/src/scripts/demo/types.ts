@@ -167,6 +167,12 @@ export interface Scorecard {
   alertWouldFire: boolean;
   /** index of the first point where an alert would fire (-1 if none). */
   alertFireIndex: number;
+  /**
+   * One index per qualifying incident: the point where a maximal run of
+   * grid-adjacent flags REACHES consecutiveAnomalies (an alert fires there).
+   * `alertFireIndex` is the first of these.
+   */
+  alertFireIndexes: number[];
 }
 
 // ----------------------------------------------------------------------------
@@ -182,10 +188,20 @@ export interface HoverInfo {
   windowEnd: number;
 }
 
+/** A fired alert to surface on the chart timeline: ms-epoch + kind. */
+export interface ChartAlert {
+  /** ms-epoch timestamp where the alert fired. */
+  t: number;
+  /** 'anomaly' | 'recovery' | 'nodata' — picks the marker color. */
+  kind: string;
+}
+
 export interface ChartData {
   series: Series;
   scored: ScoredPoint[];
   params: DetectorParams;
+  /** all fired alerts, drawn as colored markers along the top axis. */
+  alerts?: ChartAlert[];
 }
 
 export interface ChartOptions {

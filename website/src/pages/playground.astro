@@ -1,0 +1,289 @@
+---
+import Logo from '../components/Logo.astro';
+import '../styles/brand.css';
+import '../styles/landing.css';
+
+const repo = 'https://github.com/alexeiveselov92/detectkit';
+const title = 'detectkit playground — shape a metric, watch detection happen';
+const description =
+  "An interactive sandbox for detectkit's real anomaly detectors. Shape a synthetic metric, turn the detector's knobs, and see the corridor of normal, what gets flagged, and whether an alert would fire — all client-side.";
+
+// Each control carries a one-sentence, plain-language tooltip explaining what
+// the knob does. Rendered as a styled bubble on an "ⓘ" affordance (no native
+// title=), so it reads the same on every platform.
+const TIP = {
+  rhythm:
+    'The repeating shape of your metric — flat, a daily cycle, weekly, business-hours, or spiky counts.',
+  noise: 'How much random jitter sits on top of the rhythm — higher noise widens the normal band.',
+  trend: 'A slow upward or downward drift in the level over the whole series.',
+  interval: 'The spacing between points (the metric grid step), e.g. one point every hour.',
+  incident: 'The kind of problem to inject — a spike, dip, sustained step, slow drift, or a cluster.',
+  size: 'How large the injected incident is relative to normal — drag up to make it more obvious.',
+  detector:
+    'Which statistic builds the corridor: mad (robust median), zscore (mean ± σ), or iqr (quartile fences).',
+  threshold:
+    'How wide the corridor is, in spread units — higher means fewer flags, lower means more sensitive.',
+  window_size:
+    'How many recent points the corridor is computed from — longer is steadier, shorter adapts faster.',
+  weighting:
+    'Whether recent points count more than older ones when building the corridor (off, exponential, or linear).',
+  half_life: 'For exponential weighting: how many points back a point’s weight halves.',
+  detrend: 'Removes a local slope before judging a point, so a steady trend is not flagged as anomalous.',
+  smoothing:
+    'Smooths the series (EMA or SMA) before detection, so single-point noise does not trip the band.',
+  seasonality:
+    'Conditions the corridor on a seasonal key (hour, or hour+day-of-week) so each time-of-day has its own normal.',
+  consecutive:
+    'How many grid-adjacent flagged points in a row are needed before an alert actually fires.',
+};
+const tip = (key: keyof typeof TIP) =>
+  `<span class="dkx-tip" tabindex="0" aria-label="${TIP[key]}"><span class="dkx-tip-i">i</span><span class="dkx-tip-bubble">${TIP[key]}</span></span>`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href="https://dtk.pipelab.dev/playground/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content="https://dtk.pipelab.dev/playground/" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="landing">
+    <!-- ===== slim brand header ===== -->
+    <header class="site-header">
+      <nav class="wrap nav">
+        <a class="brand" href="/">
+          <Logo size={30} />
+          <span>detectkit</span>
+        </a>
+        <div class="nav-right pg-nav-right">
+          <a class="ghost-link pg-back" href="/">← back to home</a>
+          <a class="ghost-link" href={repo}>GitHub</a>
+          <a class="pip" href="/getting-started/installation/">Get started</a>
+        </div>
+      </nav>
+    </header>
+
+    <!-- ===== playground ===== -->
+    <main class="wrap pg-wrap">
+      <div class="eyebrow">interactive playground</div>
+      <h1 class="pg-h1">Shape a metric, then watch detection happen.</h1>
+      <p class="pg-intro">
+        Dial in a series that looks like one of yours, turn the detector's real knobs, and see the
+        <strong>corridor of normal</strong>, what gets flagged, and whether an <strong>alert</strong>
+        would fire. The math is the actual detectkit detector, ported to run entirely on this page —
+        nothing is sent anywhere.
+      </p>
+
+      <div id="dkx" class="dkx-card dkx-card-wide">
+        <!-- chart -->
+        <div class="dkx-chart">
+          <div class="dkx-legend">
+            <span><i class="dkx-sw dkx-sw-line"></i>metric</span>
+            <span><i class="dkx-sw dkx-sw-band"></i>expected range</span>
+            <span><i class="dkx-sw dkx-sw-anom"></i>flagged anomaly</span>
+            <span><i class="dkx-sw dkx-sw-miss"></i>injected (missed)</span>
+            <span><i class="dkx-sw dkx-sw-alert"></i>alert fires</span>
+            <span class="dkx-legend-hint">hover the chart to see the window a point is judged by</span>
+            <span id="dkx-smooth-note" class="dkx-legend-hint dkx-smooth-note hidden"></span>
+          </div>
+          <div class="dkx-plot">
+            <canvas id="dkx-canvas"></canvas>
+          </div>
+          <div id="dkx-readout" class="dkx-readout">hover a point to inspect its window &amp; verdict</div>
+        </div>
+
+        <!-- scorecard -->
+        <div class="dkx-score">
+          <div class="dkx-stat"><div class="dkx-stat-v" id="dkx-stat-caught">—</div><div class="dkx-stat-k">caught</div></div>
+          <div class="dkx-stat"><div class="dkx-stat-v" id="dkx-stat-fp">—</div><div class="dkx-stat-k">false alarms</div></div>
+          <div class="dkx-stat"><div class="dkx-stat-v" id="dkx-stat-flagged">—</div><div class="dkx-stat-k">flagged pts</div></div>
+          <div class="dkx-stat"><div class="dkx-stat-v" id="dkx-stat-flagrate">—</div><div class="dkx-stat-k">flag rate</div></div>
+          <div class="dkx-stat"><div class="dkx-stat-v" id="dkx-stat-mcc">—</div><div class="dkx-stat-k">MCC</div></div>
+          <div id="dkx-alert" class="dkx-alert"></div>
+        </div>
+
+        <!-- controls -->
+        <div class="dkx-controls dkx-controls-3">
+          <!-- group 1 — your metric (data shaping) -->
+          <div class="dkx-group">
+            <div class="dkx-group-h">your metric</div>
+
+            <label class="dkx-ctl">
+              <span class="dkx-ctl-k">rhythm <Fragment set:html={tip('rhythm')} /></span>
+              <span class="dkx-seg" data-control="seasonality">
+                <button data-v="flat" class="on">flat</button>
+                <button data-v="daily">daily</button>
+                <button data-v="weekly">weekly</button>
+                <button data-v="daily_weekly">daily+wk</button>
+                <button data-v="business_hours">business</button>
+                <button data-v="spiky_counts">spiky</button>
+              </span>
+            </label>
+
+            <label class="dkx-ctl">
+              <span class="dkx-ctl-k">noise <Fragment set:html={tip('noise')} /></span>
+              <span class="dkx-seg" data-control="noise">
+                <button data-v="low">low</button>
+                <button data-v="medium" class="on">medium</button>
+                <button data-v="high">high</button>
+              </span>
+            </label>
+
+            <label class="dkx-ctl">
+              <span class="dkx-ctl-k">trend <Fragment set:html={tip('trend')} /></span>
+              <span class="dkx-seg" data-control="trend">
+                <button data-v="none" class="on">none</button>
+                <button data-v="up">up</button>
+                <button data-v="down">down</button>
+              </span>
+            </label>
+
+            <label class="dkx-ctl">
+              <span class="dkx-ctl-k">interval <Fragment set:html={tip('interval')} /></span>
+              <span class="dkx-seg" data-control="interval">
+                <button data-v="10min">10min</button>
+                <button data-v="1h" class="on">1h</button>
+                <button data-v="1d">1d</button>
+              </span>
+            </label>
+
+            <label class="dkx-ctl">
+              <span class="dkx-ctl-k">incident <Fragment set:html={tip('incident')} /></span>
+              <span class="dkx-seg" data-control="anomaly">
+                <button data-v="spike">spike</button>
+                <button data-v="dip">dip</button>
+                <button data-v="step">step</button>
+                <button data-v="drift">drift</button>
+                <button data-v="cluster" class="on">cluster</button>
+              </span>
+            </label>
+
+            <label class="dkx-ctl">
+              <span class="dkx-ctl-k">size <b id="dkx-magnitude-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('size')} /></span>
+              <input id="dkx-magnitude" type="range" min="0" max="100" step="1" value="60" />
+            </label>
+
+            <button id="dkx-reseed" class="dkx-reseed" type="button">↻ new random sample</button>
+          </div>
+
+          <!-- group 2 — detector -->
+          <div class="dkx-group">
+            <div class="dkx-group-h">detector</div>
+
+            <label class="dkx-ctl">
+              <span class="dkx-ctl-k">detector <Fragment set:html={tip('detector')} /></span>
+              <span class="dkx-seg" data-control="detector">
+                <button data-v="mad" class="on">mad</button>
+                <button data-v="zscore">zscore</button>
+                <button data-v="iqr">iqr</button>
+              </span>
+            </label>
+
+            <label class="dkx-ctl">
+              <span class="dkx-ctl-k">threshold <b id="dkx-threshold-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('threshold')} /></span>
+              <input id="dkx-threshold" type="range" min="1" max="6" step="0.1" value="3" />
+            </label>
+
+            <label class="dkx-ctl">
+              <span class="dkx-ctl-k">window_size <b id="dkx-window-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('window_size')} /></span>
+              <input id="dkx-window" type="range" min="20" max="300" step="5" value="100" />
+            </label>
+
+            <label class="dkx-ctl">
+              <span class="dkx-ctl-k">recency weighting <Fragment set:html={tip('weighting')} /></span>
+              <span class="dkx-seg" data-control="weights">
+                <button data-v="none" class="on">none</button>
+                <button data-v="exponential">exponential</button>
+                <button data-v="linear">linear</button>
+              </span>
+            </label>
+
+            <label class="dkx-ctl hidden" id="dkx-halflife-row">
+              <span class="dkx-ctl-k">half_life <b id="dkx-halflife-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('half_life')} /></span>
+              <input id="dkx-halflife" type="range" min="2" max="100" step="1" value="15" />
+            </label>
+
+            <label class="dkx-ctl">
+              <span class="dkx-ctl-k">detrend <Fragment set:html={tip('detrend')} /></span>
+              <span class="dkx-seg" data-control="detrend">
+                <button data-v="none" class="on">off</button>
+                <button data-v="linear">linear</button>
+              </span>
+            </label>
+
+            <label class="dkx-ctl">
+              <span class="dkx-ctl-k">smoothing <Fragment set:html={tip('smoothing')} /></span>
+              <span class="dkx-seg" data-control="smoothing">
+                <button data-v="none" class="on">none</button>
+                <button data-v="ema">ema</button>
+                <button data-v="sma">sma</button>
+              </span>
+            </label>
+
+            <label class="dkx-ctl">
+              <span class="dkx-ctl-k">seasonality grouping <Fragment set:html={tip('seasonality')} /></span>
+              <span class="dkx-seg" data-control="conditioning">
+                <button data-v="off" class="on">off</button>
+                <button data-v="hour">hour</button>
+                <button data-v="hour_dow">hour+dow</button>
+              </span>
+            </label>
+          </div>
+
+          <!-- group 3 — alerting -->
+          <div class="dkx-group dkx-group-alert">
+            <div class="dkx-group-h">alerting</div>
+
+            <label class="dkx-ctl">
+              <span class="dkx-ctl-k">consecutive_anomalies <b id="dkx-consecutive-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('consecutive')} /></span>
+              <input id="dkx-consecutive" type="range" min="1" max="10" step="1" value="3" />
+            </label>
+
+            <p class="dkx-alert-help">
+              An alert fires only when this many <strong>grid-adjacent</strong> flagged points form a
+              run — so a single noisy blip never pages anyone. Each qualifying run is one alert,
+              marked with a ▼ on the chart.
+            </p>
+          </div>
+        </div>
+
+        <div class="dkx-config-row">
+          <span class="dkx-config-k">// effective config</span>
+          <code id="dkx-config"></code>
+        </div>
+      </div>
+
+      <p class="dx-foot">
+        // the same windowed statistics that run in production — current point excluded from its own
+        window, NaN gaps skipped, seasonality &amp; recency applied per point<br />
+        // detection runs only in the <strong>effective zone</strong> (past warm-up, dimmed on the
+        left); <strong>caught</strong> = injected incidents a flag landed on · <strong>flag rate</strong>
+        = share of judged points flagged · <strong>MCC</strong> = correlation of flags with the truth ·
+        the <strong>alert</strong> needs <code>consecutive_anomalies</code> grid-adjacent flags
+      </p>
+
+      <div class="pg-cta">
+        <a class="btn btn-primary" href="/getting-started/installation/">Get started for real</a>
+        <a class="btn btn-ghost" href="/guides/detectors/">Read the detectors guide</a>
+      </div>
+    </main>
+
+    <script>
+      import '../scripts/demo/main.ts';
+    </script>
+  </body>
+</html>

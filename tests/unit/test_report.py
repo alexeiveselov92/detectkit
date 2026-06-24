@@ -122,6 +122,10 @@ def test_payload_shape_and_counts():
     assert det["name"] == "MADDetector"
     assert det["anomaly_count"] == len(ANOMALY_IDX)
     assert det["params"] == {"threshold": 3.0, "window_size": 5}
+    # warm-up onset: min_samples (default 30) exceeds the 12-point window -> the
+    # whole window is still warming up, so there's no "full power" zone to mark.
+    assert "effective_start" in det
+    assert det["effective_start"] is None
     # distinct anomalous timestamps
     assert payload["summary"]["anomalies"] == len(ANOMALY_IDX)
 
@@ -158,6 +162,76 @@ def test_render_html_is_self_contained():
     assert "orders_per_min" in html
     assert "__DTK_REPORT__" in html  # the bundled renderer global
     assert "<canvas" in html or "dtk-report" in html
+
+
+SEAS_N = 24
+SEAS_DET_ID = "det00000000000002"
+
+
+class SeasonalInternal(FakeInternal):
+    """Series whose seasonality_data alternates two keys -> cardinality 2.
+
+    Carries a detector configured with ``seasonality_components`` and small
+    sample gates so the per-group warm-up lands *inside* the window, yielding a
+    concrete (non-null) effective_start.
+    """
+
+    def __init__(self) -> None:
+        self._ts = np.array(
+            [np.datetime64(BASE, "ms") + np.timedelta64(i * INTERVAL, "s") for i in range(SEAS_N)]
+        )
+        self._val = np.full(SEAS_N, 100.0)
+        # two distinct hour buckets -> cardinality 2
+        self._seas = np.array(
+            [json_dumps_sorted({"hour_bucket": i % 2}) for i in range(SEAS_N)], dtype=object
+        )
+        params = json_dumps_sorted(
+            {
+                "window_size": 50,
+                "min_samples": 2,
+                "min_samples_per_group": 2,
+                "seasonality_components": [["hour_bucket"]],
+            }
+        )
+        self._rows = [
+            {
+                "timestamp": BASE + timedelta(seconds=i * INTERVAL),
+                "detector_id": SEAS_DET_ID,
+                "detector_name": "MADDetector",
+                "is_anomaly": False,
+                "confidence_lower": 90.0,
+                "confidence_upper": 110.0,
+                "value": 100.0,
+                "processed_value": 100.0,
+                "detector_params": params,
+                "detection_metadata": json_dumps_sorted({}),
+            }
+            for i in range(SEAS_N)
+        ]
+
+    def get_last_datapoint_timestamp(self, name):
+        return BASE + timedelta(seconds=(SEAS_N - 1) * INTERVAL)
+
+    def load_datapoints(self, name, from_timestamp=None, to_timestamp=None):
+        return {
+            "timestamp": self._ts,
+            "value": self._val,
+            "seasonality_data": self._seas,
+            "seasonality_columns": ["hour_bucket"],
+        }
+
+
+def test_seasonality_detector_has_effective_start():
+    payload = build_report_payload(metric_config=_metric(None), internal=SeasonalInternal())
+    det = payload["detectors"][0]
+    eff = det["effective_start"]
+    # group warm-up = min_samples_per_group(2) * cardinality(2) = 4 points in,
+    # which fits the 50-point window -> a concrete onset past the period start.
+    assert eff is not None
+    assert eff > payload["period"]["start"]
+    # exactly the timestamp of the grid point at index 4
+    expected = payload["points"][4]["t"]
+    assert eff == expected
 
 
 def test_resolve_window_defaults_to_last_datapoint():

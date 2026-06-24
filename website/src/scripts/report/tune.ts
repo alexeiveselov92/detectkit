@@ -523,7 +523,9 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       max: windowMax,
       step: 5,
       value: Math.min(seed.windowSize, windowMax),
-      fmt: (v) => String(v),
+      // Echo the wall-clock span the window covers on the metric grid (like the
+      // "Points shown" trim), so "how much history is this" reads at a glance.
+      fmt: (v) => `${v} · ${fmtDur(v * payload.interval_seconds * 1000)}`,
       hint: 'How many trailing points form the baseline window for each scored point. ' +
         'Larger = steadier baseline (more history); smaller = adapts faster to shifts.',
     },
@@ -555,7 +557,9 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       max: windowMax,
       step: 1,
       value: seed.halfLife ?? Math.max(5, Math.round(seed.windowSize / 20)),
-      fmt: (v) => String(v),
+      // Same grid-span echo as the window: half-life in points is abstract, the
+      // equivalent duration ("767 · 32d") makes the decay horizon concrete.
+      fmt: (v) => `${v} · ${fmtDur(v * payload.interval_seconds * 1000)}`,
       hint: 'Exponential weighting only: the age (in points) at which a point counts half as ' +
         'much as the newest. Smaller = faster decay = fresher baseline.',
     },

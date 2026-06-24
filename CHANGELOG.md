@@ -5,6 +5,16 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.31.1] - 2026-06-25
+
+### Added
+- **`dtk tune`: window size and half-life echo their wall-clock span.** The
+  **Window size** and **Half-life** sliders — both measured in points — now show
+  the equivalent duration on the metric grid next to the point count (e.g.
+  `2000 · 83d 8h` on a 1h metric), so "how much history is this window" and "how
+  far back does the decay reach" read at a glance. Mirrors the existing
+  "Points shown" trim echo. Display only — what **Apply** writes is unchanged.
+
 ## [0.31.0] - 2026-06-25
 
 ### Added

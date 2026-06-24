@@ -5,6 +5,14 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.1] - 2026-06-24
+
+### Added
+- **Live time readout while editing an incident in the labeler.** Dragging an
+  incident's edge now shows `start/end: <old> → <new>`, and creating or moving a
+  band shows the resulting `<start> → <end>`, so you can place a boundary on an
+  exact timestamp.
+
 ## [0.23.0] - 2026-06-24
 
 ### Added

@@ -1,16 +1,22 @@
 # Visualizing Results
 
 detectkit writes everything it computes into a handful of internal `_dtk_*`
-tables in your database. There is no built-in UI — instead, you point **any**
-BI / dashboarding tool at those tables and chart them with plain SQL:
+tables in your database. There are two ways to see it:
 
-- Grafana, Apache Superset, Metabase, Tableau, Redash, Looker, …
-- SQL notebooks (Jupyter, Hex, Observable) or a psql/clickhouse-client session.
+- **HTML reports** — the quickest look. `dtk run --report` (or
+  `dtk autotune --report`) writes a single self-contained HTML file per metric
+  that you open in a browser — values, the detector's confidence band, anomalies,
+  and the alerts that fired, with a built-in period selector. No BI tool, no SQL.
+  See [HTML reports](#html-reports) below.
+- **Your own BI / dashboarding tool** — for shared dashboards and custom panels,
+  point **any** BI tool at the `_dtk_*` tables and chart them with plain SQL
+  (Grafana, Apache Superset, Metabase, Tableau, Redash, Looker, …, or SQL
+  notebooks and a psql/clickhouse-client session).
 
-This guide is **BI-tool-agnostic** and gives copy-pasteable SQL recipes for the
-charts people most often want: the metric over time, the detector's confidence
-band, anomaly markers, anomaly counts, the latest value vs its expected range,
-and detector comparisons.
+The BI recipes below are **tool-agnostic** copy-pasteable SQL for the charts
+people most often want: the metric over time, the detector's confidence band,
+anomaly markers, anomaly counts, the latest value vs its expected range, and
+detector comparisons.
 
 > **Database note.** The examples use ClickHouse SQL, but detectkit runs on
 > ClickHouse, PostgreSQL and MySQL — the `_dtk_*` tables exist on all three. The
@@ -49,6 +55,49 @@ metric with two detectors writes two rows per timestamp (see
 `reason` detail — see
 [Internal Tables → detection_metadata](../reference/internal-tables.md#the-detection_metadata-json)
 and [Shared Detector Parameters](../reference/detectors/shared-parameters.md#debugging-preprocessed-detections).
+
+## HTML reports
+
+For a fast, no-setup look at how a metric actually behaved, generate a
+**self-contained HTML report**. Pass `--report` to a run:
+
+```bash
+# After a normal run, write a report for the metric
+dtk run --select cpu_usage --report
+
+# A report for the detector dtk autotune just chose
+dtk autotune --select cpu_usage --report
+```
+
+Each writes one HTML file you open in a browser. It shows, over a selectable
+period:
+
+- the **metric value** over time, with each detector's **confidence band**;
+- the **anomalies** that were flagged;
+- the **alerts** that fired — anomaly, recovery, and no-data — each listed with
+  the rule that fired it, its severity, and how long it lasted;
+- a short **summary** of the period.
+
+Use the built-in **period selector** (24h / 7d / 30d / All, with zoom and pan) to
+move around the history. The report is **offline and self-contained**: the chart
+and data are inlined into the single file, so nothing is fetched and nothing
+leaves the page — you can email it or commit it as a snapshot.
+
+The report is built from the data already in the `_dtk_*` tables, so even a
+load-only run (`dtk run --select cpu_usage --steps load --report`) produces one
+from whatever is stored.
+
+**Where it lands.** `--report` is dual-mode:
+
+| You pass | The report is written to |
+|---|---|
+| `--report` (bare) | `reports/<metric>.html` (autotune: `reports/<metric>__tuned_<id>.html`) |
+| `--report <dir>` | `<dir>/<metric>.html` |
+| `--report report.html` | that exact file |
+
+For the precise flag behavior — and a note on how the report **reconstructs**
+alerts from stored detections — see the
+[CLI reference](../reference/cli.md#-report-optional-dual-mode).
 
 ## Connecting a BI tool
 

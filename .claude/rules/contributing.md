@@ -20,6 +20,7 @@ detectkit/
 │   ├── alerting/         # Alert orchestration + channels
 │   ├── orchestration/    # Task management & load→detect→alert pipeline
 │   ├── autotune/         # `dtk autotune` engine (seasonality/detector/grid search)
+│   ├── reporting/        # Self-contained HTML reports (`dtk run/autotune --report`)
 │   └── utils/            # Numpy/stats helpers, env interpolation
 ├── tests/                # Unit (numpy/mock) + integration (testcontainers)
 └── docs/                 # User-facing docs (guides, reference, examples)
@@ -188,7 +189,15 @@ pick accents with `status_color(alert_data)` so status reads from color.
    `docs/examples/autotune-labeler.html` from the real template, which the
    autotune reference page embeds — same generated-asset pattern as
    `website/scripts/make-bot-icon.mjs`).
-4. **Update the `dtk init-claude` assets** in `detectkit/cli/assets/claude/`
+4. **Regenerate the report bundle** — if you changed the HTML report's renderer
+   TS (`website/src/scripts/core/canvas.ts` or anything it pulls in), rebuild the
+   committed bundle with `node website/scripts/gen-report-bundle.mjs` (esbuild)
+   so `detectkit/reporting/assets/report.js` matches the source — the same
+   generated-asset pattern as `make-bot-icon.mjs` / `gen-labeler-example.py`. The
+   renderer is shared with the landing playground, so run the demo parity check
+   (`npm run check:demo-parity`) to confirm the TS detector port still matches the
+   Python detectors.
+5. **Update the `dtk init-claude` assets** in `detectkit/cli/assets/claude/`
    (`rules/*.md`, `skills/*/SKILL.md`, `CLAUDE.section.md`) so a freshly-run
    `dtk init-claude` matches the shipped version. These assets are user-facing
    docs, ship in the wheel (`pyproject.toml`
@@ -207,9 +216,9 @@ pick accents with `status_color(alert_data)` so status reads from color.
    the rule/skill list and the "(N created)" total must match
    `dtk init-claude --target-dir <tmp>` (the marketing page deliberately drops the
    `vX.Y.Z` suffix the CLI prints so it doesn't churn every release).
-5. **Run the gate** — `python3 -m pytest tests/unit` and
+6. **Run the gate** — `python3 -m pytest tests/unit` and
    `pre-commit run --all-files` must pass.
-6. **Build & publish** the wheel/sdist.
+7. **Build & publish** the wheel/sdist.
 
 ## PR workflow
 

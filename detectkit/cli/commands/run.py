@@ -27,6 +27,7 @@ def run_command(
     full_refresh: bool,
     force: bool,
     profile: str | None,
+    report_path: str | None = None,
 ):
     """
     Execute metric processing pipeline.
@@ -40,6 +41,9 @@ def run_command(
         full_refresh: Delete and reload all data
         force: Ignore task locks
         profile: Profile name to use
+        report_path: When not None, emit an HTML report per metric after its
+            run. "" → default location (reports/<metric>.html); a directory →
+            <dir>/<metric>.html; a .html path → that file.
     """
     # Parse steps
     step_list = parse_steps(steps)
@@ -226,6 +230,79 @@ def run_command(
                 )
             )
             break
+
+        # Optional: emit a self-contained HTML report from the freshly-persisted
+        # internal tables (values + bands + anomalies + replayed alerts).
+        if report_path is not None:
+            try:
+                emit_metric_report(
+                    config=config,
+                    project_root=project_root,
+                    internal_manager=internal_manager,
+                    report_path=report_path,
+                    project_name=getattr(project_config, "name", None),
+                    from_dt=from_dt,
+                    to_dt=to_dt,
+                )
+            except Exception as report_error:  # never fail the run on a report
+                click.echo(click.style(f"  │ Report skipped: {report_error}", fg="yellow"))
+
+
+def _resolve_report_path(report_path: str, project_root: Path, metric_name: str) -> Path:
+    """Map the ``--report`` value to a concrete output file for a metric.
+
+    "" → ``<project>/reports/<metric>.html``; a ``.html`` path → that file;
+    anything else → ``<dir>/<metric>.html``.
+    """
+    if report_path == "":
+        return project_root / "reports" / f"{metric_name}.html"
+    candidate = Path(report_path)
+    if candidate.suffix.lower() == ".html":
+        return candidate
+    return candidate / f"{metric_name}.html"
+
+
+def emit_metric_report(
+    *,
+    config: MetricConfig,
+    project_root: Path,
+    internal_manager: InternalTablesManager,
+    report_path: str,
+    project_name: str | None,
+    from_dt: datetime | None,
+    to_dt: datetime | None,
+) -> None:
+    """Build and write the HTML report for one metric (best-effort)."""
+    from detectkit.reporting import build_report_payload, render_report_html
+    from detectkit.utils.datetime_utils import now_utc_naive
+
+    payload = build_report_payload(
+        metric_config=config,
+        internal=internal_manager,
+        start=from_dt,
+        end=to_dt,
+        project_name=project_name,
+        generated_at=now_utc_naive().strftime("%Y-%m-%d %H:%M UTC"),
+    )
+    if not payload["points"]:
+        click.echo("  │ Report: no datapoints in window, skipped")
+        return
+
+    out = _resolve_report_path(report_path, project_root, config.name)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render_report_html(payload), encoding="utf-8")
+    try:
+        shown = out.relative_to(project_root)
+    except ValueError:
+        shown = out
+    click.echo(
+        click.style(
+            f"  │ Report → {shown}  "
+            f"({payload['summary']['anomalies']} anomalies, "
+            f"{payload['summary']['alerts']} alerts)",
+            fg="cyan",
+        )
+    )
 
 
 def parse_steps(steps_str: str) -> list[PipelineStep]:

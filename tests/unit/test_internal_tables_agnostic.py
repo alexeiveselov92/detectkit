@@ -138,6 +138,7 @@ def test_every_mixin_method_is_backend_agnostic():
     it.save_detections("cpu", "det1", "MADDetector", _empty_detection_batch(), "{}")
     it.get_last_detection_timestamp("cpu", "det1")
     it.list_detector_ids("cpu")
+    it.load_detections("cpu", detector_id="det1", from_timestamp=now, to_timestamp=now)
     it.delete_detections("cpu", detector_id="det1", mutations_sync=True)
     it.get_recent_detections("cpu", last_point=now, num_points=3)
 

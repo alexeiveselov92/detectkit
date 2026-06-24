@@ -139,6 +139,7 @@ class _RecoveryMixin(_OrchestratorBase):
     def _build_recovery_data(
         self,
         detections: list[DetectionRecord],
+        incident_records: list[DetectionRecord] | None = None,
     ) -> AlertData | None:
         """Construct the AlertData payload sent as a recovery notification."""
         if not detections:
@@ -165,7 +166,9 @@ class _RecoveryMixin(_OrchestratorBase):
 
         # Reconstruct the just-ended incident so the recovery message can say how
         # long it lasted (symmetric with the anomaly alert's onset/duration).
-        incident_count, onset_ts, capped = self._resolve_incident(latest.timestamp)
+        incident_count, onset_ts, capped = self._resolve_incident(
+            latest.timestamp, records=incident_records
+        )
 
         return AlertData(
             metric_name=self.metric_name,
@@ -200,7 +203,9 @@ class _RecoveryMixin(_OrchestratorBase):
             streak_capped=capped,
         )
 
-    def _resolve_incident(self, cleared_ts: Any) -> tuple[int, Any, bool]:
+    def _resolve_incident(
+        self, cleared_ts: Any, records: list[DetectionRecord] | None = None
+    ) -> tuple[int, Any, bool]:
         """Find the anomalous run that just ended before the recovery point.
 
         Walks back from *cleared_ts* (the latest, now-clean point): skips the
@@ -209,20 +214,23 @@ class _RecoveryMixin(_OrchestratorBase):
         capped)`` — ``(0, None, False)`` when no run can be reconstructed, so the
         recovery message just omits the incident duration.
         """
-        if not self.internal:
-            return 0, None, False
-
         step = np.timedelta64(self.interval.seconds, "s")
-        if isinstance(cleared_ts, np.datetime64):
-            last_point = cleared_ts.astype("datetime64[ms]").astype(datetime)
-        else:
-            last_point = cleared_ts
-        rows = self.internal.get_recent_detections(
-            metric_name=self.metric_name,
-            last_point=last_point,
-            num_points=STREAK_LOOKBACK_POINTS,
-        )
-        records = hydrate_detection_records(rows)
+        # ``records`` lets a pure caller (alert replay) supply the in-memory
+        # detection slice instead of a DB read; production passes None and the
+        # incident is resolved from ``_dtk_detections`` as before.
+        if records is None:
+            if not self.internal:
+                return 0, None, False
+            if isinstance(cleared_ts, np.datetime64):
+                last_point = cleared_ts.astype("datetime64[ms]").astype(datetime)
+            else:
+                last_point = cleared_ts
+            rows = self.internal.get_recent_detections(
+                metric_name=self.metric_name,
+                last_point=last_point,
+                num_points=STREAK_LOOKBACK_POINTS,
+            )
+            records = hydrate_detection_records(rows)
         if not records:
             return 0, None, False
 

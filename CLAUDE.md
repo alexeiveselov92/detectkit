@@ -33,5 +33,11 @@ rendered on the docs site under **For developers**). Read the relevant one:
   separate from load/detect/alert), records each run in the `_dtk_autotune_runs`
   internal table, and ships a `dtk-autotune` skill + `autotune.md` rule — keep
   those in sync on release.
+- **Reporting** lives in `detectkit/reporting/` (`dtk run --report` /
+  `dtk autotune --report`): it reads the `_dtk_*` tables and **replays alerts**
+  into one self-contained HTML report per metric, sharing a framework-free JS
+  rendering core with the website landing demo. The committed
+  `assets/report.js` bundle ships in the wheel — regenerate it (and keep it in
+  sync on release) when the report renderer TS changes.
 
 Repo: https://github.com/alexeiveselov92/detectkit

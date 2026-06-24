@@ -94,6 +94,9 @@ exclude = ["tests*", "docs*"]
 [tool.setuptools.package-data]
 # Claude Code context shipped by `dtk init-claude` (CLAUDE block, rules, skills).
 "detectkit.cli" = ["assets/**/*.md"]
+# Pre-built HTML-report renderer bundle (shared with the website landing demo),
+# inlined into self-contained reports by `dtk run --report` / `dtk autotune --report`.
+"detectkit.reporting" = ["assets/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

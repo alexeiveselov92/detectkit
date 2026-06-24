@@ -91,6 +91,10 @@ detectkit/
 │   ├── seasonality_search.py / detector_select.py / grid_search.py / window_select.py  # stages
 │   ├── html_labeler.py / label_server.py   # interactive incident labeler (static + local server)
 │   └── result.py / config_emitter.py / settings.py / _types.py / _base.py
+├── reporting/                   # self-contained HTML reports (`dtk run/autotune --report`)
+│   ├── builder.py               # build_report_payload: reads _dtk_* + replays alerts → JSON
+│   ├── html_report.py           # render_report_html: inlines assets/report.js + payload
+│   └── assets/report.js         # committed renderer bundle (shared core; ships in the wheel)
 └── utils/                       # datetime, json (sorted/orjson), env interpolation, stats
 ```
 
@@ -147,6 +151,11 @@ database-agnostic schema spec the manager turns into backend-specific DDL.
 façade over a `BaseDatabaseManager`, assembled from per-table mixins
 (`_datapoints`, `_detections`, `_tasks`, `_metrics`, `_alert_states`, `_schema`,
 `_maintenance`). It owns all `_dtk_*` knowledge; the base manager stays generic.
+Alongside the resume-cursor readers (`get_last_datapoint_timestamp` /
+`get_last_detection_timestamp`) and `load_datapoints`, it exposes
+`load_detections(metric_name, detector_id=None, from_timestamp=None,
+to_timestamp=None)` — flat per-(detector, timestamp) rows (dedup-correct via
+`final_modifier`) that the reporting layer reads back.
 
 ### Internal tables (`detectkit/database/tables.py`)
 
@@ -240,7 +249,18 @@ type names to classes: `mad`, `zscore`, `iqr`, `manual_bounds`, and the alias
 The model is **alert-centric**: messages lead with the alert and the rule it
 fired on; the anomaly is supporting evidence. The orchestrator
 (`detectkit/alerting/orchestrator/`) is composed of mixins —
-`_decision`, `_cooldown`, `_recovery`, `_dispatch`.
+`_decision`, `_cooldown`, `_recovery`, `_dispatch`, `_replay`.
+
+`_replay.py` adds a **pure** `AlertOrchestrator.replay(detections, value_at,
+start, end) -> list[ReplayedEvent]` that reconstructs the alert / recovery /
+no-data timeline over a historical period from persisted detections by
+re-walking the *same* decision logic (quorum / consecutive / cooldown / recovery
+/ no-data) — **no channel dispatch, no `_dtk_alert_states` writes, no
+wall-clock**. The reporting layer uses it to surface alerts (`_dtk_alert_states`
+is last-writer-wins state, not an event log). It reuses the decision/builder
+functions verbatim; `_resolve_incident` (`_recovery.py`) takes an optional
+in-memory `records=` so recovery resolution stays DB-free during replay (the
+production path is unchanged).
 
 **Per-point quorum** (`_decision.py`): for each timestamp, the quorum is the set
 of anomalous detections matching the `direction` policy —
@@ -365,6 +385,48 @@ own runbook, `false` → hide). `resolve_alert_help_url()` resolves it; the
 orchestrator (and the error-dispatch path) stamps the result onto
 `AlertData.help_url`. Unlike `dashboard_url`/`links`, it is a project-level
 constant rather than per-`AlertConfig`.
+
+## Reporting (`dtk run --report`)
+
+`detectkit/reporting/` turns the persisted internal tables into one
+**self-contained HTML report** per metric — the same offline delivery model as
+the autotune incident labeler (inline JS, baked payload, nothing leaves the
+browser). It lets a user *see how a metric actually performed* — values +
+per-detector confidence bands + flagged anomalies + the alerts that fired + a
+summary, with client-side period selection (24h / 7d / 30d / All + zoom/pan) and
+an alerts list — without standing up BI / SQL / a 3rd-party charting tool.
+`dtk run --report [PATH]` (after a run) and `dtk autotune --report [PATH]` (for
+the tuned winner) both emit one; because the builder reads the stored `_dtk_*`
+rows, even a `--steps load` run can produce one. `--report` is dual-mode: bare
+`--report` → default path (`reports/<metric>.html`; autotune:
+`reports/<metric>__tuned_<id>.html`), `--report <dir>` → `<dir>/<metric>.html`,
+`--report file.html` → that file (`_resolve_report_path` in
+`cli/commands/run.py`).
+
+The pipeline is two pure functions:
+
+- `builder.build_report_payload(...)` reads `_dtk_datapoints` +
+  `_dtk_detections` (via `load_datapoints` / `load_detections`) and **replays
+  alerts** into a JSON payload. The detector band series is derived straight from
+  the stored detection rows, so the report shows *what actually ran*.
+- `html_report.render_report_html(payload)` inlines the pre-built renderer bundle
+  `detectkit/reporting/assets/report.js` + the baked payload into one HTML file.
+
+**Alert replay seam.** Alerts are not read from `_dtk_alert_states` (that is
+last-writer-wins *state*, not an event log). Instead the builder calls the pure
+`AlertOrchestrator.replay(...)` (`alerting/orchestrator/_replay.py`,
+returning `ReplayedEvent`s) to reconstruct the anomaly / recovery / no-data
+timeline over the period by re-walking the **real** decision logic, with no
+dispatch, no state writes and no wall-clock (see the Alerting section).
+
+**Shared rendering core.** `assets/report.js` is a committed generated asset (the
+`bot-icon.png` / labeler-example pattern) built by
+`website/scripts/gen-report-bundle.mjs` from the **same** framework-free
+TypeScript core (`website/src/scripts/core/canvas.ts`) that powers the website's
+interactive landing playground — so the report and the marketing demo render
+identically. The bundle ships in the wheel
+(`[tool.setuptools.package-data]` `"detectkit.reporting" = ["assets/*.js"]` +
+MANIFEST.in) and must be regenerated when the renderer TS changes.
 
 ## Auto-tuning (`dtk autotune`)
 

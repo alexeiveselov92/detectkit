@@ -5,6 +5,22 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.30.1] - 2026-06-24
+
+### Fixed
+- **`dtk tune` is now responsive on large metrics.** It previously baked a
+  metric's *entire* history into the page and re-ran the client-side detector
+  over **all** points on every knob change — on a metric with tens of thousands
+  of points that made the page slow to load and laggy to drag. Now it defaults to
+  the most recent **~4000** points (a `--from` / `--to` span is still honored in
+  full), the window-size slider is capped at half the shown points, and the
+  live recompute is **debounced** so a slider drag triggers a single recompute
+  when it settles rather than one per frame. The CLI also reports how many points
+  it is tuning on.
+- **`dtk tune` no longer spews `xdg-open` errors** when launching the browser on
+  a headless / WSL box: the best-effort browser launch now silences its stderr,
+  and the printed hint tells you to open the URL manually if no browser appears.
+
 ## [0.30.0] - 2026-06-24
 
 ### Added

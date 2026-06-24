@@ -15,8 +15,15 @@ from typing import Any
 
 from detectkit.config.metric_config import MetricConfig
 from detectkit.database.internal_tables import InternalTablesManager
-from detectkit.reporting.builder import _ms, _num_or_none, _parse_seasonality, resolve_window
+from detectkit.reporting.builder import _ms, _num_or_none, _parse_seasonality
 
+# Default number of (most recent) points to show when no explicit window is given.
+# Tuning recomputes the detector client-side on every knob change, which is
+# O(points x window); baking the whole history (which can be 10k-100k points)
+# makes the page slow to load and laggy to drag. ~4000 points keeps it
+# interactive while showing plenty of context; an explicit --from/--to is honored
+# in full (the user opted into that span).
+TUNE_DEFAULT_POINTS = 4000
 # Per-type interval-width defaults (mirror the detector class defaults and the
 # website demo's DETECTOR_THRESHOLD_DEFAULT).
 _THRESHOLD_DEFAULT = {"mad": 3.0, "zscore": 3.0, "iqr": 1.5}
@@ -101,7 +108,16 @@ def build_tune_payload(
     interval = metric_config.get_interval()
     interval_seconds = interval.seconds
 
-    start, end = resolve_window(internal, name, interval_seconds, start, end)
+    # Resolve the window. ``end`` defaults to the last datapoint. ``start``
+    # defaults to ``TUNE_DEFAULT_POINTS`` intervals before ``end`` (clamped to the
+    # first datapoint) — NOT the whole history — so the page stays interactive on
+    # large metrics. An explicit ``start`` (``--from``) is honored as-is.
+    if end is None:
+        end = internal.get_last_datapoint_timestamp(name)
+    if start is None and end is not None:
+        first = internal.get_first_datapoint_timestamp(name)
+        lookback = end - timedelta(seconds=interval_seconds * TUNE_DEFAULT_POINTS)
+        start = max(first, lookback) if first is not None else lookback
 
     seed = _seed_detector(metric_config)
     consecutive = 3

@@ -11,11 +11,13 @@ knobs and retry.
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 import secrets
 import threading
 import webbrowser
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, cast
@@ -25,6 +27,29 @@ from detectkit.tuning.config_writer import AppliedConfig, apply_tuned_config
 from detectkit.tuning.html import render_tune_html
 
 _MAX_BODY = 5_000_000  # generous cap on the posted config payload
+
+
+@contextlib.contextmanager
+def _quiet_stderr() -> Iterator[None]:
+    """Silence OS-level stderr for the duration of the block.
+
+    ``webbrowser.open`` shells out to ``xdg-open``, which prints a wall of
+    "browser not found" lines to stderr on a headless / WSL box. The launch is
+    best-effort (we already print the URL), so swallow that noise.
+    """
+    try:
+        devnull = os.open(os.devnull, os.O_WRONLY)
+    except OSError:
+        yield
+        return
+    saved = os.dup(2)
+    try:
+        os.dup2(devnull, 2)
+        yield
+    finally:
+        os.dup2(saved, 2)
+        os.close(saved)
+        os.close(devnull)
 
 
 class _TuneServer(ThreadingHTTPServer):
@@ -136,10 +161,13 @@ def serve_tuner(
     if on_ready is not None:
         on_ready(url)
     echo(f"  Tuner: {url}")
-    echo("  Turn the knobs in the browser, then click Apply to metric (Ctrl-C to cancel).")
+    echo(
+        "  Open the URL above if no browser opens. Turn the knobs, then click Apply (Ctrl-C to cancel)."
+    )
     if open_browser:
         try:
-            webbrowser.open(url)
+            with _quiet_stderr():
+                webbrowser.open(url)
         except Exception:
             pass
     try:

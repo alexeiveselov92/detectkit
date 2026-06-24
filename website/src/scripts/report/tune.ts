@@ -322,25 +322,27 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     },
   });
 
-  // ---- recompute (rAF-throttled) --------------------------------------------
-  let queued = false;
+  // ---- recompute (debounced) ------------------------------------------------
+  // runDetector is O(points x window) and re-runs from scratch on every change.
+  // Debounce so a slider DRAG fires a single recompute when it settles (not one
+  // per pixel) — the difference between smooth and frozen on a large series.
+  const runRecompute = (): void => {
+    const params = readParams();
+    const scored = runDetector(series, params);
+    const fires = alertFireIndexes(scored, intervalMs, params.consecutiveAnomalies);
+    const alerts: ChartAlert[] = fires.map((i) => ({ t: series.timestamps[i], kind: 'anomaly' }));
+    chart.render({ series, scored, params, alerts });
+    const eff = effectiveStartIndex(series, params);
+    const flagged = scored.filter((s) => s.scored && s.isAnomaly).length;
+    statBar.textContent =
+      `${flagged} flagged · ${fires.length} alert${fires.length === 1 ? '' : 's'} · ` +
+      `warm-up ${eff} pts`;
+    configEcho.textContent = configText(params, consecutive);
+  };
+  let debounce = 0;
   const recompute = (): void => {
-    if (queued) return;
-    queued = true;
-    requestAnimationFrame(() => {
-      queued = false;
-      const params = readParams();
-      const scored = runDetector(series, params);
-      const fires = alertFireIndexes(scored, intervalMs, params.consecutiveAnomalies);
-      const alerts: ChartAlert[] = fires.map((i) => ({ t: series.timestamps[i], kind: 'anomaly' }));
-      chart.render({ series, scored, params, alerts });
-      const eff = effectiveStartIndex(series, params);
-      const flagged = scored.filter((s) => s.scored && s.isAnomaly).length;
-      statBar.textContent =
-        `${flagged} flagged · ${fires.length} alert${fires.length === 1 ? '' : 's'} · ` +
-        `warm-up ${eff} pts`;
-      configEcho.textContent = configText(params, consecutive);
-    });
+    if (debounce) window.clearTimeout(debounce);
+    debounce = window.setTimeout(runRecompute, 130);
   };
 
   // ---- controls -------------------------------------------------------------
@@ -373,7 +375,8 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     if (thresholdOut) thresholdOut.textContent = v.toFixed(1);
   };
 
-  const windowMax = Math.max(50, Math.min(2000, n));
+  // Cap the window at half the shown points so there's always a scored region.
+  const windowMax = Math.max(50, Math.min(2000, Math.floor(n / 2)));
   const windowCtl = rangeControl(
     'Window size (points)',
     {
@@ -542,7 +545,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   }
 
   // ---- first paint + resize -------------------------------------------------
-  recompute();
+  runRecompute();
   let rafResize = 0;
   window.addEventListener('resize', () => {
     if (rafResize) cancelAnimationFrame(rafResize);

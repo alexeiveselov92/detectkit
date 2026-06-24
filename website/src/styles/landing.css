@@ -1571,20 +1571,22 @@
   color: var(--clay);
 }
 
-/* The chat surface — a tinted backdrop the message cards sit on. Telegram
-   swaps it to its signature green dotted pattern, like the reference. */
+/* The Slack / Mattermost / Email messages are self-framed cards (their own
+   border + shadow), so they sit directly on the demo card with no extra nested
+   frame — the message + the config that produced it, nothing in between. Only
+   Telegram keeps a backdrop: its plain bubbles need a chat surface to read as
+   Telegram (its signature green dotted wallpaper, like the reference). */
 .pf-surface {
-  background: var(--paper);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 22px;
+  padding: 6px 0 2px;
   transition: background 0.2s ease;
 }
 .platform-demo:has(#pf-telegram:checked) .pf-surface {
   background: #cfe3d6;
   background-image: radial-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px);
   background-size: 18px 18px;
-  border-color: #cfe3d6;
+  border: 1px solid #cfe3d6;
+  border-radius: 14px;
+  padding: 22px;
 }
 .pf-panel {
   display: none;

@@ -10,6 +10,14 @@ A tuned config is an ordinary detectkit config (one chosen detector reusing the
 same windowed detectors and `detector_id` identity). The fastest path is the
 **`dtk-autotune`** skill, which runs the whole flow conversationally.
 
+> **Prefer to tune by hand?** `dtk tune --select <metric>` is the interactive,
+> human-in-the-loop sibling: it opens a browser view of the real series, lets you
+> turn the knobs and watch the band recompute live, and on **Apply** writes the
+> config back into the metric YAML **in place** (archiving the previous version to
+> `metrics/.history/<metric>/` first). Use `autotune` to search automatically and
+> emit a new file; use `tune` to dial a detector in by eye and commit it. See
+> `cli.md`.
+
 ## What it searches
 
 1. **Seasonality** — greedily builds the best `seasonality_components` grouping

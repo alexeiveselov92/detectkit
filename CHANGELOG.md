@@ -5,6 +5,41 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.30.0] - 2026-06-24
+
+### Added
+- **`dtk tune` — interactive manual tuning that writes the config back into the
+  metric.** The human-in-the-loop sibling of `dtk autotune`. It opens an
+  interactive browser view of the metric's **real** persisted series and lets you
+  turn the detector's knobs — type (MAD / Z-Score / IQR), threshold, window,
+  recency weighting + half-life, detrend, smoothing, seasonality conditioning,
+  and the alert `consecutive_anomalies` — while the confidence band, flagged
+  anomalies and would-fire alerts **recompute live in the browser** (the same
+  faithful TypeScript detector port that powers the landing playground, fed the
+  real series instead of synthetic data). Clicking **Apply to metric** writes the
+  chosen config back into the metric YAML. Where `dtk autotune` searches
+  automatically and writes a *new* `__tuned_<id>.yml`, `dtk tune` is manual and
+  edits the metric **in place** — the two are complementary paths to optimizing a
+  metric. Delivery mirrors the autotune incident labeler: a localhost-only server
+  with a one-shot token; nothing is exposed off the machine and nothing is written
+  until you click Apply.
+- **Safe write-back with a versioned config history.** On Apply, the chosen
+  detector + params are validated through `MetricConfig` **and** the
+  `DetectorFactory` *before anything is written* (a broken or untunable config
+  never lands, returning a 400 so you can fix the knobs and retry); the previous
+  metric YAML is then archived verbatim under `metrics/.history/<metric>/<stamp>.yml`
+  (so the history of chosen parameters is trackable and the original — including
+  its comments — is always recoverable); only then is the metric file re-emitted
+  with the tuned detector. `dtk tune` takes **no pipeline lock** (it only edits a
+  config file); re-run `dtk run` afterwards to recompute detections under the new
+  config (the live preview is the TS approximation, the next real run is the
+  source of truth). `dtk tune --no-serve` writes a static, read-only preview HTML
+  (sliders recompute live, no write-back). New top-level `detectkit/tuning/`
+  package (`build_tune_payload`, `render_tune_html`, `apply_tuned_config`,
+  `serve_tuner`); the renderer bundle `detectkit/tuning/assets/tune.js` is built
+  from the shared chart/detector core (`website/scripts/gen-tune-bundle.mjs`) and
+  ships in the wheel.
+
 ## [0.29.0] - 2026-06-24
 
 ### Added

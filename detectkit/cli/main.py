@@ -330,6 +330,81 @@ def autotune(
 
 
 @cli.command()
+@click.option(
+    "--select",
+    "-s",
+    help="Selector for the single metric to tune (metric name, path, or tag)",
+    required=True,
+)
+@click.option(
+    "--from",
+    "from_date",
+    help="Window start (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)",
+)
+@click.option(
+    "--to",
+    "to_date",
+    help="Window end (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)",
+)
+@click.option(
+    "--profile",
+    help="Profile to use (default: from project config)",
+)
+@click.option(
+    "--no-serve",
+    is_flag=True,
+    help="Write a static, read-only tuner HTML file and exit instead of serving (no write-back)",
+)
+@click.option(
+    "--no-open",
+    is_flag=True,
+    help="Don't auto-open the browser (just print the local URL)",
+)
+def tune(
+    select: str,
+    from_date: str,
+    to_date: str,
+    profile: str,
+    no_serve: bool,
+    no_open: bool,
+) -> None:
+    """
+    Interactively tune a metric's detector on its real data, then write it back.
+
+    The manual, human-in-the-loop sibling of `dtk autotune`: opens an interactive
+    browser view of the metric's persisted series, lets you turn the detector's
+    knobs (type, threshold, window, weighting, detrend, smoothing, seasonality)
+    and watch the confidence band + flagged anomalies recompute live, then — on a
+    click — writes the chosen config back into the metric YAML.
+
+    Safe by construction: the new config is validated before anything is written,
+    the previous metric YAML is archived under metrics/.history/<metric>/, and
+    only then is the metric overwritten. Takes no pipeline lock (it only edits a
+    config file); re-run `dtk run` afterwards to recompute detections.
+
+    Examples:
+        # Tune interactively and apply on click
+        dtk tune --select checkout_errors
+
+        # Tune over a specific window
+        dtk tune --select checkout_errors --from 2026-05-01 --to 2026-06-01
+
+        # Write a static, read-only preview file (no write-back)
+        dtk tune --select checkout_errors --no-serve
+    """
+    from detectkit.cli.commands.tune import run_tune
+
+    run_tune(
+        select=select,
+        profile=profile,
+        from_date=from_date,
+        to_date=to_date,
+        no_serve=no_serve,
+        no_open=no_open,
+    )
+
+
+@cli.command()
 @click.argument("metric_name")
 @click.option(
     "--profile",

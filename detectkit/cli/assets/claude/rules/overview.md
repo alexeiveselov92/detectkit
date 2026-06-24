@@ -92,6 +92,11 @@ up BI or a SQL dashboard. Offline, nothing leaves the browser. Bare `--report`
 writes `reports/<metric>.html`; pass a directory or a `.html` path to override.
 See `cli.md`.
 
+The report is read-only. To **change** the detector — turn its knobs on the real
+series, watch the band recompute live, then write the config back into the metric
+— use `dtk tune --select <m>`, the interactive sibling of `dtk autotune`
+(`cli.md`).
+
 ## Glossary
 
 - **metric** — a named time series (SQL + interval) you monitor.

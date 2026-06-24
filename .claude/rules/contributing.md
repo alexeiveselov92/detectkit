@@ -189,12 +189,17 @@ pick accents with `status_color(alert_data)` so status reads from color.
    `docs/examples/autotune-labeler.html` from the real template, which the
    autotune reference page embeds — same generated-asset pattern as
    `website/scripts/make-bot-icon.mjs`).
-4. **Regenerate the report bundle** — if you changed the HTML report's renderer
-   TS (`website/src/scripts/core/canvas.ts` or anything it pulls in), rebuild the
-   committed bundle with `node website/scripts/gen-report-bundle.mjs` (esbuild)
-   so `detectkit/reporting/assets/report.js` matches the source — the same
-   generated-asset pattern as `make-bot-icon.mjs` / `gen-labeler-example.py`. The
-   renderer is shared with the landing playground, so run the demo parity check
+4. **Regenerate the report + tune bundles** — if you changed the HTML report's
+   renderer TS (`website/src/scripts/core/canvas.ts`, `report/report.ts`, or
+   anything they pull in), rebuild the committed bundle with
+   `node website/scripts/gen-report-bundle.mjs` (esbuild) so
+   `detectkit/reporting/assets/report.js` matches the source. If you changed the
+   interactive tuning renderer (`website/src/scripts/report/tune.ts` or the shared
+   `demo/` detector/chart it reuses), also rebuild
+   `node website/scripts/gen-tune-bundle.mjs` so
+   `detectkit/tuning/assets/tune.js` matches — same generated-asset pattern as
+   `make-bot-icon.mjs` / `gen-labeler-example.py`. The renderers share the detector
+   port with the landing playground, so run the demo parity check
    (`npm run check:demo-parity`) to confirm the TS detector port still matches the
    Python detectors.
 5. **Update the `dtk init-claude` assets** in `detectkit/cli/assets/claude/`

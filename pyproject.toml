@@ -97,6 +97,9 @@ exclude = ["tests*", "docs*"]
 # Pre-built HTML-report renderer bundle (shared with the website landing demo),
 # inlined into self-contained reports by `dtk run --report` / `dtk autotune --report`.
 "detectkit.reporting" = ["assets/*.js"]
+# Pre-built interactive tuning renderer bundle (shared detector port + chart core),
+# inlined into the self-contained tuning page by `dtk tune`.
+"detectkit.tuning" = ["assets/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

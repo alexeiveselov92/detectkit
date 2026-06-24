@@ -84,6 +84,7 @@ export default defineConfig({
             // Reference entry, and nesting would collide with the Reference "Detectors" group.
             { label: 'Detectors', link: '/guides/detectors/' },
             { label: 'Auto-tuning', link: '/guides/autotuning/' },
+            { label: 'Tuning (manual)', link: '/guides/tuning/' },
             { label: 'Visualizing results', link: '/guides/visualizing-results/' },
           ],
         },

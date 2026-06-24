@@ -35,6 +35,7 @@ const PAGES = [
   { src: 'docs/guides/databases-mysql.md', dest: 'guides/databases-mysql.md' },
   { src: 'docs/guides/detectors.md', dest: 'guides/detectors.md' },
   { src: 'docs/guides/autotuning.md', dest: 'guides/autotuning.md' },
+  { src: 'docs/guides/tuning.md', dest: 'guides/tuning.md' },
   { src: 'docs/guides/alerting.md', dest: 'guides/alerting.md' },
   { src: 'docs/guides/alerting-channels.md', dest: 'guides/alerting-channels.md' },
   { src: 'docs/guides/reading-alerts.md', dest: 'guides/reading-alerts.md' },

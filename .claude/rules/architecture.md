@@ -86,7 +86,8 @@ detectkit/
 │   ├── autotuner.py             # AutoTuner facade + run_autotune_engine + alert-window sweep
 │   ├── labels.py / scoring.py / distribution.py / crossval.py   # ground truth, metrics, CV
 │   ├── seasonality_search.py / detector_select.py / grid_search.py / window_select.py  # stages
-│   └── result.py / config_emitter.py / html_labeler.py / settings.py / _types.py / _base.py
+│   ├── html_labeler.py / label_server.py   # interactive incident labeler (static + local server)
+│   └── result.py / config_emitter.py / settings.py / _types.py / _base.py
 └── utils/                       # datetime, json (sorted/orjson), env interpolation, stats
 ```
 

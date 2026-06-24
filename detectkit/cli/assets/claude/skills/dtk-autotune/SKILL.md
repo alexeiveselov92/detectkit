@@ -86,21 +86,25 @@ recall timestamps:
 dtk autotune --select <name> --label
 ```
 
-This is offline (no DB writes): it renders the metric's series into one
-self-contained file `metrics/<name>__labeler.html`. Walk the user through it:
+By default this starts a **local labeler server** (127.0.0.1) and opens the
+browser; on a remote machine add `--no-open` and share the printed URL. Walk the
+user through it:
 
-1. Open `metrics/<name>__labeler.html` in any browser — just double-click it,
-   it's self-contained (inline chart + data, no server, no internet).
-2. Navigate a long/dense series: **scroll to zoom**, double-click to reset, drag
+1. Navigate a long/dense series: **scroll to zoom**, double-click to reset, drag
    the **navigator strip** to move the view (window = pan, edges = stretch).
-3. **Click-drag across the chart** over each real incident (red band + a row
-   below with an optional **description**); *remove* / *Clear all* fix mistakes.
-4. Click **Export** — the browser downloads a *versioned* `<name>-<UTC>.yml`. A
-   browser can't write into the project, so **move it into `incidents/<name>/`**.
-   Re-labeling later adds another versioned file — nothing is overwritten, so the
-   whole history is kept. Do this move for the user (you have filesystem access).
-5. Tune on the latest version by pointing at the folder:
-   `dtk autotune --select <name> --incidents incidents/<name>/`.
+2. **Click-drag across the chart** to mark each incident (red band + a row below
+   with an optional **description**). Adjust one by dragging its **edges**, or its
+   **middle** to move it; optionally **name the set**; *remove* / *Clear all* fix
+   mistakes.
+3. Click **Save & tune**. The server writes `incidents/<name>/<set>-<UTC>.yml`
+   automatically (versioned — re-labeling never overwrites) and the **same command
+   continues into the tuning run on it**. No manual file moving.
+
+(`--no-serve` is the offline fallback: it writes a static
+`metrics/<name>__labeler.html` whose Export downloads a versioned file you then
+move into `incidents/<name>/` and pass via `--incidents`.) To re-tune later on a
+saved set, point `--incidents` at `incidents/<name>/` (interactive runs let the
+user pick a version).
 
 Prefer this whenever the user can *recognise* incidents on a chart but doesn't
 have exact timestamps — it is far easier than dictating times, and they label

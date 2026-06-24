@@ -205,7 +205,17 @@ def run(
 @click.option(
     "--label",
     is_flag=True,
-    help="Emit a self-contained HTML labeler for the series and exit",
+    help="Open the interactive labeler (local server) to mark incidents, then tune on them",
+)
+@click.option(
+    "--no-serve",
+    is_flag=True,
+    help="With --label, write a static HTML labeler file and exit instead of serving",
+)
+@click.option(
+    "--no-open",
+    is_flag=True,
+    help="With --label, don't auto-open the browser (just print the local URL)",
 )
 @click.option(
     "--scoring",
@@ -240,6 +250,8 @@ def autotune(
     select: str,
     incidents_path: str,
     label: bool,
+    no_serve: bool,
+    no_open: bool,
     scoring_override: str,
     from_date: str,
     to_date: str,
@@ -266,7 +278,7 @@ def autotune(
         # Unsupervised (no labels)
         dtk autotune --select checkout_errors
 
-        # Emit an HTML labeler to mark incidents visually
+        # Mark incidents in a browser, save into incidents/<m>/, and tune on them
         dtk autotune --select checkout_errors --label
 
         # Search only, change nothing
@@ -278,6 +290,8 @@ def autotune(
         select=select,
         incidents_path=incidents_path,
         label=label,
+        no_serve=no_serve,
+        no_open=no_open,
         scoring_override=scoring_override,
         from_date=from_date,
         to_date=to_date,

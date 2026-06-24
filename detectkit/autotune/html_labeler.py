@@ -68,8 +68,16 @@ _TEMPLATE = """<!doctype html>
   button.primary:hover { background: var(--clay-700); }
   button.ghost { background: transparent; color: var(--term-text); border: 1px solid var(--term-border); }
   button.ghost:hover { border-color: var(--faint); color: var(--paper); }
+  input.setname { background: var(--term-surface); color: var(--paper); border: 1px solid var(--term-border);
+    border-radius: 7px; padding: 9px 11px; font-family: var(--ui); font-size: 13px; min-width: 200px; }
+  input.setname::placeholder { color: var(--muted); }
+  input.setname:focus { outline: none; border-color: var(--clay); }
   .summary { margin-left: auto; color: var(--faint); font-size: 12.5px; font-family: var(--mono); }
   .summary b { color: var(--clay); font-weight: 600; }
+  .savemsg { margin: 4px 2px 0; font-size: 13px; display: none; }
+  .savemsg.ok { display: block; color: var(--accent-green, #2e9e73); }
+  .savemsg.err { display: block; color: var(--anomaly); }
+  .savemsg.info { display: block; color: var(--faint); }
   canvas#c { width: 100%; height: clamp(300px, 44vh, 500px); display:block; touch-action: none;
     background: var(--term-surface); border: 1px solid var(--term-border); border-radius: 10px; cursor: crosshair; }
   .zoombar { display:flex; align-items:center; gap:8px; margin: 10px 0 6px; }
@@ -103,18 +111,21 @@ _TEMPLATE = """<!doctype html>
   <b>Export</b>. Save the file into <code class="k">incidents/__METRIC__/</code> and run
   <code class="k">dtk autotune --select __METRIC__ --incidents incidents/__METRIC__/</code></p>
   <div class="toolbar">
+    <input id="setname" class="setname" type="text" placeholder="name this set (optional)" />
     <button id="export" class="primary">Export labels</button>
     <button id="clear" class="ghost">Clear all</button>
     <span id="summary" class="summary"></span>
   </div>
+  <div id="savemsg" class="savemsg"></div>
   <canvas id="c" aria-label="metric series — drag to mark an incident, scroll to zoom"></canvas>
   <div class="zoombar">
     <button id="zreset" class="ghost">Reset zoom</button>
     <span id="range" class="rangelbl"></span>
   </div>
   <canvas id="ov" aria-label="navigator — drag the window to pan, its edges to stretch the view"></canvas>
-  <div class="navhint">Scroll to zoom where you point · double-click to reset · drag the navigator window
-  below to move, or drag its edges to stretch / squeeze the view.</div>
+  <div class="navhint">Drag on an empty area to mark an incident · drag an existing incident's edges to
+  adjust it, or its middle to move it · scroll to zoom, double-click to reset · drag the navigator
+  window below to pan, its edges to stretch / squeeze the view.</div>
   <div id="empty" class="empty">No incidents marked yet — drag across a span on the chart above.</div>
   <ul id="list"></ul>
   <footer>All times UTC · self-contained, nothing leaves your browser · re-label any time —
@@ -123,6 +134,10 @@ _TEMPLATE = """<!doctype html>
 </div>
 <script>
 const DATA = __PAYLOAD__;
+// When served by `dtk autotune --label` (local server), this is the save endpoint
+// and Export POSTs straight into incidents/<metric>/. As a static file it is null,
+// and Export falls back to a browser download.
+const SAVE_URL = __SAVE_URL__;
 const pts = DATA.points.map(p => ({ts: Date.parse(p.t.replace(' ','T')+'Z'), v: p.v}));
 const N = pts.length;
 const vraw = pts.filter(p => p.v !== null).map(p => p.v);
@@ -218,8 +233,12 @@ function draw() {
   ctx.save(); ctx.beginPath(); ctx.rect(M.l*dpr, M.t*dpr, plotW(), plotH()); ctx.clip();
   incidents.forEach(iv => { const x0=px(iv.a), x1=px(iv.b);
     ctx.fillStyle='rgba(214,50,50,0.20)'; ctx.fillRect(x0, M.t*dpr, x1-x0, plotH());
-    ctx.strokeStyle='rgba(214,50,50,0.55)'; ctx.lineWidth=1*dpr; ctx.strokeRect(x0, M.t*dpr, x1-x0, plotH()); });
-  if (dragging) { const x0=px(dragging.a), x1=px(dragging.b);
+    ctx.strokeStyle='rgba(214,50,50,0.55)'; ctx.lineWidth=1*dpr; ctx.strokeRect(x0, M.t*dpr, x1-x0, plotH());
+    // draggable edge handles
+    ctx.fillStyle='rgba(214,50,50,0.95)';
+    ctx.fillRect(x0-1.5*dpr, M.t*dpr, 3*dpr, plotH());
+    ctx.fillRect(x1-1.5*dpr, M.t*dpr, 3*dpr, plotH()); });
+  if (dragging && dragging.mode==='new') { const x0=px(dragging.a), x1=px(dragging.b);
     ctx.fillStyle='rgba(240,173,78,0.28)'; ctx.fillRect(Math.min(x0,x1), M.t*dpr, Math.abs(x1-x0), plotH()); }
   drawSeries(ctx, px, py, viewMin, viewMax, M.l*dpr, plotW(), '#d15b36', 1.5);
   ctx.restore();
@@ -272,9 +291,45 @@ const ovEdgeCss = ts => { const r=ov.getBoundingClientRect();
 c.addEventListener('wheel', e => { e.preventDefault(); const t=tsAt(e.clientX);
   let s=clamp(vspan()*Math.pow(1.0015, e.deltaY), minSpan, fullSpan);
   const f=(t-viewMin)/(vspan()||1); setView(t-f*s, t-f*s+s); }, {passive:false});
-c.addEventListener('mousedown', e => { dragging={a:tsAt(e.clientX), b:tsAt(e.clientX), sx:e.clientX, cx:e.clientX}; });
+// Hit-test an existing incident edge / body in CSS px (for editing vs creating).
+const EDGE_PX = 6;
+const minStep = () => Math.max(step, 1);
+const pxCss = ts => { const r=c.getBoundingClientRect();
+  return M.l + (ts-viewMin)/(vspan()||1)*(r.width-(M.l+M.r)); };
+function hitIncident(clientX) {
+  const x = clientX - c.getBoundingClientRect().left;
+  for (let i=0;i<incidents.length;i++) { const xa=pxCss(incidents[i].a), xb=pxCss(incidents[i].b);
+    if (Math.abs(x-xa)<=EDGE_PX) return {i, edge:'a'};
+    if (Math.abs(x-xb)<=EDGE_PX) return {i, edge:'b'}; }
+  for (let i=0;i<incidents.length;i++) { const xa=pxCss(incidents[i].a), xb=pxCss(incidents[i].b);
+    if (x>xa+EDGE_PX && x<xb-EDGE_PX) return {i, edge:'move'}; }
+  return null;
+}
+c.addEventListener('mousedown', e => {
+  const hit = hitIncident(e.clientX), t = tsAt(e.clientX);
+  if (hit && hit.edge==='move') { const iv=incidents[hit.i];
+    dragging={mode:'move', i:hit.i, grab:t, a0:iv.a, b0:iv.b, sx:e.clientX, cx:e.clientX}; }
+  else if (hit) dragging={mode:'edge', i:hit.i, edge:hit.edge, sx:e.clientX, cx:e.clientX};
+  else dragging={mode:'new', a:t, b:t, sx:e.clientX, cx:e.clientX};
+});
 c.addEventListener('mousemove', e => { if (ovAct) return;
-  if (dragging) { dragging.b=tsAt(e.clientX); dragging.cx=e.clientX; } else { hover={ts:tsAt(e.clientX)}; } draw(); });
+  if (dragging) {
+    dragging.cx=e.clientX; const t=tsAt(e.clientX);
+    if (dragging.mode==='new') { dragging.b=t; }
+    else if (dragging.mode==='edge') { const iv=incidents[dragging.i]; if (!iv) return;
+      if (dragging.edge==='a') iv.a=clamp(Math.min(t, iv.b-minStep()), tmin, tmax);
+      else iv.b=clamp(Math.max(t, iv.a+minStep()), tmin, tmax); }
+    else if (dragging.mode==='move') { const iv=incidents[dragging.i]; if (!iv) return;
+      let na=dragging.a0+(t-dragging.grab), nb=dragging.b0+(t-dragging.grab);
+      if (na<tmin) { nb+=tmin-na; na=tmin; } if (nb>tmax) { na-=nb-tmax; nb=tmax; }
+      iv.a=clamp(na,tmin,tmax); iv.b=clamp(nb,tmin,tmax); }
+    draw();
+  } else {
+    const hit=hitIncident(e.clientX);
+    c.style.cursor = hit ? (hit.edge==='move' ? 'grab' : 'ew-resize') : 'crosshair';
+    hover={ts:tsAt(e.clientX)}; draw();
+  }
+});
 c.addEventListener('mouseleave', () => { if (!dragging) { hover=null; draw(); } });
 
 ov.addEventListener('mousedown', e => { e.preventDefault(); ov.style.cursor='grabbing';
@@ -297,10 +352,13 @@ window.addEventListener('mousemove', e => { if (!ovAct) return; const t=ovTsAtCs
 window.addEventListener('mouseup', () => {
   if (ovAct) { ovAct=null; return; }
   if (!dragging) return;
-  if (Math.abs(dragging.cx-dragging.sx) > 4) {
-    const a=clamp(Math.min(dragging.a,dragging.b),tmin,tmax), b=clamp(Math.max(dragging.a,dragging.b),tmin,tmax);
-    incidents.push({a, b, label:''});
-  }
+  if (dragging.mode==='new') {
+    if (Math.abs(dragging.cx-dragging.sx) > 4) {
+      const a=clamp(Math.min(dragging.a,dragging.b),tmin,tmax), b=clamp(Math.max(dragging.a,dragging.b),tmin,tmax);
+      incidents.push({a, b, label:''});
+    }
+  } else { const iv=incidents[dragging.i];  // edge/move: keep start <= end
+    if (iv && iv.a>iv.b) { const t=iv.a; iv.a=iv.b; iv.b=t; } }
   dragging=null; render();
 });
 
@@ -326,17 +384,40 @@ function render() {
   drawAll();
 }
 
-document.getElementById('export').onclick = () => {
-  const d=new Date();
-  const stamp=d.getUTCFullYear()+pad2(d.getUTCMonth()+1)+pad2(d.getUTCDate())+'T'
-    +pad2(d.getUTCHours())+pad2(d.getUTCMinutes())+pad2(d.getUTCSeconds())+'Z';
+const slug = s => (String(s).toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'') || '__METRIC__');
+const setMsg = (text, cls) => { const el=document.getElementById('savemsg');
+  el.textContent=text; el.className='savemsg '+cls; };
+const buildYaml = () => {
   let y='metric: __METRIC__\\ntimezone: UTC\\nincidents:\\n';
   const sorted=incidents.slice().sort((p,q)=>p.a-q.a);
   if (!sorted.length) y+='  []\\n';
   sorted.forEach(iv => { y+='  - {start: "'+fmtTs(iv.a)+'", end: "'+fmtTs(iv.b)+'"'
     + (iv.label && iv.label.trim() ? ', label: '+yamlStr(iv.label.trim()) : '') + '}\\n'; });
-  const blob=new Blob([y], {type:'text/yaml'}); const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob); a.download='__METRIC__-'+stamp+'.yml'; a.click();
+  return y;
+};
+
+const exportBtn = document.getElementById('export');
+if (SAVE_URL) exportBtn.textContent = 'Save & tune';
+exportBtn.onclick = () => {
+  const y = buildYaml();
+  const name = document.getElementById('setname').value;
+  if (SAVE_URL) {
+    setMsg('Saving…', 'info'); exportBtn.disabled = true;
+    fetch(SAVE_URL, {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name: name, yaml: y})})
+      .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t || ('HTTP '+r.status)); }))
+      .then(res => setMsg('Saved to ' + res.saved + ' — autotune is now running in your terminal. '
+        + 'You can close this tab.', 'ok'))
+      .catch(e => { exportBtn.disabled = false; setMsg('Save failed: ' + e.message, 'err'); });
+  } else {
+    const d=new Date();
+    const stamp=d.getUTCFullYear()+pad2(d.getUTCMonth()+1)+pad2(d.getUTCDate())+'T'
+      +pad2(d.getUTCHours())+pad2(d.getUTCMinutes())+pad2(d.getUTCSeconds())+'Z';
+    const base = name.trim() ? slug(name) : '__METRIC__';
+    const blob=new Blob([y], {type:'text/yaml'}); const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download=base+'-'+stamp+'.yml'; a.click();
+    setMsg('Downloaded ' + base + '-' + stamp + '.yml — move it into incidents/__METRIC__/ and re-run.', 'info');
+  }
 };
 
 function drawAll() { draw(); drawOverview();
@@ -350,8 +431,17 @@ window.addEventListener('resize', fit); fit(); render();
 """
 
 
-def render_labeler_html(metric_name: str, data: dict[str, np.ndarray]) -> str:
-    """Return a self-contained HTML labeler page for *metric_name*'s series."""
+def render_labeler_html(
+    metric_name: str, data: dict[str, np.ndarray], *, save_url: str | None = None
+) -> str:
+    """Return a self-contained HTML labeler page for *metric_name*'s series.
+
+    With ``save_url`` (set by ``dtk autotune --label``'s local server) the page's
+    Export button POSTs the labels straight to that endpoint; without it (a static
+    file) Export falls back to a browser download.
+    """
+    import json
+
     timestamps = data["timestamp"]
     values = data["value"]
     points = []
@@ -359,4 +449,8 @@ def render_labeler_html(metric_name: str, data: dict[str, np.ndarray]) -> str:
         v = values[i]
         points.append({"t": _ts_to_str(timestamps[i]), "v": None if np.isnan(v) else float(v)})
     payload = json_dumps_sorted({"metric": metric_name, "points": points})
-    return _TEMPLATE.replace("__PAYLOAD__", payload).replace("__METRIC__", metric_name)
+    return (
+        _TEMPLATE.replace("__PAYLOAD__", payload)
+        .replace("__SAVE_URL__", json.dumps(save_url))
+        .replace("__METRIC__", metric_name)
+    )

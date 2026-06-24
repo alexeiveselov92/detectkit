@@ -5,6 +5,29 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0] - 2026-06-24
+
+### Added
+- **One-command interactive labeling → tuning.** `dtk autotune --select <m> --label`
+  now launches a small **local labeler server** (127.0.0.1, one-shot token), opens
+  the browser, and on **Save & tune** writes a versioned labels file straight into
+  `incidents/<m>/` and **continues into the tuning run on it** — no manual file
+  shuffling. `--no-serve` keeps the old static-HTML-download behavior; `--no-open`
+  prints the URL instead of launching a browser.
+- **Per-incident descriptions and named label sets** in the labeler — the
+  description exports as the canonical `label:`; the set name becomes the
+  versioned filename `<name>-<UTC>.yml`.
+- **Edit existing incidents on the chart** — drag an incident's edges to adjust
+  its bounds, or its middle to move it (visible edge handles + resize cursor).
+- **Choose among saved label sets at tune time.** When `--incidents` points at a
+  directory with multiple versions and the terminal is interactive, you're
+  prompted to pick one (default: newest); non-interactive runs use the newest.
+
+### Changed
+- **Examples no longer use a real production metric name.** The labeler demo (and
+  shipped example) now uses a generic `api_error_rate` with realistic error-rate
+  numbers instead of `sessions_per_visitor_avg`.
+
 ## [0.22.0] - 2026-06-24
 
 ### Changed

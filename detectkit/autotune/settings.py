@@ -24,7 +24,9 @@ class TuneSettings:
 
     # Cross-validation
     fold_count: int = 5
-    stability_lambda: float = 0.5  # aggregate = mean - lambda * std(folds)
+    # aggregate = mean(folds) - lambda * downside_semideviation(folds); downside-only
+    # so a regime-adaptive config isn't penalized for scoring *better* on recent folds.
+    stability_lambda: float = 0.5
 
     # Detector selection: by default the grid search evaluates ALL windowed
     # statistical detectors and lets cross-validation pick the winner; the

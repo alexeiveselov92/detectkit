@@ -371,6 +371,13 @@ class AutoTuneConfig(BaseModel):
         default_factory=dict, description="Hyperparameters pinned across the whole search"
     )
     folds: int = Field(default=5, description="Cross-validation folds")
+    stability_lambda: float = Field(
+        default=0.5,
+        description="Weight on the cross-fold downside-dispersion penalty "
+        "(aggregate = mean - lambda * downside_semideviation). Lower it (e.g. 0.0) for a "
+        "metric whose behavior differs across a regime shift, so a config that adapts to "
+        "the recent regime isn't penalized for fold-to-fold variance.",
+    )
     max_history: int | None = Field(
         default=None, description="Cap on training points used during the search"
     )
@@ -461,6 +468,14 @@ class AutoTuneConfig(BaseModel):
         """A history cap, if set, must be positive."""
         if v is not None and v < 1:
             raise ValueError("max_history must be at least 1")
+        return v
+
+    @field_validator("stability_lambda")
+    @classmethod
+    def validate_stability_lambda(cls, v: float) -> float:
+        """The dispersion-penalty weight must be non-negative."""
+        if v < 0:
+            raise ValueError("stability_lambda must be >= 0")
         return v
 
     @model_validator(mode="after")

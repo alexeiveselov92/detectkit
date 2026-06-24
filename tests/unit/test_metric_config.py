@@ -508,6 +508,12 @@ class TestAutoTuneInlineIncidents:
         with pytest.raises(ValueError, match="incidents_timezone"):
             AutoTuneConfig(incidents_timezone="UTC")
 
+    def test_stability_lambda_defaults_and_validates(self):
+        assert AutoTuneConfig().stability_lambda == 0.5
+        assert AutoTuneConfig(stability_lambda=0.0).stability_lambda == 0.0
+        with pytest.raises(ValueError, match="stability_lambda"):
+            AutoTuneConfig(stability_lambda=-0.1)
+
     def test_malformed_incident_rejected(self):
         # neither 'at' nor 'start'+'end'
         with pytest.raises(ValueError):

@@ -6,7 +6,11 @@ import numpy as np
 import pytest
 
 from detectkit.autotune._types import TuneMode
-from detectkit.autotune.labels import parse_incident_labels, parse_labels_file
+from detectkit.autotune.labels import (
+    capture_windows_to_display,
+    parse_incident_labels,
+    parse_labels_file,
+)
 
 
 def _grid():
@@ -158,3 +162,47 @@ def test_offgrid_degenerate_interval_snaps_like_point():
         interval_seconds=3600,
     )
     assert far.to_ground_truth(_grid(), 3600).n_positive == 0
+
+
+# ── capture windows (labeler regime-scope metadata) ──────────────────────────
+
+
+def test_capture_windows_parsed_and_carried():
+    labels = parse_incident_labels(
+        {
+            "incidents": [{"at": "2026-01-01 05:00:00"}],
+            "capture_windows": [{"start": "2026-01-01 00:00:00", "end": "2026-01-02 00:00:00"}],
+        },
+        interval_seconds=3600,
+    )
+    assert len(labels.capture_windows) == 1
+    start, end = labels.capture_windows[0]
+    assert start.isoformat() == "2026-01-01T00:00:00"
+    assert end.isoformat() == "2026-01-02T00:00:00"
+
+
+def test_capture_windows_default_empty_and_are_metadata_only():
+    labels = parse_incident_labels(
+        {"incidents": [{"at": "2026-01-01 03:00:00"}]}, interval_seconds=3600
+    )
+    assert labels.capture_windows == []
+    # capture_windows never affect ground truth.
+    assert labels.to_ground_truth(_grid(), 3600).n_positive == 1
+
+
+def test_capture_windows_round_trip_to_display():
+    labels = parse_incident_labels(
+        {
+            "incidents": [],
+            "capture_windows": [{"start": "2026-01-01 00:00:00", "end": "2026-01-01 12:00:00"}],
+        },
+        interval_seconds=3600,
+    )
+    assert capture_windows_to_display(labels) == [
+        {"start": "2026-01-01 00:00:00", "end": "2026-01-01 12:00:00"}
+    ]
+
+
+def test_capture_windows_must_be_a_list():
+    with pytest.raises(ValueError, match="capture_windows"):
+        parse_incident_labels({"incidents": [], "capture_windows": "nope"}, interval_seconds=3600)

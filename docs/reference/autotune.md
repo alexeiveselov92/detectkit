@@ -45,7 +45,8 @@ The search runs as a sequence of stages, each recorded in the
    detectors (`mad` / `zscore` / `iqr`) and cross-validation picks the winner, so
    a heuristic can no longer drop the detector that would have scored best.
 3. **Grid search** — a bounded coordinate sweep per detector type
-   (threshold → recency weighting → detrend, gated by a trend test → window size),
+   (threshold → recency weighting, and when it's adopted a **half-life sweep** →
+   detrend, gated by a trend test → window size),
    followed by a **final threshold re-sweep at the chosen window** that fixes the
    threshold↔window coupling (the optimal threshold depends on window size, but
    threshold is chosen first against a seed window). The threshold grid includes
@@ -95,18 +96,25 @@ header; wrapped here for readability):
 
 ```
 # REGIME      : series reads stationary, but a large level shift (~9.4σ within-regime) sits
-                ~15% into the training window — the midpoint trend test misses an off-center
+                ~15% in, around 2026-05-22 — the midpoint trend test misses an off-center
                 shift, so the baseline may average two regimes. If the earlier regime is
-                stale, re-tune with `--from <date after the shift>` (or set `autotune.max_history`).
+                stale, re-tune with `--from 2026-05-22` (or set `autotune.max_history`).
 ```
 
-It is **advisory only** — it changes no chosen parameters. The fix is yours to
-make: if the earlier regime is stale, re-tune with [`--from`](#--from-optional) set
-to a date just after the shift (or cap [`max_history`](#autotune-config-block)),
-so the search and the runtime baseline see the current regime only. The probe
-detects **level** shifts, not pure variance/shape changes (a metric whose *spread*
-changed without moving its median); for those, [label the incidents](#--label-flag)
-so scoring is supervised.
+The advisory names a **concrete date** (the shift's grid timestamp, recorded as
+`shift_at` in the decision log), so the fix is copy-paste. It is **advisory only**
+— it changes no chosen parameters. If the earlier regime is stale, re-tune with
+[`--from`](#--from-optional) set to that date (or cap
+[`max_history`](#autotune-config-block)), so the search and the runtime baseline
+see the current regime only. The probe detects **level** shifts, not pure
+variance/shape changes (a metric whose *spread* changed without moving its
+median); for those, [label the incidents](#--label-flag) so scoring is supervised.
+
+Two related knobs help on a regime-shift metric even without re-scoping: the grid
+search now sweeps the recency **half-life** (a fast-forgetting baseline tracks the
+current level), and [`autotune.stability_lambda`](#autotune-config-block) can be
+lowered so a config that adapts across the shift isn't penalized for scoring
+differently before and after it.
 
 ### Unsupervised tuning (no labels)
 
@@ -200,7 +208,9 @@ Then, in the browser:
    within the **current view** by default; **drag across the chart** to limit it to
    a narrower **time window** (the rest dims out) — handy when the metric's normal
    level differs across periods, so you can use a different boundary per period.
-   **↺ whole view** clears the window.
+   **↺ whole view** clears the window. The painted window is **saved with the set**
+   (a `capture_windows:` block in the file) and **restored when you reopen it**, so
+   the regime scope you reasoned about is recorded and survives between sessions.
 4. Click **Save & tune**. The server writes a **versioned** file
    `incidents/<metric>/<metric>[-<set>]-<UTC>.yml` (named after the metric, with the
    optional set name folded in as a suffix; re-labeling adds a new file — nothing is
@@ -350,6 +360,7 @@ autotune:
   # force_seasonality: [[day_of_week, hour]]     #    (a nested list is one conjunctive group)
   fixed_params: {window_size: 4320}
   folds: 5
+  stability_lambda: 0.5            # downside-dispersion penalty weight (0 disables)
   max_history: 50000
 ```
 
@@ -366,6 +377,7 @@ autotune:
 | `force_seasonality` | list | **Pin** the seasonality grouping and **skip** the search. Each entry is a column name, or a list of columns for one conjunctive group — `[hour]` groups by `hour`; `[[day_of_week, hour]]` groups by the `day_of_week`×`hour` combination; `[day_of_week, hour]` is two separate components. Complements `seasonality_candidates` (which only restricts the search). If a forced column is absent from the data, the search runs normally instead |
 | `fixed_params` | map | Pin specific hyperparameters (they are excluded from the search) |
 | `folds` | int | Number of walk-forward (expanding-window) cross-validation folds |
+| `stability_lambda` | float | Weight on the cross-fold **downside-dispersion** penalty (`aggregate = mean − λ·downside_deviation`; default `0.5`). Lower it (e.g. `0.0`) for a metric whose behavior differs across a regime shift, so a config that adapts to the recent regime isn't penalized for scoring differently across folds |
 | `max_history` | int | Cap on the number of training points used |
 
 **Label resolution precedence** (highest first): the `--incidents` flag → the

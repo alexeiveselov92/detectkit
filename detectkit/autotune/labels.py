@@ -14,7 +14,7 @@ When no labels are supplied the tuner falls back to unsupervised mode.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -62,6 +62,10 @@ class IncidentLabels:
 
     intervals: list[IncidentInterval]
     points: list[IncidentPoint]
+    # Optional threshold-capture time window(s) painted in the labeler. Pure
+    # metadata: it records the regime scope the user reasoned about (auditable in
+    # the saved file, restored on reopen); it does NOT affect ground truth.
+    capture_windows: list[tuple[datetime, datetime]] = field(default_factory=list)
 
     def is_empty(self) -> bool:
         return not self.intervals and not self.points
@@ -152,6 +156,7 @@ def parse_incident_labels(
     if raw is None:
         return IncidentLabels([], [])
 
+    raw_windows: list = []
     if isinstance(raw, list):
         entries = raw
         tz: ZoneInfo | None = None
@@ -164,6 +169,9 @@ def parse_incident_labels(
         entries = raw.get("incidents", [])
         if not isinstance(entries, list):
             raise ValueError("'incidents' must be a list")
+        raw_windows = raw.get("capture_windows") or []
+        if not isinstance(raw_windows, list):
+            raise ValueError("'capture_windows' must be a list")
     else:
         raise ValueError("Labels must be a mapping with 'incidents' or a list of incidents")
 
@@ -187,7 +195,16 @@ def parse_incident_labels(
                 "Each incident needs either 'at' (a point) or 'start'+'end' (an interval)"
             )
 
-    return IncidentLabels(intervals=intervals, points=points)
+    capture_windows: list[tuple[datetime, datetime]] = []
+    for win in raw_windows:
+        if not isinstance(win, dict) or "start" not in win or "end" not in win:
+            raise ValueError("Each capture_windows entry needs 'start' and 'end'")
+        ws, we = _parse_dt(win["start"], tz), _parse_dt(win["end"], tz)
+        if ws > we:
+            raise ValueError(f"Capture window start {ws} is after end {we}")
+        capture_windows.append((ws, we))
+
+    return IncidentLabels(intervals=intervals, points=points, capture_windows=capture_windows)
 
 
 def parse_labels_file(
@@ -243,3 +260,22 @@ def load_incidents_for_display(
     """Load a canonical labels file and render it as labeler display dicts."""
     labels = parse_labels_file(path, interval_seconds=interval_seconds, metric_name=metric_name)
     return incidents_to_display(labels)
+
+
+def capture_windows_to_display(labels: IncidentLabels) -> list[dict[str, str]]:
+    """Render parsed capture windows as labeler display dicts (naive-UTC strings)."""
+    return [
+        {"start": start.strftime(_DISPLAY_FMT), "end": end.strftime(_DISPLAY_FMT)}
+        for start, end in labels.capture_windows
+    ]
+
+
+def load_capture_windows(
+    path: str | Path,
+    *,
+    interval_seconds: int,
+    metric_name: str | None = None,
+) -> list[dict[str, str]]:
+    """Load a labels file and render its capture windows as labeler display dicts."""
+    labels = parse_labels_file(path, interval_seconds=interval_seconds, metric_name=metric_name)
+    return capture_windows_to_display(labels)

@@ -216,6 +216,8 @@ const INTERVAL_S = __INTERVAL__;
 // Incidents to seed the editor with (editing an existing labels file). Each is
 // {start, end, label} in "YYYY-MM-DD HH:MM:SS" UTC; a point is start === end.
 const PRELOAD = __INCIDENTS__;
+// Threshold-capture window(s) to restore (from a saved file): [{start, end}] UTC.
+const CAPWINS = __CAPTURE_WINDOWS__;
 const pts = DATA.points.map(p => ({ts: Date.parse(p.t.replace(' ','T')+'Z'), v: p.v}));
 const N = pts.length;
 const vraw = pts.filter(p => p.v !== null).map(p => p.v);
@@ -242,6 +244,12 @@ let selObj = null, hoverRow = -1, hoverDel = -1, thMode = false, thHover = null;
 // Threshold-capture window: thDown tracks a press, thDragWin a live drag, capWin
 // the committed custom window (null → capture within the current view).
 let thDown = null, thDragWin = null, capWin = null;
+// Restore a saved capture window so re-opening a labels file keeps the painted
+// regime scope (only shown once threshold capture is toggled on).
+if (CAPWINS && CAPWINS.length) { const w0 = CAPWINS[0];
+  const a = Date.parse(String(w0.start).replace(' ','T')+'Z'),
+        b = Date.parse(String(w0.end).replace(' ','T')+'Z');
+  if (!isNaN(a) && !isNaN(b)) capWin = {a: Math.min(a,b), b: Math.max(a,b)}; }
 
 const clamp = (x,a,b) => Math.max(a, Math.min(b, x));
 const vspan = () => viewMax - viewMin;
@@ -710,6 +718,9 @@ const buildYaml = () => {
   if (!sorted.length) y+='  []\\n';
   sorted.forEach(iv => { y+='  - {start: "'+fmtTs(iv.a)+'", end: "'+fmtTs(iv.b)+'"'
     + (iv.label && iv.label.trim() ? ', label: '+yamlStr(iv.label.trim()) : '') + '}\\n'; });
+  // Persist the painted threshold-capture window so the regime scope is auditable
+  // in the saved file and restored on reopen. Pure metadata — autotune ignores it.
+  if (capWin) y+='capture_windows:\\n  - {start: "'+fmtTs(capWin.a)+'", end: "'+fmtTs(capWin.b)+'"}\\n';
   return y;
 };
 
@@ -767,6 +778,7 @@ def render_labeler_html(
     save_url: str | None = None,
     interval_seconds: int | None = None,
     incidents: list[dict[str, str]] | None = None,
+    capture_windows: list[dict[str, str]] | None = None,
 ) -> str:
     """Return a self-contained HTML labeler page for *metric_name*'s series.
 
@@ -791,6 +803,7 @@ def render_labeler_html(
     return (
         _TEMPLATE.replace("__PAYLOAD__", payload)
         .replace("__INCIDENTS__", preload)
+        .replace("__CAPTURE_WINDOWS__", json_dumps_sorted(capture_windows or []))
         .replace("__FAVICON__", _favicon_data_uri())
         .replace("__SAVE_URL__", json.dumps(save_url))
         .replace("__INTERVAL__", json.dumps(interval_seconds))

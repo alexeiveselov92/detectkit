@@ -5,6 +5,39 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.28.0] - 2026-06-24
+
+### Added
+- **Autotune searches the recency half-life.** The grid search previously only
+  toggled recency weighting on/off at a fixed half-life; it now sweeps the
+  half-life (in points, as fractions of the window, floored at `min_samples/2`)
+  whenever exponential weighting is adopted. This lets the search pick a
+  faster-forgetting baseline that tracks the **current** regime — the knob that
+  matters on a metric that shifted level — instead of leaving it at the default.
+- **The regime advisory names a concrete `--from` date.** The `REGIME` advisory
+  (0.27.0) now maps the detected level-shift index to the actual grid timestamp
+  and suggests `--from <YYYY-MM-DD>` verbatim (e.g. `--from 2026-05-22`), instead
+  of a generic "after the shift". The scan runs NaN-aware on the raw grid so the
+  index aligns with the timestamps. The boundary date is recorded as `shift_at`
+  in the decision log.
+- **The labeler persists its threshold-capture time window.** The painted capture
+  window (the regime scope you drag on the chart) is now written to the saved
+  labels file as an optional `capture_windows:` block and **restored when you
+  reopen** the set — so the regime boundary you reasoned about is auditable and no
+  longer lost between sessions. It is pure metadata: it never affects ground truth.
+
+### Changed
+- **The cross-fold stability penalty is now downside-only.** Candidate scoring was
+  `mean(folds) - λ·std(folds)`; `std` penalized *upside* spread too, biasing the
+  search against a regime-adaptive config that simply scores **better** on the
+  recent regime than on stale history. It is now `mean - λ·downside_deviation`
+  (shortfalls below the mean only, averaged over all folds — always ≤ the old
+  penalty), so an adaptive config is no longer punished for fold-to-fold variance
+  that is actually improvement. The weight is exposed as `autotune.stability_lambda`
+  (default `0.5`; set `0.0` to disable) for a metric whose behavior differs across
+  a regime shift. Tuning scores shift slightly and some winners may change
+  (detector identity is unaffected).
+
 ## [0.27.0] - 2026-06-24
 
 ### Added

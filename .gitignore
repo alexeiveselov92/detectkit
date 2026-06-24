@@ -58,6 +58,11 @@ profiles.yml
 .env
 *.zip
 
+# Design-tool exports (DesignCode/dc) — generated artifacts, never committed
+# (see the cleanup in #45). Covers "Name.dc.html" and "Name.dc <variant>.html".
+*.dc.html
+*.dc *.html
+
 # Claude Code: project config is SHARED so contributing works out of the box.
 # CLAUDE.md and everything under .claude/ (rules, and any future commands /
 # agents / shared settings.json) is committed. Only personal, per-machine

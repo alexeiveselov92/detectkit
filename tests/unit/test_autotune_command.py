@@ -253,6 +253,27 @@ def test_resolve_labels_directory_uses_newest(tmp_path):
     assert len(labels.intervals) == 1 and len(labels.points) == 1
 
 
+def test_resolve_labels_directory_interactive_pick(tmp_path, monkeypatch):
+    """When interactive with multiple sets, the chosen one is used (not just newest)."""
+    from detectkit.config.metric_config import AutoTuneConfig
+
+    inc = tmp_path / "incidents" / "demo"
+    inc.mkdir(parents=True)
+    (inc / "demo-20260101T000000Z.yml").write_text("incidents:\n  - {at: '2026-01-01 00:00:00'}\n")
+    (inc / "demo-20260315T120000Z.yml").write_text("incidents:\n  - {at: '2026-03-15 12:00:00'}\n")
+    monkeypatch.setattr(autotune_cmd.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(autotune_cmd.click, "prompt", lambda *a, **k: 1)  # pick the first (oldest)
+    _labels, source = autotune_cmd._resolve_labels(
+        metric_name="demo",
+        interval_seconds=3600,
+        incidents_path=str(inc),
+        autotune_cfg=AutoTuneConfig(),
+        project_root=tmp_path,
+    )
+    assert "chosen in" in source
+    assert "demo-20260101T000000Z.yml" in source
+
+
 def test_resolve_labels_empty_directory_errors(tmp_path):
     from detectkit.config.metric_config import AutoTuneConfig
 
@@ -295,7 +316,8 @@ def test_tune_one_no_datapoints_skips(tmp_path, monkeypatch):
     assert fake.runs == []
 
 
-def test_label_flag_emits_html(tmp_path, monkeypatch):
+def test_label_no_serve_emits_static_html(tmp_path, monkeypatch):
+    """--label --no-serve writes a static labeler file and exits (no server, no tuning)."""
     monkeypatch.setattr(autotune_cmd.sys.stdin, "isatty", lambda: False)
     fake = FakeInternal(_series())
     metric_path, config = _make_project(tmp_path)
@@ -306,6 +328,7 @@ def test_label_flag_emits_html(tmp_path, monkeypatch):
         internal_manager=fake,
         incidents_path=None,
         label=True,
+        no_serve=True,
         scoring_override=None,
         from_dt=None,
         to_dt=None,
@@ -315,5 +338,39 @@ def test_label_flag_emits_html(tmp_path, monkeypatch):
     assert ok is True
     html = tmp_path / "metrics" / "demo__labeler.html"
     assert html.exists()
-    assert "__PAYLOAD__" not in html.read_text()
+    assert "__PAYLOAD__" not in html.read_text() and "__SAVE_URL__" not in html.read_text()
+    assert "const SAVE_URL = null;" in html.read_text()  # static mode → download fallback
     assert fake.runs == []  # labeling persists nothing
+
+
+def test_label_serve_then_tunes(tmp_path, monkeypatch):
+    """--label (server mode): after the labeler saves a set, autotune runs on it."""
+    monkeypatch.setattr(autotune_cmd.sys.stdin, "isatty", lambda: False)
+    data = _series()
+    fake = FakeInternal(data)
+    metric_path, config = _make_project(tmp_path)
+
+    def fake_serve(*, metric_name, data, incidents_dir, interval_seconds, open_browser, echo):
+        incidents_dir.mkdir(parents=True, exist_ok=True)
+        out = incidents_dir / "demo-20260101T000000Z.yml"
+        rows = "\n".join(f"  - {{at: '{_to_dt(data['timestamp'], i)}'}}" for i in (300, 301, 600))
+        out.write_text("metric: demo\nincidents:\n" + rows + "\n")
+        return out
+
+    monkeypatch.setattr(autotune_cmd, "serve_labeler", fake_serve)
+    ok = autotune_cmd._tune_one(
+        metric_path=metric_path,
+        config=config,
+        project_root=tmp_path,
+        internal_manager=fake,
+        incidents_path=None,
+        label=True,
+        no_serve=False,
+        scoring_override=None,
+        from_dt=None,
+        to_dt=None,
+        force=False,
+        dry_run=False,
+    )
+    assert ok is True
+    assert fake.runs and fake.runs[0]["mode"] == "supervised"  # tuned on the saved labels

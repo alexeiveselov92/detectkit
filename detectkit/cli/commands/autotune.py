@@ -27,6 +27,7 @@ from detectkit.autotune import (
     render_labeler_html,
     run_autotune_engine,
 )
+from detectkit.autotune.label_server import serve_labeler
 from detectkit.autotune.labels import GroundTruth, IncidentLabels, parse_incident_labels
 from detectkit.cli._output import echo_done, echo_error, echo_noop
 from detectkit.cli.commands.run import find_project_root, parse_date, select_metrics
@@ -96,20 +97,29 @@ def _resolve_scoring(scoring_override: str | None, autotune_cfg: AutoTuneConfig)
 _LABELS_GLOBS = ("*.yml", "*.yaml", "*.json")
 
 
-def _newest_labels_file(directory: Path) -> Path | None:
-    """Newest labels file in *directory*.
+def _labels_files(directory: Path) -> list[Path]:
+    """All labels files in *directory*, oldest→newest.
 
-    The labeler exports versioned, ISO-stamped names (``<metric>-<UTC>.yml``)
-    which sort chronologically, so we pick the lexicographically-greatest name
-    (tie-broken by mtime). This lets ``--incidents incidents/<metric>/`` keep
-    every labeling round on disk while always tuning on the latest one.
+    The labeler saves versioned, ISO-stamped names (``<set>-<UTC>.yml``) which sort
+    chronologically, so name order is chronological (tie-broken by mtime). This
+    lets ``incidents/<metric>/`` keep every labeling round on disk.
     """
     files: list[Path] = []
     for pattern in _LABELS_GLOBS:
         files.extend(directory.glob(pattern))
-    if not files:
-        return None
-    return max(files, key=lambda p: (p.name, p.stat().st_mtime))
+    return sorted(files, key=lambda p: (p.name, p.stat().st_mtime))
+
+
+def _pick_labels_file(files: list[Path]) -> tuple[Path, str]:
+    """Choose one labels file from a versioned set; prompt when interactive."""
+    newest = files[-1]
+    if len(files) == 1 or not sys.stdin.isatty():
+        return newest, "newest"
+    click.echo("  Saved label sets:")
+    for i, f in enumerate(files, 1):
+        click.echo(f"    {i}) {f.name}" + ("  (newest)" if f is newest else ""))
+    idx = click.prompt(f"  Choose a set [1-{len(files)}]", default=len(files), type=int)
+    return files[min(max(idx, 1), len(files)) - 1], "chosen"
 
 
 def _resolve_labels(
@@ -132,15 +142,16 @@ def _resolve_labels(
         if not file_path.is_absolute():
             file_path = project_root / file_path
         if file_path.is_dir():
-            chosen = _newest_labels_file(file_path)
-            if chosen is None:
+            files = _labels_files(file_path)
+            if not files:
                 raise FileNotFoundError(
                     f"No labels files (*.yml / *.yaml / *.json) found in {file_path}"
                 )
+            chosen, how = _pick_labels_file(files)
             labels = parse_labels_file(
                 chosen, interval_seconds=interval_seconds, metric_name=metric_name
             )
-            return labels, f"file {chosen} (newest in {file_path}/)"
+            return labels, f"file {chosen} ({how} in {file_path}/)"
         labels = parse_labels_file(
             file_path, interval_seconds=interval_seconds, metric_name=metric_name
         )
@@ -248,6 +259,8 @@ def run_autotune(
     select: str,
     incidents_path: str | None,
     label: bool,
+    no_serve: bool = False,
+    no_open: bool = False,
     scoring_override: str | None,
     from_date: str | None,
     to_date: str | None,
@@ -283,6 +296,8 @@ def run_autotune(
             internal_manager=internal_manager,
             incidents_path=incidents_path,
             label=label,
+            no_serve=no_serve,
+            no_open=no_open,
             scoring_override=scoring_override,
             from_dt=from_dt,
             to_dt=to_dt,
@@ -303,6 +318,8 @@ def _tune_one(
     internal_manager: InternalTablesManager,
     incidents_path: str | None,
     label: bool,
+    no_serve: bool = False,
+    no_open: bool = False,
     scoring_override: str | None,
     from_dt: datetime | None,
     to_dt: datetime | None,
@@ -324,15 +341,35 @@ def _tune_one(
         echo_noop(name, "no datapoints — run `dtk run --select " + name + " --steps load` first")
         return False
 
-    # --label: emit the HTML labeler and stop (offline; no DB writes).
+    # --label: open the interactive labeler. Default — a local server that saves the
+    # marked incidents straight into incidents/<name>/ and then falls through to
+    # tuning on them. --no-serve instead writes a static HTML file and exits (you
+    # move the downloaded export in yourself); --no-open skips launching a browser.
     if label:
-        html = render_labeler_html(name, data)
-        out = project_root / "metrics" / f"{metric_path.stem}__labeler.html"
-        out.write_text(html, encoding="utf-8")
         click.echo(click.style(f"Processing metric: {name}", fg="cyan", bold=True))
-        click.echo(f"  Wrote labeler: {out.relative_to(project_root)}")
-        click.echo("  Open it, mark incidents, export, then re-run with --incidents")
-        return True
+        if no_serve:
+            html = render_labeler_html(name, data)
+            out = project_root / "metrics" / f"{metric_path.stem}__labeler.html"
+            out.write_text(html, encoding="utf-8")
+            click.echo(f"  Wrote labeler: {out.relative_to(project_root)}")
+            click.echo(
+                f"  Open it, mark incidents, Export, save into incidents/{name}/, "
+                f"then re-run with --incidents incidents/{name}/"
+            )
+            return True
+        saved = serve_labeler(
+            metric_name=name,
+            data=data,
+            incidents_dir=project_root / "incidents" / name,
+            interval_seconds=interval_seconds,
+            open_browser=not no_open,
+            echo=click.echo,
+        )
+        if saved is None:
+            echo_noop(name, "labeling cancelled — no labels saved")
+            return False
+        click.echo(f"  Saved labels: {saved.relative_to(project_root)}")
+        incidents_path = str(saved)  # continue into supervised tuning on this set
 
     click.echo(click.style(f"Tuning metric: {name}", fg="cyan", bold=True))
     click.echo(f"  Config file: {metric_path.relative_to(project_root)}")

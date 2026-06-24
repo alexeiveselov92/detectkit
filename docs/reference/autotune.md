@@ -115,51 +115,51 @@ only if labeled timestamps land on **loaded**
 grid points; labels entirely outside the loaded series mark nothing and the run
 proceeds unsupervised.
 
-`--incidents` (and `autotune.labels_file`) may also point at a **directory** — the
-newest versioned file in it is used. Pair this with the labeler's versioned
-exports (below) to keep every labeling round on disk and always tune on the
-latest:
+`--incidents` (and `autotune.labels_file`) may also point at a **directory** of
+versioned labels files (e.g. `incidents/<metric>/`, what `--label` writes). When
+the terminal is interactive and the folder holds more than one set you're
+prompted to pick one (default: the newest); non-interactive runs use the newest:
 
 ```bash
 dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml
-# …or point at the folder of versions and use the newest:
+# …or point at the folder of versions (pick interactively / newest):
 dtk autotune --select api_error_rate --incidents incidents/api_error_rate/
 ```
 
 ### `--label` (flag)
 
-The easiest way to produce labels — mark incidents **visually on the chart**
-instead of dictating timestamps. It writes a self-contained HTML chart of the
-metric's series to `metrics/<metric>__labeler.html` and exits. **Generate-and-exit**:
-the command writes no rows to the database and runs no search.
+Mark incidents **visually on the chart** instead of dictating timestamps, then
+tune on them — in one command. By default `--label` starts a small **local
+labeler server** (bound to `127.0.0.1` with a one-shot token) and opens your
+browser:
 
 ```bash
 dtk autotune --select api_error_rate --label
 ```
 
-Then:
+Then, in the browser:
 
-1. Open `metrics/api_error_rate__labeler.html` in any browser — just double-click
-   it. The file is fully self-contained (series + chart inlined; no server, no
-   internet, nothing leaves your browser).
-2. **Navigate**: scroll to zoom where you point, double-click to reset, and drag
-   the **navigator strip** below the chart to move the view (drag the window to
-   pan, drag its edges to stretch/squeeze). This makes narrow incidents markable
-   even on a long span with a small step.
-3. **Click-drag across the chart** over each real incident — it shows as a red
-   band and a row below, with an optional **description** field (exported as the
-   `label:`); *remove* / *Clear all* fix mistakes.
-4. Click **Export labels** — your browser downloads a **versioned** file
-   `<metric>-<UTC-timestamp>.yml` in the [canonical format](#labels-file-format).
-   A browser can't write into your project, so move it under
-   `incidents/<metric>/`. Re-labeling later just adds another versioned file —
-   **nothing is overwritten**, so the full history is preserved.
-5. Tune on it — point `--incidents` at the file, or at the folder to use the
-   newest version automatically:
-   `dtk autotune --select api_error_rate --incidents incidents/api_error_rate/`.
+1. **Navigate** a long/dense series: scroll to zoom where you point, double-click
+   to reset, and drag the **navigator strip** below the chart to move the view
+   (window = pan, edges = stretch/squeeze) — so narrow incidents are markable even
+   on a long span with a small step.
+2. **Mark**: click-drag across the chart to mark each incident (red band + a row
+   below with an optional **description**, exported as `label:`). **Adjust** an
+   existing incident by dragging its **edges**, or its **middle** to move it;
+   *remove* / *Clear all* fix mistakes. Optionally **name the set**.
+3. Click **Save & tune**. The server writes a **versioned** file
+   `incidents/<metric>/<name>-<UTC>.yml` (re-labeling adds a new file — nothing is
+   overwritten, so the full history is kept) and the command **continues straight
+   into the tuning run** on it. Nothing is exposed off your machine, and nothing
+   is written until you save.
+
+Variants: `--no-serve` writes a static `metrics/<metric>__labeler.html` you open
+and whose **Export** downloads the file (then move it into `incidents/<metric>/`
+and re-run `--incidents`); `--no-open` prints the local URL instead of launching a
+browser.
 
 The labeler looks like this (a live copy of the real output — scroll, drag the
-navigator, mark a span):
+navigator, mark a span, drag an incident's edges):
 
 <iframe src="/examples/autotune-labeler.html" title="Interactive incident labeler — live example" style="width:100%;height:560px;border:1px solid var(--sl-color-gray-5);border-radius:8px;background:#211e1a"></iframe>
 

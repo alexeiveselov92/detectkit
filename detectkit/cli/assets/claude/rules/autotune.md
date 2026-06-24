@@ -47,13 +47,16 @@ dtk autotune --select <sel> [--incidents FILE] [--label] [--scoring METRIC] \
 ```
 
 - `--incidents FILE|DIR` — a labels file (below) → **supervised** tuning. May be a
-  **directory** (e.g. `incidents/<name>/`) — the newest versioned file in it is
-  used. With nothing given, an interactive terminal prompts to enter incidents
-  inline; declining (or running non-interactively) tunes **unsupervised**.
-- `--label` — write a self-contained, zoomable/pannable HTML chart of the series
-  to `metrics/<name>__labeler.html`; the user marks incidents in a browser (with
-  optional per-incident descriptions) and **Export** downloads a *versioned*
-  labels file `<name>-<UTC>.yml`. Generate-and-exit (no DB writes).
+  **directory** (e.g. `incidents/<name>/`): interactive runs prompt to pick a
+  version (default newest), non-interactive use the newest. With nothing given, an
+  interactive terminal prompts to enter incidents inline; declining (or running
+  non-interactively) tunes **unsupervised**.
+- `--label` — open the interactive labeler (zoom/pan, edit incident edges,
+  per-incident descriptions, named sets). **Default:** a local 127.0.0.1 server +
+  browser; **Save & tune** writes `incidents/<name>/<set>-<UTC>.yml` and the run
+  **continues into tuning on it**. `--no-serve` writes a static
+  `metrics/<name>__labeler.html` (Export downloads the file) and exits; `--no-open`
+  prints the URL instead of launching a browser.
 - `--scoring` — `mcc` (default), `f1`, `f_beta`, `balanced_accuracy`, `roc_auc`,
   `pr_auc`. MCC uses the whole confusion matrix and suits rare anomalies.
 - `--dry-run` — run the search but persist nothing and write no config.
@@ -82,17 +85,19 @@ incidents:
 When labels would help, **offer the interactive HTML labeler before asking the
 user to recall timestamps** — it is the easiest, most reliable path:
 
-1. Run `dtk autotune --select <name> --label` (offline; writes no DB rows). It
-   renders the series to a self-contained `metrics/<name>__labeler.html`.
-2. Tell the user to open it in a browser and mark incidents on the chart: scroll
-   to zoom, drag the navigator strip to move, **click-drag** to mark each span
-   (add an optional description), then **Export**.
-3. Persist with versioning: a browser can't write into the project, so Export
-   downloads a versioned `<name>-<UTC>.yml`. **Move it into `incidents/<name>/`**
-   — re-labeling adds a new file, never overwrites, so every round is kept. You
-   (the assistant, with filesystem access) do this move.
-4. Tune on the latest: point `--incidents` at the folder so the newest version is
-   used — `dtk autotune --select <name> --incidents incidents/<name>/`.
+1. Run `dtk autotune --select <name> --label`. It starts a local labeler server
+   and opens the browser (use `--no-open` on a remote box and share the printed
+   127.0.0.1 URL; the user port-forwards or runs it locally).
+2. The user marks incidents on the chart (scroll to zoom, drag the navigator to
+   move, click-drag to mark, drag an incident's edges to adjust, add a
+   description, optionally name the set), then clicks **Save & tune**.
+3. That writes `incidents/<name>/<set>-<UTC>.yml` automatically (versioned —
+   re-labeling never overwrites) and the **same command continues into the tuning
+   run** on it. No manual file moving.
+4. To re-tune later on saved sets, point `--incidents` at the folder
+   (`incidents/<name>/`) — interactive runs let the user pick a version. The
+   static `--no-serve` path still exists (Export downloads a file you move into
+   `incidents/<name>/`).
 
 Prefer this whenever the user can *recognise* incidents on a chart but doesn't
 have exact times. If they already know the times (or you found them via a DB

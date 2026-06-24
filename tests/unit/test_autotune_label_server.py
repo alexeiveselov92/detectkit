@@ -44,9 +44,14 @@ def test_sanitize():
 def test_render_labeler_html_modes():
     static = render_labeler_html("demo", _data(8))
     assert "const SAVE_URL = null;" in static
-    served = render_labeler_html("demo", _data(8), save_url="http://127.0.0.1:9/save?token=t")
+    assert "const INTERVAL_S = null;" in static  # inferred from data when omitted
+    served = render_labeler_html(
+        "demo", _data(8), save_url="http://127.0.0.1:9/save?token=t", interval_seconds=3600
+    )
     assert 'const SAVE_URL = "http://127.0.0.1:9/save?token=t";' in served
+    assert "const INTERVAL_S = 3600;" in served
     assert "__SAVE_URL__" not in served and "__METRIC__" not in served
+    assert "__INTERVAL__" not in served
 
 
 def test_server_saves_valid_labels(tmp_path):

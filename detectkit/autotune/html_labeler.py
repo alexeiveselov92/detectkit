@@ -58,6 +58,11 @@ _TEMPLATE = """<!doctype html>
   .brand span { color: var(--faint); font-size: 12px; }
   h1 { font-size: 18px; line-height: 1.3; margin: 0 0 6px; color: var(--paper); font-weight: 600; }
   h1 code { color: var(--clay); font-family: var(--mono); font-size: .82em; }
+  .ichip { display:inline-flex; align-items:center; gap:6px; vertical-align: middle; margin-left: 8px;
+    font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--paper);
+    background: rgba(209,91,54,0.16); border: 1px solid var(--clay); border-radius: 999px; padding: 3px 10px; }
+  .ichip .d { width:6px; height:6px; border-radius:50%; background: var(--clay); }
+  .ichip b { color: var(--clay); font-weight: 700; }
   .hint { color: var(--faint); font-size: 13px; margin: 0 0 18px; line-height: 1.55; }
   .hint code, code.k { color: var(--term-text); font-family: var(--mono); font-size: 12px;
     background: var(--term-surface); border: 1px solid var(--term-border); border-radius: 5px; padding: 1px 6px; }
@@ -106,7 +111,8 @@ _TEMPLATE = """<!doctype html>
     <svg viewBox="0 0 100 100" aria-hidden="true"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
     <b>detectkit</b><span>· incident labeler</span>
   </div>
-  <h1>Label incidents — <code>__METRIC__</code></h1>
+  <h1>Label incidents — <code>__METRIC__</code><span id="intervalchip" class="ichip"
+    title="The metric's sampling interval — the spacing between points, taken straight from the metric."></span></h1>
   <p class="hint">Click-drag across the chart to mark each real incident, add a short description, then
   <b>Export</b>. Save the file into <code class="k">incidents/__METRIC__/</code> and run
   <code class="k">dtk autotune --select __METRIC__ --incidents incidents/__METRIC__/</code></p>
@@ -138,6 +144,9 @@ const DATA = __PAYLOAD__;
 // and Export POSTs straight into incidents/<metric>/. As a static file it is null,
 // and Export falls back to a browser download.
 const SAVE_URL = __SAVE_URL__;
+// The metric's sampling interval (seconds). Passed straight from the metric when
+// known; otherwise inferred from the median spacing of points.
+const INTERVAL_S = __INTERVAL__;
 const pts = DATA.points.map(p => ({ts: Date.parse(p.t.replace(' ','T')+'Z'), v: p.v}));
 const N = pts.length;
 const vraw = pts.filter(p => p.v !== null).map(p => p.v);
@@ -455,19 +464,33 @@ function drawAll() { draw(); drawOverview();
 function fit() { dpr = window.devicePixelRatio || 1;
   c.width=c.clientWidth*dpr; c.height=c.clientHeight*dpr;
   ov.width=ov.clientWidth*dpr; ov.height=ov.clientHeight*dpr; drawAll(); }
+function fmtInterval(s) { if (s<=0) return '?';
+  if (s%86400===0) return (s/86400)+'d'; if (s%3600===0) return (s/3600)+'h';
+  if (s%60===0) return (s/60)+'min'; return s+'s'; }
+function medianIntervalSec() { if (N<2) return 0;
+  const d=[]; for (let i=1;i<N;i++) d.push(pts[i].ts-pts[i-1].ts);
+  d.sort((a,b)=>a-b); return Math.round(d[Math.floor(d.length/2)]/1000); }
+const intervalSec = (typeof INTERVAL_S==='number' && INTERVAL_S>0) ? INTERVAL_S : medianIntervalSec();
+document.getElementById('intervalchip').innerHTML =
+  '<span class="d"></span>interval <b>'+fmtInterval(intervalSec)+'</b>';
 window.addEventListener('resize', fit); fit(); render();
 </script>
 """
 
 
 def render_labeler_html(
-    metric_name: str, data: dict[str, np.ndarray], *, save_url: str | None = None
+    metric_name: str,
+    data: dict[str, np.ndarray],
+    *,
+    save_url: str | None = None,
+    interval_seconds: int | None = None,
 ) -> str:
     """Return a self-contained HTML labeler page for *metric_name*'s series.
 
     With ``save_url`` (set by ``dtk autotune --label``'s local server) the page's
     Export button POSTs the labels straight to that endpoint; without it (a static
-    file) Export falls back to a browser download.
+    file) Export falls back to a browser download. ``interval_seconds`` is the
+    metric's sampling interval shown as a chip (inferred from the data if omitted).
     """
     import json
 
@@ -481,5 +504,6 @@ def render_labeler_html(
     return (
         _TEMPLATE.replace("__PAYLOAD__", payload)
         .replace("__SAVE_URL__", json.dumps(save_url))
+        .replace("__INTERVAL__", json.dumps(interval_seconds))
         .replace("__METRIC__", metric_name)
     )

@@ -46,7 +46,7 @@ def _sample_series() -> dict[str, np.ndarray]:
 
 
 def main() -> None:
-    html = render_labeler_html(_METRIC, _sample_series())
+    html = render_labeler_html(_METRIC, _sample_series(), interval_seconds=3600)
     _OUT.parent.mkdir(parents=True, exist_ok=True)
     _OUT.write_text(html, encoding="utf-8")
     print(f"gen-labeler-example: wrote {_OUT.relative_to(_REPO_ROOT)} ({len(html)} bytes)")

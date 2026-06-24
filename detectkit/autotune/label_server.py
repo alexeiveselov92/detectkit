@@ -126,7 +126,10 @@ def build_label_server(
     server.incidents_dir = incidents_dir
     server.interval_seconds = interval_seconds
     server.html = render_labeler_html(
-        metric_name, data, save_url=f"http://127.0.0.1:{port}/save?token={token}"
+        metric_name,
+        data,
+        save_url=f"http://127.0.0.1:{port}/save?token={token}",
+        interval_seconds=interval_seconds,
     )
     return server, f"http://127.0.0.1:{port}/?token={token}"
 

@@ -90,3 +90,71 @@ def test_timezone_conversion_to_utc():
     )
     gt = labels.to_ground_truth(_grid(), 3600)
     assert bool(gt.y_true[9]) is True
+
+
+def test_labels_carry_description_for_editing():
+    """Parsed incidents keep their `label`, so editing a file round-trips text."""
+    labels = parse_incident_labels(
+        {
+            "incidents": [
+                {"start": "2026-01-01 03:00:00", "end": "2026-01-01 05:00:00", "label": "outage"},
+                {"at": "2026-01-01 10:00:00", "label": "spike"},
+            ]
+        },
+        interval_seconds=3600,
+    )
+    assert labels.intervals[0].label == "outage"
+    assert labels.points[0].label == "spike"
+
+
+def test_incidents_to_display_round_trip(tmp_path):
+    """`load_incidents_for_display` renders a file as labeler seed dicts."""
+    from detectkit.autotune.labels import incidents_to_display, load_incidents_for_display
+
+    labels = parse_incident_labels(
+        {
+            "incidents": [
+                {"start": "2026-01-01 03:00:00", "end": "2026-01-01 05:00:00", "label": "outage"},
+                {"at": "2026-01-01 10:00:00"},  # a point → degenerate span
+            ]
+        },
+        interval_seconds=3600,
+    )
+    disp = incidents_to_display(labels)
+    assert disp[0] == {
+        "start": "2026-01-01 03:00:00",
+        "end": "2026-01-01 05:00:00",
+        "label": "outage",
+    }
+    assert disp[1] == {"start": "2026-01-01 10:00:00", "end": "2026-01-01 10:00:00", "label": ""}
+
+    f = tmp_path / "demo.yml"
+    f.write_text(
+        "metric: demo\nincidents:\n"
+        "  - {start: '2026-01-01 03:00:00', end: '2026-01-01 05:00:00', label: 'outage'}\n"
+    )
+    loaded = load_incidents_for_display(f, interval_seconds=3600, metric_name="demo")
+    assert loaded == [
+        {"start": "2026-01-01 03:00:00", "end": "2026-01-01 05:00:00", "label": "outage"}
+    ]
+
+
+def test_offgrid_degenerate_interval_snaps_like_point():
+    """A degenerate interval (start == end) off the grid snaps to the nearest grid
+    point, so an `{at}` point that round-trips through the labeler as
+    `{start: T, end: T}` still matches instead of silently marking nothing."""
+    # 03:07 is 7 min past the 03:00 grid point — well within the 1h tolerance.
+    labels = parse_incident_labels(
+        {"incidents": [{"start": "2026-01-01 03:07:00", "end": "2026-01-01 03:07:00"}]},
+        interval_seconds=3600,
+    )
+    gt = labels.to_ground_truth(_grid(), 3600)
+    assert gt.n_positive == 1
+    assert bool(gt.y_true[3]) is True  # snapped to hour 03
+
+    # Far off the grid (beyond tolerance) marks nothing, same as a point.
+    far = parse_incident_labels(
+        {"incidents": [{"start": "2030-01-01 00:00:00", "end": "2030-01-01 00:00:00"}]},
+        interval_seconds=3600,
+    )
+    assert far.to_ground_truth(_grid(), 3600).n_positive == 0

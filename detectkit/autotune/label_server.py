@@ -121,8 +121,13 @@ def build_label_server(
     data: dict[str, np.ndarray],
     incidents_dir: Path,
     interval_seconds: int,
+    preload: list[dict[str, str]] | None = None,
 ) -> tuple[_LabelServer, str]:
-    """Construct (without running) the labeler server; return ``(server, page_url)``."""
+    """Construct (without running) the labeler server; return ``(server, page_url)``.
+
+    ``preload`` seeds the labeler with already-marked incidents (editing an
+    existing labels file); the caller resolves which file to load.
+    """
     server = _LabelServer(("127.0.0.1", 0), _Handler)
     token = secrets.token_urlsafe(16)
     port = int(server.server_address[1])
@@ -135,6 +140,7 @@ def build_label_server(
         data,
         save_url=f"http://127.0.0.1:{port}/save?token={token}",
         interval_seconds=interval_seconds,
+        incidents=preload,
     )
     return server, f"http://127.0.0.1:{port}/?token={token}"
 
@@ -148,13 +154,18 @@ def serve_labeler(
     open_browser: bool = True,
     echo: Callable[[str], None] = print,
     on_ready: Callable[[str], None] | None = None,
+    preload: list[dict[str, str]] | None = None,
 ) -> Path | None:
-    """Serve the labeler until the user saves (returns the file) or cancels (None)."""
+    """Serve the labeler until the user saves (returns the file) or cancels (None).
+
+    ``preload`` seeds the page with existing incidents to edit in place.
+    """
     server, url = build_label_server(
         metric_name=metric_name,
         data=data,
         incidents_dir=incidents_dir,
         interval_seconds=interval_seconds,
+        preload=preload,
     )
     if on_ready is not None:
         on_ready(url)

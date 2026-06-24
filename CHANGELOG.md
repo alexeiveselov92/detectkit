@@ -5,6 +5,37 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.0] - 2026-06-24
+
+### Added
+- **The incident labeler can now open and edit an existing labels file.**
+  `dtk autotune --select <m> --label` **seeds the page from the metric's newest
+  saved set** in `incidents/<m>/` (or from `--incidents <file-or-dir>` when given),
+  so labeling can grow across sessions — open, mark a few more, **Save & tune**
+  writes the next version (history is still kept; nothing is overwritten). The
+  static `--no-serve` page also gains an **Import file…** button that loads any
+  labels file (YAML/JSON) you pick. The seed preserves each incident's
+  `label:` description.
+- **Threshold capture.** When many outliers are obvious, set a horizontal line on
+  the chart (hover, or type an exact **line value**), choose **above / below**,
+  optionally **bridge gaps ≤ N intervals**, and **Add N spans** marks every
+  qualifying contiguous span at once — instead of zooming in and dragging each.
+  The normal click-drag flow is unchanged; threshold capture is a toggled mode.
+- **On-chart incident deletion.** Each incident band carries a **✕** handle
+  (top-right); the selected band also responds to the **Delete**/**Backspace**
+  key, and **Escape** deselects. No more scrolling the list to find the one row to
+  remove. Selecting a band highlights and scrolls to its list row; **focus** on a
+  row jumps the chart to that incident (the list ↔ chart now highlight together).
+- **Favicon** — the labeler page now uses the detectkit brand mark as its tab icon
+  (inline SVG data URI, still fully self-contained).
+
+### Changed
+- `IncidentInterval` / `IncidentPoint` (`detectkit/autotune/labels.py`) now carry
+  an optional `label`, so parsing a labels file round-trips its descriptions; new
+  `incidents_to_display` / `load_incidents_for_display` helpers render a file as
+  labeler-seed dicts. `render_labeler_html` / `build_label_server` /
+  `serve_labeler` gain an `incidents` / `preload` argument.
+
 ## [0.24.2] - 2026-06-24
 
 ### Fixed

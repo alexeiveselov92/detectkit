@@ -94,18 +94,26 @@ user through it:
    the **navigator strip** to move the view (window = pan, edges = stretch).
 2. **Click-drag across the chart** to mark each incident (red band + a row below
    with an optional **description**). Adjust one by dragging its **edges**, or its
-   **middle** to move it; optionally **name the set**; *remove* / *Clear all* fix
-   mistakes.
-3. Click **Save & tune**. The server writes `incidents/<metric>/<metric>[-<set>]-<UTC>.yml`
+   **middle** to move it; optionally **name the set**. Remove one by clicking its
+   **✕** on the chart (or selecting it and pressing **Delete**) — no hunting in
+   the list; **focus** on a list row jumps the chart to that incident; *Clear all*
+   resets.
+3. When many outliers are obvious, use **Threshold capture**: set a horizontal
+   line (hover the chart or type a value), pick **above/below**, optionally bridge
+   small gaps, and **Add N spans** marks them all at once — then tidy with the ✕.
+4. Click **Save & tune**. The server writes `incidents/<metric>/<metric>[-<set>]-<UTC>.yml`
    automatically (named after the metric, with the optional set name as a suffix;
    versioned — re-labeling never overwrites) and the **same command
    continues into the tuning run on it**. No manual file moving.
 
-(`--no-serve` is the offline fallback: it writes a static
-`metrics/<name>__labeler.html` whose Export downloads a versioned file you then
-move into `incidents/<name>/` and pass via `--incidents`.) To re-tune later on a
-saved set, point `--incidents` at `incidents/<name>/` (interactive runs let the
-user pick a version).
+**Editing an existing set:** re-running `--label` **seeds the page from the
+metric's newest saved set** (or from `--label --incidents <file-or-dir>`), so
+labeling can grow across sessions — mark a few more, save a new version. (`--no-serve`
+is the offline fallback: it writes a static `metrics/<name>__labeler.html` whose
+Export downloads a versioned file you then move into `incidents/<name>/` and pass
+via `--incidents`; its **Import file…** button loads a saved set back in.) To
+re-tune later on a saved set, point `--incidents` at `incidents/<name>/`
+(interactive runs let the user pick a version).
 
 Prefer this whenever the user can *recognise* incidents on a chart but doesn't
 have exact timestamps — it is far easier than dictating times, and they label

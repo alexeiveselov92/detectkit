@@ -34,6 +34,7 @@ class IncidentInterval:
 
     start: datetime
     end: datetime
+    label: str | None = None
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,7 @@ class IncidentPoint:
     """A single anomalous point, snapped to the nearest grid interval."""
 
     at: datetime
+    label: str | None = None
 
 
 @dataclass
@@ -77,12 +79,21 @@ class IncidentLabels:
             return GroundTruth(y, TuneMode.UNSUPERVISED, 0, len(self.intervals), len(self.points))
 
         ts_ms = timestamps.astype("datetime64[ms]").astype(np.int64)
+        tolerance_ms = interval_seconds * 1000
         for interval in self.intervals:
             start_ms = np.datetime64(interval.start, "ms").astype(np.int64)
             end_ms = np.datetime64(interval.end, "ms").astype(np.int64)
-            y |= (ts_ms >= start_ms) & (ts_ms <= end_ms)
+            if start_ms == end_ms:
+                # A degenerate interval (start == end) is a point — snap to the
+                # nearest grid timestamp within one interval, like the point loop
+                # below. This keeps an off-grid point that round-trips through the
+                # labeler as {start: T, end: T} from silently matching nothing.
+                idx = int(np.argmin(np.abs(ts_ms - start_ms)))
+                if abs(int(ts_ms[idx]) - int(start_ms)) <= tolerance_ms:
+                    y[idx] = True
+            else:
+                y |= (ts_ms >= start_ms) & (ts_ms <= end_ms)
 
-        tolerance_ms = interval_seconds * 1000
         for point in self.points:
             at_ms = np.datetime64(point.at, "ms").astype(np.int64)
             idx = int(np.argmin(np.abs(ts_ms - at_ms)))
@@ -161,14 +172,16 @@ def parse_incident_labels(
     for entry in entries:
         if not isinstance(entry, dict):
             raise ValueError(f"Each incident must be a mapping, got {type(entry).__name__}")
+        raw_label = entry.get("label")
+        label = str(raw_label) if raw_label is not None else None
         if "at" in entry:
-            points.append(IncidentPoint(at=_parse_dt(entry["at"], tz)))
+            points.append(IncidentPoint(at=_parse_dt(entry["at"], tz), label=label))
         elif "start" in entry and "end" in entry:
             start = _parse_dt(entry["start"], tz)
             end = _parse_dt(entry["end"], tz)
             if start > end:
                 raise ValueError(f"Incident start {start} is after end {end}")
-            intervals.append(IncidentInterval(start=start, end=end))
+            intervals.append(IncidentInterval(start=start, end=end, label=label))
         else:
             raise ValueError(
                 "Each incident needs either 'at' (a point) or 'start'+'end' (an interval)"
@@ -194,3 +207,39 @@ def parse_labels_file(
     if raw is None:
         raise ValueError(f"Empty labels file: {file_path}")
     return parse_incident_labels(raw, interval_seconds=interval_seconds, metric_name=metric_name)
+
+
+_DISPLAY_FMT = "%Y-%m-%d %H:%M:%S"
+
+
+def incidents_to_display(labels: IncidentLabels) -> list[dict[str, str]]:
+    """Render parsed labels as labeler display dicts (naive-UTC strings).
+
+    Each is ``{"start", "end", "label"}`` in ``"YYYY-MM-DD HH:MM:SS"``; a point
+    becomes a degenerate span with ``start == end``. Used to seed the HTML labeler
+    when editing an existing labels file.
+    """
+    out: list[dict[str, str]] = []
+    for iv in labels.intervals:
+        out.append(
+            {
+                "start": iv.start.strftime(_DISPLAY_FMT),
+                "end": iv.end.strftime(_DISPLAY_FMT),
+                "label": iv.label or "",
+            }
+        )
+    for p in labels.points:
+        at = p.at.strftime(_DISPLAY_FMT)
+        out.append({"start": at, "end": at, "label": p.label or ""})
+    return out
+
+
+def load_incidents_for_display(
+    path: str | Path,
+    *,
+    interval_seconds: int,
+    metric_name: str | None = None,
+) -> list[dict[str, str]]:
+    """Load a canonical labels file and render it as labeler display dicts."""
+    labels = parse_labels_file(path, interval_seconds=interval_seconds, metric_name=metric_name)
+    return incidents_to_display(labels)

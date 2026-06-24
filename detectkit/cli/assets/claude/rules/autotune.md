@@ -56,7 +56,12 @@ dtk autotune --select <sel> [--incidents FILE] [--label] [--scoring METRIC] \
   per-incident descriptions, named sets). **Default:** a local 127.0.0.1 server +
   browser; **Save & tune** writes `incidents/<metric>/<metric>[-<set>]-<UTC>.yml`
   (named after the metric, optional set name as a suffix) and the run
-  **continues into tuning on it**. `--no-serve` writes a static
+  **continues into tuning on it**. It **seeds from the metric's newest saved set**
+  (or from `--incidents FILE|DIR` when given), so re-running `--label` continues
+  editing in place. Beyond click-drag marking it offers **Threshold capture**
+  (grab every span above/below a horizontal line in one gesture), **on-chart
+  delete** (each band's ✕, or select + Delete key), and **Import file…** (load a
+  labels file you pick). `--no-serve` writes a static
   `metrics/<name>__labeler.html` (Export downloads the file) and exits; `--no-open`
   prints the URL instead of launching a browser.
 - `--scoring` — `mcc` (default), `f1`, `f_beta`, `balanced_accuracy`, `roc_auc`,
@@ -92,15 +97,21 @@ user to recall timestamps** — it is the easiest, most reliable path:
    127.0.0.1 URL; the user port-forwards or runs it locally).
 2. The user marks incidents on the chart (scroll to zoom, drag the navigator to
    move, click-drag to mark, drag an incident's edges to adjust, add a
-   description, optionally name the set), then clicks **Save & tune**.
+   description, optionally name the set), then clicks **Save & tune**. For many
+   clear outliers, **Threshold capture** grabs every span past a horizontal line
+   at once (above/below, with an optional gap-bridge); each band's ✕ (or
+   select + Delete) removes one, and **focus** on a list row jumps the chart to it.
 3. That writes `incidents/<metric>/<metric>[-<set>]-<UTC>.yml` automatically
    (named after the metric, optional set name as a suffix; versioned —
    re-labeling never overwrites) and the **same command continues into the tuning
    run** on it. No manual file moving.
-4. To re-tune later on saved sets, point `--incidents` at the folder
-   (`incidents/<name>/`) — interactive runs let the user pick a version. The
-   static `--no-serve` path still exists (Export downloads a file you move into
-   `incidents/<name>/`).
+4. **Editing over time:** re-running `--label` seeds the page from the metric's
+   newest saved set, so labeling can grow across sessions. To re-tune later on
+   saved sets, point `--incidents` at the folder (`incidents/<name>/`) —
+   interactive runs let the user pick a version, and `--label --incidents <file>`
+   opens that exact set for editing. The static `--no-serve` path still exists
+   (Export downloads a file you move into `incidents/<name>/`; its **Import
+   file…** button loads one back in).
 
 Prefer this whenever the user can *recognise* incidents on a chart but doesn't
 have exact times. If they already know the times (or you found them via a DB

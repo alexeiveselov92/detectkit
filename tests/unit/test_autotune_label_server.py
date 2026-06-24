@@ -45,6 +45,8 @@ def test_render_labeler_html_modes():
     static = render_labeler_html("demo", _data(8))
     assert "const SAVE_URL = null;" in static
     assert "const INTERVAL_S = null;" in static  # inferred from data when omitted
+    assert "const PRELOAD = [];" in static  # no seed incidents
+    assert 'rel="icon"' in static and "data:image/svg+xml;base64," in static  # favicon
     served = render_labeler_html(
         "demo", _data(8), save_url="http://127.0.0.1:9/save?token=t", interval_seconds=3600
     )
@@ -52,6 +54,36 @@ def test_render_labeler_html_modes():
     assert "const INTERVAL_S = 3600;" in served
     assert "__SAVE_URL__" not in served and "__METRIC__" not in served
     assert "__INTERVAL__" not in served
+    # every templated placeholder is filled in
+    for placeholder in ("__PAYLOAD__", "__INCIDENTS__", "__FAVICON__"):
+        assert placeholder not in served
+
+
+def test_render_labeler_html_preloads_incidents():
+    """`incidents=` seeds the editor so an existing labels file can be edited."""
+    seed = [
+        {"start": "2026-01-02 00:00:00", "end": "2026-01-02 06:00:00", "label": "outage"},
+        {"start": "2026-01-03 01:00:00", "end": "2026-01-03 01:00:00", "label": ""},  # a point
+    ]
+    html = render_labeler_html("demo", _data(48), incidents=seed)
+    assert "const PRELOAD = [" in html
+    assert "2026-01-02 00:00:00" in html and "2026-01-02 06:00:00" in html
+    assert "outage" in html
+
+
+def test_build_label_server_preload_threads_into_page(tmp_path):
+    seed = [{"start": "2026-01-02 00:00:00", "end": "2026-01-02 06:00:00", "label": "seeded"}]
+    server, _url = build_label_server(
+        metric_name="demo",
+        data=_data(),
+        incidents_dir=tmp_path,
+        interval_seconds=3600,
+        preload=seed,
+    )
+    try:
+        assert "2026-01-02 00:00:00" in server.html and "seeded" in server.html
+    finally:
+        server.server_close()
 
 
 def test_server_saves_valid_labels(tmp_path):

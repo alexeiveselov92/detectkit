@@ -20,15 +20,16 @@ Run all commands from a project directory (the one containing
 
 Used by `run`, `unlock`, and `clean` (drift mode). Three forms:
 
-- **Metric name** — `--select cpu_usage`. Searches the root `metrics/` dir only.
-  Do **not** add `.yml` (it is appended). This matches the metric **file**, but
-  every operation is keyed by the metric `name` inside the YAML.
+- **Metric name** — `--select cpu_usage`. Resolves to `metrics/cpu_usage.yml` at
+  the root, then falls back to a recursive search by the YAML `name:` field in any
+  subdirectory. Do **not** add `.yml` (it is appended). This matches the metric by
+  **name**, and every operation is keyed by that `name` inside the YAML.
 - **Path / glob** — `--select "metrics/critical/*.yml"`, `--select "api_*"`,
   `--select "metrics/**/*.yml"`. Searches recursively via glob; keep `.yml`.
 - **Tag** — `--select tag:critical`. Searches recursively for metrics whose
   `tags:` list contains that tag.
 
-`--select "*"` selects everything. `--exclude / -e` removes matches
+`--select "*"` selects everything. `--exclude / -e` (on `dtk run`) removes matches
 (`--select "*" --exclude "metrics/staging/*"`). Metric names must be unique
 across the project; duplicates raise an error listing the conflicting files.
 
@@ -39,9 +40,9 @@ dtk run --select <sel> [--steps load,detect,alert] [--from DATE] [--to DATE] \
         [--full-refresh] [--force] [--profile NAME]
 ```
 
-- `--steps` — subset/order of `load`, `detect`, `alert` (default all). Examples:
-  `--steps load` (verify the query), `--steps detect` (rerun detection only),
-  `--steps detect,alert` (skip load).
+- `--steps` — which of `load`, `detect`, `alert` to run (default all); they always
+  execute in `load → detect → alert` order. Examples: `--steps load` (verify the
+  query), `--steps detect` (rerun detection only), `--steps detect,alert` (skip load).
 - `--from DATE` / `--to DATE` — `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`, UTC.
   Affects only the `load` step. `--from` overrides the metric's
   `loading_start_time`; `--to` defaults to now.

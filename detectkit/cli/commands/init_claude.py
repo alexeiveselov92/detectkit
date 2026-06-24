@@ -10,9 +10,9 @@ It writes three things into the target directory:
 - ``CLAUDE.md`` — created if absent, otherwise a managed detectkit block is
   injected/refreshed between HTML-comment markers (existing content is kept).
 - ``.claude/rules/detectkit/`` — the reference docs the assistant reads on
-  demand (overview, cli, project, metrics, detectors, alerting).
+  demand (overview, cli, project, metrics, detectors, alerting, autotune).
 - ``.claude/skills/`` — user-facing skills (``dtk-setup-project``,
-  ``dtk-new-metric``, ``dtk-feedback``).
+  ``dtk-new-metric``, ``dtk-autotune``, ``dtk-feedback``).
 
 The source of truth for all of the above lives in ``detectkit/cli/assets/claude``
 and ships with the package, so re-running this command after upgrading detectkit
@@ -38,12 +38,15 @@ if TYPE_CHECKING:
     # strings, so it is never evaluated at runtime — safe on 3.10).
     from importlib.resources.abc import Traversable
 
-# Region in CLAUDE.md owned by this command. The BEGIN marker carries the
-# detectkit version (informational); the regex below matches any version so a
-# refresh replaces the whole region in place rather than appending a duplicate.
+# Region in CLAUDE.md owned by this command. The BEGIN marker is intentionally
+# version-less: stamping the version here made the block churn on every release
+# (a no-op upgrade still rewrote the marker), pushing users to re-run for nothing.
+# The block now changes only when its content actually changes, so a refresh is a
+# true no-op otherwise. The regex still matches the old *versioned* markers
+# (`<!-- BEGIN detectkit v0.23.2 ... -->`), so refreshing an existing file
+# replaces the whole region in place rather than appending a duplicate.
 _BEGIN = (
-    f"<!-- BEGIN detectkit v{__version__} "
-    "(managed by `dtk init-claude` — do not edit between these markers) -->"
+    "<!-- BEGIN detectkit (managed by `dtk init-claude` — do not edit between these markers) -->"
 )
 _END = "<!-- END detectkit -->"
 _BLOCK_RE = re.compile(r"<!-- BEGIN detectkit.*?-->.*?<!-- END detectkit -->", re.DOTALL)

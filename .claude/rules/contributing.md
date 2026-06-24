@@ -192,9 +192,11 @@ pick accents with `status_color(alert_data)` so status reads from color.
    (`rules/*.md`, `skills/*/SKILL.md`, `CLAUDE.section.md`) so a freshly-run
    `dtk init-claude` matches the shipped version. These assets are user-facing
    docs, ship in the wheel (`pyproject.toml`
-   `[tool.setuptools.package-data]` + `MANIFEST.in`), and the generated block
-   records the version — users are told to re-run after upgrading, so stale
-   assets surface directly in their assistant. The command lives in
+   `[tool.setuptools.package-data]` + `MANIFEST.in`), and are exactly what a
+   freshly-run `dtk init-claude` writes — users are told to re-run after
+   upgrading, so out-of-sync assets reach their assistant directly. (The managed
+   `CLAUDE.md` block is intentionally version-less, so a no-op upgrade doesn't
+   churn it; it changes only when the shipped content changes.) The command lives in
    `detectkit/cli/commands/init_claude.py` (tests:
    `tests/unit/test_init_claude.py`). Adding a new shipped rule or skill (e.g.
    `rules/autotune.md`, `skills/dtk-autotune/`) also means extending

@@ -5,6 +5,27 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.1] - 2026-06-24
+
+### Changed
+- **`dtk init-claude`'s managed `CLAUDE.md` block is now version-less.** The
+  `<!-- BEGIN detectkit … -->` marker no longer embeds the detectkit version, so
+  re-running after an upgrade is a true no-op unless the shipped guidance actually
+  changed. Previously every release rewrote the marker (the version moved), which
+  reported the block as `updated` and nudged users to re-run for nothing. Existing
+  versioned markers (e.g. `<!-- BEGIN detectkit v0.23.2 … -->`) are still matched
+  and refreshed in place, so upgrades stay seamless.
+
+### Fixed
+- **Corrected the shipped `dtk init-claude` AI-assistant reference.** The `cli.md`
+  rule described metric-name selection as "searches the root `metrics/` dir only";
+  it actually resolves `metrics/<name>.yml` at the root and then falls back to a
+  recursive search by the YAML `name:` field in any subdirectory. It also called
+  `--steps` a "subset/order" of stages — the steps always execute in
+  `load → detect → alert` order regardless of how they are listed. The
+  `dtk-autotune` skill suggested an invalid `--scoring recall`; the valid scoring
+  metrics are `mcc`, `f1`, `f_beta`, `balanced_accuracy`, `roc_auc`, `pr_auc`.
+
 ## [0.24.0] - 2026-06-24
 
 ### Fixed

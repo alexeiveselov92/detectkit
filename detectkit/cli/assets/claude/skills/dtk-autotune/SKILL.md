@@ -158,8 +158,10 @@ dtk autotune --select <name>
 none yet, load first: `dtk run --select <name> --steps load` (optionally
 `--from <date>` to backfill history — more history tunes better). The default
 **supervised** scoring metric is **MCC** (robust to rare anomalies). Override
-only with reason: `--scoring recall` when a miss is worse than a false page,
-`--scoring f1`, etc. Run `dtk autotune --help` to confirm the live flags. Use
+only with reason: `--scoring f_beta` (with a higher `beta:` in the `autotune:`
+block) when a miss is worse than a false page, `--scoring f1` for a balanced
+trade-off, etc. The valid values are `mcc`, `f1`, `f_beta`, `balanced_accuracy`,
+`roc_auc`, `pr_auc`. Run `dtk autotune --help` to confirm the live flags. Use
 `--dry-run` to search without writing anything.
 
 **Unsupervised runs** (no labels) do **not** optimize MCC or any labeled metric —
@@ -191,9 +193,9 @@ The `#` comment header walks the whole decision; summarize for the user:
   `Objective : unsupervised (band-fit + flag-budget) = …` (it never claims an
   `mcc =` score it didn't compute). Read off the value + the per-fold CV spread.
 
-Offer alternatives: a re-run with a different `--scoring` (e.g. precision vs
-recall trade-off) or a nudged parameter. See `autotune.md` for the
-`_dtk_autotune_runs` audit table.
+Offer alternatives: a re-run with a different `--scoring` (e.g. `f_beta` with a
+higher `beta` to favor recall, or `f1` for balance) or a nudged parameter. See
+`autotune.md` for the `_dtk_autotune_runs` audit table.
 
 ## Step 5 — Show how the monitoring behaves (DB inspection query)
 

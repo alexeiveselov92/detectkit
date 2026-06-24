@@ -9,7 +9,6 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from detectkit import __version__
 from detectkit.cli.commands.init_claude import _BLOCK_RE, run_init_claude
 from detectkit.cli.main import cli
 
@@ -39,10 +38,11 @@ class TestFreshScaffold:
         claude_md = tmp_path / "CLAUDE.md"
         assert claude_md.exists()
         text = _read(claude_md)
-        # Exactly one managed block, carrying the installed version.
+        # Exactly one managed block. The marker is intentionally version-less so a
+        # no-op upgrade doesn't churn the block (see init_claude._BEGIN).
         assert text.count("<!-- BEGIN detectkit") == 1
         assert text.count("<!-- END detectkit -->") == 1
-        assert f"v{__version__}" in text
+        assert "<!-- BEGIN detectkit (managed by `dtk init-claude`" in text
         assert _BLOCK_RE.search(text) is not None
 
         rules_dir = tmp_path / ".claude" / "rules" / "detectkit"
@@ -121,7 +121,9 @@ class TestInjectionIntoExistingFile:
         assert "OLD STALE CONTENT" not in text
         assert text.count("<!-- BEGIN detectkit") == 1
         assert text.count("<!-- END detectkit -->") == 1
-        assert f"v{__version__}" in text
+        # The old versioned marker is replaced by the current version-less one.
+        assert "v0.0.1" not in text
+        assert "<!-- BEGIN detectkit (managed by `dtk init-claude`" in text
 
 
 class TestCliWiring:

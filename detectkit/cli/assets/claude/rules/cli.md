@@ -11,6 +11,7 @@ Run all commands from a project directory (the one containing
 | `dtk init-claude` | (Re)generate this Claude context (CLAUDE.md + `.claude/rules/detectkit/` + skills) |
 | `dtk run --select <sel>` | Run the load → detect → alert pipeline |
 | `dtk autotune --select <sel>` | Auto-configure a metric's detector (see `autotune.md`) |
+| `dtk tune --select <sel>` | Interactively tune a detector on real data, write it back in place |
 | `dtk test-alert <metric>` | Send a mock alert to the metric's channels |
 | `dtk unlock --select <sel>` | Clear a stuck pipeline lock |
 | `dtk clean --select <sel>` | Prune internal data that no longer matches the config |
@@ -71,6 +72,26 @@ against labeled incidents; without it, an unsupervised objective is used.
 self-contained HTML report as `dtk run` for the tuned winner (default
 `reports/<metric>__tuned_<id>.html`; `<dir>` or a `.html` file also accepted).
 Full reference: `autotune.md`.
+
+## `dtk tune --select <sel>`
+
+The **manual, interactive** sibling of `dtk autotune`. Opens a localhost browser
+view of the metric's **real** persisted series and lets you turn the detector's
+knobs (type, threshold, window, recency weighting + half-life, detrend, smoothing,
+seasonality conditioning, alert `consecutive_anomalies`) while the confidence band
+and flagged anomalies **recompute live**. Clicking **Apply** writes the chosen
+config back into the metric YAML **in place** (autotune, by contrast, writes a new
+`__tuned_<id>.yml` and never edits the original). Reads the metric's loaded
+datapoints (run `dtk run --steps load` first if empty); the selector must resolve
+to a single metric.
+
+Safe write-back: the config is validated before anything is written, the previous
+YAML is archived under `metrics/.history/<metric>/`, and only then is the metric
+overwritten. Takes **no pipeline lock** (it only edits a config file); re-run
+`dtk run` afterward to recompute detections under the new config.
+`--no-serve` writes a static read-only preview HTML instead (no write-back);
+`--from` / `--to` bound the window; `--no-open` prints the URL without opening a
+browser.
 
 ## `dtk test-alert <metric>`
 

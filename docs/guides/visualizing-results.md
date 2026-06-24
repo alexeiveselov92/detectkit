@@ -18,6 +18,12 @@ people most often want: the metric over time, the detector's confidence band,
 anomaly markers, anomaly counts, the latest value vs its expected range, and
 detector comparisons.
 
+> **Want to change the detector, not just look at it?** The HTML report is
+> read-only (it replays what already ran). To turn the detector's knobs on the
+> real series and watch the band recompute live — then write the config back into
+> the metric — use [`dtk tune`](tuning.md), the interactive sibling of
+> `dtk autotune`.
+
 > **Database note.** The examples use ClickHouse SQL, but detectkit runs on
 > ClickHouse, PostgreSQL and MySQL — the `_dtk_*` tables exist on all three. The
 > *shape* of every query is portable; only a few things are dialect-specific

@@ -506,6 +506,63 @@ prior winners. Stages (`AutoTuner.tune()`), each appending to a decision log:
 by the command. `dtk autotune` takes the same pipeline lock as `dtk run` (so the
 two are mutually exclusive and `dtk unlock` clears a stuck autotune lock).
 
+## Manual tuning (`dtk tune`)
+
+`detectkit/tuning/` is the **human-in-the-loop sibling of `dtk autotune`**,
+invoked by `dtk tune --select <metric>` (`cli/commands/tune.py`). Where autotune
+searches automatically and writes a *new* `__tuned_<id>.yml` (never touching the
+original), `dtk tune` opens an interactive browser view of the metric's **real**
+persisted series, lets the user turn the detector's knobs and watch the band
+recompute live, then writes the chosen config **back into the metric YAML in
+place**. The two are complementary optimization paths; both share the
+validate-before-write discipline and operate on the already-loaded
+`_dtk_datapoints`.
+
+The interactive recompute reuses the **same** framework-free TypeScript detector
+port (`website/src/scripts/demo/detector.ts`) + chart (`demo/chart.ts`) that
+power the landing playground — fed the real series instead of synthetic data. So
+unlike the read-only `--report` (which replays *stored* detections),
+`dtk tune` recomputes detections client-side as the user moves a slider, with no
+DB round-trip. The renderer (`website/src/scripts/report/tune.ts`) is bundled to
+the committed `detectkit/tuning/assets/tune.js` by
+`website/scripts/gen-tune-bundle.mjs` and ships in the wheel — regenerate it when
+the renderer TS changes; the detector port is the parity-checked
+(`npm run check:demo-parity`) shared core.
+
+Three pure-ish pieces + a server:
+
+- `payload.build_tune_payload(...)` reads `_dtk_datapoints` and bakes the **raw
+  gap-filled series + per-point seasonality keys + the metric's current detector
+  config (camelCased to seed the controls) + the alert `consecutive_anomalies`**
+  into a JSON payload — everything the client port needs to *recompute*. It bakes
+  **no** precomputed detection (the browser runs the detector itself).
+- `html.render_tune_html(payload)` inlines `assets/tune.js` + the payload into one
+  self-contained HTML page (mirrors `reporting/html_report.py`; assigns
+  `window.__DTK_TUNE__`).
+- `config_writer.apply_tuned_config(...)` is the **single mutation seam**: it
+  validates the chosen detector through `DetectorFactory.create` **and** the whole
+  body through `MetricConfig` *before touching the filesystem* (raising — writing
+  nothing — on a bad/untunable config), then **archives the previous YAML verbatim**
+  under `metrics/.history/<metric>/<stamp>.yml` (comments preserved; the history of
+  chosen params is trackable), and only then re-emits the metric in place via
+  `yaml.safe_dump` (PyYAML only — same no-round-trip-dep choice as
+  `config_emitter.py`; the prepended `#`-header points at the archive). It replaces
+  the `detectors` list with the single tuned detector and optionally updates the
+  first alerting block's `consecutive_anomalies` (it never invents alerting).
+- `server.serve_tuner(...)` / `build_tune_server(...)` is the localhost write-back
+  server, modeled exactly on `autotune/label_server.py`: bound to `127.0.0.1:0`
+  with a one-shot `secrets` token, serves the page, accepts **one** `POST /apply`
+  on the **Apply** click → `apply_tuned_config` → responds + self-shuts-down so the
+  command reports what changed. An invalid config returns **400 and keeps serving**
+  (fix the knobs and retry). `dtk tune --no-serve` writes a static read-only
+  preview file (sliders recompute, no write-back).
+
+Unlike `run`/`autotune`, `dtk tune` takes **no pipeline lock** — it neither runs
+the pipeline nor persists detections, it only edits a config file. Changing the
+detector params changes the `detector_id`, so detections recompute under the new
+id on the next `dtk run` (the live preview is the TS approximation; the next real
+run is the source of truth).
+
 ## Idempotency & locking
 
 Every stage **resumes from the last persisted timestamp**: load from

@@ -39,5 +39,13 @@ rendered on the docs site under **For developers**). Read the relevant one:
   rendering core with the website landing demo. The committed
   `assets/report.js` bundle ships in the wheel — regenerate it (and keep it in
   sync on release) when the report renderer TS changes.
+- **Manual tuning** lives in `detectkit/tuning/` (the `dtk tune` command): the
+  human-in-the-loop sibling of `dtk autotune`. It serves an interactive view of a
+  metric's real series (recomputing the band live via the **same** TS detector
+  port as the landing playground) and, on **Apply**, writes the chosen config
+  back into the metric YAML — validating first, archiving the previous version to
+  `metrics/.history/<metric>/`, then re-emitting in place. Committed bundle
+  `assets/tune.js` (built by `website/scripts/gen-tune-bundle.mjs`) ships in the
+  wheel — regenerate it when the renderer TS changes. Takes no pipeline lock.
 
 Repo: https://github.com/alexeiveselov92/detectkit

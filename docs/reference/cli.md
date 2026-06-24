@@ -11,6 +11,7 @@ dtk init <project>              # Initialize new project
 dtk init-claude                 # Set up Claude Code context for this folder
 dtk run --select <selector>     # Run metric pipeline
 dtk autotune --select <sel>     # Auto-configure a metric's detector from data
+dtk tune --select <sel>         # Interactively tune a detector, write it back
 dtk test-alert <metric>         # Test alert channels
 dtk unlock --select <selector>  # Clear a stuck pipeline lock
 dtk clean --select <selector>   # Prune data that no longer matches configs
@@ -733,6 +734,95 @@ dtk clean --select <name>__tuned_<id> --execute
 See the [Auto-tuning guide](../guides/autotuning.md) and the
 [Auto-tune reference](autotune.md) for the labels schema, the `autotune:` config
 block, the scoring-metrics catalog, and the `_dtk_autotune_runs` columns.
+
+---
+
+### `dtk tune`
+
+Interactively tune a metric's detector on its **real** data, then write the
+chosen config back into the metric YAML. The manual, human-in-the-loop sibling of
+[`dtk autotune`](#dtk-autotune): it opens a browser view of the metric's persisted
+series, lets you turn the detector's knobs and watch the confidence band + flagged
+anomalies + would-fire alerts **recompute live**, and — on a click — applies the
+config. Where `autotune` searches automatically and writes a *new*
+`__tuned_<id>.yml`, `tune` is manual and edits the metric **in place**.
+
+Safe by construction: the new config is validated before anything is written, the
+previous metric YAML is archived under `metrics/.history/<metric>/`, and only then
+is the metric overwritten. It takes **no pipeline lock** (it only edits a config
+file); re-run `dtk run` afterwards to recompute detections under the new config.
+
+#### Syntax
+
+```bash
+dtk tune --select <selector> [OPTIONS]
+```
+
+#### Options
+
+##### `--select`, `-s` (required)
+
+Metric selector — same semantics as [`dtk run`](#dtk-run), but it must resolve to
+a **single** metric (tuning is interactive and per-metric). Tuning reads the
+metric's **already-loaded** `_dtk_datapoints`; if it has none yet, load it first:
+
+```bash
+dtk run --select api_error_rate --steps load --from "2026-01-01"
+```
+
+##### `--from`, `--to` (optional)
+
+Restrict the window the tuner shows and recomputes over (`YYYY-MM-DD` or
+`YYYY-MM-DD HH:MM:SS`, UTC). Defaults to the recent persisted window.
+
+##### `--no-serve` (flag)
+
+Write a static, read-only tuner HTML file (`metrics/<metric>__tuner.html`) and
+exit instead of starting the local server. The sliders still recompute the band
+live, but there is **no Apply / write-back**.
+
+##### `--no-open` (flag)
+
+Don't auto-open the browser — just print the local `127.0.0.1` URL.
+
+##### `--profile` (optional)
+
+Profile override (default: from the project config).
+
+#### What you can tune
+
+Detector **type** (MAD / Z-Score / IQR), **threshold**, **window size**, recency
+**weighting** + **half-life**, **detrend**, **smoothing**, **seasonality
+conditioning** (per available seasonality column, optionally conjoined into one
+group), and the alert **`consecutive_anomalies`** window. The "effective config"
+readout shows exactly what will be written.
+
+#### How Apply writes back
+
+On **Apply to metric** the server validates the chosen detector (through the same
+`DetectorFactory` + `MetricConfig` the pipeline uses) — a broken or untunable
+config is rejected and nothing is written — then archives the current YAML
+verbatim to `metrics/.history/<metric>/<metric>-<timestamp>.yml` and re-emits the
+metric in place with the tuned detector (the `detectors` list becomes the single
+tuned detector; the first `alerting` block's `consecutive_anomalies` is updated if
+present). The archive keeps a trackable history of chosen parameters and the
+original is always recoverable.
+
+#### Examples
+
+```bash
+# Tune interactively and apply on click
+dtk tune --select api_error_rate
+
+# Tune over a specific window
+dtk tune --select api_error_rate --from 2026-05-01 --to 2026-06-01
+
+# Static, read-only preview file (no write-back)
+dtk tune --select api_error_rate --no-serve
+```
+
+See the [Tuning guide](../guides/tuning.md) for the full walkthrough and how it
+relates to `dtk autotune`.
 
 ---
 

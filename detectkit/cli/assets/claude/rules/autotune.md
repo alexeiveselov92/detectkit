@@ -32,7 +32,8 @@ same windowed detectors and `detector_id` identity). The fastest path is the
 4. **History window** — on near-ties uses a trend-gated tie-break: a stationary
    series prefers the **larger** `window_size` ("more history is better"), a
    trending / regime-shifting one the **smaller**; sets `loading_start_time` to
-   cover the lead-in.
+   cover the lead-in (and pins the detector's `start_time` to it, so the first
+   `dtk run` detects across all loaded history).
 5. **Alert window** (supervised only) — sweeps `consecutive_anomalies` on the
    labeled incidents.
 

@@ -34,7 +34,9 @@ every choice:
    recency weighting, detrending and `window_size`, maximizing a cross-validated
    score.
 4. **History window** — prefers a larger `window_size` on near-ties ("more
-   history is better"), and sets `loading_start_time` to cover the lead-in.
+   history is better"), and sets `loading_start_time` to cover the lead-in (and
+   pins the detector's `start_time` to it, so the first `dtk run` detects across
+   all loaded history).
 5. **Alert window** (supervised only) — sweeps `consecutive_anomalies` against
    the labeled incidents.
 

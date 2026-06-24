@@ -92,7 +92,8 @@ Manual Bounds detector does not use:
 `start_time` and `batch_size` are execution-level parameters (placed under
 `params:`) common to all detectors — they control *where* detection starts
 and *how much* data is processed per batch, not the algorithm itself:
-- `start_time` - Start detecting from this timestamp (optional)
+- `start_time` - Start detecting from this timestamp (optional; defaults to the
+  metric's `loading_start_time`, so the first run detects across all loaded history)
 - `batch_size` - Process data in batches (optional)
 
 ## Configuration Examples

@@ -31,7 +31,10 @@ tables described below.
   after the last persisted detection, loads datapoints **plus a historical
   context window** (`get_context_size()`), runs `detect()`, strips the context
   from the persisted rows, and writes `_dtk_detections`. Batches by the
-  detector's `batch_size`.
+  detector's `batch_size`. On a first-ever detect with no lower bound from
+  `--from`, the resume point, or the detector's `start_time`, it falls back to
+  the metric's `loading_start_time` (then its first datapoint) so detection
+  covers all loaded history instead of short-circuiting as "already up to date".
 - **alert** (`detectkit/orchestration/task_manager/_alert_step.py` →
   `detectkit/alerting/orchestrator/`): for each enabled alerting config, finds
   the last complete interval, evaluates no-data → anomaly quorum → recovery, and

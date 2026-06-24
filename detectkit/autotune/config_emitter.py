@@ -23,6 +23,7 @@ _RULE = "# " + "─" * 61
 _STAGE_LABELS = {
     "seasonality": "SEASONALITY",
     "detector_select": "DETECTOR",
+    "regime": "REGIME",
     "grid_search": "GRID SEARCH",
     "window": "WINDOW",
 }

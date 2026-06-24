@@ -64,6 +64,50 @@ Cross-validation is walk-forward (expanding-window) throughout; because the
 windowed detector is causal, `detect()` runs once per candidate and each fold is
 scored by slicing the results (no leakage, no per-fold recompute).
 
+### Non-stationary metrics & regime shifts
+
+> Advanced. Most metrics don't need this — skip it unless your series changed
+> level partway through its history.
+
+The trend gate behind window selection (and the detrend toggle) is a single
+**midpoint-median** test: it compares the median of the first half against the
+second half. That is cheap and right for the common case, but it has two blind
+spots on a metric that **shifted level partway through its history**:
+
+- an **off-center** shift (e.g. a drop a quarter of the way in) leaves both
+  halves sitting mostly at the *new* level, so their medians barely differ and
+  the test reads "stationary";
+- a **large** shift inflates the whole-series MAD the test measures against,
+  raising the bar enough that the shift can clear it — self-masking.
+
+When the gate reads "stationary" it prefers the **largest** window and skips
+detrend, so the detector's baseline silently **averages the old and new
+regimes** — a band centered between two levels, too wide to catch subtle anomalies
+in the current one.
+
+To catch this, autotune runs a second probe (`detect_level_shift`) that scans
+**every** split point and scores each step against the **within-segment** scale
+(which a true step does not inflate, but a smooth ramp does — so drift won't
+trip it). When the series reads stationary yet a **large level shift (≥3σ
+within-regime)** is present, the run emits a **`REGIME`** line in the
+[decision log](#the-annotated-config) and streams it live (one line in the
+header; wrapped here for readability):
+
+```
+# REGIME      : series reads stationary, but a large level shift (~9.4σ within-regime) sits
+                ~15% into the training window — the midpoint trend test misses an off-center
+                shift, so the baseline may average two regimes. If the earlier regime is
+                stale, re-tune with `--from <date after the shift>` (or set `autotune.max_history`).
+```
+
+It is **advisory only** — it changes no chosen parameters. The fix is yours to
+make: if the earlier regime is stale, re-tune with [`--from`](#--from-optional) set
+to a date just after the shift (or cap [`max_history`](#autotune-config-block)),
+so the search and the runtime baseline see the current regime only. The probe
+detects **level** shifts, not pure variance/shape changes (a metric whose *spread*
+changed without moving its median); for those, [label the incidents](#--label-flag)
+so scoring is supervised.
+
 ### Unsupervised tuning (no labels)
 
 Without labels the search cannot optimize a labelled metric (MCC etc.), so it

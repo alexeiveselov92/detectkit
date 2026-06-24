@@ -5,6 +5,26 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.0] - 2026-06-24
+
+### Added
+- **Autotune flags a hidden regime shift in the decision log.** The trend gate
+  that drives window selection and the detrend toggle is a single midpoint-median
+  test, so it silently misses a level shift that sits **off-center** (both halves
+  straddle it, so their medians barely differ) or one large enough to **inflate
+  the very MAD it is measured against** — and then treats the series as
+  stationary, prefers the largest window, and lets the baseline quietly average
+  two regimes. A new scan (`detect_level_shift`) checks every split point against
+  the **within-segment** scale (which a true step does not inflate, unlike a
+  smooth ramp); when the series reads stationary yet a large (≥3σ within-regime)
+  level shift is present, the run emits a `REGIME` advisory — streamed live and
+  rendered in the annotated config header and `_dtk_autotune_runs.decision_log_json`
+  — pointing at where the shift sits and suggesting you narrow the window with
+  `--from` (or `autotune.max_history`) and re-tune. **Advisory only:** it changes
+  no chosen parameters. It detects *level* shifts, not pure variance/shape changes
+  (those still need labeled incidents). See the autotune reference's
+  "Non-stationary metrics & regime shifts" note.
+
 ## [0.26.1] - 2026-06-24
 
 ### Changed

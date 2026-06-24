@@ -64,7 +64,7 @@ _SHIFT_MIN_SIDE_FRAC = 0.1  # each candidate segment must hold ≥10% of the poi
 _SHIFT_SCAN_SPLITS = 24  # coarse grid of candidate split points to scan
 
 
-def detect_level_shift(tuner: _AutoTuneBase) -> tuple[bool, float, float]:
+def detect_level_shift(tuner: _AutoTuneBase) -> tuple[bool, float, int]:
     """Scan for the strongest single level shift anywhere in the series.
 
     Complements :func:`trend_present`, which only compares the two *halves'*
@@ -74,29 +74,48 @@ def detect_level_shift(tuner: _AutoTuneBase) -> tuple[bool, float, float]:
     the series and scores each step against the **within-segment** robust scale,
     which a true step does not inflate (a smooth ramp, by contrast, keeps a large
     within-segment spread and so does not register). Returns ``(found,
-    magnitude_sigmas, location_fraction)``; ``found`` is ``True`` only when the
-    strongest step clears :data:`_SHIFT_SIGMA_BAR` within-regime sigmas.
+    magnitude_sigmas, boundary_index)`` where ``boundary_index`` is the index of
+    the **first point of the new regime** in ``tuner.data`` (so the caller can map
+    it to a timestamp for a concrete ``--from`` suggestion). The scan runs on the
+    raw grid (NaN-aware medians) so the index aligns with ``timestamp``. ``found``
+    is ``True`` only when the strongest step clears :data:`_SHIFT_SIGMA_BAR`
+    within-regime sigmas.
     """
     v = np.asarray(tuner.data["value"], dtype=float)
-    v = v[~np.isnan(v)]
     n = int(v.size)
     min_side = max(4, int(n * _SHIFT_MIN_SIDE_FRAC))
     if n < _SHIFT_MIN_POINTS or n - 2 * min_side < 1:
-        return (False, 0.0, 0.0)
+        return (False, 0.0, 0)
     step = max(1, (n - 2 * min_side) // _SHIFT_SCAN_SPLITS)
     best_sigmas = 0.0
-    best_frac = 0.0
+    best_idx = 0
     for s in range(min_side, n - min_side + 1, step):
-        med_l = float(np.median(v[:s]))
-        med_r = float(np.median(v[s:]))
+        left, right = v[:s], v[s:]
+        if np.isnan(left).all() or np.isnan(right).all():
+            continue
+        med_l = float(np.nanmedian(left))
+        med_r = float(np.nanmedian(right))
         delta = abs(med_r - med_l)
         if delta <= 0:
             continue
-        within = float(np.median(np.abs(np.concatenate([v[:s] - med_l, v[s:] - med_r]))))
+        within = float(np.nanmedian(np.abs(np.concatenate([left - med_l, right - med_r]))))
         sigmas = delta / (1.4826 * within) if within > 0 else 99.0
         if sigmas > best_sigmas:
-            best_sigmas, best_frac = sigmas, s / n
-    return (best_sigmas >= _SHIFT_SIGMA_BAR, min(best_sigmas, 99.0), best_frac)
+            best_sigmas, best_idx = sigmas, s
+    return (best_sigmas >= _SHIFT_SIGMA_BAR, min(best_sigmas, 99.0), best_idx)
+
+
+def half_life_grid(window_size: int, min_samples: int) -> list[int]:
+    """Candidate half-lives (in points) for the recency-weighting sweep.
+
+    Spaced as fractions of the window so the search can trade a fast-forgetting
+    baseline (small half-life → tracks the current regime, good after a shift)
+    against a steady one. Floored at ``min_samples / 2`` to keep the weighted
+    effective sample size from collapsing into a noisy band.
+    """
+    floor = max(2, min_samples // 2)
+    cands = {round(window_size * f) for f in (0.05, 0.1, 0.25, 0.5)}
+    return sorted({max(floor, c) for c in cands if c >= 2})
 
 
 def select_window(

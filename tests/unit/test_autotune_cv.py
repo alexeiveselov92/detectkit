@@ -3,9 +3,15 @@
 import json
 
 import numpy as np
+import pytest
 
 from detectkit.autotune._types import ScoringMetric, TuneMode
-from detectkit.autotune.crossval import build_cv_plan, predictions_from_results, run_cv
+from detectkit.autotune.crossval import (
+    _aggregate,
+    build_cv_plan,
+    predictions_from_results,
+    run_cv,
+)
 from detectkit.autotune.labels import GroundTruth
 from detectkit.autotune.settings import TuneSettings
 from detectkit.detectors.factory import DetectorFactory
@@ -69,3 +75,28 @@ def test_run_cv_returns_fold_scores():
     # supervised: only the fold containing the labeled anomaly is scored
     assert len(scores.per_fold) >= 1
     assert -1.0 <= scores.aggregate <= 1.0
+
+
+# ── downside-only stability penalty ──────────────────────────────────────────
+
+
+def test_aggregate_no_penalty_when_folds_equal():
+    aggregate, penalty = _aggregate([0.7, 0.7, 0.7], stability_lambda=1.0)
+    assert penalty == 0.0
+    assert aggregate == pytest.approx(0.7)
+
+
+def test_aggregate_penalizes_downside_more_than_upside():
+    # Mirrored values → identical std, but the config with the WORSE outlier fold
+    # (downside) is penalized more than the one with a BETTER outlier (upside).
+    # This is the regime-adaptive fix: a config that simply scores higher on the
+    # recent regime shouldn't be punished like an unstable one.
+    _agg_up, pen_up = _aggregate([0.5, 0.5, 0.9], stability_lambda=1.0)
+    _agg_dn, pen_dn = _aggregate([0.9, 0.9, 0.5], stability_lambda=1.0)
+    assert pen_dn > pen_up
+
+
+def test_aggregate_penalty_never_exceeds_full_std():
+    folds = [0.2, 0.6, 0.6, 0.9]
+    _aggregate_val, penalty = _aggregate(folds, stability_lambda=1.0)
+    assert penalty <= float(np.std(folds)) + 1e-9

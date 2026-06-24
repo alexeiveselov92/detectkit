@@ -27,8 +27,12 @@ same windowed detectors and `detector_id` identity). The fastest path is the
    detectors (`mad`/`zscore`/`iqr`) and cross-validation picks the winner — no
    type is excluded by heuristic.
 3. **Hyperparameters** — a bounded coordinate grid search over `threshold`,
-   recency weighting, detrending and `window_size`, maximizing a
-   cross-validated score, with a final `threshold` re-sweep at the chosen window.
+   recency weighting (and its **half-life** when adopted), detrending and
+   `window_size`, maximizing a cross-validated score, with a final `threshold`
+   re-sweep at the chosen window. Fold scores aggregate as
+   `mean − stability_lambda · downside_deviation` (downside-only, so a config that
+   scores *better* on recent folds isn't penalized; lower `stability_lambda` for a
+   regime-shift metric).
 4. **History window** — on near-ties uses a trend-gated tie-break: a stationary
    series prefers the **larger** `window_size` ("more history is better"), a
    trending / regime-shifting one the **smaller**; sets `loading_start_time` to
@@ -37,9 +41,10 @@ same windowed detectors and `detector_id` identity). The fastest path is the
    test, so it can miss a level shift that sits off-center or self-masks by
    inflating the global MAD; a backstop scan then logs a **`REGIME`** advisory in
    the decision log (and streams it) when the series reads stationary yet a large
-   (≥3σ within-regime) level shift is present — surface it to the user and suggest
-   re-tuning with `--from <date after the shift>` (or `autotune.max_history`) if
-   the earlier regime is stale. Advisory only; it changes no chosen parameters,
+   (≥3σ within-regime) level shift is present — it names a **concrete `--from
+   <date>`** (the shift's timestamp); surface it to the user and suggest re-tuning
+   with that date (or `autotune.max_history`) if the earlier regime is stale.
+   Advisory only; it changes no chosen parameters,
    and it detects level shifts, not variance/shape changes (label incidents for
    those).
 5. **Alert window** (supervised only) — sweeps `consecutive_anomalies` on the
@@ -109,7 +114,9 @@ user to recall timestamps** — it is the easiest, most reliable path:
    clear outliers, **Threshold capture** grabs every span past a horizontal line
    at once (above/below, with an optional gap-bridge); it captures within the
    current view by default, and dragging across the chart limits it to a time
-   window (different boundary per period). Each band's ✕ (or select + Delete)
+   window (different boundary per period) — the painted window is **saved with the
+   set and restored on reopen** (a `capture_windows:` block; metadata only). Each
+   band's ✕ (or select + Delete)
    removes one, and **focus** on a list row jumps the chart to it.
 3. That writes `incidents/<metric>/<metric>[-<set>]-<UTC>.yml` automatically
    (named after the metric, optional set name as a suffix; versioned —
@@ -156,6 +163,7 @@ autotune:
   force_seasonality: [hour]       # pin the grouping, skip the search (see below)
   fixed_params: {window_size: 4320}  # pin hyperparameters (excluded from search)
   folds: 5
+  stability_lambda: 0.5           # downside-dispersion penalty weight (0 disables)
   max_history: 50000              # cap training points
 ```
 

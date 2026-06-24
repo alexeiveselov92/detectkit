@@ -122,11 +122,14 @@ def build_label_server(
     incidents_dir: Path,
     interval_seconds: int,
     preload: list[dict[str, str]] | None = None,
+    capture_windows: list[dict[str, str]] | None = None,
 ) -> tuple[_LabelServer, str]:
     """Construct (without running) the labeler server; return ``(server, page_url)``.
 
     ``preload`` seeds the labeler with already-marked incidents (editing an
     existing labels file); the caller resolves which file to load.
+    ``capture_windows`` restores the painted threshold-capture window from a saved
+    file so the regime scope survives a reopen.
     """
     server = _LabelServer(("127.0.0.1", 0), _Handler)
     token = secrets.token_urlsafe(16)
@@ -141,6 +144,7 @@ def build_label_server(
         save_url=f"http://127.0.0.1:{port}/save?token={token}",
         interval_seconds=interval_seconds,
         incidents=preload,
+        capture_windows=capture_windows,
     )
     return server, f"http://127.0.0.1:{port}/?token={token}"
 
@@ -155,10 +159,12 @@ def serve_labeler(
     echo: Callable[[str], None] = print,
     on_ready: Callable[[str], None] | None = None,
     preload: list[dict[str, str]] | None = None,
+    capture_windows: list[dict[str, str]] | None = None,
 ) -> Path | None:
     """Serve the labeler until the user saves (returns the file) or cancels (None).
 
-    ``preload`` seeds the page with existing incidents to edit in place.
+    ``preload`` seeds the page with existing incidents to edit in place;
+    ``capture_windows`` restores the painted threshold-capture scope.
     """
     server, url = build_label_server(
         metric_name=metric_name,
@@ -166,6 +172,7 @@ def serve_labeler(
         incidents_dir=incidents_dir,
         interval_seconds=interval_seconds,
         preload=preload,
+        capture_windows=capture_windows,
     )
     if on_ready is not None:
         on_ready(url)

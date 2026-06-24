@@ -351,7 +351,15 @@ def test_label_serve_then_tunes(tmp_path, monkeypatch):
     metric_path, config = _make_project(tmp_path)
 
     def fake_serve(
-        *, metric_name, data, incidents_dir, interval_seconds, open_browser, echo, preload=None
+        *,
+        metric_name,
+        data,
+        incidents_dir,
+        interval_seconds,
+        open_browser,
+        echo,
+        preload=None,
+        capture_windows=None,
     ):
         incidents_dir.mkdir(parents=True, exist_ok=True)
         out = incidents_dir / "demo-20260101T000000Z.yml"

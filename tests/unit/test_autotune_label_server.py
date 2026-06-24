@@ -46,6 +46,7 @@ def test_render_labeler_html_modes():
     assert "const SAVE_URL = null;" in static
     assert "const INTERVAL_S = null;" in static  # inferred from data when omitted
     assert "const PRELOAD = [];" in static  # no seed incidents
+    assert "const CAPWINS = [];" in static  # no seed capture window
     assert 'rel="icon"' in static and "data:image/svg+xml;base64," in static  # favicon
     # threshold capture + its time-window controls are present
     assert 'id="thbtn"' in static and 'id="thwin"' in static and 'id="thscope"' in static
@@ -72,6 +73,18 @@ def test_render_labeler_html_preloads_incidents():
     assert "const PRELOAD = [" in html
     assert "2026-01-02 00:00:00" in html and "2026-01-02 06:00:00" in html
     assert "outage" in html
+
+
+def test_render_labeler_html_seeds_capture_window():
+    """`capture_windows=` restores the painted threshold-capture scope on reopen."""
+    html = render_labeler_html(
+        "demo",
+        _data(48),
+        capture_windows=[{"start": "2026-01-02 00:00:00", "end": "2026-01-02 12:00:00"}],
+    )
+    assert "const CAPWINS = [" in html
+    assert "2026-01-02 12:00:00" in html
+    assert "__CAPTURE_WINDOWS__" not in html  # placeholder filled
 
 
 def test_build_label_server_preload_threads_into_page(tmp_path):

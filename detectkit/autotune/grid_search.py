@@ -13,10 +13,13 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
+
 from detectkit.autotune._base import _AutoTuneBase
 from detectkit.autotune._types import CandidateEval
 from detectkit.autotune.window_select import (
     detect_level_shift,
+    half_life_grid,
     min_samples_for,
     select_window,
     trend_present,
@@ -50,18 +53,23 @@ def grid_search(
         # enough to inflate the global MAD it is measured against. When that
         # happens the engine treats the series as stationary — prefers the largest
         # window, skips detrend — and the baseline quietly averages two regimes.
-        # Surface it so the user can narrow the window and re-tune; advisory only.
-        found, sigmas, frac = detect_level_shift(tuner)
+        # Surface it (with a concrete --from date) so the user can narrow the
+        # window and re-tune; advisory only.
+        found, sigmas, idx = detect_level_shift(tuner)
         if found:
+            timestamps = tuner.data["timestamp"]
+            n = int(len(timestamps))
+            from_date = str(np.datetime64(timestamps[idx], "D"))
+            pct = round(idx / n * 100) if n else 0
             tuner.log(
                 "regime",
                 f"series reads stationary, but a large level shift (~{sigmas:.1f}σ "
-                f"within-regime) sits ~{round(frac * 100)}% into the training window — "
-                "the midpoint trend test misses an off-center shift, so the baseline "
-                "may average two regimes. If the earlier regime is stale, re-tune with "
-                "`--from <date after the shift>` (or set `autotune.max_history`).",
+                f"within-regime) sits ~{pct}% in, around {from_date} — the midpoint "
+                "trend test misses an off-center shift, so the baseline may average "
+                f"two regimes. If the earlier regime is stale, re-tune with "
+                f"`--from {from_date}` (or set `autotune.max_history`).",
                 shift_sigmas=round(sigmas, 2),
-                shift_fraction=round(frac, 3),
+                shift_at=from_date,
             )
     eps = tuner.settings.min_improvement
     best_overall: CandidateEval | None = None
@@ -103,6 +111,18 @@ def grid_search(
             ev = tuner.safe_evaluate(detector_type, {**accepted, "window_weights": weights})
             if ev is not None and ev.score > best.score + eps:
                 best, accepted["window_weights"] = ev, weights
+
+        # Axis 2b: half-life of the recency weighting — only when exponential
+        # weighting was adopted. The detector defaults to a fixed half-life; this
+        # lets the search pick a faster-forgetting baseline that tracks the current
+        # regime (the term that matters on a metric that shifted level).
+        if accepted.get("window_weights") == "exponential":
+            for half_life in half_life_grid(accepted["window_size"], accepted["min_samples"]):
+                if half_life == accepted.get("half_life"):
+                    continue
+                ev = tuner.safe_evaluate(detector_type, {**accepted, "half_life": half_life})
+                if ev is not None and ev.score > best.score + eps:
+                    best, accepted["half_life"] = ev, half_life
 
         # Axis 3: detrend (gated by the trend pre-test).
         if has_trend:

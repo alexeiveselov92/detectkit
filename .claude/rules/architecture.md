@@ -398,11 +398,13 @@ prior winners. Stages (`AutoTuner.tune()`), each appending to a decision log:
    search then evaluates **all** of them and lets cross-validation pick the
    winner, so a hand-tuned heuristic never excludes a detector.
 3. **Grid search** (`grid_search.py`) — bounded coordinate sweep (threshold →
-   recency weighting → detrend, gated by a trend test → window size → a **final
-   threshold re-sweep** at the chosen window, since the optimal threshold depends
-   on window size) maximizing the cross-validated score. The threshold grid
-   carries high "near-suppress" rungs so a heavy-tailed metric can widen the band
-   under the flag-rate budget instead of being trapped flagging its tail.
+   recency weighting → **half-life** of that weighting when exponential is adopted
+   (`half_life_grid`, fractions of the window floored at `min_samples/2`) → detrend,
+   gated by a trend test → window size → a **final threshold re-sweep** at the
+   chosen window, since the optimal threshold depends on window size) maximizing
+   the cross-validated score. The threshold grid carries high "near-suppress" rungs
+   so a heavy-tailed metric can widen the band under the flag-rate budget instead
+   of being trapped flagging its tail.
 4. **Window selection** (`window_select.py`) — window grid in natural seasonal
    units; the tie-break is **trend-gated** by `trend_present` (a midpoint-median
    test): stationary → prefer the **larger** window ("more history is better");
@@ -411,16 +413,22 @@ prior winners. Stages (`AutoTuner.tune()`), each appending to a decision log:
    Because `trend_present` only compares the two halves' medians against the
    *global* MAD, it misses a level shift that sits off-center (both halves
    straddle it) or one big enough to inflate that MAD; `detect_level_shift`
-   (`window_select.py`) backstops it — a scan of every split point against the
-   *within-segment* scale — and when the series reads stationary yet a large
-   (≥3σ within-regime) shift is present, the grid step logs a `regime` advisory
-   (rendered as `REGIME` in the config header) suggesting `--from`/`max_history`.
-   Advisory only: it changes no chosen parameters.
+   (`window_select.py`) backstops it — a NaN-aware scan of every split point
+   against the *within-segment* scale, returning the **boundary index** — and when
+   the series reads stationary yet a large (≥3σ within-regime) shift is present,
+   the grid step logs a `regime` advisory (rendered as `REGIME` in the config
+   header) naming a **concrete `--from <date>`** mapped from that index (recorded
+   as `shift_at`). Advisory only: it changes no chosen parameters.
 5. **Cross-validation + scoring** (`crossval.py`, `scoring.py`) — walk-forward
    expanding-window folds; because the windowed detector is causal, `detect()`
    runs **once** per candidate and each fold is scored by slicing the results (no
-   leakage, no per-fold recompute). Supervised metrics are pure numpy (MCC
-   default, plus `f_beta`/`balanced_accuracy`/`roc_auc`/`pr_auc`). With no labels
+   leakage, no per-fold recompute). The fold scores aggregate as
+   `mean − stability_lambda · downside_deviation` (`_aggregate`): a **downside-only**
+   penalty (shortfalls below the mean, averaged over all folds — always ≤ the old
+   `std`), so a regime-adaptive config that scores *better* on recent folds isn't
+   punished for that upside spread. `stability_lambda` (default 0.5) is exposed via
+   the `autotune:` block. Supervised metrics are pure numpy (MCC default, plus
+   `f_beta`/`balanced_accuracy`/`roc_auc`/`pr_auc`). With no labels
    the objective is `unsupervised_objective` = `0.4·budget + 0.3·sharpness +
    0.3·separation`: a smooth flag-rate **budget** (no flat cliff, one-sided so a
    clean metric isn't pushed to flag), **sharpness** (median band-relative

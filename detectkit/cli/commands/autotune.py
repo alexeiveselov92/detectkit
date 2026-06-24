@@ -32,6 +32,7 @@ from detectkit.autotune.labels import (
     GroundTruth,
     IncidentLabels,
     incidents_to_display,
+    load_capture_windows,
     load_incidents_for_display,
     parse_incident_labels,
 )
@@ -264,6 +265,7 @@ def _build_settings(*, scoring: ScoringMetric, autotune_cfg: AutoTuneConfig) -> 
         metric=scoring,
         beta=autotune_cfg.beta,
         fold_count=autotune_cfg.folds,
+        stability_lambda=autotune_cfg.stability_lambda,
         allowed_detector_types=autotune_cfg.detector_types,
         allowed_seasonality=autotune_cfg.seasonality_candidates,
         force_seasonality=autotune_cfg.force_seasonality,
@@ -427,9 +429,23 @@ def _tune_one(
                 except ValueError:  # an absolute path outside the project tree
                     where = preload_src
             click.echo(f"  Editing {len(preload)} existing incident(s) from {where}")
+        # Restore the painted threshold-capture window from the same seed file
+        # (best-effort — a missing/old file just yields no window).
+        capture_windows: list[dict[str, str]] = []
+        if preload_src is not None:
+            try:
+                capture_windows = load_capture_windows(
+                    preload_src, interval_seconds=interval_seconds, metric_name=name
+                )
+            except Exception:  # noqa: BLE001 — restoring the scope is a convenience
+                capture_windows = []
         if no_serve:
             html = render_labeler_html(
-                name, data, interval_seconds=interval_seconds, incidents=preload
+                name,
+                data,
+                interval_seconds=interval_seconds,
+                incidents=preload,
+                capture_windows=capture_windows,
             )
             out = project_root / "metrics" / f"{metric_path.stem}__labeler.html"
             out.write_text(html, encoding="utf-8")
@@ -447,6 +463,7 @@ def _tune_one(
             open_browser=not no_open,
             echo=click.echo,
             preload=preload,
+            capture_windows=capture_windows,
         )
         if saved is None:
             echo_noop(name, "labeling cancelled — no labels saved")

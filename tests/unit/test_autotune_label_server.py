@@ -47,6 +47,9 @@ def test_render_labeler_html_modes():
     assert "const INTERVAL_S = null;" in static  # inferred from data when omitted
     assert "const PRELOAD = [];" in static  # no seed incidents
     assert 'rel="icon"' in static and "data:image/svg+xml;base64," in static  # favicon
+    # threshold capture + its time-window controls are present
+    assert 'id="thbtn"' in static and 'id="thwin"' in static
+    assert "function capRange()" in static
     served = render_labeler_html(
         "demo", _data(8), save_url="http://127.0.0.1:9/save?token=t", interval_seconds=3600
     )

@@ -152,7 +152,11 @@ Then, in the browser:
 3. **Threshold capture** (for many obvious outliers): toggle it, set a horizontal
    line (hover the chart, or type an exact **line value**), choose **above / below**,
    optionally **bridge gaps ≤ N intervals**, and **Add N spans** marks every
-   qualifying span at once — then tidy any stragglers with the ✕.
+   qualifying span at once — then tidy any stragglers with the ✕. It captures
+   within the **current view** by default; **drag across the chart** to limit it to
+   a narrower **time window** (the rest dims out) — handy when the metric's normal
+   level differs across periods, so you can use a different boundary per period.
+   **↺ whole view** clears the window.
 4. Click **Save & tune**. The server writes a **versioned** file
    `incidents/<metric>/<metric>[-<set>]-<UTC>.yml` (named after the metric, with the
    optional set name folded in as a suffix; re-labeling adds a new file — nothing is

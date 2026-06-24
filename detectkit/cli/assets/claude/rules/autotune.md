@@ -99,8 +99,10 @@ user to recall timestamps** — it is the easiest, most reliable path:
    move, click-drag to mark, drag an incident's edges to adjust, add a
    description, optionally name the set), then clicks **Save & tune**. For many
    clear outliers, **Threshold capture** grabs every span past a horizontal line
-   at once (above/below, with an optional gap-bridge); each band's ✕ (or
-   select + Delete) removes one, and **focus** on a list row jumps the chart to it.
+   at once (above/below, with an optional gap-bridge); it captures within the
+   current view by default, and dragging across the chart limits it to a time
+   window (different boundary per period). Each band's ✕ (or select + Delete)
+   removes one, and **focus** on a list row jumps the chart to it.
 3. That writes `incidents/<metric>/<metric>[-<set>]-<UTC>.yml` automatically
    (named after the metric, optional set name as a suffix; versioned —
    re-labeling never overwrites) and the **same command continues into the tuning

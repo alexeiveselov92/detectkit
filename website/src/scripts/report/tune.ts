@@ -15,7 +15,6 @@
 // sliders still recompute but there is no write-back.
 
 import { createChart } from '../demo/chart';
-import { effectiveStartIndex, runDetector } from '../demo/detector';
 import type {
   ChartAlert,
   ChartHandle,
@@ -27,6 +26,21 @@ import type {
   Smoothing,
   WindowWeights,
 } from '../demo/types';
+
+// The bundled detector worker source, injected as a string literal at build time
+// (see website/scripts/gen-tune-bundle.mjs). Instantiated from a Blob URL so the
+// report stays a single self-contained file with no external requests.
+declare const __DTK_WORKER_SRC__: string;
+
+/** Shape of the message the worker posts back after a `run`. */
+interface WorkerResult {
+  type: 'result';
+  id: number;
+  scored: ScoredPoint[];
+  fires: number[];
+  eff: number;
+  flagged: number;
+}
 
 // ---------------------------------------------------------------------------
 // Payload contract — kept in lockstep with detectkit/tuning/payload.py
@@ -162,28 +176,6 @@ function rangeControl(
 }
 
 // ---------------------------------------------------------------------------
-// Alert-fire timeline (mirrors main.ts computeScorecard's alert-run logic)
-// ---------------------------------------------------------------------------
-
-/** One fire index per maximal run of grid-adjacent flagged points reaching `consecutive`. */
-function alertFireIndexes(scored: ScoredPoint[], intervalMs: number, consecutive: number): number[] {
-  const fires: number[] = [];
-  let runLen = 0;
-  for (let i = 0; i < scored.length; i++) {
-    const flagged = scored[i].scored && scored[i].isAnomaly;
-    if (!flagged) {
-      runLen = 0;
-      continue;
-    }
-    const prevFlagged = i > 0 && scored[i - 1].scored && scored[i - 1].isAnomaly;
-    const adjacent = i > 0 && scored[i].timestamp - scored[i - 1].timestamp === intervalMs;
-    runLen = prevFlagged && adjacent ? runLen + 1 : 1;
-    if (runLen === consecutive) fires.push(i);
-  }
-  return fires;
-}
-
-// ---------------------------------------------------------------------------
 // Effective-config readout + the snake_case apply body
 // ---------------------------------------------------------------------------
 
@@ -240,8 +232,6 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       ? payload.seasonality_columns
       : undefined,
   };
-  const intervalMs = payload.interval_seconds * 1000;
-
   // ---- mutable parameter state, seeded from the metric's current config -----
   const seed = payload.detector;
   let consecutive = payload.consecutive_anomalies;
@@ -322,25 +312,45 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     },
   });
 
-  // ---- recompute (rAF-throttled) --------------------------------------------
-  let queued = false;
+  // ---- detector worker + debounced recompute --------------------------------
+  // runDetector is O(points x window) and re-runs from scratch on every change;
+  // running it in a Worker keeps the UI responsive no matter the size. Post the
+  // (large) series once, then only params per recompute. Stale results (an older
+  // id) are dropped so only the latest knob state paints. Debounce so a slider
+  // DRAG fires one recompute when it settles, not one per frame.
+  const worker = new Worker(
+    URL.createObjectURL(new Blob([__DTK_WORKER_SRC__], { type: 'text/javascript' })),
+  );
+  worker.postMessage({ type: 'series', series });
+  let reqId = 0;
+  let lastParams: DetectorParams | null = null;
+  worker.onmessage = (e: MessageEvent): void => {
+    const res = e.data as WorkerResult;
+    if (res.type !== 'result' || res.id !== reqId || !lastParams) return; // ignore stale
+    const params = lastParams;
+    const alerts: ChartAlert[] = res.fires.map((i) => ({
+      t: series.timestamps[i],
+      kind: 'anomaly',
+    }));
+    chart.render({ series, scored: res.scored, params, alerts });
+    statBar.textContent =
+      `${res.flagged} flagged · ${res.fires.length} alert${res.fires.length === 1 ? '' : 's'} · ` +
+      `warm-up ${res.eff} pts`;
+    configEcho.textContent = configText(params, consecutive);
+  };
+  worker.onerror = (): void => {
+    statBar.textContent = 'recompute failed — see the browser console';
+  };
+  const runRecompute = (): void => {
+    lastParams = readParams();
+    reqId += 1;
+    statBar.textContent = 'computing…';
+    worker.postMessage({ type: 'run', id: reqId, params: lastParams });
+  };
+  let debounce = 0;
   const recompute = (): void => {
-    if (queued) return;
-    queued = true;
-    requestAnimationFrame(() => {
-      queued = false;
-      const params = readParams();
-      const scored = runDetector(series, params);
-      const fires = alertFireIndexes(scored, intervalMs, params.consecutiveAnomalies);
-      const alerts: ChartAlert[] = fires.map((i) => ({ t: series.timestamps[i], kind: 'anomaly' }));
-      chart.render({ series, scored, params, alerts });
-      const eff = effectiveStartIndex(series, params);
-      const flagged = scored.filter((s) => s.scored && s.isAnomaly).length;
-      statBar.textContent =
-        `${flagged} flagged · ${fires.length} alert${fires.length === 1 ? '' : 's'} · ` +
-        `warm-up ${eff} pts`;
-      configEcho.textContent = configText(params, consecutive);
-    });
+    if (debounce) window.clearTimeout(debounce);
+    debounce = window.setTimeout(runRecompute, 130);
   };
 
   // ---- controls -------------------------------------------------------------
@@ -373,7 +383,8 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     if (thresholdOut) thresholdOut.textContent = v.toFixed(1);
   };
 
-  const windowMax = Math.max(50, Math.min(2000, n));
+  // Cap the window at half the shown points so there's always a scored region.
+  const windowMax = Math.max(50, Math.min(2000, Math.floor(n / 2)));
   const windowCtl = rangeControl(
     'Window size (points)',
     {
@@ -542,7 +553,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   }
 
   // ---- first paint + resize -------------------------------------------------
-  recompute();
+  runRecompute();
   let rafResize = 0;
   window.addEventListener('resize', () => {
     if (rafResize) cancelAnimationFrame(rafResize);

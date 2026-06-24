@@ -15,7 +15,28 @@ from typing import Any
 
 from detectkit.config.metric_config import MetricConfig
 from detectkit.database.internal_tables import InternalTablesManager
-from detectkit.reporting.builder import _ms, _num_or_none, _parse_seasonality, resolve_window
+from detectkit.reporting.builder import _ms, _num_or_none, _parse_seasonality
+
+# How many (most recent) points to show when no explicit window is given.
+#
+# Tuning recomputes the detector client-side on every knob change, which is
+# O(points x window); baking the whole history (10k-100k points) makes the page
+# slow to load and laggy. The renderer runs detection in a Web Worker (off the UI
+# thread), so the budget is "how many window-touches keep a debounced recompute
+# under ~1s" rather than "what keeps the UI from freezing". We size the default
+# point count INVERSELY to the seeded window — small windows can afford far more
+# points than large ones — clamped to a render/payload-comfortable range. An
+# explicit --from/--to span is honored in full (the user opted into that cost).
+_TUNE_COMPUTE_BUDGET = 20_000_000  # ~points x window per recompute (off-thread)
+_TUNE_MIN_POINTS = 3000
+_TUNE_MAX_POINTS = 15000
+
+
+def default_window_points(seed_window: int) -> int:
+    """Smart default point count for a seeded window size (budget-bound + clamped)."""
+    w = max(int(seed_window or 0), 1)
+    return max(_TUNE_MIN_POINTS, min(_TUNE_MAX_POINTS, round(_TUNE_COMPUTE_BUDGET / w)))
+
 
 # Per-type interval-width defaults (mirror the detector class defaults and the
 # website demo's DETECTOR_THRESHOLD_DEFAULT).
@@ -94,16 +115,29 @@ def build_tune_payload(
     """Assemble the interactive tuning payload from the persisted ``_dtk_datapoints``.
 
     ``save_url`` is the localhost POST endpoint the **Apply** button targets; it
-    is ``None`` for a static (read-only, no write-back) preview. The series is
-    read over the same default window as the report (``resolve_window``).
+    is ``None`` for a static (read-only, no write-back) preview. With no explicit
+    ``start``/``end`` the window defaults to a budget-sized recent slice
+    (``default_window_points``), not the whole history.
     """
     name = metric_config.name
     interval = metric_config.get_interval()
     interval_seconds = interval.seconds
 
-    start, end = resolve_window(internal, name, interval_seconds, start, end)
-
     seed = _seed_detector(metric_config)
+
+    # Resolve the window. ``end`` defaults to the last datapoint. ``start``
+    # defaults to a budget-sized number of intervals before ``end`` (clamped to the
+    # first datapoint) — sized inversely to the seeded window, NOT the whole
+    # history — so the page stays interactive on large metrics. An explicit
+    # ``start`` (``--from``) is honored as-is.
+    if end is None:
+        end = internal.get_last_datapoint_timestamp(name)
+    if start is None and end is not None:
+        first = internal.get_first_datapoint_timestamp(name)
+        default_points = default_window_points(int(seed["windowSize"]))
+        lookback = end - timedelta(seconds=interval_seconds * default_points)
+        start = max(first, lookback) if first is not None else lookback
+
     consecutive = 3
     if metric_config.alerting:
         consecutive = metric_config.alerting[0].consecutive_anomalies

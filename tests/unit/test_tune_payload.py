@@ -1,6 +1,6 @@
 """Tests for the dtk tune payload builder + HTML shell."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
 
@@ -10,6 +10,7 @@ from detectkit.tuning.payload import (
     _normalize_seasonality_components,
     _seed_detector,
     build_tune_payload,
+    default_window_points,
 )
 
 
@@ -152,6 +153,63 @@ def test_build_payload_empty_when_no_datapoints():
         end=datetime(2026, 1, 2),
     )
     assert payload["points"] == []
+
+
+def test_default_window_is_bounded_not_full_history():
+    """With no --from, the window starts a budget-sized number of points before the
+    last datapoint — NOT at the first datapoint — so huge histories stay interactive."""
+
+    class Recording(FakeInternal):
+        def __init__(self):
+            super().__init__(n=10)
+            self.requested_from = None
+
+        def get_last_datapoint_timestamp(self, name):
+            return datetime(2026, 6, 1, 0, 0, 0)
+
+        def get_first_datapoint_timestamp(self, name):
+            return datetime(2020, 1, 1, 0, 0, 0)  # years of history
+
+        def load_datapoints(self, name, from_timestamp=None, to_timestamp=None):
+            self.requested_from = from_timestamp
+            return self._data
+
+    rec = Recording()
+    build_tune_payload(metric_config=_metric(), internal=rec)  # no start/end
+    # seed is a default MAD detector (window 100) → smart default point count
+    expected = datetime(2026, 6, 1, 0, 0, 0) - timedelta(seconds=3600 * default_window_points(100))
+    assert rec.requested_from == expected  # bounded recent window, not 2020
+
+
+def test_default_window_points_scales_inversely_and_clamps():
+    # small window → render-capped (MAX), large window → fewer points, clamped to MIN
+    assert default_window_points(100) == 15000  # 20M/100 clamps to MAX
+    assert default_window_points(2000) == 10000  # 20M/2000
+    assert default_window_points(50000) == 3000  # clamps to MIN
+    assert default_window_points(0) == 15000  # guards divide-by-zero
+
+
+def test_explicit_from_is_honored_in_full():
+    """An explicit start (--from) is used as-is, not clamped to the recent window."""
+
+    class Recording(FakeInternal):
+        def __init__(self):
+            super().__init__(n=10)
+            self.requested_from = None
+
+        def load_datapoints(self, name, from_timestamp=None, to_timestamp=None):
+            self.requested_from = from_timestamp
+            return self._data
+
+    rec = Recording()
+    explicit = datetime(2020, 3, 1, 0, 0, 0)
+    build_tune_payload(
+        metric_config=_metric(),
+        internal=rec,
+        start=explicit,
+        end=datetime(2026, 1, 1, 0, 0, 0),
+    )
+    assert rec.requested_from == explicit
 
 
 def test_render_tune_html_bakes_payload_and_bundle():

@@ -5,6 +5,30 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.30.1] - 2026-06-24
+
+### Fixed
+- **`dtk tune` is now responsive on large metrics.** It previously baked a
+  metric's *entire* history into the page and re-ran the client-side detector
+  over **all** points on every knob change — on a metric with tens of thousands
+  of points that made the page slow to load and froze the UI on every slider
+  drag. Three changes fix it:
+  - **The detector now runs in a Web Worker** (off the UI thread), so dragging a
+    slider never freezes the page no matter the point count or window size; a
+    `computing…` hint shows while a recompute is in flight and stale results are
+    dropped. The worker runs the *same* parity-checked detector port, so results
+    are unchanged.
+  - **Smart default point count** — instead of a flat cap, the shown window is
+    sized **inversely to the detector's window** (recompute cost is
+    `points × window`): small windows show up to ~15k points, large windows fewer,
+    clamped to a render-comfortable range. A `--from` / `--to` span is still
+    honored in full.
+  - The window-size slider is capped at half the shown points, the live recompute
+    is **debounced**, and the CLI reports how many points it is tuning on.
+- **`dtk tune` no longer spews `xdg-open` errors** when launching the browser on
+  a headless / WSL box: the best-effort browser launch now silences its stderr,
+  and the printed hint tells you to open the URL manually if no browser appears.
+
 ## [0.30.0] - 2026-06-24
 
 ### Added

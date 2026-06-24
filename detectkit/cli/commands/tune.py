@@ -13,8 +13,6 @@ new config.
 
 from __future__ import annotations
 
-from datetime import datetime
-
 import click
 
 from detectkit.cli._output import echo_done, echo_error, echo_noop
@@ -61,24 +59,26 @@ def run_tune(
 
     from_dt = parse_date(from_date) if from_date else None
     to_dt = parse_date(to_date) if to_date else None
-    data = internal_manager.load_datapoints(name, from_timestamp=from_dt, to_timestamp=to_dt)
-    ts = data["timestamp"]
-    if len(ts) == 0:
-        echo_noop(name, "no datapoints — run `dtk run --select <name> --steps load` first")
-        return False
-
-    start = ts[0].astype("datetime64[ms]").astype(datetime)
-    end = ts[-1].astype("datetime64[ms]").astype(datetime)
+    # The builder resolves the window itself (recent ~TUNE_DEFAULT_POINTS by
+    # default, or the explicit --from/--to span) and reads only that slice — no
+    # need to pull the whole history just to find the bounds.
     payload = build_tune_payload(
         metric_config=config,
         internal=internal_manager,
-        start=start,
-        end=end,
+        start=from_dt,
+        end=to_dt,
         project_name=project_name,
     )
-    if not payload["points"]:
-        echo_noop(name, "no datapoints in the resolved window")
+    n_points = len(payload["points"])
+    if n_points == 0:
+        echo_noop(
+            name,
+            "no datapoints in range — run `dtk run --select <name> --steps load` first, "
+            "or widen --from/--to",
+        )
         return False
+    span = "the most recent points" if not (from_date or to_date) else "the selected window"
+    click.echo(f"  Tuning on {n_points} points ({span}; pass --from/--to for a different span).")
 
     # Static, read-only preview (no localhost server, no write-back).
     if no_serve:

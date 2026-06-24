@@ -96,15 +96,29 @@ interface SegSpec {
   value: string;
 }
 
+/** A control label carrying an optional tooltip (native title + a faint ⓘ). */
+function ctlLabel(text: string, hint?: string): HTMLElement {
+  const lab = el('label', 'dtk-ctl-label', text);
+  if (hint) {
+    lab.title = hint;
+    const q = el('span', 'dtk-ctl-info', 'ⓘ');
+    q.title = hint;
+    lab.appendChild(document.createTextNode(' '));
+    lab.appendChild(q);
+  }
+  return lab;
+}
+
 /** A segmented button group. Returns the row element + a getter/setter. */
 function segControl(
   label: string,
   options: SegSpec[],
   initial: string,
   onChange: (v: string) => void,
+  hint?: string,
 ): { row: HTMLElement; get: () => string; set: (v: string) => void } {
   const row = el('div', 'dtk-ctl');
-  row.appendChild(el('label', 'dtk-ctl-label', label));
+  row.appendChild(ctlLabel(label, hint));
   const group = el('div', 'dtk-seg');
   let current = initial;
   const buttons: HTMLButtonElement[] = [];
@@ -138,12 +152,19 @@ function segControl(
 /** A labeled range slider with a live value echo. */
 function rangeControl(
   label: string,
-  opts: { min: number; max: number; step: number; value: number; fmt?: (v: number) => string },
+  opts: {
+    min: number;
+    max: number;
+    step: number;
+    value: number;
+    fmt?: (v: number) => string;
+    hint?: string;
+  },
   onChange: (v: number) => void,
 ): { row: HTMLElement; get: () => number; setMax: (m: number) => void } {
   const row = el('div', 'dtk-ctl');
   const head = el('div', 'dtk-ctl-head');
-  const lab = el('label', 'dtk-ctl-label', label);
+  const lab = ctlLabel(label, opts.hint);
   const out = el('span', 'dtk-ctl-val');
   const fmt = opts.fmt ?? ((v: number): string => String(v));
   head.appendChild(lab);
@@ -222,7 +243,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
 
   // ---- series from the real persisted points -------------------------------
   const n = payload.points.length;
-  const series: Series = {
+  const fullSeries: Series = {
     timestamps: payload.points.map((p) => p.t),
     values: payload.points.map((p) => (p.v == null ? NaN : p.v)),
     intervalSeconds: payload.interval_seconds,
@@ -232,18 +253,46 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       ? payload.seasonality_columns
       : undefined,
   };
+  // The active series fed to the detector + chart. The trim slider can shorten it
+  // to the most-recent N points, so a very long/heavy metric recomputes faster
+  // (cost is O(points × window)) once you've confirmed a smaller period suffices.
+  let series: Series = fullSeries;
+  const sliceSeries = (count: number): Series => {
+    const start = Math.max(0, n - count);
+    if (start <= 0) return fullSeries;
+    return {
+      timestamps: fullSeries.timestamps.slice(start),
+      values: fullSeries.values.slice(start),
+      intervalSeconds: fullSeries.intervalSeconds,
+      truthAnomaly: fullSeries.truthAnomaly.slice(start),
+      seasonalityData: fullSeries.seasonalityData
+        ? fullSeries.seasonalityData.slice(start)
+        : undefined,
+      seasonalityColumns: fullSeries.seasonalityColumns,
+    };
+  };
   // ---- mutable parameter state, seeded from the metric's current config -----
   const seed = payload.detector;
   let consecutive = payload.consecutive_anomalies;
-  // seasonality: selected columns + whether to conjoin them into one group
+  // seasonality: each available column is assigned to a group id (0 = off).
+  // Columns sharing a group are conjoined into one seasonal key; separate groups
+  // apply independent (cumulative) corrections — the full string[][] the detector
+  // supports, not just "all-separate" or "all-in-one".
   const seedGroups = seed.seasonalityComponents ?? [];
-  const selectedCols = new Set<string>(seedGroups.flat());
-  let conjoin = seedGroups.length === 1 && seedGroups[0].length > 1;
+  const colGroup = new Map<string, number>();
+  seedGroups.forEach((grp, gi) => grp.forEach((c) => colGroup.set(c, gi + 1)));
 
   const buildSeasonality = (): string[][] | null => {
-    const cols = payload.seasonality_columns.filter((c) => selectedCols.has(c));
-    if (!cols.length) return null;
-    return conjoin ? [cols] : cols.map((c) => [c]);
+    let maxG = 0;
+    colGroup.forEach((g) => {
+      if (g > maxG) maxG = g;
+    });
+    const groups: string[][] = [];
+    for (let g = 1; g <= maxG; g++) {
+      const cols = payload.seasonality_columns.filter((c) => colGroup.get(c) === g);
+      if (cols.length) groups.push(cols);
+    }
+    return groups.length ? groups : null;
   };
 
   const readParams = (): DetectorParams => ({
@@ -290,15 +339,64 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   grid.appendChild(main);
   root.appendChild(grid);
 
+  // ---- trim slider (above the chart) ---------------------------------------
+  // Shorten the active sample to the most-recent N points. The fitted period
+  // shrinks and the live recompute speeds up (cost ∝ points × window). Echo is
+  // live; the actual re-slice/recompute is debounced.
+  const trimWrap = el('div', 'dtk-tune-trim');
+  const trimHead = el('div', 'dtk-tune-trim-head');
+  trimHead.appendChild(
+    ctlLabel(
+      'Points shown',
+      'Trim the active sample to the most-recent N points. Fewer points recompute faster ' +
+        '(cost grows with points × window) and make a shorter period easier to read — handy ' +
+        'once you can see a smaller window/period is enough.',
+    ),
+  );
+  const trimEcho = el('span', 'dtk-tune-trim-val');
+  trimHead.appendChild(trimEcho);
+  trimWrap.appendChild(trimHead);
+  const trimInput = el('input', 'dtk-range');
+  trimInput.type = 'range';
+  trimInput.min = String(Math.min(n, 200));
+  trimInput.max = String(n);
+  trimInput.step = String(Math.max(1, Math.round(n / 200)));
+  trimInput.value = String(n);
+  trimWrap.appendChild(trimInput);
+  main.appendChild(trimWrap);
+
   // chart
   const chartWrap = el('div', 'dtk-tune-chart');
   const canvas = el('canvas');
   chartWrap.appendChild(canvas);
+  // recompute spinner overlay (top-right of the chart)
+  const spinner = el('div', 'dtk-tune-spin');
+  spinner.appendChild(el('span', 'dtk-spin-ring'));
+  spinner.appendChild(el('span', 'dtk-spin-txt', 'computing…'));
+  chartWrap.appendChild(spinner);
   main.appendChild(chartWrap);
+
+  // legend
+  const legend = el('div', 'dtk-tune-legend');
+  const legItem = (sw: string, text: string, hint: string): void => {
+    const item = el('span', 'dtk-leg-item');
+    item.title = hint;
+    item.appendChild(el('span', `dtk-leg-sw ${sw}`));
+    item.appendChild(el('span', 'dtk-leg-txt', text));
+    legend.appendChild(item);
+  };
+  legItem('line', 'metric', 'The metric value over time.');
+  legItem('band', 'expected range', "The detector's confidence band — values inside it read as normal.");
+  legItem('center', 'band center', 'The expected value at the middle of the band.');
+  legItem('dot', 'anomaly', 'A point the detector flagged as anomalous (outside the band).');
+  legItem('alert', 'alert', 'Where an alert fired — enough consecutive anomalies to meet the rule.');
+  main.appendChild(legend);
+
   const readout = el('div', 'dtk-tune-readout');
   main.appendChild(readout);
 
   const chart: ChartHandle = createChart(canvas, {
+    navigable: true,
     onHover: (info): void => {
       if (!info || !info.point || !info.point.scored) {
         readout.textContent = '';
@@ -327,6 +425,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   worker.onmessage = (e: MessageEvent): void => {
     const res = e.data as WorkerResult;
     if (res.type !== 'result' || res.id !== reqId || !lastParams) return; // ignore stale
+    spinner.classList.remove('on');
     const params = lastParams;
     const alerts: ChartAlert[] = res.fires.map((i) => ({
       t: series.timestamps[i],
@@ -339,13 +438,35 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     configEcho.textContent = configText(params, consecutive);
   };
   worker.onerror = (): void => {
+    spinner.classList.remove('on');
     statBar.textContent = 'recompute failed — see the browser console';
   };
   const runRecompute = (): void => {
     lastParams = readParams();
     reqId += 1;
-    statBar.textContent = 'computing…';
+    spinner.classList.add('on');
     worker.postMessage({ type: 'run', id: reqId, params: lastParams });
+  };
+
+  // ---- trim: re-slice the active series, re-post, recompute -----------------
+  const trimSpan = (count: number): string =>
+    count > 1 ? fmtDur(fullSeries.timestamps[n - 1] - fullSeries.timestamps[n - count]) : '—';
+  const setTrimEcho = (count: number): void => {
+    trimEcho.textContent =
+      count >= n ? `${n} pts · full (${trimSpan(n)})` : `${count} pts · ${trimSpan(count)}`;
+  };
+  setTrimEcho(n);
+  function setActivePoints(count: number): void {
+    series = sliceSeries(count);
+    worker.postMessage({ type: 'series', series });
+    recompute();
+  }
+  let trimDebounce = 0;
+  trimInput.oninput = (): void => {
+    const count = Number(trimInput.value);
+    setTrimEcho(count);
+    if (trimDebounce) window.clearTimeout(trimDebounce);
+    trimDebounce = window.setTimeout(() => setActivePoints(count), 200);
   };
   let debounce = 0;
   const recompute = (): void => {
@@ -367,12 +488,22 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       thresholdCtl_setDefault(THRESHOLD_DEFAULT[v as DetectorType] ?? 3.0);
       recompute();
     },
+    'The statistic used for the center/spread of the band: MAD (robust median, ' +
+      'default), Z-Score (mean/std) or IQR (quartiles). All share the same windowing.',
   );
   controls.appendChild(detectorCtl.row);
 
   const thresholdCtl = rangeControl(
     'Threshold (σ-equivalent)',
-    { min: 0.5, max: 10, step: 0.1, value: seed.threshold, fmt: (v) => v.toFixed(1) },
+    {
+      min: 0.5,
+      max: 10,
+      step: 0.1,
+      value: seed.threshold,
+      fmt: (v) => v.toFixed(1),
+      hint: 'Band half-width in σ-equivalents. Lower = tighter band = more flags; higher = ' +
+        'wider band = fewer flags.',
+    },
     recompute,
   );
   controls.appendChild(thresholdCtl.row);
@@ -393,6 +524,8 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       step: 5,
       value: Math.min(seed.windowSize, windowMax),
       fmt: (v) => String(v),
+      hint: 'How many trailing points form the baseline window for each scored point. ' +
+        'Larger = steadier baseline (more history); smaller = adapts faster to shifts.',
     },
     recompute,
   );
@@ -410,6 +543,8 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       halfLifeRow.style.display = v === 'exponential' ? '' : 'none';
       recompute();
     },
+    'Weight recent points in the window more heavily: none (flat), exponential (half-life ' +
+      'decay) or linear. Helps the baseline track a drifting level.',
   );
   controls.appendChild(weightsCtl.row);
 
@@ -421,6 +556,8 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       step: 1,
       value: seed.halfLife ?? Math.max(5, Math.round(seed.windowSize / 20)),
       fmt: (v) => String(v),
+      hint: 'Exponential weighting only: the age (in points) at which a point counts half as ' +
+        'much as the newest. Smaller = faster decay = fresher baseline.',
     },
     recompute,
   );
@@ -436,6 +573,8 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     ],
     seed.detrend,
     recompute,
+    'Remove a robust linear trend from each window before computing the band, so a steadily ' +
+      'rising/falling metric is not flagged for the trend itself.',
   );
   controls.appendChild(detrendCtl.row);
 
@@ -448,44 +587,69 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     ],
     seed.smoothing,
     recompute,
+    'Smooth the series before detection (EMA or SMA) so single-point jitter does not flag. ' +
+      'The detector judges the smoothed line; the raw values show as a faint ghost.',
   );
   controls.appendChild(smoothingCtl.row);
 
-  // seasonality (only when the metric has seasonality columns)
+  // seasonality (only when the metric has seasonality columns).
+  // Each column is assigned a group: Off, or G1/G2/G3… Columns sharing a group
+  // are conjoined into ONE seasonal key (e.g. dow×hour); separate groups apply
+  // independent corrections — the full string[][] grouping the detector supports.
   if (payload.seasonality_columns.length) {
+    const cols = payload.seasonality_columns;
     const row = el('div', 'dtk-ctl');
-    row.appendChild(el('label', 'dtk-ctl-label', 'Seasonality conditioning'));
-    const chips = el('div', 'dtk-seg dtk-wrap');
-    payload.seasonality_columns.forEach((col) => {
-      const b = el('button', 'dtk-seg-btn', col);
-      b.type = 'button';
-      b.classList.toggle('on', selectedCols.has(col));
-      b.onclick = (): void => {
-        if (selectedCols.has(col)) selectedCols.delete(col);
-        else selectedCols.add(col);
-        b.classList.toggle('on', selectedCols.has(col));
-        recompute();
-      };
-      chips.appendChild(b);
+    row.appendChild(
+      ctlLabel(
+        'Seasonality groups',
+        'Condition the band on seasonal keys. Pick a group per column: columns in the SAME ' +
+          'group are combined into one key (e.g. dow×hour); separate groups each apply their ' +
+          'own correction. Off = ignore that column.',
+      ),
+    );
+    // Offer Off + as many groups as there are columns (each could stand alone).
+    const groupCount = Math.min(cols.length, 6);
+    const opts: SegSpec[] = [{ label: '—', value: '0' }];
+    for (let gi = 1; gi <= groupCount; gi++) opts.push({ label: `G${gi}`, value: String(gi) });
+    cols.forEach((col) => {
+      const crow = el('div', 'dtk-season-row');
+      crow.appendChild(el('span', 'dtk-season-col', col));
+      const seg = el('div', 'dtk-seg dtk-season-seg');
+      const buttons: HTMLButtonElement[] = [];
+      const cur = (): number => colGroup.get(col) ?? 0;
+      const paint = (): void =>
+        buttons.forEach((b) => b.classList.toggle('on', Number(b.dataset.v) === cur()));
+      opts.forEach((opt) => {
+        const b = el('button', 'dtk-seg-btn', opt.label);
+        b.type = 'button';
+        b.dataset.v = opt.value;
+        b.title = opt.value === '0' ? `ignore ${col}` : `put ${col} in group ${opt.value}`;
+        b.onclick = (): void => {
+          colGroup.set(col, Number(opt.value));
+          paint();
+          recompute();
+        };
+        buttons.push(b);
+        seg.appendChild(b);
+      });
+      paint();
+      crow.appendChild(seg);
+      row.appendChild(crow);
     });
-    row.appendChild(chips);
-    const conjoinLab = el('label', 'dtk-check');
-    const cb = el('input');
-    cb.type = 'checkbox';
-    cb.checked = conjoin;
-    cb.onchange = (): void => {
-      conjoin = cb.checked;
-      recompute();
-    };
-    conjoinLab.appendChild(cb);
-    conjoinLab.appendChild(el('span', undefined, 'conjoin selected into one group'));
-    row.appendChild(conjoinLab);
     controls.appendChild(row);
   }
 
   const consecutiveCtl = rangeControl(
     'Alert: consecutive anomalies',
-    { min: 1, max: 10, step: 1, value: consecutive, fmt: (v) => String(v) },
+    {
+      min: 1,
+      max: 10,
+      step: 1,
+      value: consecutive,
+      fmt: (v) => String(v),
+      hint: 'How many anomalies in a row are required before an alert fires. Higher = fewer, ' +
+        'more-confident alerts (the ▼ markers on the chart).',
+    },
     (v) => {
       consecutive = v;
       recompute();
@@ -507,6 +671,9 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     const applyWrap = el('div', 'dtk-tune-apply');
     const btn = el('button', 'dtk-apply-btn', 'Apply to metric');
     btn.type = 'button';
+    btn.title =
+      'Write this detector config back into the metric YAML (the previous version is archived ' +
+      'under metrics/.history/). Trimming the sample does not change what is written.';
     const msg = el('span', 'dtk-apply-msg');
     btn.onclick = (): void => {
       const params = readParams();
@@ -576,6 +743,16 @@ function fmtTs(ms: number): string {
   return new Date(ms).toISOString().slice(0, 16).replace('T', ' ');
 }
 
+function fmtDur(ms: number): string {
+  const m = Math.round(ms / 60000);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  const hh = h % 24;
+  return hh ? `${d}d ${hh}h` : `${d}d`;
+}
+
 function fmtInterval(seconds: number): string {
   if (seconds % 86400 === 0) return `${seconds / 86400}d`;
   if (seconds % 3600 === 0) return `${seconds / 3600}h`;
@@ -620,7 +797,7 @@ function injectStyle(): void {
 .dtk-range{width:100%;accent-color:var(--c);cursor:pointer;}
 .dtk-check{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:2px;cursor:pointer;}
 .dtk-tune-main{display:flex;flex-direction:column;gap:10px;min-width:0;}
-.dtk-tune-chart{position:relative;width:100%;height:420px;background:var(--surface);
+.dtk-tune-chart{position:relative;width:100%;height:470px;background:var(--surface);
   border:1px solid var(--border);border-radius:12px;overflow:hidden;}
 .dtk-tune-chart canvas{width:100%;height:100%;display:block;}
 .dtk-tune-readout{font-family:var(--mono);font-size:12px;color:var(--muted);min-height:18px;}
@@ -640,6 +817,35 @@ function injectStyle(): void {
 .dtk-apply-msg.info{color:var(--muted);}
 .dtk-tune-note{font-size:13px;color:var(--muted);background:var(--surface);border:1px dashed var(--border);
   border-radius:8px;padding:10px 12px;}
+.dtk-ctl-info{color:var(--faint);font-size:10px;cursor:help;vertical-align:super;}
+.dtk-tune-trim{display:flex;flex-direction:column;gap:6px;background:var(--surface);
+  border:1px solid var(--border);border-radius:10px;padding:9px 12px;}
+.dtk-tune-trim-head{display:flex;justify-content:space-between;align-items:baseline;}
+.dtk-tune-trim-val{font-family:var(--mono);font-size:12px;color:var(--c7);}
+.dtk-tune-spin{position:absolute;top:10px;right:12px;display:none;align-items:center;gap:7px;
+  background:rgba(27,25,22,0.78);color:#e6e0d4;border:1px solid #332f29;border-radius:999px;
+  padding:4px 11px 4px 8px;font-family:var(--mono);font-size:11px;pointer-events:none;}
+.dtk-tune-spin.on{display:inline-flex;}
+.dtk-spin-ring{width:12px;height:12px;border-radius:50%;border:2px solid rgba(245,241,232,0.25);
+  border-top-color:var(--c);animation:dtk-spin .7s linear infinite;}
+@keyframes dtk-spin{to{transform:rotate(360deg);}}
+.dtk-tune-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);padding:2px 2px 0;}
+.dtk-leg-item{display:inline-flex;align-items:center;gap:6px;cursor:help;}
+.dtk-leg-sw{display:inline-block;flex:0 0 auto;}
+.dtk-leg-sw.line{width:16px;height:3px;background:var(--c);border-radius:2px;}
+.dtk-leg-sw.band{width:16px;height:11px;background:rgba(209,91,54,0.18);
+  border:1px solid rgba(209,91,54,0.5);border-radius:2px;}
+.dtk-leg-sw.center{width:16px;height:2px;
+  background:repeating-linear-gradient(90deg,var(--faint) 0 4px,transparent 4px 7px);}
+.dtk-leg-sw.dot{width:9px;height:9px;border-radius:50%;background:var(--anom);}
+.dtk-leg-sw.alert{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;
+  border-top:7px solid var(--anom);}
+.dtk-leg-txt{white-space:nowrap;}
+.dtk-season-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.dtk-season-col{font-family:var(--mono);font-size:11.5px;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dtk-season-seg{flex:0 0 auto;padding:2px;}
+.dtk-season-seg .dtk-seg-btn{flex:0 0 auto;padding:3px 7px;font-family:var(--mono);font-size:11px;}
 `;
   const style = document.createElement('style');
   style.textContent = css;

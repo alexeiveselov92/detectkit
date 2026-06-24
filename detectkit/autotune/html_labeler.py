@@ -141,7 +141,7 @@ _TEMPLATE = """<!doctype html>
     box-shadow: var(--panel-shadow); }
   .zoombar { display:flex; align-items:center; gap:8px; margin: 12px 0 6px; }
   .rangelbl { margin-left: auto; color: var(--muted); font-size: 12px; font-family: var(--mono); }
-  canvas#ov { width: 100%; height: 66px; display:block; touch-action: none;
+  canvas#ov { width: 100%; height: 78px; display:block; touch-action: none;
     background: var(--term-bg); border: 1px solid var(--term-border); border-radius: 12px; cursor: grab;
     box-shadow: var(--panel-shadow); }
   .navhint { color: var(--faint); font-size: 12px; margin: 8px 2px 0; line-height: 1.55; }
@@ -256,7 +256,7 @@ PRELOAD.forEach(p => { const a = Date.parse(String(p.start).replace(' ','T')+'Z'
   if (!isNaN(a) && !isNaN(b)) incidents.push({a: Math.min(a,b), b: Math.max(a,b), label: p.label || ''}); });
 const c = document.getElementById('c'), ov = document.getElementById('ov');
 const ctx = c.getContext('2d'), octx = ov.getContext('2d');
-const M = {l:56, r:16, t:14, b:30}, OM = {l:56, r:16, t:8, b:8};
+const M = {l:56, r:16, t:14, b:30}, OM = {l:56, r:16, t:8, b:20};
 let dpr = 1, hover = null, dragging = null, ovAct = null;
 // selObj: the currently selected incident (object ref, survives re-sorting);
 // hoverRow/hoverDel: list-row / ✕-handle hover targets; threshold-capture state.
@@ -286,6 +286,42 @@ const fmtTs = ts => new Date(ts).toISOString().slice(0,19).replace('T',' ');
 const fmtTick = (ts, sp) => { const s = new Date(ts).toISOString();
   return sp < 2*86400000 ? s.slice(5,16).replace('T',' ') : s.slice(5,10); };
 const fmtVal = v => { const a = Math.abs(v); return a>=1000 ? v.toFixed(0) : a>=10 ? v.toFixed(1) : v.toFixed(2); };
+// Adaptive, UTC-aligned "nice" time gridlines so each point's real time is
+// readable at a glance — placed at round calendar boundaries (the hour, day,
+// month, year) rather than arbitrary even splits. Returns {ticks, step}.
+const MS_S=1000, MS_MIN=60*MS_S, MS_H=60*MS_MIN, MS_D=24*MS_H;
+const TICK_STEPS=[MS_S,2*MS_S,5*MS_S,10*MS_S,15*MS_S,30*MS_S,
+  MS_MIN,2*MS_MIN,5*MS_MIN,10*MS_MIN,15*MS_MIN,30*MS_MIN,
+  MS_H,2*MS_H,3*MS_H,6*MS_H,12*MS_H, MS_D,2*MS_D,3*MS_D,5*MS_D,7*MS_D,14*MS_D];
+function niceTimeTicks(lo, hi, target) {
+  const span=Math.max(hi-lo, 1);
+  if (span > target*28*MS_D) {  // month/year calendar ticks for long spans
+    const mSteps=[1,2,3,6,12,24,36,60,120,240]; let stepM=mSteps[mSteps.length-1];
+    for (const m of mSteps) { if (span/(m*30.44*MS_D) <= target) { stepM=m; break; } }
+    const d=new Date(lo); let y=d.getUTCFullYear(), mo=d.getUTCMonth();
+    if (stepM>=12) { const ys=stepM/12; y=Math.floor(y/ys)*ys; mo=0; }
+    else { mo=Math.floor(mo/stepM)*stepM; }
+    const ticks=[]; let t=Date.UTC(y,mo,1);
+    while (t<=hi) { if (t>=lo) ticks.push(t); mo+=stepM; y+=Math.floor(mo/12); mo%=12; t=Date.UTC(y,mo,1); }
+    return {ticks, step: stepM*30*MS_D};
+  }
+  let step=TICK_STEPS[TICK_STEPS.length-1];
+  for (const s of TICK_STEPS) { if (span/s <= target) { step=s; break; } }
+  let first;
+  if (step % MS_D === 0) { const d=new Date(lo);  // align day-multiples to UTC midnight
+    first=Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    const k=step/MS_D, dayNo=Math.round(first/MS_D); first += ((k - (dayNo % k)) % k) * MS_D;
+  } else { first=Math.ceil(lo/step)*step; }
+  const ticks=[]; for (let t=first; t<=hi; t+=step) if (t>=lo) ticks.push(t);
+  return {ticks, step};
+}
+// Step-aware label: year / month / day / minute / second precision.
+const fmtAxis = (ts, step) => { const s=new Date(ts).toISOString();
+  if (step >= 320*MS_D) return s.slice(0,4);
+  if (step >= 26*MS_D) return s.slice(0,7);
+  if (step >= MS_D) return s.slice(5,10);
+  if (step >= MS_H) return s.slice(5,16).replace('T',' ');
+  return s.slice(5,19).replace('T',' '); };
 function fmtDur(ms) { const m = Math.round(ms/60000); if (m<60) return m+'m';
   const h = Math.floor(m/60), mm = m%60; if (h<24) return h+'h'+(mm?(' '+mm+'m'):'');
   const d = Math.floor(h/24), hh = h%24; return d+'d'+(hh?(' '+hh+'h'):''); }
@@ -399,10 +435,16 @@ function draw() {
     ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1*dpr;
     ctx.beginPath(); ctx.moveTo(M.l*dpr,yy); ctx.lineTo(c.width-M.r*dpr,yy); ctx.stroke();
     ctx.fillStyle='#6e675b'; ctx.textAlign='right'; ctx.fillText(fmtVal(v),(M.l-8)*dpr,yy); }
+  // Adaptive vertical time gridlines + round-boundary labels, so a point's place
+  // in real time reads off the grid (not only by chasing the cursor).
   ctx.textBaseline = 'top';
-  for (let i=0;i<=5;i++) { const ts=viewMin+vspan()*i/5, xx=px(ts);
-    ctx.fillStyle='#6e675b'; ctx.textAlign=i===0?'left':i===5?'right':'center';
-    ctx.fillText(fmtTick(ts,vspan()), xx, (c.height-M.b+8)*dpr); }
+  const xtk=niceTimeTicks(viewMin, viewMax, 7);
+  xtk.ticks.forEach(ts => { const xx=px(ts);
+    ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1*dpr;
+    ctx.beginPath(); ctx.moveTo(xx, M.t*dpr); ctx.lineTo(xx, c.height-M.b*dpr); ctx.stroke();
+    ctx.fillStyle='#6e675b';
+    ctx.textAlign = xx < (M.l+24)*dpr ? 'left' : xx > c.width-(M.r+24)*dpr ? 'right' : 'center';
+    ctx.fillText(fmtAxis(ts, xtk.step), xx, c.height-(M.b-8)*dpr); });
   ctx.save(); ctx.beginPath(); ctx.rect(M.l*dpr, M.t*dpr, plotW(), plotH()); ctx.clip();
   // Threshold-capture preview bands (amber), under the committed incident bands.
   if (thMode) { const val=thEff(); if (val!==null) thRuns().forEach(r => {
@@ -508,20 +550,40 @@ function drawHover() {
 
 function drawOverview() {
   octx.clearRect(0,0,ov.width,ov.height);
+  const otk=niceTimeTicks(tmin, tmax, 5), plotBot=ov.height-OM.b*dpr;
   octx.save(); octx.beginPath(); octx.rect(OM.l*dpr, OM.t*dpr, ovWd(), ovHt()); octx.clip();
-  incidents.forEach(iv => { const x0=ovpx(iv.a), x1=ovpx(iv.b);
-    octx.fillStyle='rgba(214,50,50,0.30)'; octx.fillRect(x0, OM.t*dpr, x1-x0, ovHt()); });
+  // faint vertical time gridlines behind the series
+  octx.strokeStyle='rgba(201,194,180,0.10)'; octx.lineWidth=1*dpr;
+  otk.ticks.forEach(ts => { const xx=ovpx(ts);
+    octx.beginPath(); octx.moveTo(xx, OM.t*dpr); octx.lineTo(xx, plotBot); octx.stroke(); });
   drawSeries(octx, ovpx, ovpy, tmin, tmax, OM.l*dpr, ovWd(), 'rgba(209,91,54,0.7)', 1.1);
   octx.restore();
   const vx0=ovpx(viewMin), vx1=ovpx(viewMax);
+  // dim the out-of-view region (plot area only — leaves the label band clean)
   octx.fillStyle='rgba(27,25,22,0.55)';
   octx.fillRect(OM.l*dpr, OM.t*dpr, vx0-OM.l*dpr, ovHt());
   octx.fillRect(vx1, OM.t*dpr, (ov.width-OM.r*dpr)-vx1, ovHt());
+  // incident markers, full-strength on top of the dim so every incident stays
+  // visible to navigate to — min width so a single-point/short span isn't
+  // sub-pixel on the full-span strip; the selected one is highlighted.
+  incidents.forEach(iv => { const x0=ovpx(iv.a), w=Math.max(ovpx(iv.b)-x0, 3*dpr);
+    octx.fillStyle = (iv===selObj) ? 'rgba(214,50,50,0.97)' : 'rgba(214,50,50,0.72)';
+    octx.fillRect(x0, OM.t*dpr, w, ovHt()); });
+  // current-view window frame + grab handles
   octx.fillStyle='rgba(245,241,232,0.06)'; octx.fillRect(vx0, OM.t*dpr, vx1-vx0, ovHt());
   octx.strokeStyle='#d15b36'; octx.lineWidth=1.5*dpr;
   octx.strokeRect(vx0, OM.t*dpr+1, vx1-vx0, ovHt()-2);
   octx.fillStyle='#d15b36'; const hy=OM.t*dpr+ovHt()/2-9*dpr;
   octx.fillRect(vx0-2*dpr, hy, 4*dpr, 18*dpr); octx.fillRect(vx1-2*dpr, hy, 4*dpr, 18*dpr);
+  // absolute-time anchors under the strip, so a point's real time is readable
+  // across the whole series without hovering.
+  octx.font=(10*dpr)+'px ui-monospace, monospace'; octx.textBaseline='top';
+  otk.ticks.forEach(ts => { const xx=ovpx(ts);
+    octx.strokeStyle='rgba(201,194,180,0.25)'; octx.lineWidth=1*dpr;
+    octx.beginPath(); octx.moveTo(xx, plotBot); octx.lineTo(xx, plotBot+3*dpr); octx.stroke();
+    octx.fillStyle='#6e675b';
+    octx.textAlign = xx < (OM.l+26)*dpr ? 'left' : xx > ov.width-(OM.r+26)*dpr ? 'right' : 'center';
+    octx.fillText(fmtAxis(ts, otk.step), xx, plotBot+5*dpr); });
 }
 
 const tsAt = clientX => { const r=c.getBoundingClientRect();

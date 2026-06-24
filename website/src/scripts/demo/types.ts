@@ -207,6 +207,13 @@ export interface ChartData {
 export interface ChartOptions {
   /** notified as the cursor moves so main.ts can update a textual readout. */
   onHover?: (info: HoverInfo | null) => void;
+  /**
+   * Opt-in time navigation (used by `dtk tune`, not the fixed-window landing
+   * demo): mouse-wheel zoom, drag-to-pan, double-click reset and a bottom
+   * navigator/minimap strip with the current-view window + alert ticks. When
+   * false/absent the whole series is fitted to the canvas width as before.
+   */
+  navigable?: boolean;
 }
 
 export interface ChartHandle {

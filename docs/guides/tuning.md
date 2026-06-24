@@ -55,13 +55,33 @@ In the browser you can adjust:
   half-life (in points) when exponential.
 - **Detrend** — none / linear (robust split-median slope).
 - **Smoothing** — none / EMA / SMA.
-- **Seasonality conditioning** — toggle each seasonality column the metric has;
-  optionally conjoin the selected columns into one group.
+- **Seasonality groups** — assign each seasonality column the metric has to a
+  group (Off, G1, G2, …). Columns in the **same** group are conjoined into one
+  seasonal key (e.g. `dow`×`hour`); **separate** groups each apply their own
+  correction. This is the full `seasonality_components` grouping — you can mix one
+  conjunctive group with other standalone columns, not just "all-separate" or
+  "all-in-one".
 - **Alert: consecutive anomalies** — the alert window (`consecutive_anomalies`).
 
-The confidence band, the flagged points and the would-fire alert markers update
-on every change, and the "effective config" readout shows exactly what will be
-written.
+Every control carries an **ⓘ tooltip** explaining what it does. The confidence
+band, the flagged points and the would-fire alert markers update on every change
+(a small **computing…** spinner shows while a recompute is in flight), a **legend**
+labels the series / band / center / anomalies / alerts, and the "effective config"
+readout shows exactly what will be written.
+
+### Navigate a dense series
+
+The chart is **zoomable** — scroll to zoom where you point, **drag to pan**,
+double-click to reset, and drag the **navigator strip** below the chart to move
+the view (the strip shows the whole series, the alert firings as red ticks, and a
+time axis). Zooming in lets you inspect alert quality region-by-region on a long,
+busy metric.
+
+A **Points shown** slider above the chart **trims the active sample** to the most
+recent N points. Recompute cost grows with *points × window*, so once you can see
+a shorter period is enough, trimming it makes every knob-drag noticeably faster
+(and the period easier to read). Trimming only affects the live view — it never
+changes what **Apply** writes.
 
 ## Apply the config back
 

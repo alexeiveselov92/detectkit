@@ -1,4 +1,7 @@
-# detectkit
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/detectkit-lockup-dark.svg">
+  <img src="assets/detectkit-lockup.svg" alt="detectkit" width="260">
+</picture>
 
 [![PyPI version](https://img.shields.io/pypi/v/detectkit.svg)](https://pypi.org/project/detectkit/)
 [![Python](https://img.shields.io/pypi/pyversions/detectkit.svg)](https://pypi.org/project/detectkit/)

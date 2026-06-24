@@ -78,6 +78,16 @@ class _DetectStepMixin(_TaskManagerBase):
                 actual_from = max(actual_from, start_time) if actual_from else start_time
 
             actual_from = to_naive_utc(actual_from)
+
+            # No lower bound from --from, the resume point, or the detector's
+            # `start_time`: a first-ever detect for a detector that omits
+            # `start_time` (every `dtk autotune` config does). Fall back to the
+            # metric's load start so the run detects across all loaded history,
+            # instead of mistaking "no lower bound" for "nothing to do" and
+            # silently reporting "already up to date" without ever detecting.
+            if actual_from is None:
+                actual_from = self._detect_fallback_start(config)
+
             if not actual_from or actual_from >= actual_to:
                 click.echo("  │   Nothing to detect (already up to date)")
                 continue
@@ -200,3 +210,17 @@ class _DetectStepMixin(_TaskManagerBase):
             )
         )
         return {"anomalies_count": anomalies_count}
+
+    def _detect_fallback_start(self, config: MetricConfig) -> datetime | None:
+        """Lower bound for a first-ever detect when nothing else pins it.
+
+        Mirrors the LOAD step: prefer the configured ``loading_start_time``,
+        else the metric's earliest stored datapoint. Returns ``None`` only when
+        the metric has no configured start and no data at all (genuinely nothing
+        to detect).
+        """
+        if config.loading_start_time:
+            return to_naive_utc(
+                datetime.fromisoformat(config.loading_start_time.replace("Z", "+00:00"))
+            )
+        return to_naive_utc(self.internal.get_first_datapoint_timestamp(config.name))

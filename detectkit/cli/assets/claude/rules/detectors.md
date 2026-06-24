@@ -67,7 +67,7 @@ expected interval for the current point.
     half_life: null          # exponential half-life: int points or "3d"/"12h"
     detrend: null            # null | linear
     # --- execution (NOT hashed) ---
-    start_time: "2024-01-01 00:00:00"   # when detection begins
+    start_time: "2024-01-01 00:00:00"   # optional; when detection begins (default: loading_start_time)
     batch_size: 500
 ```
 

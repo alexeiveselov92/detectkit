@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:#E7E3DA;color:#1B1916;font-family:'Schibsted Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  ::selection{background:#D15B36;color:#FBF9F3}
+  @keyframes dtkDraw{from{stroke-dashoffset:1400}to{stroke-dashoffset:0}}
+  @keyframes dtkPop{0%{opacity:0;transform:translateY(10px) scale(.96)}100%{opacity:1;transform:none}}
+  @keyframes dtkPulse{0%,100%{opacity:1}50%{opacity:.3}}
+  @keyframes dtkRing{0%{transform:scale(.6);opacity:.7}100%{transform:scale(1.6);opacity:0}}
+  .dtkLine{stroke-dasharray:1400;animation:dtkDraw 1.7s cubic-bezier(.65,.05,.36,1) forwards}
+  .dtkAnom{animation:dtkPulse 1.9s ease-in-out 1.6s infinite both}
+  .dtkRing{transform-origin:center;transform-box:fill-box;animation:dtkRing 1.9s ease-out 1.6s infinite both}
+  .dtkCard{animation:dtkPop .6s cubic-bezier(.2,.7,.3,1) 1.5s both}
+</style>
+</helmet>
+
+<!-- ============================================================= -->
+<!-- ====================== FULL LANDING ========================= -->
+<!-- ============================================================= -->
+<div data-screen-label="Landing" style="background:#F5F1E8;max-width:1180px;margin:18px auto;border:1px solid #DCD5C6;border-radius:18px;overflow:hidden;box-shadow:0 1px 3px #00000010">
+
+  <!-- ===== NAV ===== -->
+  <div style="display:flex;align-items:center;gap:14px;padding:20px 40px;border-bottom:1px solid #E6E0D4;background:#F5F1E8;position:relative;z-index:2">
+    <svg width="30" height="30" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+    <span style="font-size:18px;font-weight:700;letter-spacing:-.02em">detectkit</span>
+    <div style="margin-left:30px;display:flex;gap:26px;font-size:14.5px;color:#6E675B;font-weight:500"><span>Docs</span><span>Detectors</span><span>Alerting</span><span>Changelog</span></div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:18px"><span style="display:inline-flex;align-items:center;gap:6px;font-size:14.5px;color:#6E675B;font-weight:500"><svg width="16" height="16" viewBox="0 0 24 24" fill="#6E675B"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.5 11.5 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222 0 1.606-.014 2.898-.014 3.293 0 .322.216.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>GitHub</span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;background:#1B1916;color:#FBF9F3;padding:9px 16px;border-radius:9px">pip install detectkit</span></div>
+  </div>
+
+  <!-- ===== HERO (Direction A) ===== -->
+  <div style="display:grid;grid-template-columns:1fr 1.08fr;gap:44px;padding:64px 40px 52px;align-items:center">
+    <div>
+      <div style="display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#B4471F;background:#D15B3615;border:1px solid #D15B3633;padding:6px 12px;border-radius:20px;margin-bottom:22px"><span style="width:7px;height:7px;border-radius:50%;background:#2E9E73"></span>open source · python</div>
+      <h1 style="font-size:56px;line-height:1.01;letter-spacing:-.035em;font-weight:800;margin:0 0 20px">Catch the spike<br>before it pages you.</h1>
+      <p style="font-size:18px;line-height:1.55;color:#6E675B;margin:0 0 28px;max-width:45ch">Time-series anomaly detection and alerting with a dbt-like project layout. A metric is a SQL query plus a detector in YAML — run it with one command.</p>
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:26px">
+        <span style="font-size:15px;font-weight:600;background:#D15B36;color:#FBF9F3;padding:14px 26px;border-radius:11px">Get started</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;color:#1B1916;padding:14px 20px;border-radius:11px;border:1px solid #D8D1C2;background:#FBF9F3">pip install detectkit</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;font-size:13.5px;color:#6E675B;flex-wrap:wrap">
+        <span style="display:inline-flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="#D15B36"><path d="M12 .587l3.668 7.431 8.2 1.193-5.934 5.787 1.401 8.169L12 18.896l-7.335 3.871 1.401-8.169L.132 9.211l8.2-1.193z"/></svg><strong style="color:#1B1916">1.2k</strong> stars</span>
+        <span style="width:4px;height:4px;border-radius:50%;background:#C9C2B4"></span>
+        <span><strong style="color:#1B1916">48k</strong> installs/mo</span>
+        <span style="width:4px;height:4px;border-radius:50%;background:#C9C2B4"></span>
+        <span>MIT licensed</span>
+      </div>
+    </div>
+    <div style="position:relative">
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:16px;padding:22px 22px 16px;box-shadow:0 24px 50px -28px #1b191655">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#1B1916">api_error_rate</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384">last 24h · 5min</span>
+        </div>
+        <svg viewBox="0 0 520 300" width="100%" style="display:block">
+          <line x1="30" y1="90" x2="500" y2="90" stroke="#EBE5D9" stroke-width="1"/>
+          <line x1="30" y1="150" x2="500" y2="150" stroke="#EBE5D9" stroke-width="1"/>
+          <line x1="30" y1="210" x2="500" y2="210" stroke="#EBE5D9" stroke-width="1"/>
+          <path d="M30,150 L80,148 L130,150 L180,147 L230,150 L280,148 L330,151 L380,149 L430,150 L500,149 L500,206 L430,205 L380,206 L330,204 L280,206 L230,205 L180,206 L130,204 L80,206 L30,205 Z" fill="#D15B3612"/>
+          <path d="M30,150 L500,149" fill="none" stroke="#D15B3640" stroke-width="1.2" stroke-dasharray="3 4"/>
+          <path d="M30,205 L500,206" fill="none" stroke="#D15B3640" stroke-width="1.2" stroke-dasharray="3 4"/>
+          <path class="dtkLine" d="M30,178 L60,182 L90,175 L120,184 L150,176 L180,186 L210,178 L240,182 L270,176 L300,184 L330,179 L360,188 L388,182 L405,178 L420,150 L435,96 L450,58 L466,120 L480,168 L500,178" fill="none" stroke="#1B1916" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle class="dtkRing" cx="450" cy="58" r="6" fill="none" stroke="#D63232" stroke-width="2"/>
+          <circle class="dtkAnom" cx="450" cy="58" r="6" fill="#D63232"/>
+        </svg>
+        <div style="display:flex;align-items:center;gap:16px;margin-top:6px;padding-left:30px">
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#6E675B"><span style="width:14px;height:2.5px;background:#1B1916;border-radius:2px"></span>metric</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#6E675B"><span style="width:14px;height:9px;background:#D15B3625;border:1px solid #D15B3640;border-radius:2px"></span>expected range</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#6E675B"><span style="width:9px;height:9px;border-radius:50%;background:#D63232"></span>anomaly</span>
+        </div>
+      </div>
+      <div class="dtkCard" style="position:absolute;right:-6px;bottom:-18px;background:#1B1916;color:#FBF9F3;border-radius:12px;padding:13px 16px;box-shadow:0 18px 40px -18px #1b1916cc;display:flex;gap:11px;align-items:center;max-width:290px">
+        <svg width="30" height="30" viewBox="0 0 100 100" style="border-radius:8px;flex:none"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+        <div style="min-width:0">
+          <div style="font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:#E8806F"></span>Anomaly · api_error_rate</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9A9384;margin-top:3px">value 4.2 · expected ≤ 1.1 → Slack</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TRUST / WORKS-WITH BAND ===== -->
+  <div style="border-top:1px solid #E6E0D4;background:#FBF9F3">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid #E6E0D4">
+      <div style="padding:22px 30px;border-right:1px solid #E6E0D4"><div style="font-size:24px;font-weight:800;letter-spacing:-.02em">1.2k</div><div style="font-size:12.5px;color:#9A9384;font-family:'JetBrains Mono',monospace;margin-top:2px">GitHub stars</div></div>
+      <div style="padding:22px 30px;border-right:1px solid #E6E0D4"><div style="font-size:24px;font-weight:800;letter-spacing:-.02em">48k<span style="font-size:14px;color:#9A9384">/mo</span></div><div style="font-size:12.5px;color:#9A9384;font-family:'JetBrains Mono',monospace;margin-top:2px">PyPI installs</div></div>
+      <div style="padding:22px 30px;border-right:1px solid #E6E0D4"><div style="font-size:24px;font-weight:800;letter-spacing:-.02em">3</div><div style="font-size:12.5px;color:#9A9384;font-family:'JetBrains Mono',monospace;margin-top:2px">databases supported</div></div>
+      <div style="padding:22px 30px"><div style="font-size:24px;font-weight:800;letter-spacing:-.02em">MIT</div><div style="font-size:12.5px;color:#9A9384;font-family:'JetBrains Mono',monospace;margin-top:2px">open source · Python 3.10+</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:32px;padding:20px 40px;flex-wrap:wrap">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#9A9384;font-weight:600">Works with</span>
+      <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:center">
+        <div style="display:flex;align-items:center;gap:9px"><span style="width:28px;height:28px;border-radius:8px;background:#1B1916;display:flex;align-items:center;justify-content:center;flex:none"><svg width="15" height="15" viewBox="0 0 24 24" fill="#FAFF00"><path d="M21.333 10H24v4h-2.667ZM16 1.335h2.667v21.33H16Zm-5.333 0h2.666v21.33h-2.666ZM0 22.665V1.335h2.667v21.33zm5.333-21.33H8v21.33H5.333Z"/></svg></span><span style="font-size:15px;font-weight:700;letter-spacing:-.01em">ClickHouse</span></div>
+        <div style="display:flex;align-items:center;gap:9px"><span style="width:28px;height:28px;border-radius:8px;background:#336791;display:flex;align-items:center;justify-content:center;flex:none"><svg width="17" height="17" viewBox="0 0 24 24" fill="#fff"><path d="M17.128 0a10.134 10.134 0 0 0-2.755.403l-.063.018a10.922 10.922 0 0 0-1.71-.135C10.76.27 9.475.733 8.49 1.555a13.95 13.95 0 0 0-1.014-.06c-1.45 0-2.642.434-3.443 1.254-1.078 1.105-1.097 2.81-.99 4.013.013.143.027.286.043.428-.013.143-.027.286-.04.428-.107 1.204-.088 2.908.99 4.013.16.164.343.31.546.437.05.36.117.71.205 1.05.27 1.054.69 1.97 1.243 2.71l.001.001c.49.658 1.12 1.16 1.85 1.466l.045.018c-.01.13-.018.26-.022.39-.03.93.18 1.62.633 2.05.4.38.94.57 1.61.57.27 0 .56-.03.87-.1.97-.21 1.39-.64 1.55-1.58.08-.47.22-1.56.29-2.22.01-.04.02-.06.03-.07.01 0 .04-.03.23.02h.02l.14.01c.46.02 1.04-.08 1.38-.23.28-.13.98-.56.86-.91-.29-.86-.07.04-.05-.36 1.34-2.04 2.45-4.51 3.03-6.81.27-1.05.8-3.52.12-4.72a1.56 1.56 0 0 0-.15-.23C19.7.91 17.81.02 15.52 0z"/></svg></span><span style="font-size:15px;font-weight:700;color:#336791;letter-spacing:-.01em">PostgreSQL</span></div>
+        <div style="display:flex;align-items:center;gap:9px"><span style="width:28px;height:28px;border-radius:8px;background:#00758F;display:flex;align-items:center;justify-content:center;flex:none"><svg width="17" height="17" viewBox="0 0 24 24" fill="#fff"><path d="M16.405 5.501c-.115 0-.193.014-.274.033v.013h.014c.054.104.146.18.214.273.054.107.1.214.154.32l.014-.015c.094-.066.14-.172.14-.333-.04-.047-.046-.094-.08-.14-.04-.067-.126-.1-.18-.153zM5.77 18.695h-.927a50.854 50.854 0 0 0-.27-4.41h-.008l-1.41 4.41H2.45l-1.4-4.41h-.01a72.892 72.892 0 0 0-.195 4.41H0c.055-1.966.192-3.81.41-5.53h1.15l1.335 4.064h.008l1.347-4.064h1.095c.242 2.015.384 3.86.428 5.53z"/></svg></span><span style="font-size:15px;font-weight:700;color:#00758F;letter-spacing:-.01em">MySQL</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== FEATURE CARDS ===== -->
+  <div style="padding:56px 40px 12px">
+    <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:6px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;font-weight:600">how it works</span></div>
+    <h2 style="font-size:32px;letter-spacing:-.03em;font-weight:800;margin:0 0 28px;max-width:20ch">Three pieces, one project tree.</h2>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px">
+      <!-- card query -->
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:16px;padding:26px 26px 24px;display:flex;flex-direction:column">
+        <div style="height:64px;border-radius:10px;background:#1B1916;display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:20px;font-family:'JetBrains Mono',monospace;font-size:13px"><span style="color:#9FB8C4">SELECT</span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D15B36" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span style="color:#7BC9A6">numpy[]</span></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;margin-bottom:8px">// query</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px;letter-spacing:-.01em">SQL → time series</div>
+        <div style="font-size:14.5px;color:#6E675B;line-height:1.5">Any query on ClickHouse, PostgreSQL or MySQL becomes a metric. No SDK, no agents — your warehouse is the source of truth.</div>
+      </div>
+      <!-- card detectors -->
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:16px;padding:26px 26px 24px;display:flex;flex-direction:column">
+        <div style="height:64px;border-radius:10px;background:#1B1916;display:flex;align-items:center;justify-content:center;margin-bottom:20px;overflow:hidden">
+          <svg viewBox="0 0 200 64" width="100%" height="64" preserveAspectRatio="none"><path d="M0,40 L200,39 L200,52 L0,53 Z" fill="#D15B3622"/><path d="M0,46 L40,48 L70,44 L95,47 L112,30 L124,18 L140,42 L170,46 L200,45" fill="none" stroke="#FBF9F3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="124" cy="18" r="4.5" fill="#E8806F"/></svg>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;margin-bottom:8px">// detectors</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px;letter-spacing:-.01em">Z-Score · MAD · IQR</div>
+        <div style="font-size:14.5px;color:#6E675B;line-height:1.5">Robust statistics learn a corridor of normal — with seasonality, trends and recency weighting — and flag the step outside it.</div>
+      </div>
+      <!-- card channels -->
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:16px;padding:26px 26px 24px;display:flex;flex-direction:column">
+        <div style="height:64px;border-radius:10px;background:#1B1916;display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:20px">
+          <svg width="22" height="22" viewBox="0 0 24 24"><path fill="#E01E5A" d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z"/><path fill="#36C5F0" d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z"/><path fill="#2EB67D" d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.685 8.834a2.528 2.528 0 0 1-2.521 2.521 2.528 2.528 0 0 1-2.521-2.521V2.522A2.528 2.528 0 0 1 15.164 0a2.528 2.528 0 0 1 2.521 2.522v6.312z"/><path fill="#ECB22E" d="M15.164 18.956a2.528 2.528 0 0 1 2.521 2.522A2.528 2.528 0 0 1 15.164 24a2.528 2.528 0 0 1-2.521-2.522v-2.522h2.521zM15.164 17.685a2.528 2.528 0 0 1-2.521-2.521 2.528 2.528 0 0 1 2.521-2.521h6.313A2.528 2.528 0 0 1 24 15.164a2.528 2.528 0 0 1-2.523 2.521h-6.313z"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FBF9F3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4.5" width="20" height="15" rx="2.5"/><path d="m3 6 9 6 9-6"/></svg>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;margin-bottom:8px">// channels</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px;letter-spacing:-.01em">Slack · Mattermost · TG</div>
+        <div style="font-size:14.5px;color:#6E675B;line-height:1.5">Direction-aware quorum, cooldown, recovery and no-data alerts — posted with the rule that fired up top and evidence below.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ONE RUN ===== -->
+  <div style="padding:60px 40px 8px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;font-weight:600;margin-bottom:6px">dtk run</div>
+    <h2 style="font-size:32px;letter-spacing:-.03em;font-weight:800;margin:0 0 8px;max-width:22ch">Load → detect → alert, in one command.</h2>
+    <p style="font-size:16px;line-height:1.55;color:#6E675B;max-width:60ch;margin:0 0 30px">Idempotent and resumable: it picks up from the last saved point, so a cron every five minutes just works.</p>
+
+    <!-- step diagram -->
+    <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:stretch;gap:0;margin-bottom:24px">
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:14px;padding:22px 24px">
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px"><span style="width:9px;height:9px;border-radius:50%;background:#36A64F"></span><span style="font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:700;letter-spacing:.04em;color:#1B1916">LOAD</span></div>
+        <div style="font-size:14.5px;color:#6E675B;line-height:1.5">Run the SQL on your warehouse, in batches, from the last checkpoint.</div>
+      </div>
+      <div style="display:flex;align-items:center;padding:0 14px;color:#C9C2B4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:14px;padding:22px 24px">
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px"><span style="width:9px;height:9px;border-radius:50%;background:#F0AD4E"></span><span style="font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:700;letter-spacing:.04em;color:#1B1916">DETECT</span></div>
+        <div style="font-size:14.5px;color:#6E675B;line-height:1.5">Each detector scores points against its learned corridor of normal.</div>
+      </div>
+      <div style="display:flex;align-items:center;padding:0 14px;color:#C9C2B4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+      <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:14px;padding:22px 24px">
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px"><span style="width:9px;height:9px;border-radius:50%;background:#D15B36"></span><span style="font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:700;letter-spacing:.04em;color:#1B1916">ALERT</span></div>
+        <div style="font-size:14.5px;color:#6E675B;line-height:1.5">Quorum met → post to chat with the rule up top, recovery on the way back.</div>
+      </div>
+    </div>
+
+    <!-- compact terminal -->
+    <div style="background:#211E1A;border-radius:14px;overflow:hidden;border:1px solid #332F29">
+      <div style="display:flex;align-items:center;gap:8px;padding:13px 18px;border-bottom:1px solid #332F29"><span style="width:10px;height:10px;border-radius:50%;background:#E5675B"></span><span style="width:10px;height:10px;border-radius:50%;background:#E0A23B"></span><span style="width:10px;height:10px;border-radius:50%;background:#2E9E73"></span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#7C766A;margin-left:8px">dtk run --select api_error_rate</span></div>
+      <div style="margin:0;padding:20px 22px;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.65;color:#C9C2B4;overflow-x:auto">
+        <sc-for list="{{ logRows }}" as="row" hint-placeholder-count="20">
+          <div style="min-height:1.2em;white-space:pre"><sc-for list="{{ row }}" as="seg" hint-placeholder-count="1"><span style="{{ seg.style }}">{{ seg.text }}</span></sc-for></div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== DETECTORS (dark feature) ===== -->
+  <div style="margin:60px 0 0;background:#1B1916;color:#FBF9F3;padding:56px 40px;position:relative;overflow:hidden">
+    <div style="position:absolute;inset:0;background-image:linear-gradient(#FFFFFF07 1px,transparent 1px),linear-gradient(90deg,#FFFFFF07 1px,transparent 1px);background-size:36px 36px"></div>
+    <div style="position:relative;display:grid;grid-template-columns:1fr 1.05fr;gap:48px;align-items:start">
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#E8A07F;font-weight:600;margin-bottom:8px">detectors</div>
+        <h2 style="font-size:34px;letter-spacing:-.03em;font-weight:800;margin:0 0 16px;color:#FBF9F3">Robust statistics,<br>not magic.</h2>
+        <p style="font-size:16px;line-height:1.6;color:#A8A192;margin:0 0 24px;max-width:46ch">Every detector learns a <strong style="color:#FBF9F3">corridor of normal</strong> from recent history — recomputed per window with seasonality and recency weighting. Switch the detector to see the metric shape it’s built for.</p>
+        <div style="display:flex;gap:8px;margin-bottom:24px">
+          <sc-for list="{{ detTabs }}" as="t" hint-placeholder-count="3">
+            <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.code }}</button>
+          </sc-for>
+        </div>
+        <div style="font-size:17px;font-weight:700;color:#FBF9F3;margin-bottom:8px">{{ activeName }}</div>
+        <p style="font-size:14.5px;line-height:1.55;color:#A8A192;margin:0 0 20px;max-width:46ch">{{ activeDesc }}</p>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <div style="flex:1.4;min-width:200px">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#7C766A;font-weight:600;margin-bottom:8px">Corridor</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:13.5px;font-weight:600;color:#FBF9F3;background:#211E1A;border:1px solid #332F29;border-radius:9px;padding:11px 13px">{{ activeFormula }}</div>
+          </div>
+          <div style="flex:1;min-width:150px">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#7C766A;font-weight:600;margin-bottom:8px">Best for</div>
+            <div style="font-size:13.5px;color:#A8A192;line-height:1.45">{{ activeBest }}</div>
+          </div>
+        </div>
+      </div>
+      <div style="background:#211E1A;border:1px solid #332F29;border-radius:16px;padding:24px 26px 22px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#C9C2B4;font-weight:600">corridor of normal · {{ detCode }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#7C766A">{{ detThreshold }}</span></div>
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:2px">
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#8A8475"><span style="width:14px;height:2.5px;background:#FBF9F3;border-radius:2px"></span>metric</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#8A8475"><span style="width:14px;height:9px;background:#D15B3625;border:1px solid #D15B3655;border-radius:2px"></span>expected range</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#8A8475"><span style="width:9px;height:9px;border-radius:50%;background:#E8806F"></span>anomaly</span>
+        </div>
+        <svg viewBox="0 0 900 360" width="100%" style="display:block">
+          <sc-for list="{{ detGrid }}" as="g" hint-placeholder-count="3">
+            <line x1="{{ g.x0 }}" y1="{{ g.y }}" x2="{{ g.x1 }}" y2="{{ g.y }}" stroke="#FFFFFF0D" stroke-width="1"></line>
+          </sc-for>
+          <path d="{{ detBand }}" fill="#D15B3618"></path>
+          <path d="{{ detUpper }}" fill="none" stroke="#D15B3666" stroke-width="1.4" stroke-dasharray="3 4"></path>
+          <path d="{{ detLower }}" fill="none" stroke="#D15B3666" stroke-width="1.4" stroke-dasharray="3 4"></path>
+          <path d="{{ detCenter }}" fill="none" stroke="#D15B3640" stroke-width="1.2" stroke-dasharray="2 6"></path>
+          <path d="{{ detLine }}" fill="none" stroke="#FBF9F3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
+          <line x1="{{ detAnom.x }}" y1="{{ detAnom.lineTop }}" x2="{{ detAnom.x }}" y2="{{ detAnom.lineBot }}" stroke="#E8806F" stroke-width="1.3" stroke-dasharray="2 3"></line>
+          <g transform="{{ detAnom.boxT }}">
+            <rect x="0" y="0" width="172" height="30" rx="8" fill="#2A2620" stroke="#D15B3640" stroke-width="1"></rect>
+            <text x="13" y="19.5" font-family="'JetBrains Mono',monospace" font-size="13"><tspan fill="#E8806F" font-weight="700">anomaly</tspan><tspan fill="#7C766A">  ·  </tspan><tspan fill="#FBF9F3" font-weight="600">{{ detAnom.label }}</tspan></text>
+          </g>
+          <circle class="dtkRing" cx="{{ detAnom.x }}" cy="{{ detAnom.y }}" r="11" fill="none" stroke="#D63232" stroke-width="2"></circle>
+          <circle class="dtkAnom" cx="{{ detAnom.x }}" cy="{{ detAnom.y }}" r="6" fill="#E8806F" stroke="#211E1A" stroke-width="2.5"></circle>
+          <line x1="{{ detAxis.x0 }}" y1="{{ detAxis.y }}" x2="{{ detAxis.x1 }}" y2="{{ detAxis.y }}" stroke="#3A352E" stroke-width="1.4"></line>
+          <text x="{{ detAxis.x0 }}" y="{{ detAxis.ty }}" font-family="'JetBrains Mono',monospace" font-size="12" fill="#6E675B">7 days ago</text>
+          <text x="{{ detAxis.x1 }}" y="{{ detAxis.ty }}" text-anchor="end" font-family="'JetBrains Mono',monospace" font-size="12" fill="#6E675B">now</text>
+        </svg>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#7C766A;margin-top:8px;line-height:1.6">// newer points weigh more — the band tracks drift,<br>// then the point that steps outside is flagged.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ALERTING (interactive) ===== -->
+  <div style="padding:60px 40px 8px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;font-weight:600;margin-bottom:6px">alerting</div>
+    <h2 style="font-size:32px;letter-spacing:-.03em;font-weight:800;margin:0 0 8px;max-width:24ch">The same alert, native to every channel.</h2>
+    <p style="font-size:16px;line-height:1.55;color:#6E675B;max-width:62ch;margin:0 0 26px">Each message leads with the project name and the rule that fired, evidence below — rendered the way that channel formats it. Switch the channel and the event.</p>
+
+    <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:center;margin-bottom:26px">
+      <div style="display:flex;gap:6px;background:#EDE7DA;padding:5px;border-radius:11px">
+        <button onClick="{{ slackTab.onClick }}" style="{{ slackTab.style }}"><span style="display:flex;align-items:center;gap:7px"><svg width="14" height="14" viewBox="0 0 24 24"><path fill="#E01E5A" d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z"/><path fill="#36C5F0" d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z"/><path fill="#2EB67D" d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.685 8.834a2.528 2.528 0 0 1-2.521 2.521 2.528 2.528 0 0 1-2.521-2.521V2.522A2.528 2.528 0 0 1 15.164 0a2.528 2.528 0 0 1 2.521 2.522v6.312z"/><path fill="#ECB22E" d="M15.164 18.956a2.528 2.528 0 0 1 2.521 2.522A2.528 2.528 0 0 1 15.164 24a2.528 2.528 0 0 1-2.521-2.522v-2.522h2.521zM15.164 17.685a2.528 2.528 0 0 1-2.521-2.521 2.528 2.528 0 0 1 2.521-2.521h6.313A2.528 2.528 0 0 1 24 15.164a2.528 2.528 0 0 1-2.523 2.521h-6.313z"/></svg>Slack</span></button>
+        <button onClick="{{ mmTab.onClick }}" style="{{ mmTab.style }}"><span style="display:flex;align-items:center;gap:7px"><svg width="14" height="14" viewBox="0 0 24 24" fill="#0058CC"><path d="M12.081 0C7.048-.034 2.339 3.125.637 8.153c-2.125 6.276 1.24 13.086 7.516 15.21 6.276 2.125 13.086-1.24 15.21-7.516 1.727-5.1-.172-10.552-4.311-13.557l.126 2.547c2.065 2.282 2.88 5.512 1.852 8.549-1.534 4.532-6.594 6.915-11.3 5.321-4.708-1.593-7.28-6.559-5.745-11.092 1.031-3.046 3.655-5.121 6.694-5.67l1.642-1.94A4.87 4.87 0 0 0 12.08 0z"/></svg>Mattermost</span></button>
+        <button onClick="{{ tgTab.onClick }}" style="{{ tgTab.style }}"><span style="display:flex;align-items:center;gap:7px"><svg width="14" height="14" viewBox="0 0 24 24" fill="#26A5E4"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>Telegram</span></button>
+        <button onClick="{{ emailTab.onClick }}" style="{{ emailTab.style }}"><span style="display:flex;align-items:center;gap:7px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D15B36" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4.5" width="20" height="15" rx="2.5"/><path d="m3 6 9 6 9-6"/></svg>Email</span></button>
+      </div>
+      <div style="display:flex;gap:6px;background:#EDE7DA;padding:5px;border-radius:11px">
+        <sc-for list="{{ severities }}" as="sv" hint-placeholder-count="2">
+          <button onClick="{{ sv.onClick }}" style="{{ sv.style }}">{{ sv.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="background:{{ chatBg }};border:1px solid #E6E0D4;border-radius:16px;padding:30px;min-height:280px">
+      <sc-if value="{{ isSlack }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width:640px;display:flex;gap:12px;font-family:'Schibsted Grotesk',sans-serif">
+          <svg width="36" height="36" viewBox="0 0 100 100" style="border-radius:8px;flex:none"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-weight:700;font-size:15px;color:#1D1C1D">{{ botName }}</span><span style="font-size:10px;font-weight:700;background:#E8E8E8;color:#616061;padding:1px 5px;border-radius:3px;letter-spacing:.03em">APP</span><span style="font-size:12px;color:#616061">12:04</span></div>
+            <div style="display:flex;background:#fff;border-radius:6px;overflow:hidden;border:1px solid #E8E8E8;box-shadow:0 1px 1px #0000000a">
+              <div style="width:4px;background:{{ attachmentColor }};flex:none"></div>
+              <div style="padding:12px 15px;flex:1;min-width:0">
+                <div style="font-weight:700;font-size:15px;color:#1D1C1D;margin-bottom:6px">{{ title }}</div>
+                <div style="font-size:13.5px;line-height:1.55;color:#1D1C1D;white-space:pre-wrap;word-break:break-word">{{ webhookBody }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isMM }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width:640px;display:flex;gap:12px;font-family:'Schibsted Grotesk',sans-serif">
+          <svg width="36" height="36" viewBox="0 0 100 100" style="border-radius:50%;flex:none"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-weight:700;font-size:15px;color:#3D3C40">{{ botName }}</span><span style="font-size:10px;font-weight:600;background:#1C58D9;color:#fff;padding:1px 6px;border-radius:3px">BOT</span><span style="font-size:12px;color:#A4A6AA">12:04</span></div>
+            <div style="border-left:4px solid {{ attachmentColor }};background:#fff;border-radius:0 6px 6px 0;padding:12px 16px;box-shadow:0 1px 3px #0000000f">
+              <div style="font-weight:700;font-size:15px;color:#3D3C40;margin-bottom:6px">{{ title }}</div>
+              <div style="font-size:13.5px;line-height:1.55;color:#3D3C40;white-space:pre-wrap;word-break:break-word">{{ webhookBody }}</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isTg }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width:480px;font-family:'Schibsted Grotesk',sans-serif">
+          <div style="display:flex;gap:10px;align-items:flex-end">
+            <svg width="34" height="34" viewBox="0 0 100 100" style="border-radius:50%;flex:none"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+            <div style="background:#fff;border-radius:14px 14px 14px 4px;padding:11px 14px;box-shadow:0 1px 2px #0000001a;max-width:400px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="font-weight:700;font-size:13.5px;color:#D15B36">detectkit</span><svg width="14" height="14" viewBox="0 0 24 24" fill="#3390EC"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg></div>
+              <div style="font-size:13.5px;line-height:1.5;color:#222;white-space:pre-wrap;word-break:break-word">{{ tgBody }}</div>
+              <div style="text-align:right;font-size:11px;color:#A8A8A8;margin-top:4px">12:04</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isEmail }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width:640px;font-family:'Schibsted Grotesk',sans-serif;background:#fff;border:1px solid #E6E0D4;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px #0000000f">
+          <div style="padding:16px 20px;border-bottom:1px solid #EFEDE6">
+            <div style="font-size:17px;font-weight:700;color:#1B1916;margin-bottom:12px">{{ title }}</div>
+            <div style="display:flex;gap:11px;align-items:center">
+              <svg width="34" height="34" viewBox="0 0 100 100" style="border-radius:50%;flex:none"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+              <div style="min-width:0">
+                <div style="font-size:14px;color:#1B1916"><span style="font-weight:600">detectkit alerts</span> <span style="color:#868686">&lt;alerts<span>&#64;</span>detectkit.dev&gt;</span></div>
+                <div style="font-size:12.5px;color:#868686">to team<span>&#64;</span>example.com · 12:04</div>
+              </div>
+            </div>
+          </div>
+          <div style="padding:18px 20px;font-size:13.5px;line-height:1.6;color:#1B1916;white-space:pre-wrap;word-break:break-word">{{ emailBody }}</div>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <!-- ===== CTA BAND ===== -->
+  <div style="padding:60px 40px">
+    <div style="background:#1B1916;border-radius:20px;padding:56px 48px;position:relative;overflow:hidden;text-align:center">
+      <div style="position:absolute;left:0;right:0;top:30px;opacity:.5"><svg viewBox="0 0 1100 120" width="100%" preserveAspectRatio="none" style="display:block"><path d="M0,80 L160,82 L320,76 L460,84 L560,40 L610,14 L700,72 L860,80 L1100,78" fill="none" stroke="#D15B3640" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div style="position:relative">
+        <h2 style="font-size:38px;letter-spacing:-.03em;font-weight:800;margin:0 0 12px;color:#FBF9F3">Ship your first detector<br>in five minutes.</h2>
+        <p style="font-size:17px;line-height:1.55;color:#A8A192;margin:0 0 28px;max-width:48ch;margin-left:auto;margin-right:auto">SQL + YAML, one command. No agents, no dashboards to babysit.</p>
+        <div style="display:flex;gap:12px;align-items:center;justify-content:center">
+          <span style="font-size:15px;font-weight:600;background:#D15B36;color:#FBF9F3;padding:14px 28px;border-radius:11px">Get started</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;color:#FBF9F3;padding:14px 22px;border-radius:11px;border:1px solid #443e36"><span style="color:#2E9E73">$</span> pip install detectkit</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== FOOTER ===== -->
+  <div style="border-top:1px solid #E6E0D4;background:#FBF9F3;padding:48px 40px 36px">
+    <div style="display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:32px">
+      <div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><svg width="28" height="28" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg><span style="font-size:17px;font-weight:700;letter-spacing:-.02em">detectkit</span></div>
+        <p style="font-size:14px;line-height:1.55;color:#6E675B;margin:0;max-width:34ch">Time-series anomaly detection and alerting with a dbt-like project layout.</p>
+      </div>
+      <div><div style="font-size:13px;font-weight:700;margin-bottom:14px">Docs</div><div style="display:flex;flex-direction:column;gap:9px;font-size:14px;color:#6E675B"><span>Overview</span><span>Quickstart</span><span>Configuration</span><span>CLI reference</span></div></div>
+      <div><div style="font-size:13px;font-weight:700;margin-bottom:14px">Reference</div><div style="display:flex;flex-direction:column;gap:9px;font-size:14px;color:#6E675B"><span>Detectors</span><span>Alerting</span><span>Examples</span><span>Changelog</span></div></div>
+      <div><div style="font-size:13px;font-weight:700;margin-bottom:14px">Project</div><div style="display:flex;flex-direction:column;gap:9px;font-size:14px;color:#6E675B"><span>GitHub</span><span>PyPI</span><span>Issues</span><span>License (MIT)</span></div></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:36px;padding-top:20px;border-top:1px solid #E6E0D4;font-size:12.5px;color:#9A9384;font-family:'JetBrains Mono',monospace;flex-wrap:wrap;gap:10px"><span>© 2026 detectkit · MIT License</span><span>Built with Astro + Starlight</span></div>
+  </div>
+</div>
+
+<!-- ============================================================= -->
+<!-- ======================== MOBILE ============================ -->
+<!-- ============================================================= -->
+<div data-screen-label="Mobile" style="max-width:1180px;margin:0 auto;padding:30px 32px 70px">
+  <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:6px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#D15B36;font-weight:600">responsive</span></div>
+  <h2 style="font-size:28px;letter-spacing:-.025em;font-weight:800;margin:0 0 4px">Mobile</h2>
+  <p style="font-size:15px;line-height:1.5;color:#6E675B;max-width:60ch;margin:0 0 32px">Same hero on a 320px viewport — single column, collapsed nav, the chart and the floating alert kept as the anchor.</p>
+
+  <div style="display:flex;gap:36px;flex-wrap:wrap;justify-content:center;background:#1B1916;border-radius:24px;padding:52px 40px;background-image:linear-gradient(#FFFFFF0A 1px,transparent 1px),linear-gradient(90deg,#FFFFFF0A 1px,transparent 1px);background-size:32px 32px">
+
+    <!-- PHONE 1 — hero + chart -->
+    <div style="flex:none">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#7C766A;text-align:center;margin-bottom:16px">Home · caught spike</div>
+      <div style="width:300px;height:640px;background:#1B1916;border-radius:42px;padding:9px;box-shadow:0 30px 70px -20px #00000080;border:1px solid #332F29">
+        <div style="position:relative;width:100%;height:100%;background:#F5F1E8;border-radius:34px;overflow:hidden">
+          <div style="position:absolute;top:0;left:0;right:0;height:42px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:12px;font-weight:600;color:#1B1916;z-index:3"><span>9:41</span><span style="width:54px;height:18px;background:#1B1916;border-radius:0 0 12px 12px;position:absolute;left:50%;top:0;transform:translateX(-50%)"></span><span style="font-family:'JetBrains Mono',monospace;font-size:11px">5G ▰▰▰</span></div>
+          <div style="position:absolute;inset:42px 0 0;overflow:hidden;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #E6E0D4">
+              <svg width="26" height="26" viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+              <span style="font-size:16px;font-weight:700;letter-spacing:-.02em">detectkit</span>
+              <div style="margin-left:auto;display:flex;flex-direction:column;gap:4px"><span style="width:20px;height:2px;background:#1B1916;border-radius:2px"></span><span style="width:20px;height:2px;background:#1B1916;border-radius:2px"></span><span style="width:20px;height:2px;background:#1B1916;border-radius:2px"></span></div>
+            </div>
+            <div style="padding:22px 20px 0;overflow:hidden">
+              <div style="display:inline-flex;align-items:center;gap:7px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#B4471F;background:#D15B3615;border:1px solid #D15B3633;padding:5px 10px;border-radius:20px;margin-bottom:16px"><span style="width:6px;height:6px;border-radius:50%;background:#2E9E73"></span>open source · python</div>
+              <h1 style="font-size:30px;line-height:1.04;letter-spacing:-.03em;font-weight:800;margin:0 0 12px">Catch the spike <span style="color:#D15B36">first.</span></h1>
+              <p style="font-size:14px;line-height:1.5;color:#6E675B;margin:0 0 18px">Anomaly detection with a dbt-like layout. SQL + YAML, one command.</p>
+              <div style="background:#FBF9F3;border:1px solid #E6E0D4;border-radius:13px;padding:12px 12px 8px;margin-bottom:16px;position:relative">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9A9384;margin-bottom:4px">api_error_rate</div>
+                <svg viewBox="0 0 260 130" width="100%" style="display:block">
+                  <path d="M10,64 L250,63 L250,90 L10,91 Z" fill="#D15B3612"/>
+                  <path d="M10,64 L250,63" fill="none" stroke="#D15B3640" stroke-width="1" stroke-dasharray="3 3"/>
+                  <path d="M10,90 L250,91" fill="none" stroke="#D15B3640" stroke-width="1" stroke-dasharray="3 3"/>
+                  <path d="M10,78 L40,80 L70,76 L100,82 L130,77 L160,82 L185,78 L200,76 L212,40 L222,22 L234,72 L250,78" fill="none" stroke="#1B1916" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <circle cx="222" cy="22" r="5" fill="#D63232"/>
+                </svg>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <span style="font-size:15px;font-weight:600;background:#D15B36;color:#FBF9F3;padding:12px;border-radius:11px;text-align:center">Get started</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#1B1916;padding:12px;border-radius:11px;border:1px solid #D8D1C2;background:#FBF9F3;text-align:center">pip install detectkit</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PHONE 2 — alert in chat -->
+    <div style="flex:none">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#7C766A;text-align:center;margin-bottom:16px">Alert · Slack</div>
+      <div style="width:300px;height:640px;background:#1B1916;border-radius:42px;padding:9px;box-shadow:0 30px 70px -20px #00000080;border:1px solid #332F29">
+        <div style="position:relative;width:100%;height:100%;background:#fff;border-radius:34px;overflow:hidden">
+          <div style="position:absolute;top:0;left:0;right:0;height:42px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:12px;font-weight:600;color:#1B1916;z-index:3"><span>9:41</span><span style="width:54px;height:18px;background:#1B1916;border-radius:0 0 12px 12px;position:absolute;left:50%;top:0;transform:translateX(-50%)"></span><span style="font-family:'JetBrains Mono',monospace;font-size:11px">5G ▰▰▰</span></div>
+          <div style="position:absolute;inset:42px 0 0;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid #EDEDED;background:#4A154B">
+              <span style="font-size:14px;font-weight:700;color:#fff">#alerts-payments</span>
+            </div>
+            <div style="padding:18px 14px;overflow:hidden">
+              <div style="display:flex;gap:10px">
+                <svg width="34" height="34" viewBox="0 0 100 100" style="border-radius:8px;flex:none"><rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/><polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><span style="font-weight:700;font-size:13.5px;color:#1D1C1D">detectk</span><span style="font-size:9px;font-weight:700;background:#E8E8E8;color:#616061;padding:1px 4px;border-radius:3px">APP</span><span style="font-size:11px;color:#616061">12:04</span></div>
+                  <div style="display:flex;background:#fff;border-radius:6px;overflow:hidden;border:1px solid #E8E8E8">
+                    <div style="width:4px;background:#D63232;flex:none"></div>
+                    <div style="padding:10px 12px;min-width:0">
+                      <div style="font-weight:700;font-size:13.5px;color:#1D1C1D;margin-bottom:5px">⚠ Alert: api_error_rate</div>
+                      <div style="font-size:12px;line-height:1.5;color:#1D1C1D;white-space:pre-wrap">Quorum 1/1 · above · 3/3
+Value: 4.2 | Expected: ≤ 1.1
+Detector: mad
+@oncall_engineer</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1244,&quot;height&quot;:900},&quot;alertPlatform&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;slack&quot;,&quot;mattermost&quot;,&quot;telegram&quot;,&quot;email&quot;],&quot;default&quot;:&quot;slack&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;severity&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;anomaly&quot;,&quot;recovery&quot;],&quot;default&quot;:&quot;anomaly&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;detector&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;mad&quot;,&quot;zscore&quot;,&quot;iqr&quot;],&quot;default&quot;:&quot;mad&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = {
+    platform: this.props.alertPlatform || 'slack',
+    severity: this.props.severity || 'anomaly',
+    det: this.props.detector || 'mad',
+  };
+
+  renderVals() {
+    const platform = this.state.platform;
+    const severity = this.state.severity;
+    const isAnomaly = severity === 'anomaly';
+
+    const mkSeg = (active) => ({
+      border: 'none', cursor: 'pointer',
+      fontFamily: "'Schibsted Grotesk', sans-serif",
+      fontSize: '13.5px', fontWeight: 600,
+      padding: '7px 16px', borderRadius: '8px',
+      background: active ? '#FBF9F3' : 'transparent',
+      color: active ? '#1B1916' : '#6E675B',
+      boxShadow: active ? '0 1px 2px #00000014' : 'none',
+      transition: 'all .15s',
+    });
+    const tab = (id) => ({ style: mkSeg(platform === id), onClick: () => this.setState({ platform: id }) });
+    const slackTab = tab('slack');
+    const mmTab = tab('mattermost');
+    const tgTab = tab('telegram');
+    const emailTab = tab('email');
+
+    const severities = [
+      { id: 'anomaly', label: 'Anomaly' },
+      { id: 'recovery', label: 'Recovery' },
+    ].map(s => ({ label: s.label, style: mkSeg(severity === s.id), onClick: () => this.setState({ severity: s.id }) }));
+
+    const title = isAnomaly ? '⚠ Alert: api_error_rate' : '✅ Alert cleared: api_error_rate';
+    const attachmentColor = isAnomaly ? '#D63232' : '#36A64F';
+    const params = '{"threshold": 3.0, "window_size": 2016, "half_life": "1d"}';
+    const mentions = '@oncall_engineer @here';
+
+    const webhookBody = isAnomaly
+      ? 'Quorum 1/1 · direction above (policy same) · consecutive 3/3\n'
+        + 'Rule: min_detectors=1 · direction=same · consecutive=3\n\n'
+        + 'Latest point (evidence):\n'
+        + '· Time: 2026-06-19 12:04:00 (Europe/Moscow)\n'
+        + '· Value: 4.2 | Expected: <= 1.1\n'
+        + '· Severity: 3.40\n'
+        + 'Detectors: mad\n'
+        + 'Parameters: ' + params + '\n'
+        + mentions
+      : 'The alert condition no longer holds — the metric is back within expected bounds.\n'
+        + 'Rule: min_detectors=1 · direction=same · consecutive=3\n\n'
+        + 'Latest point:\n'
+        + '· Time: 2026-06-19 12:42:00 (Europe/Moscow)\n'
+        + '· Value: 0.9 | Expected: <= 1.1\n'
+        + 'Detectors: mad\n'
+        + mentions;
+
+    const tgBody = title + '\n' + webhookBody;
+    const emailBody = webhookBody.replace(mentions, 'CC: oncall_engineer');
+
+    const C = { def: '#C9C2B4', cyan: '#6CC0B6', green: '#6FCB8E', yellow: '#E7B45C', red: '#E8806F' };
+    const seg = (text, color, bold) => ({ text, style: 'color:' + (color || C.def) + (bold ? ';font-weight:700' : '') });
+    const line = (text, color, bold) => [seg(text, color, bold)];
+    const blank = [seg('\u00A0', C.def)];
+    const logRows = [
+      line('Project root: ~/monitoring'),
+      line('Found 1 metric(s) to process'),
+      blank,
+      line('Processing metric: api_error_rate', C.cyan, true),
+      line('  Steps: load, detect, alert'),
+      blank,
+      line('  ┌─ LOAD', C.cyan, true),
+      line('  │ Resuming from last saved: 2026-06-19 11:55:00'),
+      line('  │ Loading from 12:00:00 to 12:05:00'),
+      line('  └─ Loaded 1 datapoints', C.green),
+      blank,
+      line('  ┌─ DETECT', C.cyan, true),
+      line('  │ [1/1] Detector: mad'),
+      line('  │   └─ Detected 1 anomalies', C.yellow),
+      line('  └─ Total anomalies: 1', C.yellow),
+      blank,
+      line('  ┌─ ALERT', C.cyan, true),
+      [seg('  │ '), seg('⚠ Alert triggered! Sending to 1 channel(s)...', C.yellow, true)],
+      [seg('  │   '), seg('✓', C.green), seg(' slack_payments')],
+      line('  └─ Sent 1/1 alerts', C.green),
+      blank,
+      line('✓ Pipeline completed successfully', C.green, true),
+    ];
+
+    // ----- detectors explorer -----
+    const det = this.state.det;
+    const dser = {
+      mad:[0.45,0.40,0.48,0.42,0.38,0.46,0.41,0.49,0.43,0.39,0.47,0.42,0.50,0.44,0.40,0.48,0.43,0.51,0.45,0.41,0.49,0.44,0.42,0.48,0.45,0.40,0.47,0.50,0.44,0.42,0.48,0.54,0.90,0.58,0.46,0.42,0.49,0.44,0.40,0.47,0.42,0.50,0.45,0.41,0.48,0.44],
+      iqr:[0.34,0.31,0.36,0.33,0.30,0.35,0.32,0.50,0.37,0.33,0.31,0.36,0.34,0.49,0.33,0.30,0.35,0.32,0.38,0.34,0.31,0.48,0.35,0.33,0.30,0.36,0.34,0.32,0.50,0.33,0.31,0.36,0.90,0.42,0.34,0.31,0.35,0.33,0.30,0.47,0.34,0.32,0.36,0.33,0.31,0.35],
+    };
+    let dv = dser[det] || dser.mad;
+    if (det === 'zscore') { dv = []; for (let i = 0; i < 46; i++) dv.push(0.5 + 0.085 * Math.sin(i * 0.46) + 0.015 * Math.cos(i * 1.1)); dv[32] = 0.90; }
+    const Ny = dv.length;
+    const dW = 900, dH = 360, dpL = 40, dpR = 40, dpT = 54, dpB = 44;
+    const gx0 = dpL, gx1 = dW - dpR, gy0 = dpT, gy1 = dH - dpB;
+    const gpW = gx1 - gx0, gpH = gy1 - gy0;
+    const GX = i => +(gx0 + (i / (Ny - 1)) * gpW).toFixed(1);
+    const GY = v => +(gy1 - v * gpH).toFixed(1);
+    const medf = a => { const s = [...a].sort((p, q) => p - q); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+    const cen = dv.map((_, i) => medf(dv.slice(Math.max(0, i - 4), Math.min(Ny, i + 5))));
+    const dcfg = ({ mad: { u: .135, d: .135 }, zscore: { u: .13, d: .13 }, iqr: { u: .21, d: .10 } })[det] || { u: .135, d: .135 };
+    const cl = v => Math.max(.06, Math.min(.96, v));
+    const up = cen.map(c => cl(c + dcfg.u)), lo = cen.map(c => cl(c - dcfg.d));
+    const detLine = 'M' + dv.map((v, i) => GX(i) + ',' + GY(v)).join(' L');
+    const detUpper = 'M' + up.map((v, i) => GX(i) + ',' + GY(v)).join(' L');
+    const detLower = 'M' + lo.map((v, i) => GX(i) + ',' + GY(v)).join(' L');
+    const detBand = 'M' + up.map((v, i) => GX(i) + ',' + GY(v)).join(' L') + ' L' + lo.map((v, i) => GX(i) + ',' + GY(v)).reverse().join(' L') + ' Z';
+    const detCenter = 'M' + cen.map((v, i) => GX(i) + ',' + GY(v)).join(' L');
+    const aidx = dv.indexOf(Math.max(...dv));
+    const aX = GX(aidx), aY = GY(dv[aidx]);
+    const aboxX = Math.min(Math.max(aX - 86, gx0), gx1 - 172);
+    const dLab = ({ mad: '3.40 \u03c3', zscore: 'z = 4.1', iqr: 'beyond fence' })[det];
+    const detAnom = { x: aX, y: aY, lineTop: dpT - 6, lineBot: +(aY - 12).toFixed(1), boxT: 'translate(' + aboxX.toFixed(1) + ',' + (dpT - 34) + ')', label: dLab };
+    const dinfo = ({
+      mad: { code: 'mad', name: 'Median absolute deviation', desc: 'Measures the typical distance from the median. A handful of wild spikes barely move it \u2014 the most robust default.', formula: 'median \u00b1 3 \u00d7 MAD', best: 'Spiky, noisy metrics with outliers in their history.', thr: 'threshold 3.0' },
+      zscore: { code: 'zscore', name: 'Z-score', desc: 'Classic mean \u00b1 k standard deviations. Fast and simple, but one big outlier inflates the band \u2014 keep it for clean data.', formula: 'mean \u00b1 3 \u00d7 \u03c3', best: 'Clean, roughly bell-shaped metrics.', thr: 'k = 3.0' },
+      iqr: { code: 'iqr', name: 'Interquartile range', desc: 'Builds the corridor from the middle 50% of values, then extends fences 1.5\u00d7IQR out. Comfortable with skewed, long-tailed data.', formula: '[ Q1 \u2212 1.5\u00b7IQR , Q3 + 1.5\u00b7IQR ]', best: 'Skewed distributions and one-sided outliers.', thr: 'fence 1.5\u00d7' },
+    })[det];
+    const dTab = (id, code) => { const a = det === id; return { code, onClick: () => this.setState({ det: id }), style: ["cursor:pointer", "font-family:'JetBrains Mono',monospace", "font-size:13px", "font-weight:700", "letter-spacing:.02em", "padding:9px 17px", "border-radius:9px", "transition:all .15s", "background:" + (a ? '#D15B36' : '#211E1A'), "color:" + (a ? '#FBF9F3' : '#8A8475'), "border:1px solid " + (a ? '#D15B36' : '#332F29')].join(';') }; };
+    const detTabs = [dTab('mad', 'MAD'), dTab('zscore', 'Z-SCORE'), dTab('iqr', 'IQR')];
+    const detGrid = [.25, .5, .75].map(v => ({ x0: gx0, x1: gx1, y: GY(v) }));
+    const detAxis = { x0: gx0, x1: gx1, y: gy1 + 1, ty: gy1 + 22 };
+
+    return {
+      detTabs, detGrid, detAxis, detLine, detUpper, detLower, detBand, detCenter, detAnom,
+      detCode: dinfo.code, detThreshold: dinfo.thr, activeName: dinfo.name, activeDesc: dinfo.desc, activeFormula: dinfo.formula, activeBest: dinfo.best,
+      slackTab, mmTab, tgTab, emailTab, severities,
+      isSlack: platform === 'slack',
+      isMM: platform === 'mattermost',
+      isTg: platform === 'telegram',
+      isEmail: platform === 'email',
+      chatBg: platform === 'telegram' ? '#CFE3D6' : platform === 'email' ? '#F1EFE8' : '#FFFFFF',
+      title, attachmentColor, webhookBody, tgBody, emailBody, botName: 'detectk',
+      logRows,
+    };
+  }
+}
+</script>
+</body>
+</html>

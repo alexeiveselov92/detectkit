@@ -40,6 +40,21 @@ class _DatapointsMixin(_InternalTablesBase):
         last_ts = self._manager.get_last_timestamp(full_table_name, metric_name)
         return self._normalize_max_timestamp(last_ts)
 
+    def get_first_datapoint_timestamp(self, metric_name: str) -> datetime | None:
+        """Return the earliest timestamp stored for *metric_name*, if any."""
+        full_table_name = self._manager.get_full_table_name(TABLE_DATAPOINTS, use_internal=True)
+        query = f"""
+        SELECT min(timestamp) AS first_ts
+        FROM {full_table_name}
+        WHERE metric_name = %(metric_name)s
+        """
+        result = self._manager.execute_query(query, {"metric_name": metric_name})
+        if not result:
+            return None
+        # ClickHouse min() over an empty selection yields the epoch sentinel
+        # rather than NULL; _normalize_max_timestamp maps that back to None.
+        return self._normalize_max_timestamp(result[0].get("first_ts"))
+
     def get_value_at(self, metric_name: str, timestamp: datetime) -> float | None:
         """Return the stored ``value`` for an exact timestamp.
 

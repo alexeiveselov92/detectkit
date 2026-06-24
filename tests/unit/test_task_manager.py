@@ -292,6 +292,69 @@ class TestTaskManager:
         # Currently returns 0 (placeholder implementation)
         assert result["anomalies_count"] == 0
 
+    def test_detect_fallback_start_prefers_loading_start_time(self):
+        """The first-detect lower bound falls back to loading_start_time."""
+        manager = TaskManager(internal_manager=Mock(), db_manager=Mock())
+
+        config = Mock(spec=MetricConfig)
+        config.name = "cpu_usage"
+        config.loading_start_time = "2024-03-01 12:00:00"
+
+        assert manager._detect_fallback_start(config) == datetime(2024, 3, 1, 12, 0, 0)
+        # loading_start_time wins, so the datapoint table is not consulted.
+        manager.internal.get_first_datapoint_timestamp.assert_not_called()
+
+    def test_detect_fallback_start_uses_first_datapoint(self):
+        """Without loading_start_time, fall back to the earliest datapoint."""
+        internal = Mock()
+        internal.get_first_datapoint_timestamp.return_value = datetime(
+            2024, 2, 1, tzinfo=timezone.utc
+        )
+        manager = TaskManager(internal_manager=internal, db_manager=Mock())
+
+        config = Mock(spec=MetricConfig)
+        config.name = "cpu_usage"
+        config.loading_start_time = None
+
+        assert manager._detect_fallback_start(config) == datetime(2024, 2, 1)
+        internal.get_first_datapoint_timestamp.assert_called_once_with("cpu_usage")
+
+    def test_run_detect_step_without_start_time_does_not_short_circuit(self):
+        """A fresh detector with no start_time/resume/--from must still detect.
+
+        Regression: a detector that omits ``start_time`` (every ``dtk autotune``
+        config) left ``actual_from`` unset, so DETECT used to report
+        "already up to date" and never detect. It must now fall back to
+        ``loading_start_time`` and run the batch loop.
+        """
+        internal = Mock()
+        # No prior detections for this fresh metric ...
+        internal.get_last_detection_timestamp.return_value = None
+        # ... and the datapoint window comes back empty, so the batch loop just
+        # advances. The point under test is that we REACH the loop at all.
+        internal.load_datapoints.return_value = {"timestamp": np.array([], dtype="datetime64[ms]")}
+        manager = TaskManager(internal_manager=internal, db_manager=Mock())
+
+        config = MetricConfig(
+            name="cpu_usage",
+            interval="10min",
+            query="SELECT 1",
+            loading_start_time="2024-01-01 00:00:00",
+            detectors=[
+                {"type": "mad", "params": {"threshold": 3.0, "window_size": 200, "min_samples": 10}}
+            ],
+        )
+
+        result = manager._run_detect_step(
+            config,
+            from_date=None,
+            to_date=datetime(2024, 1, 1, 2, 0, 0, tzinfo=timezone.utc),
+        )
+
+        # Passed the guard and entered the batch loop (the bug skipped it).
+        assert internal.load_datapoints.called
+        assert result["anomalies_count"] == 0
+
     def test_run_alert_step_no_config(self):
         """Test _run_alert_step when no alerting configured."""
         internal_manager = Mock()

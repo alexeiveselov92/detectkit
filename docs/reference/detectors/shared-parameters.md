@@ -325,6 +325,11 @@ and are **not** part of the detector ID hash.
 ### `start_time` (string, optional)
 Start detecting anomalies from this timestamp. Data before is used only for building history.
 
+If omitted, detection starts from the metric's `loading_start_time` (and, failing
+that, its earliest stored datapoint) — so the **first run detects across all
+loaded history**. Set `start_time` only when you want detection to begin later
+than the loaded data.
+
 **Format**: `"YYYY-MM-DD HH:MM:SS"`
 
 **Example:**

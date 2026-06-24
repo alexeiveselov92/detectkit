@@ -123,6 +123,11 @@ def test_supervised_run_produces_valid_tuned_config(tmp_path):
     assert reparsed.name == f"demo__tuned_{run_id}"
     assert len(reparsed.detectors) == 1
     assert reparsed.detectors[0].type == result.chosen_detector_type
+    # Regression: the generated config pins start_time to the load start so the
+    # first `dtk run` detects across all loaded history (autotuned configs used
+    # to omit start_time, leaving DETECT with no lower bound → never detected).
+    assert reparsed.loading_start_time
+    assert reparsed.detectors[0].params["start_time"] == reparsed.loading_start_time
 
 
 def test_unsupervised_run_without_labels(tmp_path):

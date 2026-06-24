@@ -55,6 +55,50 @@ def trend_present(tuner: _AutoTuneBase) -> bool:
     return abs(med_second - med_first) > 2.0 * 1.4826 * mad
 
 
+# A level shift is "large" when the two regimes' centers differ by at least this
+# many within-regime robust sigmas. Measured against the *within-segment* scale
+# (not the global MAD) so a big step can't self-mask by inflating the yardstick.
+_SHIFT_SIGMA_BAR = 3.0
+_SHIFT_MIN_POINTS = 32  # too few points to meaningfully talk about two regimes
+_SHIFT_MIN_SIDE_FRAC = 0.1  # each candidate segment must hold ≥10% of the points
+_SHIFT_SCAN_SPLITS = 24  # coarse grid of candidate split points to scan
+
+
+def detect_level_shift(tuner: _AutoTuneBase) -> tuple[bool, float, float]:
+    """Scan for the strongest single level shift anywhere in the series.
+
+    Complements :func:`trend_present`, which only compares the two *halves'*
+    medians against the *global* MAD and so misses a shift that (a) sits
+    off-center — both halves then straddle it — or (b) self-masks by inflating the
+    global MAD it is measured against. This scans candidate split points across
+    the series and scores each step against the **within-segment** robust scale,
+    which a true step does not inflate (a smooth ramp, by contrast, keeps a large
+    within-segment spread and so does not register). Returns ``(found,
+    magnitude_sigmas, location_fraction)``; ``found`` is ``True`` only when the
+    strongest step clears :data:`_SHIFT_SIGMA_BAR` within-regime sigmas.
+    """
+    v = np.asarray(tuner.data["value"], dtype=float)
+    v = v[~np.isnan(v)]
+    n = int(v.size)
+    min_side = max(4, int(n * _SHIFT_MIN_SIDE_FRAC))
+    if n < _SHIFT_MIN_POINTS or n - 2 * min_side < 1:
+        return (False, 0.0, 0.0)
+    step = max(1, (n - 2 * min_side) // _SHIFT_SCAN_SPLITS)
+    best_sigmas = 0.0
+    best_frac = 0.0
+    for s in range(min_side, n - min_side + 1, step):
+        med_l = float(np.median(v[:s]))
+        med_r = float(np.median(v[s:]))
+        delta = abs(med_r - med_l)
+        if delta <= 0:
+            continue
+        within = float(np.median(np.abs(np.concatenate([v[:s] - med_l, v[s:] - med_r]))))
+        sigmas = delta / (1.4826 * within) if within > 0 else 99.0
+        if sigmas > best_sigmas:
+            best_sigmas, best_frac = sigmas, s / n
+    return (best_sigmas >= _SHIFT_SIGMA_BAR, min(best_sigmas, 99.0), best_frac)
+
+
 def select_window(
     tuner: _AutoTuneBase,
     detector_type: str,

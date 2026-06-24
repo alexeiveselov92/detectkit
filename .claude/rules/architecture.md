@@ -404,10 +404,18 @@ prior winners. Stages (`AutoTuner.tune()`), each appending to a decision log:
    carries high "near-suppress" rungs so a heavy-tailed metric can widen the band
    under the flag-rate budget instead of being trapped flagging its tail.
 4. **Window selection** (`window_select.py`) — window grid in natural seasonal
-   units; the tie-break is **trend-gated**: stationary → prefer the **larger**
-   window ("more history is better"); trend / regime shift present → prefer the
-   **smaller** (fresher baseline). Supervised runs also sweep
-   `consecutive_anomalies` for the alert window.
+   units; the tie-break is **trend-gated** by `trend_present` (a midpoint-median
+   test): stationary → prefer the **larger** window ("more history is better");
+   trend / regime shift present → prefer the **smaller** (fresher baseline).
+   Supervised runs also sweep `consecutive_anomalies` for the alert window.
+   Because `trend_present` only compares the two halves' medians against the
+   *global* MAD, it misses a level shift that sits off-center (both halves
+   straddle it) or one big enough to inflate that MAD; `detect_level_shift`
+   (`window_select.py`) backstops it — a scan of every split point against the
+   *within-segment* scale — and when the series reads stationary yet a large
+   (≥3σ within-regime) shift is present, the grid step logs a `regime` advisory
+   (rendered as `REGIME` in the config header) suggesting `--from`/`max_history`.
+   Advisory only: it changes no chosen parameters.
 5. **Cross-validation + scoring** (`crossval.py`, `scoring.py`) — walk-forward
    expanding-window folds; because the windowed detector is causal, `detect()`
    runs **once** per candidate and each fold is scored by slicing the results (no

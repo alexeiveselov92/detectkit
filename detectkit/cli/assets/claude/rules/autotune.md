@@ -33,7 +33,15 @@ same windowed detectors and `detector_id` identity). The fastest path is the
    series prefers the **larger** `window_size` ("more history is better"), a
    trending / regime-shifting one the **smaller**; sets `loading_start_time` to
    cover the lead-in (and pins the detector's `start_time` to it, so the first
-   `dtk run` detects across all loaded history).
+   `dtk run` detects across all loaded history). The trend gate is a midpoint
+   test, so it can miss a level shift that sits off-center or self-masks by
+   inflating the global MAD; a backstop scan then logs a **`REGIME`** advisory in
+   the decision log (and streams it) when the series reads stationary yet a large
+   (≥3σ within-regime) level shift is present — surface it to the user and suggest
+   re-tuning with `--from <date after the shift>` (or `autotune.max_history`) if
+   the earlier regime is stale. Advisory only; it changes no chosen parameters,
+   and it detects level shifts, not variance/shape changes (label incidents for
+   those).
 5. **Alert window** (supervised only) — sweeps `consecutive_anomalies` on the
    labeled incidents.
 

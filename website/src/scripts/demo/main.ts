@@ -7,10 +7,11 @@
 // frame, so the VPS only ever serves the static bundle.
 
 import { createChart } from './chart';
-import { runDetector } from './detector';
+import { effectiveStartIndex, runDetector } from './detector';
 import { generateSeries } from './synth';
 import type {
   AnomalyKind,
+  ChartAlert,
   DetectorParams,
   DetectorType,
   Detrend,
@@ -164,15 +165,18 @@ function init(): void {
     const mccDen = Math.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn));
     const mcc = mccDen > 0 ? (tp * tn - fp * fn) / mccDen : 0;
 
-    // Alert layer: first run of >= `consecutive` grid-adjacent flagged points.
+    // Alert layer: one alert per MAXIMAL run of grid-adjacent flagged points
+    // that reaches `consecutive` — fired at the point where the run first hits
+    // the threshold. A gap (non-adjacent grid step) or an un-flagged point ends
+    // the run, so each qualifying incident contributes exactly one fire index.
+    const alertFireIndexes: number[] = [];
     let runLen = 0;
-    let alertFireIndex = -1;
     for (let i = 0; i < n; i++) {
       const adjacent =
         i > 0 &&
         scored[i].timestamp - scored[i - 1].timestamp === series.intervalSeconds * 1000;
       runLen = flagged[i] ? (adjacent ? runLen + 1 : 1) : 0;
-      if (runLen >= consecutive && alertFireIndex < 0) alertFireIndex = i;
+      if (runLen === consecutive) alertFireIndexes.push(i);
     }
 
     return {
@@ -187,8 +191,9 @@ function init(): void {
       recall,
       f1,
       mcc,
-      alertWouldFire: alertFireIndex >= 0,
-      alertFireIndex,
+      alertWouldFire: alertFireIndexes.length > 0,
+      alertFireIndex: alertFireIndexes.length > 0 ? alertFireIndexes[0] : -1,
+      alertFireIndexes,
     };
   };
 
@@ -246,12 +251,28 @@ function init(): void {
 
     const alertEl = root.querySelector<HTMLElement>('#dkx-alert');
     if (alertEl) {
-      if (sc.alertWouldFire) {
-        const at = fmtTime(series.timestamps[sc.alertFireIndex], series.intervalSeconds);
-        alertEl.innerHTML = `<span class="dkx-dot dkx-dot-anom"></span> alert fires — ${at}`;
+      const fires = sc.alertFireIndexes;
+      if (fires.length > 0) {
+        const count = fires.length;
+        // A compact strip of fire times (cap the rendered chips so the card
+        // never overflows; the count above is always exact).
+        const shown = fires.slice(0, 6);
+        const chips = shown
+          .map(
+            (i) =>
+              `<span class="dkx-fire-chip">${fmtTime(series.timestamps[i], series.intervalSeconds)}</span>`,
+          )
+          .join('');
+        const more = count > shown.length ? `<span class="dkx-fire-more">+${count - shown.length}</span>` : '';
+        alertEl.innerHTML =
+          `<div class="dkx-alert-head"><span class="dkx-dot dkx-dot-anom"></span>` +
+          `<b>${count}</b> alert${count === 1 ? '' : 's'} would fire</div>` +
+          `<div class="dkx-fire-strip">${chips}${more}</div>`;
         alertEl.className = 'dkx-alert on fires';
       } else {
-        alertEl.innerHTML = `<span class="dkx-dot dkx-dot-ok"></span> no alert (need ${seg('detector') ? '' : ''}${num('dkx-consecutive')} in a row)`;
+        alertEl.innerHTML =
+          `<div class="dkx-alert-head"><span class="dkx-dot dkx-dot-ok"></span>` +
+          `no alert <span class="dkx-alert-sub">(need ${num('dkx-consecutive')} in a row)</span></div>`;
         alertEl.className = 'dkx-alert on quiet';
       }
     }
@@ -264,12 +285,33 @@ function init(): void {
     requestAnimationFrame(() => {
       queued = false;
       const params = readParams();
-      const series = generateSeries(readSynth());
+      const synth = readSynth();
+
+      // Size the series by the warm-up so the EFFECTIVE zone dominates the
+      // chart. A provisional series at the interval's base length tells us where
+      // detection reaches full power; if too little of it would actually be
+      // scored, regenerate longer so ~300+ effective points remain.
+      const provisional = generateSeries(synth);
+      const eff = effectiveStartIndex(provisional, params);
+      let series = provisional;
+      if (provisional.timestamps.length - eff < 300) {
+        const points = Math.min(eff + 320, 1200);
+        series = generateSeries({ ...synth, points });
+      }
       currentSeries = series;
+
       const scored = runDetector(series, params);
-      chart.render({ series, scored, params });
       const sc = computeScorecard(series, scored, params.consecutiveAnomalies);
+
+      // Surface ALL fired alerts on the chart timeline (one per incident).
+      const alerts: ChartAlert[] = sc.alertFireIndexes.map((i) => ({
+        t: series.timestamps[i],
+        kind: 'anomaly',
+      }));
+
+      chart.render({ series, scored, params, alerts });
       setBadge(sc, series);
+
       // echo the live config (so people see the knobs map to real params)
       out(
         'dkx-config',
@@ -284,6 +326,17 @@ function init(): void {
             : '') +
           ` · consecutive_anomalies=${params.consecutiveAnomalies}`,
       );
+
+      // Note in the legend hint whether the live line is the smoothed series.
+      const smoothEl = root.querySelector<HTMLElement>('#dkx-smooth-note');
+      if (smoothEl) {
+        if (params.smoothing !== 'none') {
+          smoothEl.textContent = `· line shown is ${params.smoothing}-smoothed (raw is the faint ghost)`;
+          smoothEl.classList.remove('hidden');
+        } else {
+          smoothEl.classList.add('hidden');
+        }
+      }
     });
   };
 

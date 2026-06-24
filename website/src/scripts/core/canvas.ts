@@ -421,3 +421,110 @@ export function fmtDur(ms: number): string {
   const hh = h % 24;
   return d + 'd' + (hh ? ' ' + hh + 'h' : '');
 }
+
+// ----------------------------------------------------------------------------
+// Warm-up overlay + alert markers (shared by the playground and the report)
+// ----------------------------------------------------------------------------
+
+export interface PlotRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/** Device-px bounds of the plot area for a canvas + margins. */
+export function plotRect(canvas: HTMLCanvasElement, m: Margins, dpr: number): PlotRect {
+  return {
+    left: m.l * dpr,
+    top: m.t * dpr,
+    right: canvas.width - m.r * dpr,
+    bottom: canvas.height - m.b * dpr,
+  };
+}
+
+/**
+ * Dim the warm-up region (timestamps before `dividerTs`) so it never reads as
+ * real detection, then draw a dashed divider + a small label marking where the
+ * detector reaches full power. Bands / anomalies should be drawn only at/after
+ * the divider; the metric line still spans the whole series for context.
+ */
+export function drawWarmupOverlay(
+  g: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  m: Margins,
+  dpr: number,
+  px: (ts: number) => number,
+  dividerTs: number,
+  label: string,
+): void {
+  const r = plotRect(canvas, m, dpr);
+  const xDiv = Math.max(r.left, Math.min(px(dividerTs), r.right));
+  if (xDiv <= r.left + 0.5) return; // nothing meaningful to dim
+  // Dim fill over the warm-up span.
+  g.save();
+  g.fillStyle = 'rgba(17,15,13,0.42)';
+  g.fillRect(r.left, r.top, xDiv - r.left, r.bottom - r.top);
+  // Dashed divider.
+  g.strokeStyle = rgba(token('--faint'), 0.7);
+  g.lineWidth = 1 * dpr;
+  g.setLineDash([4 * dpr, 4 * dpr]);
+  g.beginPath();
+  g.moveTo(xDiv, r.top);
+  g.lineTo(xDiv, r.bottom);
+  g.stroke();
+  g.setLineDash([]);
+  // Label, just right of the divider near the top.
+  g.fillStyle = rgba(token('--faint'), 0.95);
+  g.font = `${10 * dpr}px ui-monospace, monospace`;
+  g.textAlign = 'left';
+  g.textBaseline = 'top';
+  g.fillText(label, xDiv + 6 * dpr, r.top + 5 * dpr);
+  g.restore();
+}
+
+export interface AlertMark {
+  t: number;
+  kind: string;
+}
+
+/**
+ * Draw a vertical tick + a down-pointing triangle at the top of the plot for
+ * each alert, colored by kind via `colorOf`. Used to surface ALL alert firings
+ * (not just the first) on both the playground and the report chart.
+ */
+export function drawAlertMarkers(
+  g: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  m: Margins,
+  dpr: number,
+  px: (ts: number) => number,
+  alerts: ArrayLike<AlertMark>,
+  colorOf: (kind: string) => string,
+): void {
+  const r = plotRect(canvas, m, dpr);
+  const tri = 5 * dpr;
+  g.save();
+  for (let i = 0; i < alerts.length; i++) {
+    const a = alerts[i];
+    const x = px(a.t);
+    if (x < r.left - 1 || x > r.right + 1) continue;
+    const col = colorOf(a.kind);
+    // faint full-height tick
+    g.strokeStyle = rgba(col, 0.45);
+    g.lineWidth = 1 * dpr;
+    g.beginPath();
+    g.moveTo(x, r.top);
+    g.lineTo(x, r.bottom);
+    g.stroke();
+    // solid triangle at the top
+    g.fillStyle = col;
+    g.beginPath();
+    g.moveTo(x - tri, r.top);
+    g.lineTo(x + tri, r.top);
+    g.lineTo(x, r.top + tri * 1.4);
+    g.closePath();
+    g.fill();
+  }
+  g.restore();
+}

@@ -22,22 +22,36 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const WEBSITE = path.resolve(here, '..');
 const REPO = path.resolve(WEBSITE, '..');
 const ENTRY = path.join(WEBSITE, 'src', 'scripts', 'report', 'tune.ts');
+const WORKER_ENTRY = path.join(WEBSITE, 'src', 'scripts', 'report', 'tune.worker.ts');
 const OUT_DIR = path.join(REPO, 'detectkit', 'tuning', 'assets');
 const OUT_FILE = path.join(OUT_DIR, 'tune.js');
+
+const COMMON = {
+  bundle: true,
+  write: false,
+  format: 'iife',
+  platform: 'browser',
+  target: 'es2019',
+  minify: true,
+  legalComments: 'none',
+  logLevel: 'info',
+};
 
 async function main() {
   await fs.mkdir(OUT_DIR, { recursive: true });
 
+  // 1) Bundle the detector worker on its own. It runs the parity-checked detector
+  //    port off the UI thread; we embed its code as a string so the report stays
+  //    a single self-contained file (the main bundle spins it up from a Blob URL).
+  const workerRes = await build({ ...COMMON, entryPoints: [WORKER_ENTRY] });
+  const workerCode = workerRes.outputFiles[0].text;
+
+  // 2) Bundle the main renderer, injecting the worker source as a string literal
+  //    via `define` (esbuild replaces the __DTK_WORKER_SRC__ identifier).
   const result = await build({
+    ...COMMON,
     entryPoints: [ENTRY],
-    bundle: true,
-    write: false,
-    format: 'iife',
-    platform: 'browser',
-    target: 'es2019',
-    minify: true,
-    legalComments: 'none',
-    logLevel: 'info',
+    define: { __DTK_WORKER_SRC__: JSON.stringify(workerCode) },
   });
 
   const code = result.outputFiles[0].text;

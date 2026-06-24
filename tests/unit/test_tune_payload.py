@@ -7,10 +7,10 @@ import numpy as np
 from detectkit.config.metric_config import MetricConfig
 from detectkit.tuning.html import render_tune_html
 from detectkit.tuning.payload import (
-    TUNE_DEFAULT_POINTS,
     _normalize_seasonality_components,
     _seed_detector,
     build_tune_payload,
+    default_window_points,
 )
 
 
@@ -156,8 +156,8 @@ def test_build_payload_empty_when_no_datapoints():
 
 
 def test_default_window_is_bounded_not_full_history():
-    """With no --from, the window starts ~TUNE_DEFAULT_POINTS before the last
-    datapoint — NOT at the first datapoint — so huge histories stay interactive."""
+    """With no --from, the window starts a budget-sized number of points before the
+    last datapoint — NOT at the first datapoint — so huge histories stay interactive."""
 
     class Recording(FakeInternal):
         def __init__(self):
@@ -176,8 +176,17 @@ def test_default_window_is_bounded_not_full_history():
 
     rec = Recording()
     build_tune_payload(metric_config=_metric(), internal=rec)  # no start/end
-    expected = datetime(2026, 6, 1, 0, 0, 0) - timedelta(seconds=3600 * TUNE_DEFAULT_POINTS)
+    # seed is a default MAD detector (window 100) → smart default point count
+    expected = datetime(2026, 6, 1, 0, 0, 0) - timedelta(seconds=3600 * default_window_points(100))
     assert rec.requested_from == expected  # bounded recent window, not 2020
+
+
+def test_default_window_points_scales_inversely_and_clamps():
+    # small window → render-capped (MAX), large window → fewer points, clamped to MIN
+    assert default_window_points(100) == 15000  # 20M/100 clamps to MAX
+    assert default_window_points(2000) == 10000  # 20M/2000
+    assert default_window_points(50000) == 3000  # clamps to MIN
+    assert default_window_points(0) == 15000  # guards divide-by-zero
 
 
 def test_explicit_from_is_honored_in_full():

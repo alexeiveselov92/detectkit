@@ -31,9 +31,12 @@ _MAX_BODY = 5_000_000  # generous cap on the posted labels payload
 
 
 def _sanitize(name: str) -> str:
-    """Filesystem-safe slug for a label-set name; falls back to ``incidents``."""
-    slug = _NAME_RE.sub("-", name.strip().lower()).strip("-")
-    return slug or "incidents"
+    """Filesystem-safe slug for a label-set name; ``""`` when blank.
+
+    Used as an optional *suffix* appended to the metric-named filename, so a blank
+    name simply yields no suffix (the file is named after the metric alone).
+    """
+    return _NAME_RE.sub("-", name.strip().lower()).strip("-")
 
 
 def _stamp() -> str:
@@ -87,14 +90,16 @@ class _Handler(BaseHTTPRequestHandler):
 
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             yaml_text = str(payload.get("yaml", ""))
-            set_name = _sanitize(str(payload.get("name", "")))
+            suffix = _sanitize(str(payload.get("name", "")))
             raw = _yaml.safe_load(yaml_text)
             # validate against the canonical schema before writing anything
             parse_incident_labels(
                 raw, interval_seconds=srv.interval_seconds, metric_name=srv.metric
             )
             srv.incidents_dir.mkdir(parents=True, exist_ok=True)
-            out = srv.incidents_dir / f"{set_name}-{_stamp()}.yml"
+            # Always name the file after the metric; the optional set name is a suffix.
+            stem = f"{srv.metric}-{suffix}" if suffix else srv.metric
+            out = srv.incidents_dir / f"{stem}-{_stamp()}.yml"
             out.write_text(yaml_text, encoding="utf-8")
             srv.saved_path = out
         except Exception as exc:

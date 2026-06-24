@@ -148,7 +148,8 @@ Then, in the browser:
    existing incident by dragging its **edges**, or its **middle** to move it;
    *remove* / *Clear all* fix mistakes. Optionally **name the set**.
 3. Click **Save & tune**. The server writes a **versioned** file
-   `incidents/<metric>/<name>-<UTC>.yml` (re-labeling adds a new file — nothing is
+   `incidents/<metric>/<metric>[-<set>]-<UTC>.yml` (named after the metric, with the
+   optional set name folded in as a suffix; re-labeling adds a new file — nothing is
    overwritten, so the full history is kept) and the command **continues straight
    into the tuning run** on it. Nothing is exposed off your machine, and nothing
    is written until you save.

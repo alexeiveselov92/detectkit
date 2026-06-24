@@ -100,9 +100,9 @@ _LABELS_GLOBS = ("*.yml", "*.yaml", "*.json")
 def _labels_files(directory: Path) -> list[Path]:
     """All labels files in *directory*, oldest→newest.
 
-    The labeler saves versioned, ISO-stamped names (``<set>-<UTC>.yml``) which sort
-    chronologically, so name order is chronological (tie-broken by mtime). This
-    lets ``incidents/<metric>/`` keep every labeling round on disk.
+    The labeler saves versioned, ISO-stamped names (``<metric>[-<set>]-<UTC>.yml``)
+    which sort chronologically, so name order is chronological (tie-broken by mtime).
+    This lets ``incidents/<metric>/`` keep every labeling round on disk.
     """
     files: list[Path] = []
     for pattern in _LABELS_GLOBS:

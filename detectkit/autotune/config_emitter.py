@@ -85,11 +85,23 @@ def _build_body(original: MetricConfig, result: AutoTuneResult, new_name: str) -
         body["loading_start_time"] = original.loading_start_time
     body["loading_batch_size"] = original.loading_batch_size
 
-    scalar_cols = _flatten_scalar_seasonality(result.chosen_seasonality)
-    if scalar_cols:
-        body["seasonality_columns"] = scalar_cols
-    elif original.seasonality_columns:
-        body["seasonality_columns"] = original.seasonality_columns
+    # The top-level `seasonality_columns` field feeds the *built-in* time-feature
+    # extractor and is validated against the built-in allowlist (hour/day_of_week/…).
+    # When the metric instead sources seasonality from the query
+    # (`query_columns.seasonality`, e.g. a custom `league_day`), the loader ignores
+    # `seasonality_columns` entirely and the chosen grouping rides in the detector's
+    # `seasonality_components`. So never copy the chosen columns here in that mode —
+    # they may be custom names the validator rejects, and they are already declared
+    # in the preserved `query_columns`.
+    if original.query_columns and original.query_columns.seasonality:
+        if original.seasonality_columns:
+            body["seasonality_columns"] = original.seasonality_columns
+    else:
+        scalar_cols = _flatten_scalar_seasonality(result.chosen_seasonality)
+        if scalar_cols:
+            body["seasonality_columns"] = scalar_cols
+        elif original.seasonality_columns:
+            body["seasonality_columns"] = original.seasonality_columns
 
     body["detectors"] = [
         {"type": result.chosen_detector_type, "params": result.chosen_detector_params}

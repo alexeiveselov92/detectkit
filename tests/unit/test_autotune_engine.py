@@ -17,7 +17,8 @@ from detectkit.autotune import (
 from detectkit.autotune.detector_select import detector_suitability
 from detectkit.autotune.distribution import compute_distribution_features
 from detectkit.autotune.labels import IncidentLabels
-from detectkit.config.metric_config import MetricConfig
+from detectkit.autotune.result import AutoTuneResult
+from detectkit.config.metric_config import MetricConfig, QueryColumnsConfig
 
 
 def _seasonal_series(n=24 * 40, anomalies=(300, 301, 600), bump=70.0, noise=4.0, seed=7):
@@ -137,6 +138,89 @@ def test_unsupervised_run_without_labels(tmp_path):
     )
     assert result.chosen_detector_type in {"mad", "zscore", "iqr"}
     assert result.consecutive_anomalies is None  # alert window only tuned when supervised
+
+
+def _result_with_seasonality(seasonality, params):
+    """Minimal AutoTuneResult for exercising the config emitter directly."""
+    return AutoTuneResult(
+        metric_name="demo",
+        mode="supervised",
+        scoring_metric="mcc",
+        training_start=datetime(2026, 1, 1),
+        training_end=datetime(2026, 2, 1),
+        interval_seconds=3600,
+        n_points=744,
+        labels_summary={"intervals": 2, "points": 3, "positive_grid_points": 3},
+        chosen_seasonality=seasonality,
+        chosen_detector_type="mad",
+        chosen_detector_params=params,
+        winning_detector_id="abc123def456",
+        score=0.5,
+        cv_per_fold=[0.5],
+        cv_stability_penalty=0.0,
+        consecutive_anomalies=3,
+        candidate_detector_ids=["abc123def456"],
+    )
+
+
+def test_emit_does_not_leak_query_seasonality_into_seasonality_columns(tmp_path):
+    """Regression: a custom query-provided seasonality column (e.g. ``league_day``)
+    must NOT be written into the built-in-only ``seasonality_columns`` field, which
+    would fail ``MetricConfig`` validation and reject the whole tuned config."""
+    orig = MetricConfig(
+        name="demo",
+        interval="1h",
+        query="SELECT 1",
+        query_columns=QueryColumnsConfig(
+            timestamp="period_time",
+            metric="val",
+            seasonality=["hour", "day_of_week", "league_day"],
+        ),
+    )
+    result = _result_with_seasonality(
+        seasonality=[["hour", "league_day"]],
+        params={
+            "threshold": 4.0,
+            "window_size": 168,
+            "seasonality_components": [["hour", "league_day"]],
+        },
+    )
+    # emit_tuned_config validates through MetricConfig — before the fix this raised.
+    out_path, text, _ = emit_tuned_config(
+        original_config=orig,
+        original_path=Path("metrics/demo.yml"),
+        result=result,
+        project_root=Path("."),
+    )
+    written = tmp_path / out_path.name
+    written.write_text(text)
+    reparsed = MetricConfig.from_yaml_file(written)
+    # The custom column is not duplicated into seasonality_columns…
+    assert "league_day" not in reparsed.seasonality_columns
+    # …it stays declared in query_columns…
+    assert reparsed.query_columns is not None
+    assert reparsed.query_columns.seasonality == ["hour", "day_of_week", "league_day"]
+    # …and the chosen grouping rides in the detector's seasonality_components.
+    assert reparsed.detectors[0].params["seasonality_components"] == [["hour", "league_day"]]
+
+
+def test_emit_writes_builtin_seasonality_columns(tmp_path):
+    """The built-in path still writes the chosen scalar columns into seasonality_columns."""
+    orig = MetricConfig(name="demo", interval="1h", query="SELECT 1")
+    result = _result_with_seasonality(
+        seasonality=["hour", "day_of_week"],
+        params={"threshold": 3.0, "window_size": 168},
+    )
+    out_path, text, _ = emit_tuned_config(
+        original_config=orig,
+        original_path=Path("metrics/demo.yml"),
+        result=result,
+        project_root=Path("."),
+    )
+    written = tmp_path / out_path.name
+    written.write_text(text)
+    reparsed = MetricConfig.from_yaml_file(written)
+    assert reparsed.seasonality_columns == ["hour", "day_of_week"]
 
 
 def test_run_id_is_deterministic():

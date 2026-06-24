@@ -78,9 +78,10 @@ integration = [
 dtk = "detectkit.cli.main:cli"
 
 [project.urls]
-Homepage = "https://github.com/alexeiveselov92/detectkit"
-Documentation = "https://github.com/alexeiveselov92/detectkit"
+Homepage = "https://dtk.pipelab.dev"
+Documentation = "https://dtk.pipelab.dev"
 Repository = "https://github.com/alexeiveselov92/detectkit"
+Changelog = "https://github.com/alexeiveselov92/detectkit/blob/main/CHANGELOG.md"
 Issues = "https://github.com/alexeiveselov92/detectkit/issues"
 
 [tool.setuptools.dynamic]

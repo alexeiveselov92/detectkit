@@ -1,14 +1,19 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/detectkit-lockup-dark.svg">
-  <img src="assets/detectkit-lockup.svg" alt="detectkit" width="260">
-</picture>
+<a href="https://dtk.pipelab.dev">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/detectkit-lockup-dark.svg">
+    <img src="assets/detectkit-lockup.svg" alt="detectkit" width="260">
+  </picture>
+</a>
 
 [![PyPI version](https://img.shields.io/pypi/v/detectkit.svg)](https://pypi.org/project/detectkit/)
 [![Python](https://img.shields.io/pypi/pyversions/detectkit.svg)](https://pypi.org/project/detectkit/)
+[![Docs & playground](https://img.shields.io/badge/docs-dtk.pipelab.dev-d15b36)](https://dtk.pipelab.dev)
 
 **Metric monitoring with automatic anomaly detection.**
 
-`detectkit` is a Python library for data analysts and engineers to monitor time-series metrics with automatic anomaly detection and alerting. dbt-like project structure and CLI.
+[`detectkit`](https://dtk.pipelab.dev) is a Python library for data analysts and engineers to monitor time-series metrics with automatic anomaly detection and alerting. dbt-like project structure and CLI.
+
+**Website, docs & live playground → [dtk.pipelab.dev](https://dtk.pipelab.dev)**
 
 ## Features
 
@@ -116,6 +121,7 @@ for r in results:
 
 ## Documentation
 
+- **[dtk.pipelab.dev](https://dtk.pipelab.dev)** — full docs site, guides, reference, and a live in-browser playground
 - [Getting Started](docs/getting-started/quickstart.md) — 5-minute quickstart
 - [Configuration Guide](docs/guides/configuration.md) — all config options
 - [Detectors Guide](docs/guides/detectors.md) — choosing the right detector

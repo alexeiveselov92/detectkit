@@ -351,6 +351,43 @@ dtk run --select cpu_usage --profile staging
 - Testing with different database
 - Running against multiple environments
 
+##### `--report` (optional, dual-mode)
+
+After the run, write a **self-contained HTML report** per selected metric —
+values, each detector's confidence band, the flagged anomalies, the alerts that
+fired (anomaly / recovery / no-data) and a summary, with a client-side period
+selector (24h / 7d / 30d / All + zoom/pan). The report is offline: the chart and
+data are inlined into one file, so nothing is fetched and nothing leaves the
+page.
+
+```bash
+# Default path: reports/<metric>.html
+dtk run --select cpu_usage --report
+
+# Into a directory: <dir>/<metric>.html
+dtk run --select cpu_usage --report reports/
+
+# Into a specific file
+dtk run --select cpu_usage --report cpu.html
+```
+
+**Behavior**:
+- Bare `--report` → `reports/<metric>.html`; a **directory** → `<dir>/<metric>.html`;
+  a `.html` path → that exact file.
+- Reads the persisted `_dtk_datapoints` / `_dtk_detections`, so it works even on a
+  `--steps load` (or any partial) run, charting whatever is already stored.
+- Best-effort: a report failure is reported and **does not** fail the run.
+
+> **Advanced — alerts are reconstructed, not read from state.** `_dtk_alert_states`
+> stores last-writer-wins cooldown/recovery bookkeeping, not an event log, so the
+> report cannot read past alerts from it. Instead it **replays** the real decision
+> logic (quorum, `consecutive_anomalies`, cooldown, recovery, no-data) over the
+> stored detections to reconstruct the timeline. This is faithful to the rules,
+> but because cooldown suppression depends on **when** the live pipeline ran
+> (run cadence), the set of *suppressed* repeat alerts a live run dispatched can
+> differ slightly from the replay, which evaluates every grid point causally.
+> The anomalies, bands, and which incidents fired are unaffected.
+
 #### Metric Selection Rules
 
 Understanding how metric selection works is important to avoid confusion:
@@ -649,6 +686,29 @@ Ignore an existing task lock and run anyway (same lock semantics as
 
 Run the search but **persist nothing** — no config, no detections, no
 `_dtk_autotune_runs` row. Previews what autotune would choose.
+
+##### `--report` (optional, dual-mode)
+
+Write the same **self-contained HTML report** as
+[`dtk run --report`](#-report-optional-dual-mode) for the **tuned winner** —
+values, the chosen detector's confidence band, the
+flagged anomalies, the alerts that would have fired, and a summary, with the
+client-side period selector. It charts the winner's detections (persisted during
+the run), so run without `--dry-run`.
+
+```bash
+# Default path: reports/<metric>__tuned_<id>.html
+dtk autotune --select cpu_usage --report
+
+# A directory, or a specific file
+dtk autotune --select cpu_usage --report reports/
+dtk autotune --select cpu_usage --report cpu_tuned.html
+```
+
+Bare `--report` → `reports/<metric>__tuned_<id>.html`; a directory →
+`<dir>/<metric>.html`; a `.html` path → that file. The same **Advanced** note as
+`dtk run --report` applies: alerts in the report are reconstructed by replaying
+the decision logic over the stored detections.
 
 #### Behavior
 

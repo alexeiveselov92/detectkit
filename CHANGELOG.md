@@ -5,6 +5,53 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.29.0] - 2026-06-24
+
+### Added
+- **`dtk run --report` / `dtk autotune --report` emit a self-contained HTML
+  report.** Each writes one offline HTML file per metric — values + per-detector
+  confidence bands + flagged anomalies + the alerts that fired (anomaly /
+  recovery / no-data) + a summary, with client-side period selection (24h / 7d /
+  30d / All, plus zoom/pan) and an alerts list (rule that fired, severity,
+  duration). Nothing leaves the browser (inline JS, baked payload), so a user can
+  see how a metric actually performed without standing up BI / SQL / a 3rd-party
+  charting tool. `--report` is dual-mode: bare `--report` → default path
+  (`reports/<metric>.html`; autotune: `reports/<metric>__tuned_<id>.html`),
+  `--report <dir>` → `<dir>/<metric>.html`, `--report file.html` → that file.
+  The report reads the persisted `_dtk_*` tables, so even a `--steps load` run can
+  produce one from whatever is stored. New top-level `detectkit/reporting/` package
+  (`build_report_payload` reads `_dtk_datapoints` + `_dtk_detections` and replays
+  alerts into a JSON payload; `render_report_html` inlines the pre-built renderer
+  bundle `detectkit/reporting/assets/report.js` + the payload into one HTML file).
+- **Alert replay reconstructs the alert/recovery/no-data timeline from persisted
+  detections.** A new pure `AlertOrchestrator.replay(detections, value_at, start,
+  end)` (`detectkit/alerting/orchestrator/_replay.py`, `ReplayedEvent`) re-walks
+  the **real** decision logic (quorum / consecutive / cooldown / recovery /
+  no-data) over a historical period — no channel dispatch, no `_dtk_alert_states`
+  writes, no wall-clock. This is how the report surfaces alerts, because
+  `_dtk_alert_states` is last-writer-wins state, not an event log. It reuses the
+  existing decision/builder functions verbatim; `_resolve_incident` gained an
+  optional in-memory `records=` parameter so recovery resolution stays DB-free
+  during replay (the production path is unchanged).
+- **`InternalTablesManager.load_detections(...)`** — a new reader returning flat
+  per-(detector, timestamp) detection rows (`detector_id` / `from_timestamp` /
+  `to_timestamp` filters, `final_modifier` for correct `ReplacingMergeTree`
+  dedup), parallel to `load_datapoints`. The report builder reads through it.
+- **An interactive landing playground.** The website (`website/`) ships a
+  client-side island where a visitor shapes a synthetic metric
+  (seasonality/noise/trend/incident) and tunes the real detector
+  (MAD/zscore/iqr, threshold, window, recency, detrend, smoothing, seasonality
+  grouping, `consecutive_anomalies`) live — seeing the corridor, flagged points,
+  the trailing window used to score each point, and whether an alert would fire,
+  all in-browser with zero server compute. Its chart renderer is the **same**
+  framework-free TypeScript core (`website/src/scripts/core/canvas.ts`) the HTML
+  report uses; the report bundle is built from it by
+  `website/scripts/gen-report-bundle.mjs` (esbuild) into
+  `detectkit/reporting/assets/report.js` (a committed generated asset). The
+  playground's detector math is a TS port verified to exact parity against the
+  Python detectors (`website/scripts/check-demo-parity.mjs`, golden vectors from
+  `website/scripts/gen-demo-golden.py`).
+
 ## [0.28.0] - 2026-06-24
 
 ### Added

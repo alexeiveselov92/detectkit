@@ -106,6 +106,68 @@ class _DetectionsMixin(_InternalTablesBase):
         result = self._manager.execute_query(query, {"metric_name": metric_name})
         return {row["detector_id"]: int(row["cnt"]) for row in result if row.get("detector_id")}
 
+    def load_detections(
+        self,
+        metric_name: str,
+        detector_id: str | None = None,
+        from_timestamp: datetime | None = None,
+        to_timestamp: datetime | None = None,
+    ) -> list[dict]:
+        """Load detection rows for *metric_name* in the ``[from, to)`` range.
+
+        Returns one flat dict per ``(detector_id, timestamp)`` row, ascending by
+        timestamp. Numeric Nullable columns pass through unchanged (``None``
+        stays ``None``); ``is_anomaly`` is coerced to ``bool`` and ``timestamp``
+        is normalised to naive UTC. Mirrors :meth:`load_datapoints`.
+        """
+        full_table_name = self._manager.get_full_table_name(TABLE_DETECTIONS, use_internal=True)
+
+        where_parts = ["metric_name = %(metric_name)s"]
+        params: dict[str, Any] = {"metric_name": metric_name}
+        if detector_id:
+            where_parts.append("detector_id = %(detector_id)s")
+            params["detector_id"] = detector_id
+        if from_timestamp:
+            where_parts.append("timestamp >= %(from_timestamp)s")
+            params["from_timestamp"] = from_timestamp
+        if to_timestamp:
+            where_parts.append("timestamp < %(to_timestamp)s")
+            params["to_timestamp"] = to_timestamp
+
+        query = f"""
+        SELECT
+            timestamp,
+            detector_id,
+            detector_name,
+            is_anomaly,
+            confidence_lower,
+            confidence_upper,
+            value,
+            processed_value,
+            detector_params,
+            detection_metadata
+        FROM {full_table_name}{self._manager.final_modifier}
+        WHERE {" AND ".join(where_parts)}
+        ORDER BY timestamp, detector_id
+        """
+        results = self._manager.execute_query(query, params=params)
+
+        return [
+            {
+                "timestamp": to_naive_utc(row["timestamp"]),
+                "detector_id": row["detector_id"],
+                "detector_name": row["detector_name"],
+                "is_anomaly": bool(row["is_anomaly"]),
+                "confidence_lower": row["confidence_lower"],
+                "confidence_upper": row["confidence_upper"],
+                "value": row["value"],
+                "processed_value": row["processed_value"],
+                "detector_params": row["detector_params"],
+                "detection_metadata": row["detection_metadata"],
+            }
+            for row in results
+        ]
+
     def get_recent_detections(
         self,
         metric_name: str,

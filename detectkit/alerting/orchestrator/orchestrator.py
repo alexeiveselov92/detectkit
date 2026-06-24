@@ -6,12 +6,14 @@ from detectkit.alerting.orchestrator._cooldown import _CooldownMixin
 from detectkit.alerting.orchestrator._decision import _DecisionMixin
 from detectkit.alerting.orchestrator._dispatch import _DispatchMixin
 from detectkit.alerting.orchestrator._recovery import _RecoveryMixin
+from detectkit.alerting.orchestrator._replay import _ReplayMixin
 
 
 class AlertOrchestrator(
     _DecisionMixin,
     _CooldownMixin,
     _RecoveryMixin,
+    _ReplayMixin,
     _DispatchMixin,
 ):
     """Coordinates alert decisions, cooldown, recovery and dispatch.
@@ -21,6 +23,8 @@ class AlertOrchestrator(
     * ``_DecisionMixin`` — should we alert? builds AlertData.
     * ``_CooldownMixin`` — suppress within the configured window.
     * ``_RecoveryMixin`` — direction-aware "all-clear" detection.
+    * ``_ReplayMixin``   — pure historical replay of alert/recovery/no-data
+      events (no dispatch, no DB state, no wall-clock).
     * ``_DispatchMixin``  — ship to channels and stamp state.
     """
 

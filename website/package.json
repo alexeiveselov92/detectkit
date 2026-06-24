@@ -5,6 +5,8 @@
   "description": "Marketing landing + documentation site for detectkit (dtk.pipelab.dev)",
   "scripts": {
     "sync": "node scripts/sync-docs.mjs",
+    "check:demo-parity": "node scripts/check-demo-parity.mjs",
+    "build:report-bundle": "node scripts/gen-report-bundle.mjs",
     "dev": "npm run sync && astro dev",
     "start": "npm run dev",
     "build": "npm run sync && astro build",

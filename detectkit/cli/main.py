@@ -136,6 +136,18 @@ def init_claude(target_dir: str):
     "--profile",
     help="Profile to use (default: from project config)",
 )
+@click.option(
+    "--report",
+    "report_path",
+    is_flag=False,
+    flag_value="",
+    default=None,
+    help=(
+        "After the run, emit a self-contained HTML report per metric "
+        "(values, confidence bands, anomalies, and alerts). Optional value: "
+        "an output file or directory; defaults to reports/<metric>.html."
+    ),
+)
 def run(
     select: str,
     exclude: str,
@@ -145,6 +157,7 @@ def run(
     full_refresh: bool,
     force: bool,
     profile: str,
+    report_path: str,
 ):
     """
     Run metric processing pipeline.
@@ -186,6 +199,7 @@ def run(
         full_refresh=full_refresh,
         force=force,
         profile=profile,
+        report_path=report_path,
     )
 
 
@@ -246,6 +260,18 @@ def run(
     is_flag=True,
     help="Run the search but persist nothing and write no config",
 )
+@click.option(
+    "--report",
+    "report_path",
+    is_flag=False,
+    flag_value="",
+    default=None,
+    help=(
+        "After tuning, emit a self-contained HTML report for the winning "
+        "config (values, confidence bands, anomalies, alerts). Optional value: "
+        "an output file or directory; defaults to reports/<metric>__tuned_<id>.html."
+    ),
+)
 def autotune(
     select: str,
     incidents_path: str,
@@ -258,6 +284,7 @@ def autotune(
     profile: str,
     force: bool,
     dry_run: bool,
+    report_path: str,
 ):
     """
     Automatically configure a metric's anomaly detector.
@@ -298,6 +325,7 @@ def autotune(
         profile=profile,
         force=force,
         dry_run=dry_run,
+        report_path=report_path,
     )
 
 

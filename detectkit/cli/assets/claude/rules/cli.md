@@ -37,7 +37,7 @@ across the project; duplicates raise an error listing the conflicting files.
 
 ```bash
 dtk run --select <sel> [--steps load,detect,alert] [--from DATE] [--to DATE] \
-        [--full-refresh] [--force] [--profile NAME]
+        [--full-refresh] [--force] [--profile NAME] [--report [PATH]]
 ```
 
 - `--steps` — which of `load`, `detect`, `alert` to run (default all); they always
@@ -52,6 +52,13 @@ dtk run --select <sel> [--steps load,detect,alert] [--from DATE] [--to DATE] \
 - `--force` — ignore a held lock and run anyway (also releases it on exit).
   Risky with concurrent runs; usually `dtk unlock` is the better recovery.
 - `--profile` — override the project's default profile (e.g. run against staging).
+- `--report [PATH]` — after the run, write a **self-contained HTML report** per
+  metric (values + per-detector confidence bands + flagged anomalies + the alerts
+  that fired + a summary, with client-side period selection). It is offline — open
+  it in a browser, nothing leaves the page. The report reads the persisted `_dtk_*`
+  tables, so even a `--steps load` run can produce one. Dual-mode: bare `--report`
+  → `reports/<metric>.html`; `--report <dir>` → `<dir>/<metric>.html`;
+  `--report file.html` → that file.
 
 ## `dtk autotune --select <sel>`
 
@@ -60,7 +67,10 @@ history window, then writes an annotated `metrics/<name>__tuned_<id>.yml`. Reads
 the metric's loaded datapoints (run `dtk run --steps load` first if empty), never
 edits the original, never alerts. `--incidents FILE` enables supervised tuning
 against labeled incidents; without it, an unsupervised objective is used.
-`--dry-run` searches without writing. Full reference: `autotune.md`.
+`--dry-run` searches without writing. `--report [PATH]` writes the same
+self-contained HTML report as `dtk run` for the tuned winner (default
+`reports/<metric>__tuned_<id>.html`; `<dir>` or a `.html` file also accepted).
+Full reference: `autotune.md`.
 
 ## `dtk test-alert <metric>`
 

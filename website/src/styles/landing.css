@@ -2234,3 +2234,327 @@
     height: 560px;
   }
 }
+
+/* ============================================================================
+   Interactive playground (#dkx). Fully self-contained + namespaced so the whole
+   block (markup + these rules + src/scripts/demo/) can be removed in one go.
+   ========================================================================== */
+.dkx-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+.dkx-card .hidden {
+  display: none !important;
+}
+
+/* ----- chart ----- */
+.dkx-chart {
+  padding: 22px 22px 14px;
+}
+.dkx-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+.dkx-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.dkx-legend-hint {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+}
+.dkx-sw {
+  display: inline-block;
+  flex: none;
+}
+.dkx-sw-line {
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--clay);
+}
+.dkx-sw-band {
+  width: 16px;
+  height: 11px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--clay) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--clay) 38%, transparent);
+}
+.dkx-sw-anom {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--st-anomaly);
+}
+.dkx-sw-miss {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+}
+.dkx-plot {
+  position: relative;
+  width: 100%;
+  height: 360px;
+  background: var(--term-bg);
+  border: 1px solid var(--term-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.dkx-plot canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+.dkx-readout {
+  margin-top: 10px;
+  min-height: 1.5em;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow-x: auto;
+}
+.dkx-readout .dkx-ro-k {
+  color: var(--faint);
+  margin-left: 12px;
+}
+.dkx-readout .dkx-ro-k:first-child {
+  margin-left: 0;
+}
+.dkx-readout .dkx-ro-v {
+  font-weight: 600;
+  margin-left: 12px;
+}
+.dkx-readout .dkx-ro-anom {
+  color: var(--st-anomaly);
+}
+.dkx-readout .dkx-ro-ok {
+  color: var(--accent-green);
+}
+
+/* ----- scorecard ----- */
+.dkx-score {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 1px;
+  background: var(--border);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.dkx-stat {
+  flex: 1 1 0;
+  min-width: 92px;
+  padding: 14px 16px;
+  background: var(--surface);
+  text-align: center;
+}
+.dkx-stat-v {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.dkx-stat-k {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+  margin-top: 4px;
+}
+.dkx-alert {
+  flex: 2 1 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 14px 18px;
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+.dkx-alert.fires {
+  color: var(--st-anomaly);
+  background: color-mix(in srgb, var(--st-anomaly) 8%, var(--surface));
+}
+.dkx-alert.quiet {
+  color: var(--muted);
+}
+.dkx-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+.dkx-dot-anom {
+  background: var(--st-anomaly);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-anomaly) 22%, transparent);
+}
+.dkx-dot-ok {
+  background: var(--accent-green);
+}
+
+/* ----- controls ----- */
+.dkx-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+.dkx-group {
+  padding: 20px 22px;
+}
+.dkx-group:first-child {
+  border-right: 1px solid var(--border);
+}
+.dkx-group-h {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--clay);
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.dkx-ctl {
+  display: block;
+  margin-bottom: 15px;
+}
+.dkx-ctl-k {
+  display: block;
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+.dkx-ctl-v {
+  font-family: var(--mono);
+  color: var(--clay-700);
+  font-weight: 600;
+}
+.dkx-ctl-k b {
+  font-weight: 600;
+}
+
+/* segmented button group */
+.dkx-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dkx-seg button {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 6px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+.dkx-seg button:hover {
+  border-color: color-mix(in srgb, var(--clay) 45%, var(--border));
+  color: var(--ink);
+}
+.dkx-seg button.on {
+  background: var(--clay);
+  border-color: var(--clay);
+  color: #fff;
+}
+
+/* range inputs */
+.dkx-ctl input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--border);
+  outline: none;
+}
+.dkx-ctl input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--clay);
+  border: 2px solid var(--surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.dkx-ctl input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--clay);
+  cursor: pointer;
+}
+.dkx-reseed {
+  margin-top: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 7px 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--muted);
+  cursor: pointer;
+}
+.dkx-reseed:hover {
+  border-color: color-mix(in srgb, var(--clay) 45%, var(--border));
+  color: var(--ink);
+}
+
+/* effective-config echo */
+.dkx-config-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  padding: 14px 22px;
+  border-top: 1px solid var(--border);
+  background: var(--paper);
+}
+.dkx-config-k {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+  flex: none;
+}
+.dkx-config-row code {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--clay-700);
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .dkx-controls {
+    grid-template-columns: 1fr;
+  }
+  .dkx-group:first-child {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .dkx-plot {
+    height: 300px;
+  }
+}

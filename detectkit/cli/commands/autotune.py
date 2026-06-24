@@ -333,6 +333,7 @@ def run_autotune(
     profile: str | None,
     force: bool,
     dry_run: bool,
+    report_path: str | None = None,
 ) -> None:
     """Auto-tune each selected metric's detector configuration."""
     from_dt = parse_date(from_date) if from_date else None
@@ -342,6 +343,7 @@ def run_autotune(
     if loaded is None:
         return
     project_root, _project_config, internal_manager, _db_manager = loaded
+    project_name = getattr(_project_config, "name", None)
 
     try:
         metrics = select_metrics(select, project_root)
@@ -369,6 +371,8 @@ def run_autotune(
             to_dt=to_dt,
             force=force,
             dry_run=dry_run,
+            report_path=report_path,
+            project_name=project_name,
         )
         if ok:
             succeeded += 1
@@ -391,6 +395,8 @@ def _tune_one(
     to_dt: datetime | None,
     force: bool,
     dry_run: bool,
+    report_path: str | None = None,
+    project_name: str | None = None,
 ) -> bool:
     """Tune one metric end to end; return True on success."""
     name = config.name
@@ -526,6 +532,9 @@ def _tune_one(
             ground_truth=ground_truth,
             dry_run=dry_run,
             project_root=project_root,
+            config=config,
+            report_path=report_path,
+            project_name=project_name,
         )
         internal_manager.release_lock(name, "pipeline", "pipeline", status="completed")
         return True
@@ -559,6 +568,9 @@ def _finalize(
     ground_truth: GroundTruth,
     dry_run: bool,
     project_root: Path,
+    config: MetricConfig | None = None,
+    report_path: str | None = None,
+    project_name: str | None = None,
 ) -> None:
     """Persist run + winner detections + tuned config, prune prior winners, render RESULT."""
     folds = " ".join(f"{f:.2f}" for f in result.cv_per_fold) or "—"
@@ -622,6 +634,33 @@ def _finalize(
 
     # Write the annotated tuned config.
     out_path.write_text(config_text, encoding="utf-8")
+
+    # Optional: emit an HTML report for the tuned window (winner's bands +
+    # anomalies + replayed alerts under the metric's alerting rules).
+    if report_path is not None and config is not None:
+        try:
+            from detectkit.cli.commands.run import _resolve_report_path
+            from detectkit.reporting import build_report_payload, render_report_html
+            from detectkit.utils.datetime_utils import now_utc_naive
+
+            ts = data["timestamp"]
+            start = ts[0].astype("datetime64[ms]").astype(datetime) if len(ts) else None
+            end = ts[-1].astype("datetime64[ms]").astype(datetime) if len(ts) else None
+            payload = build_report_payload(
+                metric_config=config,
+                internal=internal_manager,
+                start=start,
+                end=end,
+                project_name=project_name,
+                generated_at=now_utc_naive().strftime("%Y-%m-%d %H:%M UTC"),
+            )
+            if payload["points"]:
+                report_out = _resolve_report_path(report_path, project_root, out_path.stem)
+                report_out.parent.mkdir(parents=True, exist_ok=True)
+                report_out.write_text(render_report_html(payload), encoding="utf-8")
+                children.append(f"Report → {report_out.relative_to(project_root)}")
+        except Exception as report_error:  # never fail tuning on a report
+            children.append(f"Report skipped: {report_error}")
 
     children.append(f"Wrote {out_path.relative_to(project_root)}  (run_id={run_id})")
     children.append(

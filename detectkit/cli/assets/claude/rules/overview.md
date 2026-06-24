@@ -82,6 +82,16 @@ detectors agreeing under a `direction` policy) that must hold for
 and the rule it fired on, with the anomaly shown as evidence. See
 `alerting.md`.
 
+## Seeing results — HTML reports
+
+Beyond alerts, `dtk run --select <m> --report` (and `dtk autotune --report`)
+writes a **self-contained HTML report**: the metric's values, each detector's
+confidence band, flagged anomalies, and the alerts/recoveries/no-data it fired,
+over a selectable period — so you can see how a metric behaved without standing
+up BI or a SQL dashboard. Offline, nothing leaves the browser. Bare `--report`
+writes `reports/<metric>.html`; pass a directory or a `.html` path to override.
+See `cli.md`.
+
 ## Glossary
 
 - **metric** — a named time series (SQL + interval) you monitor.

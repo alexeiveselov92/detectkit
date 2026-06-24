@@ -96,8 +96,9 @@ user through it:
    with an optional **description**). Adjust one by dragging its **edges**, or its
    **middle** to move it; optionally **name the set**; *remove* / *Clear all* fix
    mistakes.
-3. Click **Save & tune**. The server writes `incidents/<name>/<set>-<UTC>.yml`
-   automatically (versioned — re-labeling never overwrites) and the **same command
+3. Click **Save & tune**. The server writes `incidents/<metric>/<metric>[-<set>]-<UTC>.yml`
+   automatically (named after the metric, with the optional set name as a suffix;
+   versioned — re-labeling never overwrites) and the **same command
    continues into the tuning run on it**. No manual file moving.
 
 (`--no-serve` is the offline fallback: it writes a static

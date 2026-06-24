@@ -5,6 +5,27 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.0] - 2026-06-24
+
+### Fixed
+- **`dtk autotune` no longer emits an invalid config for metrics whose seasonality
+  comes from the query.** When a metric sources seasonality via
+  `query_columns.seasonality` (custom columns such as `league_day`), the tuner could
+  pick a grouping over those columns and then duplicate them into the top-level
+  `seasonality_columns` field — which is validated against the built-in allowlist
+  (`hour`, `day_of_week`, …) and is *ignored* by the loader in that mode. The result
+  was a `MetricConfig` validation error and no tuned config written (`0 succeeded`).
+  The emitter now keeps query-provided seasonality columns in `query_columns` only;
+  the chosen grouping still rides in the detector's `seasonality_components`, so
+  detection behavior is unchanged.
+
+### Changed
+- **The labeler names exported/saved files after the metric**, with the optional set
+  name folded in as a suffix: `<metric>[-<set>]-<UTC>.yml` (e.g.
+  `api_error_rate-outage-20260624T010252Z.yml`, or `api_error_rate-<UTC>.yml` with no
+  set name). Previously a typed set name *replaced* the metric name in the filename;
+  now it is always appended, so every labeling round stays grouped under the metric.
+
 ## [0.23.2] - 2026-06-24
 
 ### Added

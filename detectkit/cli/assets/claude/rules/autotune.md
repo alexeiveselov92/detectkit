@@ -53,7 +53,8 @@ dtk autotune --select <sel> [--incidents FILE] [--label] [--scoring METRIC] \
   non-interactively) tunes **unsupervised**.
 - `--label` — open the interactive labeler (zoom/pan, edit incident edges,
   per-incident descriptions, named sets). **Default:** a local 127.0.0.1 server +
-  browser; **Save & tune** writes `incidents/<name>/<set>-<UTC>.yml` and the run
+  browser; **Save & tune** writes `incidents/<metric>/<metric>[-<set>]-<UTC>.yml`
+  (named after the metric, optional set name as a suffix) and the run
   **continues into tuning on it**. `--no-serve` writes a static
   `metrics/<name>__labeler.html` (Export downloads the file) and exits; `--no-open`
   prints the URL instead of launching a browser.
@@ -91,7 +92,8 @@ user to recall timestamps** — it is the easiest, most reliable path:
 2. The user marks incidents on the chart (scroll to zoom, drag the navigator to
    move, click-drag to mark, drag an incident's edges to adjust, add a
    description, optionally name the set), then clicks **Save & tune**.
-3. That writes `incidents/<name>/<set>-<UTC>.yml` automatically (versioned —
+3. That writes `incidents/<metric>/<metric>[-<set>]-<UTC>.yml` automatically
+   (named after the metric, optional set name as a suffix; versioned —
    re-labeling never overwrites) and the **same command continues into the tuning
    run** on it. No manual file moving.
 4. To re-tune later on saved sets, point `--incidents` at the folder

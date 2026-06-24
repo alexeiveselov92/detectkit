@@ -36,7 +36,7 @@ def _post(url_base, token, name, yaml_text):
 
 def test_sanitize():
     assert _sanitize("My Outage!") == "my-outage"
-    assert _sanitize("   ") == "incidents"
+    assert _sanitize("   ") == ""  # blank → no suffix (file is named after the metric)
     assert _sanitize("a/b\\c") == "a-b-c"
     assert _sanitize("CheckOut_5xx") == "checkout_5xx"
 
@@ -71,8 +71,36 @@ def test_server_saves_valid_labels(tmp_path):
         th.join(timeout=5)  # server stops itself after a successful save
         assert server.saved_path is not None and server.saved_path.exists()
         assert server.saved_path.parent == inc
-        assert server.saved_path.name.startswith("set-one-")
+        # File is named after the metric; the set name rides along as a suffix.
+        assert server.saved_path.name.startswith("demo-set-one-")
         assert "outage" in server.saved_path.read_text()
+    finally:
+        try:
+            server.shutdown()
+        except Exception:
+            pass
+        server.server_close()
+
+
+def test_server_filename_without_set_name(tmp_path):
+    """A blank set name yields a file named after the metric alone (no leading dash)."""
+    inc = tmp_path / "incidents" / "demo"
+    server, url = build_label_server(
+        metric_name="demo", data=_data(), incidents_dir=inc, interval_seconds=3600
+    )
+    th = _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        y = (
+            "metric: demo\ntimezone: UTC\nincidents:\n"
+            "  - {start: '2026-01-02 00:00:00', end: '2026-01-02 06:00:00', label: 'outage'}\n"
+        )
+        r = _post(base, token, "", y)
+        assert r.status == 200
+        th.join(timeout=5)
+        assert server.saved_path is not None and server.saved_path.exists()
+        assert server.saved_path.name.startswith("demo-")
+        assert not server.saved_path.name.startswith("demo--")  # no empty suffix
     finally:
         try:
             server.shutdown()

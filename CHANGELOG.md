@@ -5,6 +5,16 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.1] - 2026-06-24
+
+### Changed
+- **Made the threshold-capture time window discoverable.** The per-period window
+  (added in 0.26.0) was only reachable by dragging the chart, with no visible cue
+  — the reset button appeared only after a window existed. The threshold bar now
+  always shows the current scope (`period: current view — drag the chart to limit
+  it`, or `period: <span>` once set), and the on-chart readout prompts `drag the
+  chart to pick a period` before a line is set. No behavior change.
+
 ## [0.26.0] - 2026-06-24
 
 ### Added

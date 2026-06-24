@@ -348,7 +348,7 @@ def _tune_one(
     if label:
         click.echo(click.style(f"Processing metric: {name}", fg="cyan", bold=True))
         if no_serve:
-            html = render_labeler_html(name, data)
+            html = render_labeler_html(name, data, interval_seconds=interval_seconds)
             out = project_root / "metrics" / f"{metric_path.stem}__labeler.html"
             out.write_text(html, encoding="utf-8")
             click.echo(f"  Wrote labeler: {out.relative_to(project_root)}")

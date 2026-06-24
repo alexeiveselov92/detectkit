@@ -5,6 +5,13 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.2] - 2026-06-24
+
+### Added
+- **The labeler shows the metric's sampling interval** as a highlighted chip next
+  to the metric name (e.g. `interval 1h`) — the point spacing, taken straight from
+  the metric (inferred from the series when not provided).
+
 ## [0.23.1] - 2026-06-24
 
 ### Added

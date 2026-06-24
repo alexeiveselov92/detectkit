@@ -113,6 +113,7 @@
     <label>bridge gaps ≤
       <input id="thgap" class="num" type="number" min="0" step="1" value="0" /> intervals
     </label>
+    <button id="thwin" class="ghost" style="display:none" title="capture across the whole current view again">↺ whole view</button>
     <button id="thadd" class="primary" disabled>Add 0 spans</button>
     <button id="thdone" class="ghost">Done</button>
   </div>
@@ -125,8 +126,10 @@
   <canvas id="ov" aria-label="navigator — drag the window to pan, its edges to stretch the view"></canvas>
   <div class="navhint">Drag on an empty area to mark an incident · drag an existing incident's edges to
   adjust it, or its middle to move it · click its <b>✕</b> (or select it and press Delete) to remove it ·
-  use <b>Threshold capture</b> to grab every span past a horizontal line at once · <b>focus</b> a row to jump
-  the chart to it · scroll to zoom, double-click to reset · drag the navigator window below to pan.</div>
+  use <b>Threshold capture</b> to grab every span past a horizontal line at once (click sets the line; drag
+  across the chart to limit it to a time window — handy when the metric behaves differently across periods) ·
+  <b>focus</b> a row to jump the chart to it · scroll to zoom, double-click to reset · drag the navigator
+  window below to pan.</div>
   <div id="empty" class="empty">No incidents marked yet — drag across a span on the chart above.</div>
   <ul id="list"></ul>
   <footer>All times UTC · self-contained, nothing leaves your browser · re-label any time —
@@ -168,6 +171,9 @@ let dpr = 1, hover = null, dragging = null, ovAct = null;
 // selObj: the currently selected incident (object ref, survives re-sorting);
 // hoverRow/hoverDel: list-row / ✕-handle hover targets; threshold-capture state.
 let selObj = null, hoverRow = -1, hoverDel = -1, thMode = false, thHover = null;
+// Threshold-capture window: thDown tracks a press, thDragWin a live drag, capWin
+// the committed custom window (null → capture within the current view).
+let thDown = null, thDragWin = null, capWin = null;
 
 const clamp = (x,a,b) => Math.max(a, Math.min(b, x));
 const vspan = () => viewMax - viewMin;
@@ -240,11 +246,20 @@ const vAt = clientY => { const r=c.getBoundingClientRect();
 // The active threshold value: the locked input wins, else the live cursor value.
 function thEff() { const s=thvalEl.value.trim();
   return (s!=='' && !isNaN(Number(s))) ? Number(s) : thHover; }
-// Contiguous runs of points on the chosen side of the line, bridging short gaps.
+// The active capture window: a live/committed custom window, else the current
+// view — so the threshold only grabs the period you're looking at (or painted),
+// not the whole series. Returns [lo, hi] in ms.
+function capRange() {
+  const w = thDragWin || capWin;
+  if (w) return [Math.min(w.a,w.b), Math.max(w.a,w.b)];
+  return [viewMin, viewMax]; }
+// Contiguous runs of points on the chosen side of the line within the capture
+// window, bridging short gaps.
 function thRuns() { const val=thEff(); if (val===null) return [];
   const dir=thdirEl.value, gapMax=Math.max(0, parseInt(thgapEl.value)||0);
+  const win=capRange(), lo=win[0], hi=win[1];
   const runs=[]; let s=null, e=null, gap=0;
-  for (let i=0;i<N;i++) { const p=pts[i];
+  for (let i=0;i<N;i++) { const p=pts[i]; if (p.ts<lo || p.ts>hi) continue;
     const q = p.v!==null && (dir==='above' ? p.v>val : p.v<val);
     if (q) { if (s===null) s=p.ts; e=p.ts; gap=0; }
     else if (s!==null) { gap++; if (gap>gapMax) { runs.push([s,e]); s=null; gap=0; } } }
@@ -264,8 +279,8 @@ function addCaptured(a,b) {
   if (host===null) incidents.push({a, b, label:''}); }
 function toggleTh(on) { thMode = (on===undefined) ? !thMode : !!on;
   thbtnEl.classList.toggle('active', thMode); thbarEl.style.display = thMode ? 'flex' : 'none';
-  if (thMode) { hover=null; } else { thHover=null; }
-  c.style.cursor = thMode ? 'row-resize' : 'crosshair'; if (thMode) thCount(); draw(); }
+  if (thMode) { hover=null; } else { thHover=null; thDown=null; thDragWin=null; capWin=null; updateThWin(); }
+  c.style.cursor = thMode ? 'crosshair' : 'crosshair'; if (thMode) { updateThWin(); thCount(); } draw(); }
 
 function rr(g,x,y,w,h,r) { g.beginPath();
   g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
@@ -312,9 +327,20 @@ function draw() {
   if (dragging && dragging.mode==='new') { const x0=px(dragging.a), x1=px(dragging.b);
     ctx.fillStyle='rgba(240,173,78,0.28)'; ctx.fillRect(Math.min(x0,x1), M.t*dpr, Math.abs(x1-x0), plotH()); }
   drawSeries(ctx, px, py, viewMin, viewMax, M.l*dpr, plotW(), '#d15b36', 1.5);
-  if (thMode) { const val=thEff(); if (val!==null && val>=vmin && val<=vmax) { const yy=py(val);
-    ctx.strokeStyle='#f0ad4e'; ctx.lineWidth=1.5*dpr; ctx.setLineDash([6*dpr,4*dpr]);
-    ctx.beginPath(); ctx.moveTo(M.l*dpr, yy); ctx.lineTo(c.width-M.r*dpr, yy); ctx.stroke(); ctx.setLineDash([]); } }
+  if (thMode) {
+    const win=capRange(), narrow = !!(thDragWin || capWin);
+    const xlo=clamp(px(win[0]), M.l*dpr, c.width-M.r*dpr), xhi=clamp(px(win[1]), M.l*dpr, c.width-M.r*dpr);
+    if (narrow) {  // dim everything outside the capture window
+      ctx.fillStyle='rgba(27,25,22,0.5)';
+      ctx.fillRect(M.l*dpr, M.t*dpr, xlo-M.l*dpr, plotH());
+      ctx.fillRect(xhi, M.t*dpr, (c.width-M.r*dpr)-xhi, plotH());
+      ctx.strokeStyle='rgba(240,173,78,0.7)'; ctx.lineWidth=1*dpr; ctx.setLineDash([3*dpr,3*dpr]);
+      ctx.beginPath(); ctx.moveTo(xlo,M.t*dpr); ctx.lineTo(xlo,c.height-M.b*dpr);
+      ctx.moveTo(xhi,M.t*dpr); ctx.lineTo(xhi,c.height-M.b*dpr); ctx.stroke(); ctx.setLineDash([]); }
+    const val=thEff();
+    if (val!==null && val>=vmin && val<=vmax) { const yy=py(val);
+      ctx.strokeStyle='#f0ad4e'; ctx.lineWidth=1.5*dpr; ctx.setLineDash([6*dpr,4*dpr]);
+      ctx.beginPath(); ctx.moveTo(xlo, yy); ctx.lineTo(xhi, yy); ctx.stroke(); ctx.setLineDash([]); } }
   ctx.restore();
   if (thMode) drawThLabel();
   else if (dragging && !ovAct) drawDragLabel();
@@ -325,8 +351,9 @@ function draw() {
 // would be captured.
 function drawThLabel() {
   const val=thEff(); if (val===null) return;
-  const n=thRuns().length;
-  const text='line '+fmtVal(val)+'  ·  '+thdirEl.value+'  ·  '+n+' span'+(n===1?'':'s');
+  const n=thRuns().length, win=capRange(), narrow = !!(thDragWin || capWin);
+  const text='line '+fmtVal(val)+'  ·  '+thdirEl.value+'  ·  '+n+' span'+(n===1?'':'s')
+    + (narrow ? ('  ·  '+fmtDur(win[1]-win[0])+' window') : '');
   ctx.font=(11*dpr)+'px ui-monospace, monospace';
   const tw=ctx.measureText(text).width, bw=tw+14*dpr, bh=22*dpr, bx=M.l*dpr+6*dpr, by=M.t*dpr+2;
   ctx.fillStyle='rgba(27,25,22,0.96)'; ctx.strokeStyle='#f0ad4e'; ctx.lineWidth=1*dpr;
@@ -427,7 +454,9 @@ function hitIncident(clientX, clientY) {
   return null;
 }
 c.addEventListener('mousedown', e => {
-  if (thMode) { thvalEl.value = String(Math.round(vAt(e.clientY)*1000)/1000); thCount(); draw(); return; }
+  // In threshold mode a press either sets the line (a click) or paints a capture
+  // window (a horizontal drag) — resolved on mouseup by how far it moved.
+  if (thMode) { thDown = {x:e.clientX, ts:tsAt(e.clientX)}; thHover = vAt(e.clientY); thCount(); draw(); return; }
   const hit = hitIncident(e.clientX, e.clientY), t = tsAt(e.clientX);
   if (hit && hit.edge==='del') { removeIncident(incidents[hit.i]); return; }
   if (hit && hit.edge==='move') { const iv=incidents[hit.i]; selObj=iv;
@@ -437,7 +466,10 @@ c.addEventListener('mousedown', e => {
   else { selObj=null; dragging={mode:'new', a:t, b:t, sx:e.clientX, cx:e.clientX}; draw(); }
 });
 c.addEventListener('mousemove', e => { if (ovAct) return;
-  if (thMode && !dragging) { thHover=vAt(e.clientY); thCount(); draw(); return; }
+  if (thMode && !dragging) {
+    if (thDown && Math.abs(e.clientX - thDown.x) > 6) { thDragWin = {a: thDown.ts, b: tsAt(e.clientX)}; }
+    else { if (thDown) thDragWin = null; thHover = vAt(e.clientY); }
+    thCount(); draw(); return; }
   if (dragging) {
     dragging.cx=e.clientX; const t=tsAt(e.clientX);
     if (dragging.mode==='new') { dragging.b=t; }
@@ -475,8 +507,16 @@ window.addEventListener('mousemove', e => { if (!ovAct) return; const t=ovTsAtCs
   if (ovAct.type==='l') setView(Math.min(t, viewMax-minSpan), viewMax);
   else if (ovAct.type==='r') setView(viewMin, Math.max(t, viewMin+minSpan));
   else { const d=t-ovAct.grab; setView(ovAct.vMin+d, ovAct.vMax+d); } });
-window.addEventListener('mouseup', () => {
+window.addEventListener('mouseup', e => {
   if (ovAct) { ovAct=null; return; }
+  if (thMode && thDown) {
+    if (Math.abs(e.clientX - thDown.x) > 6) {  // a drag → set the capture window
+      const a=thDown.ts, b=tsAt(e.clientX); capWin = {a:Math.min(a,b), b:Math.max(a,b)};
+    } else {  // a click → set the threshold line value
+      thvalEl.value = String(Math.round(vAt(e.clientY)*1000)/1000);
+    }
+    thDown=null; thDragWin=null; updateThWin(); thCount(); draw(); return;
+  }
   if (!dragging) return;
   if (dragging.mode==='new') {
     if (Math.abs(dragging.cx-dragging.sx) > 4) {
@@ -510,7 +550,9 @@ window.focusInc = i => { const iv=incidents[i]; if (!iv) return; selObj=iv;
 const thbtnEl=document.getElementById('thbtn'), thbarEl=document.getElementById('thbar');
 const thvalEl=document.getElementById('thval'), thdirEl=document.getElementById('thdir');
 const thgapEl=document.getElementById('thgap'), thaddEl=document.getElementById('thadd');
-const thdoneEl=document.getElementById('thdone');
+const thdoneEl=document.getElementById('thdone'), thwinEl=document.getElementById('thwin');
+function updateThWin() { thwinEl.style.display = capWin ? '' : 'none'; }
+thwinEl.onclick = () => { capWin=null; updateThWin(); thCount(); draw(); };
 thbtnEl.onclick = () => toggleTh();
 thdoneEl.onclick = () => toggleTh(false);
 thdirEl.onchange = () => { thCount(); draw(); };

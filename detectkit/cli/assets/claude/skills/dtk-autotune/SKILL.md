@@ -101,6 +101,9 @@ user through it:
 3. When many outliers are obvious, use **Threshold capture**: set a horizontal
    line (hover the chart or type a value), pick **above/below**, optionally bridge
    small gaps, and **Add N spans** marks them all at once — then tidy with the ✕.
+   It captures within the current view by default; **drag across the chart** to
+   limit it to a time window (so a metric that behaves differently across periods
+   can take a different boundary in each). **↺ whole view** clears the window.
 4. Click **Save & tune**. The server writes `incidents/<metric>/<metric>[-<set>]-<UTC>.yml`
    automatically (named after the metric, with the optional set name as a suffix;
    versioned — re-labeling never overwrites) and the **same command

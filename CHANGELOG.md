@@ -5,6 +5,19 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.0] - 2026-06-24
+
+### Added
+- **Threshold capture can be scoped to a time window.** Previously the labeler's
+  threshold capture scanned the whole series, so one boundary had to fit every
+  period. Now it captures within the **current view** by default, and you can
+  **drag horizontally across the chart** to paint a narrower capture window — the
+  area outside dims, the dashed line spans only the window, and the readout shows
+  its span. This lets a metric that behaved differently across history take a
+  different above/below boundary per period. **↺ whole view** clears the window;
+  the existing flow is unchanged (a click sets the line, a horizontal drag sets
+  the window).
+
 ## [0.25.0] - 2026-06-24
 
 ### Added

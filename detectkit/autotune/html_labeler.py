@@ -6,6 +6,14 @@ incident spans (with an optional per-incident description) and exports a labels
 file in the canonical schema, fed back via
 ``dtk autotune --select <metric> --incidents <file-or-dir>``.
 
+It can be **seeded with existing incidents** (the ``incidents=`` argument) so a
+labels file can be opened and edited in place — the round-trip flow of filling
+incidents in over time. Beyond click-drag marking it supports **threshold
+capture** (grab every contiguous span above/below a horizontal line in one
+gesture), **on-chart deletion** (each band carries an ✕ handle; the selected
+band also responds to the Delete key), and an in-browser **Import** button that
+loads a labels file you pick (YAML/JSON).
+
 The page is offline-only — a browser cannot write to the project, so Export
 downloads a **versioned** file named after the metric, with the optional set name
 folded in as a suffix (``<metric>[-<name>]-<UTC-stamp>.yml``); drop it into
@@ -21,6 +29,7 @@ release checklist).
 
 from __future__ import annotations
 
+import base64
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -33,13 +42,30 @@ def _ts_to_str(ts64: np.datetime64) -> str:
     return (datetime(1970, 1, 1) + timedelta(milliseconds=ms)).strftime("%Y-%m-%d %H:%M:%S")
 
 
+# The brand mark, served as the page favicon (data URI, no network). Mirrors the
+# inline header logo + website/public/favicon.svg (.claude/rules/design.md).
+_FAVICON_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+    '<rect x="3" y="3" width="94" height="94" rx="26" fill="#D15B36"/>'
+    '<polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" '
+    'stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>'
+    '<circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>'
+)
+
+
+def _favicon_data_uri() -> str:
+    b64 = base64.b64encode(_FAVICON_SVG.encode("utf-8")).decode("ascii")
+    return "data:image/svg+xml;base64," + b64
+
+
 # Built with .replace() (not .format()), so braces are literal — keep them single.
 # Self-contained: inline brand styling/logo/JS, no network. Palette + fonts mirror
 # website/src/styles/brand.css (.claude/rules/design.md); incident bands use the
-# anomaly status color, the drag preview the no-data color.
+# anomaly status color, the drag preview / threshold guide the no-data color.
 _TEMPLATE = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="__FAVICON__">
 <title>detectkit · label incidents · __METRIC__</title>
 <style>
   :root {
@@ -72,8 +98,10 @@ _TEMPLATE = """<!doctype html>
     padding: 9px 15px; cursor: pointer; transition: background .12s ease, border-color .12s ease, color .12s ease; }
   button.primary { background: var(--clay); color: #fff; }
   button.primary:hover { background: var(--clay-700); }
+  button.primary:disabled { background: var(--term-border); color: var(--faint); cursor: default; }
   button.ghost { background: transparent; color: var(--term-text); border: 1px solid var(--term-border); }
   button.ghost:hover { border-color: var(--faint); color: var(--paper); }
+  button.ghost.active { border-color: var(--nodata); color: var(--paper); background: rgba(240,173,78,0.16); }
   input.setname { background: var(--term-surface); color: var(--paper); border: 1px solid var(--term-border);
     border-radius: 7px; padding: 9px 11px; font-family: var(--ui); font-size: 13px; min-width: 200px; }
   input.setname::placeholder { color: var(--muted); }
@@ -84,17 +112,27 @@ _TEMPLATE = """<!doctype html>
   .savemsg.ok { display: block; color: var(--accent-green, #2e9e73); }
   .savemsg.err { display: block; color: var(--anomaly); }
   .savemsg.info { display: block; color: var(--faint); }
+  .thbar { display:none; flex-wrap:wrap; gap:12px; align-items:center; margin: 0 0 12px;
+    padding: 11px 13px; border: 1px solid var(--nodata); border-radius: 9px; background: var(--term-surface); }
+  .thbar .thlabel { color: var(--nodata); font-size: 12.5px; font-weight: 600; }
+  .thbar label { color: var(--faint); font-size: 12.5px; display:inline-flex; align-items:center; gap:6px; }
+  .thbar select, .thbar input { background: var(--term-bg); color: var(--paper); border: 1px solid var(--term-border);
+    border-radius: 6px; padding: 6px 8px; font-family: var(--ui); font-size: 12.5px; }
+  .thbar input.num { width: 84px; font-family: var(--mono); }
+  .thbar input:focus, .thbar select:focus { outline: none; border-color: var(--nodata); }
+  .thbar button { padding: 7px 13px; }
   canvas#c { width: 100%; height: clamp(300px, 44vh, 500px); display:block; touch-action: none;
     background: var(--term-surface); border: 1px solid var(--term-border); border-radius: 10px; cursor: crosshair; }
   .zoombar { display:flex; align-items:center; gap:8px; margin: 10px 0 6px; }
   .rangelbl { margin-left: auto; color: var(--faint); font-size: 12px; font-family: var(--mono); }
   canvas#ov { width: 100%; height: 66px; display:block; touch-action: none;
     background: var(--term-surface); border: 1px solid var(--term-border); border-radius: 10px; cursor: grab; }
-  .navhint { color: var(--faint); font-size: 12px; margin: 7px 2px 0; }
+  .navhint { color: var(--faint); font-size: 12px; margin: 7px 2px 0; line-height: 1.55; }
   .empty { color: var(--faint); font-size: 13px; margin: 18px 2px; font-style: italic; }
   ul { list-style: none; margin: 16px 0 0; padding: 0; }
   li { display:flex; align-items:center; gap:11px; padding: 9px 12px; font-size: 13px; flex-wrap: wrap;
     border: 1px solid var(--term-border); border-radius: 8px; margin-bottom: 7px; background: var(--term-surface); }
+  li.sel { border-color: var(--clay); background: rgba(209,91,54,0.10); }
   li .dot { width:9px; height:9px; border-radius:50%; background: var(--anomaly); flex: 0 0 auto; }
   li .span { font-family: var(--mono); color: var(--term-text); }
   li .dur { color: var(--faint); font-size: 12px; }
@@ -103,6 +141,8 @@ _TEMPLATE = """<!doctype html>
   li input.desc::placeholder { color: var(--muted); }
   li input.desc:focus { outline: none; border-color: var(--clay); }
   li button { margin-left: auto; padding: 5px 11px; font-size: 12px; }
+  li button.focus { margin-left: auto; }
+  li button.focus + button { margin-left: 0; }
   footer { margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--term-border);
     color: var(--faint); font-size: 12px; line-height: 1.6; }
   footer code { font-family: var(--mono); color: var(--term-text); }
@@ -118,10 +158,27 @@ _TEMPLATE = """<!doctype html>
   <b>Export</b>. Save the file into <code class="k">incidents/__METRIC__/</code> and run
   <code class="k">dtk autotune --select __METRIC__ --incidents incidents/__METRIC__/</code></p>
   <div class="toolbar">
+    <button id="importbtn" class="ghost" title="open an existing labels file to keep editing">Import file…</button>
+    <input id="file" type="file" accept=".yml,.yaml,.json,.txt" style="display:none">
     <input id="setname" class="setname" type="text" placeholder="name this set (optional)" />
     <button id="export" class="primary">Export labels</button>
+    <button id="thbtn" class="ghost" title="capture every span above or below a horizontal line">Threshold capture</button>
     <button id="clear" class="ghost">Clear all</button>
     <span id="summary" class="summary"></span>
+  </div>
+  <div id="thbar" class="thbar">
+    <span class="thlabel">Threshold capture</span>
+    <label>grab points
+      <select id="thdir"><option value="above">above the line</option><option value="below">below the line</option></select>
+    </label>
+    <label>line value
+      <input id="thval" class="num" type="number" step="any" placeholder="hover chart" />
+    </label>
+    <label>bridge gaps ≤
+      <input id="thgap" class="num" type="number" min="0" step="1" value="0" /> intervals
+    </label>
+    <button id="thadd" class="primary" disabled>Add 0 spans</button>
+    <button id="thdone" class="ghost">Done</button>
   </div>
   <div id="savemsg" class="savemsg"></div>
   <canvas id="c" aria-label="metric series — drag to mark an incident, scroll to zoom"></canvas>
@@ -131,8 +188,9 @@ _TEMPLATE = """<!doctype html>
   </div>
   <canvas id="ov" aria-label="navigator — drag the window to pan, its edges to stretch the view"></canvas>
   <div class="navhint">Drag on an empty area to mark an incident · drag an existing incident's edges to
-  adjust it, or its middle to move it · scroll to zoom, double-click to reset · drag the navigator
-  window below to pan, its edges to stretch / squeeze the view.</div>
+  adjust it, or its middle to move it · click its <b>✕</b> (or select it and press Delete) to remove it ·
+  use <b>Threshold capture</b> to grab every span past a horizontal line at once · <b>focus</b> a row to jump
+  the chart to it · scroll to zoom, double-click to reset · drag the navigator window below to pan.</div>
   <div id="empty" class="empty">No incidents marked yet — drag across a span on the chart above.</div>
   <ul id="list"></ul>
   <footer>All times UTC · self-contained, nothing leaves your browser · re-label any time —
@@ -148,6 +206,9 @@ const SAVE_URL = __SAVE_URL__;
 // The metric's sampling interval (seconds). Passed straight from the metric when
 // known; otherwise inferred from the median spacing of points.
 const INTERVAL_S = __INTERVAL__;
+// Incidents to seed the editor with (editing an existing labels file). Each is
+// {start, end, label} in "YYYY-MM-DD HH:MM:SS" UTC; a point is start === end.
+const PRELOAD = __INCIDENTS__;
 const pts = DATA.points.map(p => ({ts: Date.parse(p.t.replace(' ','T')+'Z'), v: p.v}));
 const N = pts.length;
 const vraw = pts.filter(p => p.v !== null).map(p => p.v);
@@ -160,10 +221,17 @@ const step = fullSpan / Math.max(1, N - 1);
 const minSpan = Math.max(step * 8, 1000);
 let viewMin = tmin, viewMax = tmax;
 const incidents = [];
+// Seed from PRELOAD so re-opening a saved labels file continues where it left off.
+PRELOAD.forEach(p => { const a = Date.parse(String(p.start).replace(' ','T')+'Z'),
+  b = Date.parse(String(p.end).replace(' ','T')+'Z');
+  if (!isNaN(a) && !isNaN(b)) incidents.push({a: Math.min(a,b), b: Math.max(a,b), label: p.label || ''}); });
 const c = document.getElementById('c'), ov = document.getElementById('ov');
 const ctx = c.getContext('2d'), octx = ov.getContext('2d');
 const M = {l:56, r:16, t:14, b:30}, OM = {l:56, r:16, t:8, b:8};
 let dpr = 1, hover = null, dragging = null, ovAct = null;
+// selObj: the currently selected incident (object ref, survives re-sorting);
+// hoverRow/hoverDel: list-row / ✕-handle hover targets; threshold-capture state.
+let selObj = null, hoverRow = -1, hoverDel = -1, thMode = false, thHover = null;
 
 const clamp = (x,a,b) => Math.max(a, Math.min(b, x));
 const vspan = () => viewMax - viewMin;
@@ -228,6 +296,54 @@ function drawSeries(ctx2, xfn, yfn, lo, hi, leftDev, widthDev, color, lw) {
   ctx2.stroke();
 }
 
+// Value at a CSS-pixel Y on the chart (inverse of py) — used to read the
+// threshold line off the cursor.
+const vAt = clientY => { const r=c.getBoundingClientRect();
+  const fr=((clientY-r.top)-M.t)/((r.height-(M.t+M.b))||1);
+  return vmax - clamp(fr,0,1)*(vmax-vmin); };
+// The active threshold value: the locked input wins, else the live cursor value.
+function thEff() { const s=thvalEl.value.trim();
+  return (s!=='' && !isNaN(Number(s))) ? Number(s) : thHover; }
+// Contiguous runs of points on the chosen side of the line, bridging short gaps.
+function thRuns() { const val=thEff(); if (val===null) return [];
+  const dir=thdirEl.value, gapMax=Math.max(0, parseInt(thgapEl.value)||0);
+  const runs=[]; let s=null, e=null, gap=0;
+  for (let i=0;i<N;i++) { const p=pts[i];
+    const q = p.v!==null && (dir==='above' ? p.v>val : p.v<val);
+    if (q) { if (s===null) s=p.ts; e=p.ts; gap=0; }
+    else if (s!==null) { gap++; if (gap>gapMax) { runs.push([s,e]); s=null; gap=0; } } }
+  if (s!==null) runs.push([s,e]);
+  return runs; }
+function thCount() { const n=thRuns().length;
+  thaddEl.textContent = 'Add '+n+' span'+(n===1?'':'s'); thaddEl.disabled = n===0; }
+// Add a captured span, merging it into any overlapping incidents (a single span
+// can bridge several) into one band that keeps the first one's label.
+function addCaptured(a,b) {
+  let host=null;
+  for (let i=incidents.length-1;i>=0;i--) { const iv=incidents[i];
+    if (a<=iv.b && b>=iv.a) {
+      if (host===null) { iv.a=Math.min(iv.a,a); iv.b=Math.max(iv.b,b); host=iv; }
+      else { host.a=Math.min(host.a,iv.a); host.b=Math.max(host.b,iv.b);
+        if (selObj===iv) selObj=host; incidents.splice(i,1); } } }
+  if (host===null) incidents.push({a, b, label:''}); }
+function toggleTh(on) { thMode = (on===undefined) ? !thMode : !!on;
+  thbtnEl.classList.toggle('active', thMode); thbarEl.style.display = thMode ? 'flex' : 'none';
+  if (thMode) { hover=null; } else { thHover=null; }
+  c.style.cursor = thMode ? 'row-resize' : 'crosshair'; if (thMode) thCount(); draw(); }
+
+function rr(g,x,y,w,h,r) { g.beginPath();
+  g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
+  g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+// The ✕ delete handle at a band's top-right (device px); `hot` brightens it.
+function drawDelHandle(x1, hot) { const s=14*dpr, m=3*dpr, bx=x1-s-m, by=M.t*dpr+m;
+  ctx.fillStyle = hot ? 'rgba(214,50,50,0.95)' : 'rgba(27,25,22,0.82)';
+  ctx.strokeStyle = 'rgba(214,50,50,0.9)'; ctx.lineWidth = 1*dpr;
+  rr(ctx, bx, by, s, s, 3*dpr); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = hot ? '#fff' : '#d63232'; ctx.lineWidth = 1.5*dpr;
+  const p=4*dpr; ctx.beginPath();
+  ctx.moveTo(bx+p, by+p); ctx.lineTo(bx+s-p, by+s-p);
+  ctx.moveTo(bx+s-p, by+p); ctx.lineTo(bx+p, by+s-p); ctx.stroke(); }
+
 function draw() {
   ctx.clearRect(0,0,c.width,c.height);
   ctx.font = (11*dpr)+'px ui-sans-serif, system-ui, sans-serif';
@@ -241,19 +357,46 @@ function draw() {
     ctx.fillStyle='#6e675b'; ctx.textAlign=i===0?'left':i===5?'right':'center';
     ctx.fillText(fmtTick(ts,vspan()), xx, (c.height-M.b+8)*dpr); }
   ctx.save(); ctx.beginPath(); ctx.rect(M.l*dpr, M.t*dpr, plotW(), plotH()); ctx.clip();
-  incidents.forEach(iv => { const x0=px(iv.a), x1=px(iv.b);
-    ctx.fillStyle='rgba(214,50,50,0.20)'; ctx.fillRect(x0, M.t*dpr, x1-x0, plotH());
-    ctx.strokeStyle='rgba(214,50,50,0.55)'; ctx.lineWidth=1*dpr; ctx.strokeRect(x0, M.t*dpr, x1-x0, plotH());
+  // Threshold-capture preview bands (amber), under the committed incident bands.
+  if (thMode) { const val=thEff(); if (val!==null) thRuns().forEach(r => {
+    const x0=px(r[0]), w=Math.max(px(r[1])-x0, 2*dpr);
+    ctx.fillStyle='rgba(240,173,78,0.22)'; ctx.fillRect(x0, M.t*dpr, w, plotH());
+    ctx.strokeStyle='rgba(240,173,78,0.6)'; ctx.lineWidth=1*dpr; ctx.strokeRect(x0, M.t*dpr, w, plotH()); }); }
+  incidents.forEach((iv,idx) => { const x0=px(iv.a), x1=px(iv.b), w=Math.max(x1-x0, 2*dpr);
+    const isSel=(iv===selObj), isHov=(idx===hoverRow);
+    ctx.fillStyle = (isSel||isHov) ? 'rgba(214,50,50,0.32)' : 'rgba(214,50,50,0.20)';
+    ctx.fillRect(x0, M.t*dpr, w, plotH());
+    ctx.strokeStyle = isSel ? 'rgba(214,50,50,0.95)' : isHov ? 'rgba(214,50,50,0.78)' : 'rgba(214,50,50,0.55)';
+    ctx.lineWidth=(isSel?2:1)*dpr; ctx.strokeRect(x0, M.t*dpr, w, plotH());
     // draggable edge handles
     ctx.fillStyle='rgba(214,50,50,0.95)';
     ctx.fillRect(x0-1.5*dpr, M.t*dpr, 3*dpr, plotH());
-    ctx.fillRect(x1-1.5*dpr, M.t*dpr, 3*dpr, plotH()); });
+    ctx.fillRect(x1-1.5*dpr, M.t*dpr, 3*dpr, plotH());
+    if ((x1-x0) >= 22*dpr || isSel) drawDelHandle(x1, isSel || idx===hoverDel); });
   if (dragging && dragging.mode==='new') { const x0=px(dragging.a), x1=px(dragging.b);
     ctx.fillStyle='rgba(240,173,78,0.28)'; ctx.fillRect(Math.min(x0,x1), M.t*dpr, Math.abs(x1-x0), plotH()); }
   drawSeries(ctx, px, py, viewMin, viewMax, M.l*dpr, plotW(), '#d15b36', 1.5);
+  if (thMode) { const val=thEff(); if (val!==null && val>=vmin && val<=vmax) { const yy=py(val);
+    ctx.strokeStyle='#f0ad4e'; ctx.lineWidth=1.5*dpr; ctx.setLineDash([6*dpr,4*dpr]);
+    ctx.beginPath(); ctx.moveTo(M.l*dpr, yy); ctx.lineTo(c.width-M.r*dpr, yy); ctx.stroke(); ctx.setLineDash([]); } }
   ctx.restore();
-  if (dragging && !ovAct) drawDragLabel();
+  if (thMode) drawThLabel();
+  else if (dragging && !ovAct) drawDragLabel();
   else if (hover && !ovAct) drawHover();
+}
+
+// Readout while picking a threshold: the line value, side, and how many spans
+// would be captured.
+function drawThLabel() {
+  const val=thEff(); if (val===null) return;
+  const n=thRuns().length;
+  const text='line '+fmtVal(val)+'  ·  '+thdirEl.value+'  ·  '+n+' span'+(n===1?'':'s');
+  ctx.font=(11*dpr)+'px ui-monospace, monospace';
+  const tw=ctx.measureText(text).width, bw=tw+14*dpr, bh=22*dpr, bx=M.l*dpr+6*dpr, by=M.t*dpr+2;
+  ctx.fillStyle='rgba(27,25,22,0.96)'; ctx.strokeStyle='#f0ad4e'; ctx.lineWidth=1*dpr;
+  ctx.fillRect(bx, by, bw, bh); ctx.strokeRect(bx, by, bw, bh);
+  ctx.fillStyle='#f0ad4e'; ctx.textAlign='left'; ctx.textBaseline='middle';
+  ctx.fillText(text, bx+7*dpr, by+bh/2);
 }
 
 // Live time readout while marking/resizing/moving an incident, so you can place
@@ -263,7 +406,7 @@ function drawDragLabel() {
   if (dragging.mode==='new') {
     const a=Math.min(dragging.a,dragging.b), b=Math.max(dragging.a,dragging.b);
     text = fmtTs(a)+'  →  '+fmtTs(b); atTs = dragging.b;
-  } else { const iv=incidents[dragging.i]; if (!iv) return;
+  } else { const iv=dragging.iv; if (!iv) return;
     if (dragging.mode==='edge') {
       const old = dragging.edge==='a' ? dragging.a0 : dragging.b0;
       const cur = dragging.edge==='a' ? iv.a : iv.b;
@@ -329,13 +472,17 @@ const ovEdgeCss = ts => { const r=ov.getBoundingClientRect();
 c.addEventListener('wheel', e => { e.preventDefault(); const t=tsAt(e.clientX);
   let s=clamp(vspan()*Math.pow(1.0015, e.deltaY), minSpan, fullSpan);
   const f=(t-viewMin)/(vspan()||1); setView(t-f*s, t-f*s+s); }, {passive:false});
-// Hit-test an existing incident edge / body in CSS px (for editing vs creating).
+// Hit-test an existing incident's ✕ handle / edge / body in CSS px.
 const EDGE_PX = 6;
 const minStep = () => Math.max(step, 1);
 const pxCss = ts => { const r=c.getBoundingClientRect();
   return M.l + (ts-viewMin)/(vspan()||1)*(r.width-(M.l+M.r)); };
-function hitIncident(clientX) {
-  const x = clientX - c.getBoundingClientRect().left;
+function hitIncident(clientX, clientY) {
+  const r=c.getBoundingClientRect(), x=clientX-r.left, y=clientY-r.top;
+  for (let i=0;i<incidents.length;i++) { const xa=pxCss(incidents[i].a), xb=pxCss(incidents[i].b);
+    if ((xb-xa)>=22 || incidents[i]===selObj) {
+      const s=14, m=3, hx0=xb-s-m, hy0=M.t+m;
+      if (x>=hx0 && x<=hx0+s && y>=hy0 && y<=hy0+s) return {i, edge:'del'}; } }
   for (let i=0;i<incidents.length;i++) { const xa=pxCss(incidents[i].a), xb=pxCss(incidents[i].b);
     if (Math.abs(x-xa)<=EDGE_PX) return {i, edge:'a'};
     if (Math.abs(x-xb)<=EDGE_PX) return {i, edge:'b'}; }
@@ -344,32 +491,36 @@ function hitIncident(clientX) {
   return null;
 }
 c.addEventListener('mousedown', e => {
-  const hit = hitIncident(e.clientX), t = tsAt(e.clientX);
-  if (hit && hit.edge==='move') { const iv=incidents[hit.i];
-    dragging={mode:'move', i:hit.i, grab:t, a0:iv.a, b0:iv.b, sx:e.clientX, cx:e.clientX}; }
-  else if (hit) { const iv=incidents[hit.i];
-    dragging={mode:'edge', i:hit.i, edge:hit.edge, a0:iv.a, b0:iv.b, sx:e.clientX, cx:e.clientX}; }
-  else dragging={mode:'new', a:t, b:t, sx:e.clientX, cx:e.clientX};
+  if (thMode) { thvalEl.value = String(Math.round(vAt(e.clientY)*1000)/1000); thCount(); draw(); return; }
+  const hit = hitIncident(e.clientX, e.clientY), t = tsAt(e.clientX);
+  if (hit && hit.edge==='del') { removeIncident(incidents[hit.i]); return; }
+  if (hit && hit.edge==='move') { const iv=incidents[hit.i]; selObj=iv;
+    dragging={mode:'move', iv, grab:t, a0:iv.a, b0:iv.b, sx:e.clientX, cx:e.clientX}; render(); }
+  else if (hit) { const iv=incidents[hit.i]; selObj=iv;
+    dragging={mode:'edge', iv, edge:hit.edge, a0:iv.a, b0:iv.b, sx:e.clientX, cx:e.clientX}; draw(); }
+  else { selObj=null; dragging={mode:'new', a:t, b:t, sx:e.clientX, cx:e.clientX}; draw(); }
 });
 c.addEventListener('mousemove', e => { if (ovAct) return;
+  if (thMode && !dragging) { thHover=vAt(e.clientY); thCount(); draw(); return; }
   if (dragging) {
     dragging.cx=e.clientX; const t=tsAt(e.clientX);
     if (dragging.mode==='new') { dragging.b=t; }
-    else if (dragging.mode==='edge') { const iv=incidents[dragging.i]; if (!iv) return;
+    else if (dragging.mode==='edge') { const iv=dragging.iv; if (!iv) return;
       if (dragging.edge==='a') iv.a=clamp(Math.min(t, iv.b-minStep()), tmin, tmax);
       else iv.b=clamp(Math.max(t, iv.a+minStep()), tmin, tmax); }
-    else if (dragging.mode==='move') { const iv=incidents[dragging.i]; if (!iv) return;
+    else if (dragging.mode==='move') { const iv=dragging.iv; if (!iv) return;
       let na=dragging.a0+(t-dragging.grab), nb=dragging.b0+(t-dragging.grab);
       if (na<tmin) { nb+=tmin-na; na=tmin; } if (nb>tmax) { na-=nb-tmax; nb=tmax; }
       iv.a=clamp(na,tmin,tmax); iv.b=clamp(nb,tmin,tmax); }
     draw();
   } else {
-    const hit=hitIncident(e.clientX);
-    c.style.cursor = hit ? (hit.edge==='move' ? 'grab' : 'ew-resize') : 'crosshair';
+    const hit=hitIncident(e.clientX, e.clientY);
+    hoverDel = (hit && hit.edge==='del') ? hit.i : -1;
+    c.style.cursor = hit ? (hit.edge==='del' ? 'pointer' : hit.edge==='move' ? 'grab' : 'ew-resize') : 'crosshair';
     hover={ts:tsAt(e.clientX)}; draw();
   }
 });
-c.addEventListener('mouseleave', () => { if (!dragging) { hover=null; draw(); } });
+c.addEventListener('mouseleave', () => { if (!dragging) { hover=null; hoverDel=-1; draw(); } });
 
 ov.addEventListener('mousedown', e => { e.preventDefault(); ov.style.cursor='grabbing';
   const xl=ovEdgeCss(viewMin), xr=ovEdgeCss(viewMax), x=e.clientX, H=8;
@@ -394,32 +545,102 @@ window.addEventListener('mouseup', () => {
   if (dragging.mode==='new') {
     if (Math.abs(dragging.cx-dragging.sx) > 4) {
       const a=clamp(Math.min(dragging.a,dragging.b),tmin,tmax), b=clamp(Math.max(dragging.a,dragging.b),tmin,tmax);
-      incidents.push({a, b, label:''});
-    }
-  } else { const iv=incidents[dragging.i];  // edge/move: keep start <= end
+      const iv={a, b, label:''}; incidents.push(iv); selObj=iv;
+    } else { selObj=null; }  // a plain click on empty space clears the selection
+  } else { const iv=dragging.iv;  // edge/move: keep start <= end
     if (iv && iv.a>iv.b) { const t=iv.a; iv.a=iv.b; iv.b=t; } }
   dragging=null; render();
 });
 
+// Remove an incident by object reference (survives list re-sorting).
+function removeIncident(iv) { const k=incidents.indexOf(iv); if (k<0) return;
+  incidents.splice(k,1); if (selObj===iv) selObj=null; hoverDel=-1; render(); }
+window.addEventListener('keydown', e => {
+  const t=e.target, typing = t && (t.tagName==='INPUT' || t.tagName==='TEXTAREA' || t.isContentEditable);
+  if (e.key==='Escape') { if (thMode) toggleTh(false); else if (selObj) { selObj=null; draw(); } return; }
+  if ((e.key==='Delete' || e.key==='Backspace') && selObj && !typing) { e.preventDefault(); removeIncident(selObj); }
+});
+
 document.getElementById('zreset').onclick = () => setView(tmin, tmax);
-c.addEventListener('dblclick', () => setView(tmin, tmax));
-document.getElementById('clear').onclick = () => { incidents.length=0; render(); };
+c.addEventListener('dblclick', () => { if (!thMode) setView(tmin, tmax); });
+document.getElementById('clear').onclick = () => { incidents.length=0; selObj=null; render(); };
 window.setLabel = (i, val) => { if (incidents[i]) incidents[i].label = val; };
-window.rm = i => { incidents.splice(i,1); render(); };
+window.rm = i => { const iv=incidents[i]; if (iv && selObj===iv) selObj=null; incidents.splice(i,1); render(); };
+window.hl = i => { hoverRow=i; draw(); };
+window.focusInc = i => { const iv=incidents[i]; if (!iv) return; selObj=iv;
+  const pad=Math.max((iv.b-iv.a)*1.5, step*10, minSpan*0.5); setView(iv.a-pad, iv.b+pad); render(); };
+
+// Threshold-capture controls.
+const thbtnEl=document.getElementById('thbtn'), thbarEl=document.getElementById('thbar');
+const thvalEl=document.getElementById('thval'), thdirEl=document.getElementById('thdir');
+const thgapEl=document.getElementById('thgap'), thaddEl=document.getElementById('thadd');
+const thdoneEl=document.getElementById('thdone');
+thbtnEl.onclick = () => toggleTh();
+thdoneEl.onclick = () => toggleTh(false);
+thdirEl.onchange = () => { thCount(); draw(); };
+thgapEl.oninput = () => { thCount(); draw(); };
+thvalEl.oninput = () => { thCount(); draw(); };
+thaddEl.onclick = () => { const runs=thRuns(); if (!runs.length) return;
+  runs.forEach(r => addCaptured(r[0], r[1]));
+  setMsg('Added '+runs.length+' incident'+(runs.length===1?'':'s')+' from the threshold — review and tidy below.', 'ok');
+  render(); thCount(); };
+
+// Import an existing labels file (YAML/JSON) the user picks, merging it in.
+const fileEl=document.getElementById('file');
+document.getElementById('importbtn').onclick = () => fileEl.click();
+function normEntry(e) { const lab = e.label!=null ? String(e.label) : '';
+  const toMs = s => Date.parse(String(s).trim().replace(' ','T')+'Z');
+  if (e.at!=null) { const t=toMs(e.at); return isNaN(t) ? null : {a:t, b:t, label:lab}; }
+  if (e.start!=null && e.end!=null) { const a=toMs(e.start), b=toMs(e.end);
+    return (isNaN(a)||isNaN(b)) ? null : {a:Math.min(a,b), b:Math.max(a,b), label:lab}; }
+  return null; }
+function parseLabelsText(txt) {
+  txt = txt.trim();
+  if (txt[0]==='[' || txt[0]==='{') { try { const j=JSON.parse(txt);
+    const arr = Array.isArray(j) ? j : (j.incidents || []);
+    return arr.map(normEntry).filter(Boolean); } catch (e) { /* fall through to YAML */ } }
+  const out=[], lines=txt.split(/\\r?\\n/); let cur=null;
+  const flush = () => { if (cur) { const e=normEntry(cur); if (e) out.push(e); cur=null; } };
+  for (let ln of lines) {
+    if (/^\\s*-/.test(ln)) { flush(); cur={}; ln=ln.replace(/^\\s*-\\s*/, ''); }
+    if (cur===null) continue;
+    // strip only the wrapping braces of a flow map, so braces inside a quoted
+    // label survive (a global brace strip would mangle them).
+    ln = ln.trim();
+    if (ln[0]==='{') ln=ln.slice(1);
+    if (ln[ln.length-1]==='}') ln=ln.slice(0,-1);
+    const re=/(start|end|at|label)\\s*:\\s*("([^"]*)"|'([^']*)'|[^,]+)/g; let m;
+    while ((m=re.exec(ln))) { const k=m[1];
+      const v = m[3]!==undefined ? m[3] : (m[4]!==undefined ? m[4] : m[2]); cur[k]=String(v).trim(); } }
+  flush();
+  return out; }
+fileEl.onchange = ev => { const f=ev.target.files && ev.target.files[0]; if (!f) return;
+  const rd=new FileReader();
+  rd.onload = () => { try { const got=parseLabelsText(String(rd.result));
+      if (!got.length) { setMsg('No incidents found in '+f.name+'.', 'err'); }
+      else { got.forEach(g => incidents.push(g)); render();
+        setMsg('Imported '+got.length+' incident'+(got.length===1?'':'s')+' from '+f.name+'.', 'ok'); }
+    } catch (err) { setMsg('Could not read '+f.name+': '+err.message, 'err'); }
+    fileEl.value=''; };
+  rd.readAsText(f); };
 
 function render() {
   incidents.sort((p,q)=>p.a-q.a);
   const list=document.getElementById('list');
-  list.innerHTML = incidents.map((iv,i)=>'<li><span class="dot"></span>'
+  list.innerHTML = incidents.map((iv,i)=>'<li data-k="'+i+'" class="'+(iv===selObj?'sel':'')+'"'
+    +' onmouseenter="hl('+i+')" onmouseleave="hl(-1)"><span class="dot"></span>'
     +'<span class="span">'+fmtTs(iv.a)+' &rarr; '+fmtTs(iv.b)+'</span>'
     +'<span class="dur">'+fmtDur(iv.b-iv.a)+'</span>'
     +'<input class="desc" type="text" placeholder="describe this incident (optional)" '
     +'value="'+esc(iv.label||'')+'" oninput="setLabel('+i+', this.value)">'
+    +'<button class="ghost focus" title="zoom the chart to this incident" onclick="focusInc('+i+')">focus</button>'
     +'<button class="ghost" onclick="rm('+i+')">remove</button></li>').join('');
   document.getElementById('empty').style.display = incidents.length ? 'none' : '';
   const total=incidents.reduce((s,iv)=>s+(iv.b-iv.a),0);
   document.getElementById('summary').innerHTML = incidents.length
     ? '<b>'+incidents.length+'</b> incident'+(incidents.length>1?'s':'')+' · '+fmtDur(total)+' total' : '';
+  if (selObj) { const k=incidents.indexOf(selObj);
+    if (k>=0 && list.children[k]) list.children[k].scrollIntoView({block:'nearest'}); }
   drawAll();
 }
 
@@ -488,6 +709,7 @@ def render_labeler_html(
     *,
     save_url: str | None = None,
     interval_seconds: int | None = None,
+    incidents: list[dict[str, str]] | None = None,
 ) -> str:
     """Return a self-contained HTML labeler page for *metric_name*'s series.
 
@@ -495,6 +717,9 @@ def render_labeler_html(
     Export button POSTs the labels straight to that endpoint; without it (a static
     file) Export falls back to a browser download. ``interval_seconds`` is the
     metric's sampling interval shown as a chip (inferred from the data if omitted).
+    ``incidents`` seeds the editor with already-labeled spans (each a
+    ``{"start", "end", "label"}`` dict in naive-UTC ``"YYYY-MM-DD HH:MM:SS"``; a
+    point is ``start == end``) so an existing labels file can be opened and edited.
     """
     import json
 
@@ -505,8 +730,11 @@ def render_labeler_html(
         v = values[i]
         points.append({"t": _ts_to_str(timestamps[i]), "v": None if np.isnan(v) else float(v)})
     payload = json_dumps_sorted({"metric": metric_name, "points": points})
+    preload = json_dumps_sorted(incidents or [])
     return (
         _TEMPLATE.replace("__PAYLOAD__", payload)
+        .replace("__INCIDENTS__", preload)
+        .replace("__FAVICON__", _favicon_data_uri())
         .replace("__SAVE_URL__", json.dumps(save_url))
         .replace("__INTERVAL__", json.dumps(interval_seconds))
         .replace("__METRIC__", metric_name)

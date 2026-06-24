@@ -28,7 +28,13 @@ from detectkit.autotune import (
     run_autotune_engine,
 )
 from detectkit.autotune.label_server import serve_labeler
-from detectkit.autotune.labels import GroundTruth, IncidentLabels, parse_incident_labels
+from detectkit.autotune.labels import (
+    GroundTruth,
+    IncidentLabels,
+    incidents_to_display,
+    load_incidents_for_display,
+    parse_incident_labels,
+)
 from detectkit.cli._output import echo_done, echo_error, echo_noop
 from detectkit.cli.commands.run import find_project_root, parse_date, select_metrics
 from detectkit.config.metric_config import AutoTuneConfig, MetricConfig
@@ -108,6 +114,64 @@ def _labels_files(directory: Path) -> list[Path]:
     for pattern in _LABELS_GLOBS:
         files.extend(directory.glob(pattern))
     return sorted(files, key=lambda p: (p.name, p.stat().st_mtime))
+
+
+def _resolve_preload_incidents(
+    *,
+    metric: str,
+    interval_seconds: int,
+    incidents_path: str | None,
+    autotune_cfg: AutoTuneConfig,
+    project_root: Path,
+) -> tuple[list[dict[str, str]], Path | None]:
+    """Existing incidents to seed the labeler with (edit-in-place flow).
+
+    Tries, in order: the ``--incidents`` flag, the config ``labels_file``, then the
+    default versioned dir ``incidents/<metric>/`` (where ``--label`` saves). A
+    directory resolves to its newest file. Best-effort — a missing/invalid file
+    just yields an empty seed (and a warning), never aborting the labeling flow.
+    """
+    candidates: list[Path] = []
+    explicit = incidents_path or autotune_cfg.labels_file
+    if explicit:
+        p = Path(explicit)
+        candidates.append(p if p.is_absolute() else project_root / p)
+    candidates.append(project_root / "incidents" / metric)
+    for cand in candidates:
+        try:
+            if cand.is_dir():
+                files = _labels_files(cand)
+                if not files:
+                    continue
+                target = files[-1]
+            elif cand.exists():
+                target = cand
+            else:
+                continue
+            disp = load_incidents_for_display(
+                target, interval_seconds=interval_seconds, metric_name=metric
+            )
+            return disp, target
+        except Exception as exc:  # noqa: BLE001 — preload is a best-effort convenience
+            click.echo(click.style(f"  Could not preload {cand}: {exc}", fg="yellow"))
+            return [], None
+
+    # No file on disk — fall back to inline config incidents (mirrors the
+    # precedence in _resolve_labels) so an inline-labeled metric also seeds.
+    if autotune_cfg.incidents:
+        try:
+            labels = parse_incident_labels(
+                {
+                    "incidents": autotune_cfg.incidents,
+                    "timezone": autotune_cfg.incidents_timezone,
+                },
+                interval_seconds=interval_seconds,
+                metric_name=metric,
+            )
+            return incidents_to_display(labels), None
+        except Exception as exc:  # noqa: BLE001 — best-effort convenience
+            click.echo(click.style(f"  Could not preload inline incidents: {exc}", fg="yellow"))
+    return [], None
 
 
 def _pick_labels_file(files: list[Path]) -> tuple[Path, str]:
@@ -347,8 +411,26 @@ def _tune_one(
     # move the downloaded export in yourself); --no-open skips launching a browser.
     if label:
         click.echo(click.style(f"Processing metric: {name}", fg="cyan", bold=True))
+        preload, preload_src = _resolve_preload_incidents(
+            metric=name,
+            interval_seconds=interval_seconds,
+            incidents_path=incidents_path,
+            autotune_cfg=autotune_cfg,
+            project_root=project_root,
+        )
+        if preload:
+            if preload_src is None:
+                where: object = "inline config"
+            else:
+                try:
+                    where = preload_src.relative_to(project_root)
+                except ValueError:  # an absolute path outside the project tree
+                    where = preload_src
+            click.echo(f"  Editing {len(preload)} existing incident(s) from {where}")
         if no_serve:
-            html = render_labeler_html(name, data, interval_seconds=interval_seconds)
+            html = render_labeler_html(
+                name, data, interval_seconds=interval_seconds, incidents=preload
+            )
             out = project_root / "metrics" / f"{metric_path.stem}__labeler.html"
             out.write_text(html, encoding="utf-8")
             click.echo(f"  Wrote labeler: {out.relative_to(project_root)}")
@@ -364,6 +446,7 @@ def _tune_one(
             interval_seconds=interval_seconds,
             open_browser=not no_open,
             echo=click.echo,
+            preload=preload,
         )
         if saved is None:
             echo_noop(name, "labeling cancelled — no labels saved")

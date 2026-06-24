@@ -145,14 +145,27 @@ Then, in the browser:
    on a long span with a small step.
 2. **Mark**: click-drag across the chart to mark each incident (red band + a row
    below with an optional **description**, exported as `label:`). **Adjust** an
-   existing incident by dragging its **edges**, or its **middle** to move it;
-   *remove* / *Clear all* fix mistakes. Optionally **name the set**.
-3. Click **Save & tune**. The server writes a **versioned** file
+   existing incident by dragging its **edges**, or its **middle** to move it.
+   **Remove** one by clicking its **✕** on the chart, or selecting it and pressing
+   **Delete** — no need to hunt for its row; **focus** on a row jumps the chart to
+   that incident; *Clear all* resets. Optionally **name the set**.
+3. **Threshold capture** (for many obvious outliers): toggle it, set a horizontal
+   line (hover the chart, or type an exact **line value**), choose **above / below**,
+   optionally **bridge gaps ≤ N intervals**, and **Add N spans** marks every
+   qualifying span at once — then tidy any stragglers with the ✕.
+4. Click **Save & tune**. The server writes a **versioned** file
    `incidents/<metric>/<metric>[-<set>]-<UTC>.yml` (named after the metric, with the
    optional set name folded in as a suffix; re-labeling adds a new file — nothing is
    overwritten, so the full history is kept) and the command **continues straight
    into the tuning run** on it. Nothing is exposed off your machine, and nothing
    is written until you save.
+
+**Editing an existing set.** `--label` **seeds the page from the metric's newest
+saved set** (or from `--incidents <file-or-dir>`, the config `autotune.labels_file`,
+or inline `autotune.incidents` — the same precedence as a normal run), so you can
+keep filling incidents in over time — open, mark a few more, **Save & tune** writes
+the next version. The static page also has an **Import file…** button to load any
+labels file you pick back in.
 
 Variants: `--no-serve` writes a static `metrics/<metric>__labeler.html` you open
 and whose **Export** downloads the file (then move it into `incidents/<metric>/`

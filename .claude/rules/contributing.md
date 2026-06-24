@@ -198,10 +198,15 @@ pick accents with `status_color(alert_data)` so status reads from color.
    `CLAUDE.md` block is intentionally version-less, so a no-op upgrade doesn't
    churn it; it changes only when the shipped content changes.) The command lives in
    `detectkit/cli/commands/init_claude.py` (tests:
-   `tests/unit/test_init_claude.py`). Adding a new shipped rule or skill (e.g.
-   `rules/autotune.md`, `skills/dtk-autotune/`) also means extending
+   `tests/unit/test_init_claude.py`). Adding or removing a shipped rule or skill
+   (e.g. `rules/autotune.md`, `skills/dtk-autotune/`) also means: (a) extending
    `test_init_claude.py` — `RULE_FILES` is matched as an **exact set** and each
-   skill is asserted present.
+   skill is asserted present; **and (b)** updating the landing's `dtk init-claude`
+   terminal block (`claudeLines`) and the "_… skills_" prose in
+   `website/src/pages/index.astro`, which reproduce the real command output —
+   the rule/skill list and the "(N created)" total must match
+   `dtk init-claude --target-dir <tmp>` (the marketing page deliberately drops the
+   `vX.Y.Z` suffix the CLI prints so it doesn't churn every release).
 5. **Run the gate** — `python3 -m pytest tests/unit` and
    `pre-commit run --all-files` must pass.
 6. **Build & publish** the wheel/sdist.

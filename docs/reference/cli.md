@@ -600,11 +600,17 @@ dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml
 
 ##### `--label` (flag)
 
-Write a self-contained HTML chart of the metric's series to
-`metrics/<metric>__labeler.html` so you can mark incidents visually. Open it in a
-browser, mark each incident, and use its **Export** button to download a labels
-file in the format above — then re-run with `--incidents`. **Generate-and-exit** —
-no DB writes, no search.
+Open the interactive labeler to mark incidents visually, then tune on them in the
+same command. By default it starts a local `127.0.0.1` browser labeler; **Save &
+tune** writes a versioned file into `incidents/<metric>/` and the run continues
+into tuning. Mark incidents by click-drag, or use **Threshold capture** to grab
+every span above/below a horizontal line at once; remove one with its chart-side
+**✕** or the Delete key. It **seeds from the metric's newest saved set** (or
+`--incidents <file-or-dir>`), so re-running `--label` keeps editing in place.
+`--no-serve` instead writes a static `metrics/<metric>__labeler.html` (Export
+downloads a labels file; **Import file…** loads one back); `--no-open` prints the
+URL instead of launching a browser. See the
+[`--label` reference](autotune.md#--label-flag) for the full walkthrough.
 
 ```bash
 dtk autotune --select api_error_rate --label

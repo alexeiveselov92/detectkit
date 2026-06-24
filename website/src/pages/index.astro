@@ -118,25 +118,30 @@ const logLines = [
 ];
 const logHtml = logLines.map((l) => `<div class="ln">${l}</div>`).join('');
 
-// ---- `dtk init-claude` output (matches init_claude.py + _output.py) ----
+// ---- `dtk init-claude` output (mirrors init_claude.py + _output.py). Keep the
+// rule/skill list + total in sync with detectkit/cli/assets/claude/ — the version
+// suffix the real CLI prints is intentionally dropped here so it doesn't drift
+// every release. See the release checklist in development/contributing.md. ----
 const claudeLines = [
   'Target: ~/monitoring',
   '',
   sp('  ┌─ CLAUDE.md', C.cyan, true),
   '  └─ detectkit section ' + sp('created', C.green),
   sp('  ┌─ .claude/rules/detectkit/', C.cyan, true),
-  '  │   overview.md ' + sp('(created)', C.green),
+  '  │   alerting.md ' + sp('(created)', C.green),
+  '  │   autotune.md ' + sp('(created)', C.green),
   '  │   cli.md ' + sp('(created)', C.green),
-  '  │   project.md ' + sp('(created)', C.green),
-  '  │   metrics.md ' + sp('(created)', C.green),
   '  │   detectors.md ' + sp('(created)', C.green),
-  '  └─ alerting.md ' + sp('(created)', C.green),
+  '  │   metrics.md ' + sp('(created)', C.green),
+  '  │   overview.md ' + sp('(created)', C.green),
+  '  └─ project.md ' + sp('(created)', C.green),
   sp('  ┌─ .claude/skills/', C.cyan, true),
-  '  │   dtk-setup-project/SKILL.md ' + sp('(created)', C.green),
+  '  │   dtk-autotune/SKILL.md ' + sp('(created)', C.green),
+  '  │   dtk-feedback/SKILL.md ' + sp('(created)', C.green),
   '  │   dtk-new-metric/SKILL.md ' + sp('(created)', C.green),
-  '  └─ dtk-feedback/SKILL.md ' + sp('(created)', C.green),
+  '  └─ dtk-setup-project/SKILL.md ' + sp('(created)', C.green),
   '',
-  sp('Done. Claude context ready (10 created).', C.cyan, true),
+  sp('Done. Claude context ready (12 created).', C.cyan, true),
 ];
 const claudeHtml = claudeLines.map((l) => `<div class="ln">${l}</div>`).join('');
 
@@ -704,9 +709,10 @@ const dxExplainer = (() => {
       <p class="sub">
         One command sets up <a href="https://claude.com/claude-code">Claude Code</a> for your
         project folder — a <code>CLAUDE.md</code>, a <code>.claude/rules/detectkit/</code> reference,
-        and three skills: <code>dtk-setup-project</code> (configure your database),
-        <code>dtk-new-metric</code> (scaffold a metric), and <code>dtk-feedback</code> (file a redacted
-        bug report or feature request upstream). Now an assistant writes metrics, tunes detectors,
+        and four skills: <code>dtk-setup-project</code> (configure your database),
+        <code>dtk-new-metric</code> (scaffold a metric), <code>dtk-autotune</code> (auto-tune a
+        detector against labeled incidents), and <code>dtk-feedback</code> (file a redacted bug
+        report or feature request upstream). Now an assistant writes metrics, tunes detectors,
         wires up alerts, and reports issues with full knowledge of detectkit. Re-run it after an
         upgrade to refresh the context.
       </p>

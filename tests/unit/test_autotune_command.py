@@ -350,7 +350,9 @@ def test_label_serve_then_tunes(tmp_path, monkeypatch):
     fake = FakeInternal(data)
     metric_path, config = _make_project(tmp_path)
 
-    def fake_serve(*, metric_name, data, incidents_dir, interval_seconds, open_browser, echo):
+    def fake_serve(
+        *, metric_name, data, incidents_dir, interval_seconds, open_browser, echo, preload=None
+    ):
         incidents_dir.mkdir(parents=True, exist_ok=True)
         out = incidents_dir / "demo-20260101T000000Z.yml"
         rows = "\n".join(f"  - {{at: '{_to_dt(data['timestamp'], i)}'}}" for i in (300, 301, 600))
@@ -374,3 +376,182 @@ def test_label_serve_then_tunes(tmp_path, monkeypatch):
     )
     assert ok is True
     assert fake.runs and fake.runs[0]["mode"] == "supervised"  # tuned on the saved labels
+
+
+def test_resolve_preload_incidents_from_default_dir(tmp_path):
+    """The labeler is seeded from the newest file in incidents/<metric>/ by default."""
+    from detectkit.config.metric_config import AutoTuneConfig
+
+    inc = tmp_path / "incidents" / "demo"
+    inc.mkdir(parents=True)
+    (inc / "demo-20260101T000000Z.yml").write_text(
+        "metric: demo\nincidents:\n  - {start: '2026-01-02 00:00:00', end: '2026-01-02 06:00:00', "
+        "label: 'old'}\n"
+    )
+    (inc / "demo-20260201T000000Z.yml").write_text(  # newest wins
+        "metric: demo\nincidents:\n  - {start: '2026-03-02 00:00:00', end: '2026-03-02 06:00:00', "
+        "label: 'newest'}\n"
+    )
+    preload, src = autotune_cmd._resolve_preload_incidents(
+        metric="demo",
+        interval_seconds=3600,
+        incidents_path=None,
+        autotune_cfg=AutoTuneConfig(),
+        project_root=tmp_path,
+    )
+    assert src is not None and src.name == "demo-20260201T000000Z.yml"
+    assert preload == [
+        {"start": "2026-03-02 00:00:00", "end": "2026-03-02 06:00:00", "label": "newest"}
+    ]
+
+
+def test_resolve_preload_incidents_explicit_flag_wins(tmp_path):
+    """An explicit --incidents file is preferred over the default dir."""
+    from detectkit.config.metric_config import AutoTuneConfig
+
+    (tmp_path / "incidents" / "demo").mkdir(parents=True)
+    (tmp_path / "incidents" / "demo" / "demo-20260101T000000Z.yml").write_text(
+        "metric: demo\nincidents:\n  - {at: '2026-01-09 00:00:00'}\n"
+    )
+    explicit = tmp_path / "my_labels.yml"
+    explicit.write_text(
+        "metric: demo\nincidents:\n  - {start: '2026-05-02 00:00:00', end: '2026-05-02 06:00:00'}\n"
+    )
+    preload, src = autotune_cmd._resolve_preload_incidents(
+        metric="demo",
+        interval_seconds=3600,
+        incidents_path=str(explicit),
+        autotune_cfg=AutoTuneConfig(),
+        project_root=tmp_path,
+    )
+    assert src == explicit
+    assert preload == [{"start": "2026-05-02 00:00:00", "end": "2026-05-02 06:00:00", "label": ""}]
+
+
+def test_resolve_preload_incidents_none_when_absent(tmp_path):
+    from detectkit.config.metric_config import AutoTuneConfig
+
+    preload, src = autotune_cmd._resolve_preload_incidents(
+        metric="demo",
+        interval_seconds=3600,
+        incidents_path=None,
+        autotune_cfg=AutoTuneConfig(),
+        project_root=tmp_path,
+    )
+    assert preload == [] and src is None
+
+
+def test_label_serve_preloads_existing(tmp_path, monkeypatch):
+    """--label server mode seeds the page with the metric's newest saved set."""
+    monkeypatch.setattr(autotune_cmd.sys.stdin, "isatty", lambda: False)
+    data = _series()
+    fake = FakeInternal(data)
+    metric_path, config = _make_project(tmp_path)
+    inc = tmp_path / "incidents" / "demo"
+    inc.mkdir(parents=True)
+    (inc / "demo-20260101T000000Z.yml").write_text(
+        f"metric: demo\nincidents:\n  - {{at: '{_to_dt(data['timestamp'], 300)}'}}\n"
+    )
+    captured = {}
+
+    def fake_serve(*, preload=None, **kw):
+        captured["preload"] = preload
+        out = kw["incidents_dir"] / "demo-20260102T000000Z.yml"
+        kw["incidents_dir"].mkdir(parents=True, exist_ok=True)
+        out.write_text(
+            f"metric: demo\nincidents:\n  - {{at: '{_to_dt(data['timestamp'], 600)}'}}\n"
+        )
+        return out
+
+    monkeypatch.setattr(autotune_cmd, "serve_labeler", fake_serve)
+    autotune_cmd._tune_one(
+        metric_path=metric_path,
+        config=config,
+        project_root=tmp_path,
+        internal_manager=fake,
+        incidents_path=None,
+        label=True,
+        no_serve=False,
+        scoring_override=None,
+        from_dt=None,
+        to_dt=None,
+        force=False,
+        dry_run=False,
+    )
+    assert captured["preload"] and captured["preload"][0]["start"] == _to_dt(data["timestamp"], 300)
+
+
+def test_resolve_preload_incidents_from_labels_file_config(tmp_path):
+    """The config `labels_file` seeds the labeler when no --incidents flag is given."""
+    from detectkit.config.metric_config import AutoTuneConfig
+
+    f = tmp_path / "lab.yml"
+    f.write_text(
+        "metric: demo\nincidents:\n  - {start: '2026-02-02 00:00:00', end: '2026-02-02 06:00:00'}\n"
+    )
+    preload, src = autotune_cmd._resolve_preload_incidents(
+        metric="demo",
+        interval_seconds=3600,
+        incidents_path=None,
+        autotune_cfg=AutoTuneConfig(labels_file="lab.yml"),
+        project_root=tmp_path,
+    )
+    assert src == f
+    assert preload[0]["start"] == "2026-02-02 00:00:00"
+
+
+def test_resolve_preload_incidents_from_inline_config(tmp_path):
+    """With no file anywhere, inline `autotune.incidents` still seeds the labeler."""
+    from detectkit.config.metric_config import AutoTuneConfig
+
+    cfg = AutoTuneConfig(
+        incidents=[{"start": "2026-01-02 00:00:00", "end": "2026-01-02 06:00:00", "label": "inl"}]
+    )
+    preload, src = autotune_cmd._resolve_preload_incidents(
+        metric="demo",
+        interval_seconds=3600,
+        incidents_path=None,
+        autotune_cfg=cfg,
+        project_root=tmp_path,
+    )
+    assert src is None  # inline → no source path
+    assert preload == [
+        {"start": "2026-01-02 00:00:00", "end": "2026-01-02 06:00:00", "label": "inl"}
+    ]
+
+
+def test_label_no_serve_preloads_and_tolerates_outside_path(tmp_path, monkeypatch):
+    """--label --no-serve seeds the static page, and an absolute labels path OUTSIDE
+    the project tree does not crash the run (regression: relative_to ValueError)."""
+    monkeypatch.setattr(autotune_cmd.sys.stdin, "isatty", lambda: False)
+    data = _series()
+    fake = FakeInternal(data)
+    proj = tmp_path / "proj"
+    (proj / "metrics").mkdir(parents=True)
+    metric_path = proj / "metrics" / "demo.yml"
+    config = MetricConfig(
+        name="demo", interval="1h", query="SELECT 1", seasonality_columns=["hour"]
+    )
+    outside = tmp_path / "outside_labels.yml"  # absolute, NOT under proj
+    outside.write_text(
+        "metric: demo\nincidents:\n"
+        f"  - {{start: '{_to_dt(data['timestamp'], 300)}', "
+        f"end: '{_to_dt(data['timestamp'], 305)}', label: 'seeded'}}\n"
+    )
+    ok = autotune_cmd._tune_one(
+        metric_path=metric_path,
+        config=config,
+        project_root=proj,
+        internal_manager=fake,
+        incidents_path=str(outside),
+        label=True,
+        no_serve=True,
+        scoring_override=None,
+        from_dt=None,
+        to_dt=None,
+        force=False,
+        dry_run=False,
+    )
+    assert ok is True  # did not raise on relative_to() of an outside path
+    html = (proj / "metrics" / "demo__labeler.html").read_text()
+    assert "const PRELOAD = [" in html and "seeded" in html

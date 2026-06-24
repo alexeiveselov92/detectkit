@@ -121,6 +121,9 @@ _TEMPLATE = """<!doctype html>
   .thbar input.num { width: 84px; font-family: var(--mono); }
   .thbar input:focus, .thbar select:focus { outline: none; border-color: var(--nodata); }
   .thbar button { padding: 7px 13px; }
+  .thbar .thscope { color: var(--faint); font-size: 12px; white-space: nowrap; }
+  .thbar .thscope.hint { font-style: italic; }
+  .thbar .thscope b { color: var(--nodata); font-weight: 600; font-style: normal; }
   canvas#c { width: 100%; height: clamp(300px, 44vh, 500px); display:block; touch-action: none;
     background: var(--term-surface); border: 1px solid var(--term-border); border-radius: 10px; cursor: crosshair; }
   .zoombar { display:flex; align-items:center; gap:8px; margin: 10px 0 6px; }
@@ -177,6 +180,7 @@ _TEMPLATE = """<!doctype html>
     <label>bridge gaps ≤
       <input id="thgap" class="num" type="number" min="0" step="1" value="0" /> intervals
     </label>
+    <span id="thscope" class="thscope"></span>
     <button id="thwin" class="ghost" style="display:none" title="capture across the whole current view again">↺ whole view</button>
     <button id="thadd" class="primary" disabled>Add 0 spans</button>
     <button id="thdone" class="ghost">Done</button>
@@ -330,7 +334,7 @@ function thRuns() { const val=thEff(); if (val===null) return [];
   if (s!==null) runs.push([s,e]);
   return runs; }
 function thCount() { const n=thRuns().length;
-  thaddEl.textContent = 'Add '+n+' span'+(n===1?'':'s'); thaddEl.disabled = n===0; }
+  thaddEl.textContent = 'Add '+n+' span'+(n===1?'':'s'); thaddEl.disabled = n===0; updateThWin(); }
 // Add a captured span, merging it into any overlapping incidents (a single span
 // can bridge several) into one band that keeps the first one's label.
 function addCaptured(a,b) {
@@ -414,10 +418,13 @@ function draw() {
 // Readout while picking a threshold: the line value, side, and how many spans
 // would be captured.
 function drawThLabel() {
-  const val=thEff(); if (val===null) return;
-  const n=thRuns().length, win=capRange(), narrow = !!(thDragWin || capWin);
-  const text='line '+fmtVal(val)+'  ·  '+thdirEl.value+'  ·  '+n+' span'+(n===1?'':'s')
-    + (narrow ? ('  ·  '+fmtDur(win[1]-win[0])+' window') : '');
+  const val=thEff(), win=capRange(), narrow = !!(thDragWin || capWin);
+  let text;
+  if (val===null) {  // no line yet — prompt how to use the mode
+    text = 'drag the chart to pick a period  ·  hover or type a value to set the line';
+  } else { const n=thRuns().length;
+    text='line '+fmtVal(val)+'  ·  '+thdirEl.value+'  ·  '+n+' span'+(n===1?'':'s')
+      + (narrow ? ('  ·  '+fmtDur(win[1]-win[0])+' window') : ''); }
   ctx.font=(11*dpr)+'px ui-monospace, monospace';
   const tw=ctx.measureText(text).width, bw=tw+14*dpr, bh=22*dpr, bx=M.l*dpr+6*dpr, by=M.t*dpr+2;
   ctx.fillStyle='rgba(27,25,22,0.96)'; ctx.strokeStyle='#f0ad4e'; ctx.lineWidth=1*dpr;
@@ -615,7 +622,15 @@ const thbtnEl=document.getElementById('thbtn'), thbarEl=document.getElementById(
 const thvalEl=document.getElementById('thval'), thdirEl=document.getElementById('thdir');
 const thgapEl=document.getElementById('thgap'), thaddEl=document.getElementById('thadd');
 const thdoneEl=document.getElementById('thdone'), thwinEl=document.getElementById('thwin');
-function updateThWin() { thwinEl.style.display = capWin ? '' : 'none'; }
+const thscopeEl=document.getElementById('thscope');
+// Always-visible scope readout so the time-window control is discoverable
+// (the ✕/↺ reset only appears once a window exists).
+function updateThWin() {
+  thwinEl.style.display = capWin ? '' : 'none';
+  if (!thscopeEl) return;
+  const w = thDragWin || capWin;
+  if (w) { const r=capRange(); thscopeEl.innerHTML = 'period: <b>'+fmtDur(r[1]-r[0])+'</b>'; thscopeEl.className='thscope'; }
+  else { thscopeEl.textContent = 'period: current view — drag the chart to limit it'; thscopeEl.className='thscope hint'; } }
 thwinEl.onclick = () => { capWin=null; updateThWin(); thCount(); draw(); };
 thbtnEl.onclick = () => toggleTh();
 thdoneEl.onclick = () => toggleTh(false);

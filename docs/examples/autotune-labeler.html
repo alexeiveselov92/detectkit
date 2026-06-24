@@ -204,7 +204,35 @@ function draw() {
     ctx.fillStyle='rgba(240,173,78,0.28)'; ctx.fillRect(Math.min(x0,x1), M.t*dpr, Math.abs(x1-x0), plotH()); }
   drawSeries(ctx, px, py, viewMin, viewMax, M.l*dpr, plotW(), '#d15b36', 1.5);
   ctx.restore();
-  if (hover && !dragging && !ovAct) drawHover();
+  if (dragging && !ovAct) drawDragLabel();
+  else if (hover && !ovAct) drawHover();
+}
+
+// Live time readout while marking/resizing/moving an incident, so you can place
+// an edge precisely (an edge shows old → new; move/new show the resulting span).
+function drawDragLabel() {
+  let text, atTs;
+  if (dragging.mode==='new') {
+    const a=Math.min(dragging.a,dragging.b), b=Math.max(dragging.a,dragging.b);
+    text = fmtTs(a)+'  →  '+fmtTs(b); atTs = dragging.b;
+  } else { const iv=incidents[dragging.i]; if (!iv) return;
+    if (dragging.mode==='edge') {
+      const old = dragging.edge==='a' ? dragging.a0 : dragging.b0;
+      const cur = dragging.edge==='a' ? iv.a : iv.b;
+      text = (dragging.edge==='a' ? 'start: ' : 'end: ') + fmtTs(old) + '  →  ' + fmtTs(cur);
+      atTs = cur;
+    } else { text = fmtTs(iv.a) + '  →  ' + fmtTs(iv.b); atTs = (iv.a+iv.b)/2; }
+  }
+  const X = clamp(px(atTs), M.l*dpr, c.width-M.r*dpr);
+  ctx.font=(11*dpr)+'px ui-monospace, monospace';
+  const tw=ctx.measureText(text).width, bw=tw+14*dpr, bh=22*dpr, by=M.t*dpr+2;
+  let bx = X - bw/2;
+  if (bx < M.l*dpr) bx = M.l*dpr;
+  if (bx+bw > c.width-M.r*dpr) bx = c.width-M.r*dpr-bw;
+  ctx.fillStyle='rgba(27,25,22,0.96)'; ctx.strokeStyle='#d15b36'; ctx.lineWidth=1*dpr;
+  ctx.fillRect(bx, by, bw, bh); ctx.strokeRect(bx, by, bw, bh);
+  ctx.fillStyle='#f5f1e8'; ctx.textAlign='left'; ctx.textBaseline='middle';
+  ctx.fillText(text, bx+7*dpr, by+bh/2);
 }
 
 function drawHover() {
@@ -271,7 +299,8 @@ c.addEventListener('mousedown', e => {
   const hit = hitIncident(e.clientX), t = tsAt(e.clientX);
   if (hit && hit.edge==='move') { const iv=incidents[hit.i];
     dragging={mode:'move', i:hit.i, grab:t, a0:iv.a, b0:iv.b, sx:e.clientX, cx:e.clientX}; }
-  else if (hit) dragging={mode:'edge', i:hit.i, edge:hit.edge, sx:e.clientX, cx:e.clientX};
+  else if (hit) { const iv=incidents[hit.i];
+    dragging={mode:'edge', i:hit.i, edge:hit.edge, a0:iv.a, b0:iv.b, sx:e.clientX, cx:e.clientX}; }
   else dragging={mode:'new', a:t, b:t, sx:e.clientX, cx:e.clientX};
 });
 c.addEventListener('mousemove', e => { if (ovAct) return;

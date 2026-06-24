@@ -187,6 +187,12 @@ later for a sharper tune.
 
 ## Step 4 — Study and present the result
 
+For a visual the user can open, re-run the tune with `--report` (or run
+`dtk run --select <name>__tuned_<id> --report`): it writes a self-contained
+`reports/<name>__tuned_<id>.html` charting values, the confidence band, anomalies
+and the alerts that would fire — no SQL needed. The raw-row queries below remain
+the fallback for inline inspection.
+
 Read the emitted `metrics/<name>__tuned_<id>.yml` (do not re-run the search).
 The `#` comment header walks the whole decision; summarize for the user:
 

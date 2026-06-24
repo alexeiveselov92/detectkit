@@ -281,6 +281,23 @@ Ignore an existing task lock and run anyway (same lock semantics as
 Run the full search but **persist nothing** — write no config, no detections, and
 no `_dtk_autotune_runs` row. Useful to preview what autotune would choose.
 
+### `--report` (optional, dual-mode)
+
+After tuning, emit a **self-contained HTML report** for the winning config over
+the training window: the metric's values, the detector's confidence band,
+flagged anomalies, and the alerts it would fire — with a client-side period
+selector, fully offline. Bare `--report` writes
+`reports/<name>__tuned_<id>.html`; pass a directory (`--report dir/`) or an
+explicit `--report path.html` to override. See
+[Visualizing results](../guides/visualizing-results.md) for what the report
+shows; `dtk run --select <m> --report` produces the same report from the live
+config.
+
+> **Advanced.** The report's alerts are *reconstructed* by replaying the alert
+> decision logic over the persisted detections (no channels are contacted). The
+> set of suppressed repeats can differ slightly from what a live pipeline
+> dispatched, because cooldown depends on the actual run cadence.
+
 ## What It Produces
 
 On success (without `--dry-run`), one run:
@@ -291,7 +308,8 @@ On success (without `--dry-run`), one run:
 - records one row in [`_dtk_autotune_runs`](#_dtk_autotune_runs-table) (the audit
   trail);
 - persists the winning detector's detections to `_dtk_detections`;
-- prunes the superseded winners from prior autotune runs of the same metric.
+- prunes the superseded winners from prior autotune runs of the same metric;
+- with `--report`, writes the HTML report described above.
 
 It never touches the original metric YAML.
 

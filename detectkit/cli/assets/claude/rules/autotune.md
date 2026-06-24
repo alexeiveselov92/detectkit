@@ -57,7 +57,7 @@ ratios to choose.
 
 ```bash
 dtk autotune --select <sel> [--incidents FILE] [--label] [--scoring METRIC] \
-             [--from DATE] [--to DATE] [--profile NAME] [--force] [--dry-run]
+             [--from DATE] [--to DATE] [--profile NAME] [--force] [--dry-run] [--report]
 ```
 
 - `--incidents FILE|DIR` — a labels file (below) → **supervised** tuning. May be a
@@ -80,6 +80,12 @@ dtk autotune --select <sel> [--incidents FILE] [--label] [--scoring METRIC] \
 - `--scoring` — `mcc` (default), `f1`, `f_beta`, `balanced_accuracy`, `roc_auc`,
   `pr_auc`. MCC uses the whole confusion matrix and suits rare anomalies.
 - `--dry-run` — run the search but persist nothing and write no config.
+- `--report [PATH]` — after tuning, emit a self-contained **HTML report** for the
+  winning config over the training window (values, confidence band, anomalies,
+  replayed alerts; offline). Bare `--report` writes
+  `reports/<name>__tuned_<id>.html`; pass a directory or a `.html` path to
+  override. `dtk run --select <m> --report` produces the same report from the
+  live config.
 - Selectors match `dtk run`. Tuning reads loaded datapoints — if empty, run
   `dtk run --select <m> --steps load` (optionally `--from`) first.
 
@@ -215,7 +221,12 @@ LIMIT 5
 
 ## Reading the tuned detector's results
 
-To see the winning detector at work, join recent datapoints with its detections
+The quickest view is an **HTML report**: add `--report` to the tune (or run
+`dtk run --select <m> --report` later) to get a self-contained file charting the
+winning detector's values, confidence band, flagged anomalies and the alerts it
+would fire, with a period selector — no BI/SQL setup, offline.
+
+To query the raw rows instead, join recent datapoints with its detections
 (`value` vs `confidence_lower/upper` vs `is_anomaly`) for the
 `winning_detector_id` — see the per-backend query templates in the
 **`dtk-autotune`** skill and in the visualizing-results guide.

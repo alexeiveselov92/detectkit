@@ -313,9 +313,21 @@ for every field.
 
 ## See How It Behaves
 
-To *see* the tuned detector at work, join recent datapoints with its detections
-— `value` vs `confidence_lower` / `confidence_upper` vs `is_anomaly` vs
-`severity` — for the run's **winning `detector_id`**. Get that id from the latest
+The quickest view is an **HTML report** — add `--report` to the tune:
+
+```bash
+dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml --report
+```
+
+It writes a self-contained `reports/<name>__tuned_<id>.html` charting the winning
+detector's values, confidence band, flagged anomalies and the alerts it would
+fire, with a period selector — no BI or SQL setup, nothing leaves your browser.
+See [Visualizing results](visualizing-results.md) for the full picture (and
+`dtk run --select <m> --report` for the live config).
+
+To query the raw rows instead, join recent datapoints with its detections —
+`value` vs `confidence_lower` / `confidence_upper` vs `is_anomaly` vs `severity`
+— for the run's **winning `detector_id`**. Get that id from the latest
 `_dtk_autotune_runs` row:
 
 ```sql

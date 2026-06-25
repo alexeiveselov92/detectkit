@@ -93,6 +93,23 @@ function init(): void {
     }
   };
 
+  // Distinct seasonal keys present for a grouping (max across groups). A group's
+  // per-key band engages only when the window holds min_samples_per_group points
+  // of the current key, and same-key points recur once per this many positions —
+  // so window_size must be >= min_samples_per_group * cardinality or every point
+  // falls back to the global band (the seasonality silently does nothing).
+  const seasonalCardinality = (series: Series, groups: string[][] | null): number => {
+    const rows = series.seasonalityData;
+    if (!groups || !rows || rows.length === 0) return 0;
+    let card = 0;
+    for (const g of groups) {
+      const seen = new Set<string>();
+      for (const row of rows) seen.add(g.map((c) => String(row?.[c] ?? '')).join('|'));
+      card = Math.max(card, seen.size);
+    }
+    return card;
+  };
+
   const readParams = (): DetectorParams => {
     const type = (seg('detector') || 'mad') as DetectorType;
     const weights = (seg('weights') || 'none') as WindowWeights;
@@ -326,6 +343,25 @@ function init(): void {
             : '') +
           ` · consecutive_anomalies=${params.consecutiveAnomalies}`,
       );
+
+      // Surface when the window is too small to fill the chosen seasonality, so
+      // the band silently uses global stats (mirrors the Python detector's runtime
+      // warning + the dtk tune indicator). Without it, the wide band reads as a bug.
+      const warnEl = root.querySelector<HTMLElement>('#dkx-season-warn');
+      if (warnEl) {
+        const card = seasonalCardinality(series, params.seasonalityComponents);
+        const needed = params.minSamplesPerGroup * card;
+        if (params.seasonalityComponents && card > 0 && params.windowSize < needed) {
+          warnEl.textContent =
+            `⚠ Seasonality inactive at this window: ${params.windowSize} < ${needed} ` +
+            `(min_samples_per_group ${params.minSamplesPerGroup} × ${card} keys). Each point keeps ` +
+            `only ~${Math.floor(params.windowSize / card)} same-key point(s), so the band falls back ` +
+            `to global statistics. Raise the window to ≥ ${needed} to condition on the season.`;
+          warnEl.hidden = false;
+        } else {
+          warnEl.hidden = true;
+        }
+      }
 
       // Note in the legend hint whether the live line is the smoothed series.
       const smoothEl = root.querySelector<HTMLElement>('#dkx-smooth-note');

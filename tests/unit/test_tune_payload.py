@@ -286,74 +286,66 @@ def test_payload_includes_capture_windows_seed():
     assert payload["capture_windows"] == capture
 
 
-def test_seeded_incident_older_than_default_window_pulls_window_back():
-    """A seeded incident older than the recent default slice must fall inside the
-    loaded window — otherwise it shows in the list but never renders / scores."""
+class _WindowRecording(FakeInternal):
+    """Records the [from, to] window the builder requests, with custom bounds."""
 
-    class Recording(FakeInternal):
-        def __init__(self):
-            super().__init__(n=10)
-            self.requested_from = None
+    def __init__(self, last, firstdp):
+        super().__init__(n=10)
+        self.requested_from = None
+        self.requested_to = None
+        self._last_dp = last
+        self._firstdp = firstdp
 
-        def get_last_datapoint_timestamp(self, name):
-            return datetime(2026, 6, 1, 0, 0, 0)
+    def get_last_datapoint_timestamp(self, name):
+        return self._last_dp
 
-        def get_first_datapoint_timestamp(self, name):
-            return datetime(2020, 1, 1, 0, 0, 0)  # years of history available
+    def get_first_datapoint_timestamp(self, name):
+        return self._firstdp
 
-        def load_datapoints(self, name, from_timestamp=None, to_timestamp=None):
-            self.requested_from = from_timestamp
-            return self._data
+    def load_datapoints(self, name, from_timestamp=None, to_timestamp=None):
+        self.requested_from = from_timestamp
+        self.requested_to = to_timestamp
+        return self._data
 
-    rec = Recording()
-    # Incident ~30 days before the last datapoint — well outside the default
-    # ~15000h recent slice would NOT be (15000h ≈ 625d), so use one that is.
-    incident_start = datetime(2024, 1, 1, 0, 0, 0)  # > 625 days before end
+
+def test_seeded_incident_anchors_a_bounded_window_on_the_incident():
+    """A seeded incident older than the recent slice anchors the (budget-sized)
+    window on the incident region — it ends just past the latest incident rather
+    than at the last datapoint — so the incident renders without loading history."""
+    rec = _WindowRecording(datetime(2026, 6, 1, 0, 0, 0), datetime(2020, 1, 1, 0, 0, 0))
     build_tune_payload(
-        metric_config=_metric(),
+        metric_config=_metric(),  # 1h grid, window 100 → ~15000-point budget
         internal=rec,
         incidents=[{"start": "2024-01-01 00:00:00", "end": "2024-01-01 06:00:00"}],
     )
-    # The loaded window starts at or before the incident (minus leading context),
-    # so the incident is inside the series.
-    assert rec.requested_from is not None
-    assert rec.requested_from <= incident_start
+    budget_pts = default_window_points(100)
+    # The window ENDS shortly after the latest incident, NOT at the last datapoint.
+    assert rec.requested_to is not None and rec.requested_to < datetime(2026, 1, 1)
+    assert rec.requested_to >= datetime(2024, 1, 1, 6, 0, 0)  # covers the incident end
+    # ...and is budget-bounded, not the whole 2020→2026 history.
+    span_hours = (rec.requested_to - rec.requested_from).total_seconds() / 3600
+    assert span_hours <= budget_pts + 1
 
 
-def test_seeded_incident_window_respects_point_ceiling():
-    """A wildly old incident on a minute-grained series is capped at the ceiling
-    (most-recent _TUNE_INCIDENT_MAX_POINTS), not the whole history."""
-    from detectkit.tuning.payload import _TUNE_INCIDENT_MAX_POINTS
-
-    class Recording(FakeInternal):
-        def __init__(self):
-            super().__init__(n=10)
-            self.requested_from = None
-
-        def get_last_datapoint_timestamp(self, name):
-            return datetime(2026, 6, 1, 0, 0, 0)
-
-        def get_first_datapoint_timestamp(self, name):
-            return datetime(2000, 1, 1, 0, 0, 0)  # ancient history
-
-        def load_datapoints(self, name, from_timestamp=None, to_timestamp=None):
-            self.requested_from = from_timestamp
-            return self._data
-
-    rec = Recording()
-    m = _metric(interval="1min")
+def test_seeded_incident_window_stays_budget_bounded():
+    """A wildly old incident on a minute-grained series loads a budget-sized window
+    around the incident — NOT the whole history (the recompute-budget protection)."""
+    rec = _WindowRecording(datetime(2026, 6, 1, 0, 0, 0), datetime(2000, 1, 1, 0, 0, 0))
     build_tune_payload(
-        metric_config=m,
+        metric_config=_metric(interval="1min"),
         internal=rec,
         incidents=[{"start": "2001-01-01 00:00:00", "end": "2001-01-01 00:05:00"}],
     )
-    ceiling = datetime(2026, 6, 1, 0, 0, 0) - timedelta(seconds=60 * _TUNE_INCIDENT_MAX_POINTS)
-    assert rec.requested_from == ceiling
+    budget_pts = default_window_points(100)
+    span_minutes = (rec.requested_to - rec.requested_from).total_seconds() / 60
+    assert span_minutes <= budget_pts + 1  # bounded, not 26 years of minutes
+    # anchored on the (ancient) incident, not the recent end
+    assert rec.requested_to < datetime(2001, 2, 1)
 
 
 def test_seeded_incident_with_tz_aware_db_timestamps():
-    """A backend that returns tz-aware datetimes must not crash when widening the
-    window to a (naive-UTC) seeded incident (regression: 'can't compare
+    """A backend that returns tz-aware datetimes must not crash when anchoring the
+    window on a (naive-UTC) seeded incident (regression: 'can't compare
     offset-naive and offset-aware datetimes')."""
 
     class AwareRecording(FakeInternal):

@@ -813,10 +813,12 @@ rate** — the share of fired alerts outside every incident ("≈1 in N false");
 incidents within the loaded window are scored. **Save incidents** writes
 a versioned `incidents/<metric>/<…>.yml`, the **same store
 [`dtk autotune`](#dtk-autotune) reads** (it seeds incidents *and* capture windows
-from the newest such file on open, **widening the loaded window to cover seeded
-incidents** so older ones still render and count), so a labeling round here also
-feeds the next supervised tune. Saving incidents does not end the session; only
-**Apply** does.
+from the newest such file on open, **anchoring the budget-sized loaded window on
+the seeded incidents** — ending just past the latest one rather than at the last
+datapoint — so they render and count without loading the whole history; older
+incidents stay list-only, use `--from`/`--to` to tune against them), so a labeling
+round here also feeds the next supervised tune. Saving incidents does not end the
+session; only **Apply** does.
 
 #### How Apply writes back
 

@@ -593,13 +593,25 @@ so alerts vs incidents read together; the labeler chart owns the strip. A
 prominent **metrics bar** recomputes as you tune from the worker's fired-alert
 timestamps vs the marked spans: **incident catch rate (recall)** = incidents
 containing ≥1 alert / total, and **false-alert rate (FDR)** = alerts outside every
-span / total (shown as `%` and "≈1 in N false"). Labeling is anchored here (not the
+span / total (shown as `%` and "≈1 in N false"); only incidents overlapping the
+**loaded (possibly trimmed) series** are scored, so an out-of-window label can't
+mechanically drag recall down. Labeling is anchored here (not the
 read-only report) because the labels are fixed ground truth while only the alerts
-move as you tune. **Save incidents** POSTs to the server's `/labels` endpoint,
+move as you tune. A **Threshold capture** tool (ported from the autotune
+`html_labeler`, lives in `chart.ts`'s `labeling` mode behind `setThresholdMode` +
+an `onThresholdChange` callback) grabs every contiguous run of points on the chosen
+side of a horizontal line in one click — click/value sets the line, a horizontal
+plot drag paints a capture window (else the current view), `applyThreshold` merges
+the runs into incidents; the painted window persists as `capture_windows` in the
+saved labels and re-seeds via `setCaptureWindow` on reopen (pure metadata —
+autotune ignores it). **Save incidents** POSTs to the server's `/labels` endpoint,
 which writes a versioned `incidents/<metric>/<…>.yml` — the **same store
 `dtk autotune` reads**, so a labeling round here also feeds the next supervised
-autotune; the command seeds the labeler from the newest file in that directory on
-open. The whole labels stack (schema, validation, versioned filenames) is shared
+autotune; the command seeds the labeler (incidents **and** capture windows) from
+the newest file in that directory on open, and `build_tune_payload` **widens the
+loaded window back to cover the seeded incidents** (capped at
+`_TUNE_INCIDENT_MAX_POINTS`) so an incident older than the recent default slice
+still renders and counts instead of showing only in the list. The whole labels stack (schema, validation, versioned filenames) is shared
 with the autotune labeler via `autotune/labels.py` (`parse_incident_labels`,
 `incidents_to_display`, `newest_labels_file`, `versioned_labels_path`). A **y = 0
 reference line** toggle (shared chart `showZeroLine` + `setZeroLine`, also on
@@ -612,9 +624,12 @@ Three pure-ish pieces + a server:
 - `payload.build_tune_payload(...)` reads `_dtk_datapoints` and bakes the **raw
   gap-filled series + per-point seasonality keys + the metric's current detector
   config (camelCased to seed the controls, including any `manual_bounds` lower/upper)
-  + the alert `consecutive_anomalies` and seeded `direction` + seeded `incidents`**
-  (newest `incidents/<metric>/` file → display dicts) into a JSON payload —
-  everything the client port needs to *recompute*. It bakes **no** precomputed
+  + the alert `consecutive_anomalies` and seeded `direction` + seeded `incidents`
+  and `capture_windows`** (newest `incidents/<metric>/` file → display dicts) into a
+  JSON payload — everything the client port needs to *recompute*. When seeded
+  incidents fall outside the recent default slice it **pulls the loaded window back
+  to cover them** (clamped to the first datapoint and `_TUNE_INCIDENT_MAX_POINTS`),
+  so they render and score. It bakes **no** precomputed
   detection (the browser runs the detector itself). `labels_save_url` (like
   `save_url`) is injected by the server.
 - `html.render_tune_html(payload)` inlines `assets/tune.js` + the payload into one

@@ -26,6 +26,7 @@ import type {
   ScoredPoint,
   Series,
   Smoothing,
+  ThresholdInfo,
   WindowWeights,
 } from '../demo/types';
 
@@ -74,6 +75,8 @@ interface TunePayload {
   save_url: string | null;
   /** seeded incident spans ({start,end,label} naive-UTC strings) from incidents/<metric>/. */
   incidents?: Array<{ start: string; end: string; label?: string }>;
+  /** seeded threshold-capture window(s) ({start,end} naive-UTC strings) — regime scope. */
+  capture_windows?: Array<{ start: string; end: string }>;
   /** localhost POST endpoint for Save labels; null = download instead (no server). */
   labels_save_url?: string | null;
 }
@@ -303,6 +306,16 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     .map((p) => ({ start: parseDisplayTs(p.start), end: parseDisplayTs(p.end), label: p.label || '' }))
     .filter((iv) => Number.isFinite(iv.start) && Number.isFinite(iv.end))
     .map((iv) => ({ start: Math.min(iv.start, iv.end), end: Math.max(iv.start, iv.end), label: iv.label }));
+  // Seeded threshold-capture window (regime scope) from the saved labels file —
+  // restored so re-opening keeps the painted scope. Only the first is used.
+  const seedCaptureWin = ((): { start: number; end: number } | null => {
+    const w = (payload.capture_windows || [])[0];
+    if (!w) return null;
+    const a = parseDisplayTs(w.start);
+    const b = parseDisplayTs(w.end);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+    return { start: Math.min(a, b), end: Math.max(a, b) };
+  })();
   // Most-recent fired-alert timestamps from the worker, for the live metrics.
   let lastFireTs: number[] = [];
 
@@ -529,8 +542,15 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     falseAlerts: number;
     fdr: number;
   }
-  const computeQuality = (fires: number[], ivs: Incident[]): Quality => {
+  const computeQuality = (fires: number[], allIvs: Incident[]): Quality => {
     const tol = (payload.interval_seconds * 1000) / 2; // ±½ interval grid tolerance
+    // Only score incidents that overlap the active (possibly trimmed) series — an
+    // incident outside the loaded window can never be caught, so counting it would
+    // wrongly drag recall down. The chart still LISTS every marked incident.
+    const ts = series.timestamps;
+    const lo = (ts.length ? ts[0] : 0) - tol;
+    const hi = (ts.length ? ts[ts.length - 1] : 0) + tol;
+    const ivs = allIvs.filter((iv) => iv.end >= lo && iv.start <= hi);
     const within = (t: number, iv: Incident): boolean => t >= iv.start - tol && t <= iv.end + tol;
     let correct = 0;
     for (const t of fires) if (ivs.some((iv) => within(t, iv))) correct++;
@@ -620,6 +640,9 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     minSamplesPerGroup: 10,
     consecutiveAnomalies: 1,
   };
+  // Filled once the threshold-capture bar is built (the chart pushes preview state
+  // here on every hover / window paint / knob change).
+  let updateThresholdUI: (info: ThresholdInfo) => void = () => {};
   labelerChart = createChart(labCanvas, {
     navigable: true,
     labeling: true,
@@ -631,10 +654,116 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       renderMetrics();
       chart.setIncidents(incidents); // live read-only shading on the detector chart
     },
+    onThresholdChange: (info): void => updateThresholdUI(info),
   });
   labelerChart.setIncidents(incidents);
+  if (seedCaptureWin) labelerChart.setCaptureWindow(seedCaptureWin);
   const renderLabeler = (): void => {
     labelerChart.render({ series, scored: [], params: LABELER_PARAMS, alerts: [] });
+  };
+
+  // ---- threshold-capture toolbar (above the labeler chart) ------------------
+  // Mark incidents fast: set a horizontal line and grab every contiguous span past
+  // it in one click — the same tool as the autotune html labeler, here feeding the
+  // synced incident labeler. All capture state lives in the labeler chart; this bar
+  // just drives it and reflects the live run count + scope.
+  const thWrap = el('div', 'dtk-th');
+  const thToggle = el('button', 'dtk-th-toggle', 'Threshold capture');
+  thToggle.type = 'button';
+  thToggle.title =
+    'Mark incidents fast: set a horizontal line and grab every contiguous span above (or below) ' +
+    'it. Click the chart to set the line, drag across it to limit the capture to a time window.';
+  thWrap.appendChild(thToggle);
+  const thBar = el('div', 'dtk-th-bar');
+  const thDirSel = el('select', 'dtk-th-sel');
+  for (const [v, lbl] of [
+    ['above', 'above the line'],
+    ['below', 'below the line'],
+  ] as const) {
+    const o = el('option');
+    o.value = v;
+    o.textContent = lbl;
+    thDirSel.appendChild(o);
+  }
+  const thValInput = el('input', 'dtk-th-num');
+  thValInput.type = 'number';
+  thValInput.step = 'any';
+  thValInput.placeholder = 'hover chart';
+  const thGapInput = el('input', 'dtk-th-num');
+  thGapInput.type = 'number';
+  thGapInput.min = '0';
+  thGapInput.step = '1';
+  thGapInput.value = '0';
+  const thScope = el('span', 'dtk-th-scope');
+  const thWinReset = el('button', 'dtk-inc-btn', '↺ whole view');
+  thWinReset.type = 'button';
+  thWinReset.style.display = 'none';
+  const thAdd = el('button', 'dtk-apply-btn dtk-th-add', 'Add 0 spans');
+  thAdd.type = 'button';
+  thAdd.disabled = true;
+  const thDone = el('button', 'dtk-inc-btn', 'Done');
+  thDone.type = 'button';
+  const thGrp = (labelText: string, control: HTMLElement): HTMLElement => {
+    const w = el('label', 'dtk-th-grp');
+    w.appendChild(el('span', 'dtk-th-lbl', labelText));
+    w.appendChild(control);
+    return w;
+  };
+  thBar.appendChild(thGrp('grab points', thDirSel));
+  thBar.appendChild(thGrp('line value', thValInput));
+  thBar.appendChild(thGrp('bridge gaps ≤', thGapInput));
+  thBar.appendChild(thScope);
+  thBar.appendChild(thWinReset);
+  thBar.appendChild(thAdd);
+  thBar.appendChild(thDone);
+  thBar.style.display = 'none';
+  thWrap.appendChild(thBar);
+  main.insertBefore(thWrap, labChartWrap);
+
+  let thActive = false;
+  // True only for the synchronous span of the value input's own oninput, so the UI
+  // refresh below can tell a user keystroke apart from a chart-driven value change
+  // (a chart click should win and write the input; typing must not be clobbered).
+  let thTyping = false;
+  const setThActive = (on: boolean): void => {
+    thActive = on;
+    thToggle.classList.toggle('on', on);
+    thBar.style.display = on ? 'flex' : 'none';
+    labelerChart.setThresholdMode(on);
+  };
+  thToggle.onclick = (): void => setThActive(!thActive);
+  thDone.onclick = (): void => setThActive(false);
+  thDirSel.onchange = (): void =>
+    labelerChart.setThresholdDirection(thDirSel.value as 'above' | 'below');
+  thValInput.oninput = (): void => {
+    const s = thValInput.value.trim();
+    thTyping = true;
+    labelerChart.setThresholdValue(s !== '' && !isNaN(Number(s)) ? Number(s) : null);
+    thTyping = false;
+  };
+  thGapInput.oninput = (): void => labelerChart.setThresholdGap(Number(thGapInput.value) || 0);
+  thWinReset.onclick = (): void => labelerChart.clearCaptureWindow();
+  thAdd.onclick = (): void => {
+    labelerChart.applyThreshold(); // commits spans → incidents (fires onIncidentsChange)
+  };
+  // Esc backs out of threshold capture (parity with the autotune labeler); routed
+  // through setThActive so the toggle/bar state stays in sync with the chart.
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && thActive) setThActive(false);
+  });
+  updateThresholdUI = (info): void => {
+    thAdd.textContent = `Add ${info.runs} span${info.runs === 1 ? '' : 's'}`;
+    thAdd.disabled = info.runs === 0;
+    // Mirror a pinned line value into the input — including a chart click while the
+    // input is focused — but never overwrite the digits the user is mid-typing.
+    if (info.locked && info.value != null && !thTyping) {
+      thValInput.value = String(Math.round(info.value * 1000) / 1000);
+    }
+    // The reset only makes sense for a COMMITTED window, not a window mid-drag.
+    thWinReset.style.display = info.committed ? '' : 'none';
+    thScope.textContent = info.window
+      ? `scope: ${fmtDur(info.windowMs)} painted`
+      : 'scope: current view — drag the chart to limit it';
   };
 
   // ---- detector worker + debounced recompute --------------------------------
@@ -1119,12 +1248,19 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     const sorted = [...incidents].sort((a, b) => a.start - b.start);
     if (!sorted.length) {
       lines.push('incidents: []');
-      return lines.join('\n') + '\n';
+    } else {
+      lines.push('incidents:');
+      for (const iv of sorted) {
+        const lbl = iv.label ? `, label: ${yamlStr(iv.label)}` : '';
+        lines.push(`  - {start: "${fmtUtc(iv.start)}", end: "${fmtUtc(iv.end)}"${lbl}}`);
+      }
     }
-    lines.push('incidents:');
-    for (const iv of sorted) {
-      const lbl = iv.label ? `, label: ${yamlStr(iv.label)}` : '';
-      lines.push(`  - {start: "${fmtUtc(iv.start)}", end: "${fmtUtc(iv.end)}"${lbl}}`);
+    // Persist the painted threshold-capture window so the regime scope is auditable
+    // and restored on reopen. Pure metadata — autotune ignores it.
+    const cap = labelerChart.getCaptureWindow();
+    if (cap) {
+      lines.push('capture_windows:');
+      lines.push(`  - {start: "${fmtUtc(cap.start)}", end: "${fmtUtc(cap.end)}"}`);
     }
     return lines.join('\n') + '\n';
   };
@@ -1330,6 +1466,22 @@ function injectStyle(): void {
   margin-top:4px;flex-wrap:wrap;}
 .dtk-tune-labhint{font-family:var(--mono);font-size:11px;color:var(--faint);}
 .dtk-tune-labchart{height:240px;}
+.dtk-th{display:flex;flex-direction:column;gap:8px;margin:2px 0 6px;}
+.dtk-th-toggle{align-self:flex-start;border:1px solid var(--border);background:var(--surface);
+  color:var(--muted);border-radius:8px;padding:6px 12px;font-family:var(--sans);font-size:12.5px;cursor:pointer;}
+.dtk-th-toggle:hover{border-color:var(--c);color:var(--c7);}
+.dtk-th-toggle.on{background:var(--c);border-color:var(--c);color:#fff;}
+.dtk-th-bar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 14px;padding:11px 13px;
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;}
+.dtk-th-grp{display:flex;flex-direction:column;gap:3px;}
+.dtk-th-lbl{font-family:var(--mono);font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;}
+.dtk-th-num,.dtk-th-sel{background:var(--paper);color:var(--ink);border:1px solid var(--border);
+  border-radius:6px;padding:5px 8px;font-family:var(--mono);font-size:12px;}
+.dtk-th-num{width:96px;}
+.dtk-th-num:focus,.dtk-th-sel:focus{outline:none;border-color:var(--c);}
+.dtk-th-scope{font-family:var(--mono);font-size:11px;color:var(--muted);align-self:center;flex:1 1 160px;}
+.dtk-th-add{padding:7px 14px;}
+.dtk-th-add:disabled{opacity:.5;cursor:default;}
 .dtk-incidents{gap:8px;}
 .dtk-inc-list{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto;}
 .dtk-inc-empty{font-size:12px;color:var(--faint);font-style:italic;}

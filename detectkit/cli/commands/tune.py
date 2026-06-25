@@ -15,7 +15,11 @@ from __future__ import annotations
 
 import click
 
-from detectkit.autotune.labels import load_incidents_for_display, newest_labels_file
+from detectkit.autotune.labels import (
+    load_capture_windows,
+    load_incidents_for_display,
+    newest_labels_file,
+)
 from detectkit.cli._output import echo_done, echo_error, echo_noop
 from detectkit.cli.commands.autotune import _load_project
 from detectkit.cli.commands.run import parse_date, select_metrics
@@ -65,10 +69,14 @@ def run_tune(
     # just yields no seed.
     incidents_dir = project_root / "incidents" / name
     preload_incidents: list[dict[str, str]] = []
+    preload_capture: list[dict[str, str]] = []
     newest = newest_labels_file(incidents_dir)
     if newest is not None:
         try:
             preload_incidents = load_incidents_for_display(
+                newest, interval_seconds=interval_seconds, metric_name=name
+            )
+            preload_capture = load_capture_windows(
                 newest, interval_seconds=interval_seconds, metric_name=name
             )
             click.echo(
@@ -90,6 +98,7 @@ def run_tune(
         end=to_dt,
         project_name=project_name,
         incidents=preload_incidents,
+        capture_windows=preload_capture,
     )
     n_points = len(payload["points"])
     if n_points == 0:

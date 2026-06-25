@@ -274,4 +274,102 @@ def test_payload_includes_incidents_seed():
 def test_payload_incidents_default_empty():
     payload = build_tune_payload(metric_config=_metric(), internal=FakeInternal())
     assert payload["incidents"] == []
+    assert payload["capture_windows"] == []
     assert payload["labels_save_url"] is None
+
+
+def test_payload_includes_capture_windows_seed():
+    capture = [{"start": "2026-01-01 00:00:00", "end": "2026-01-01 04:00:00"}]
+    payload = build_tune_payload(
+        metric_config=_metric(), internal=FakeInternal(), capture_windows=capture
+    )
+    assert payload["capture_windows"] == capture
+
+
+def test_seeded_incident_older_than_default_window_pulls_window_back():
+    """A seeded incident older than the recent default slice must fall inside the
+    loaded window — otherwise it shows in the list but never renders / scores."""
+
+    class Recording(FakeInternal):
+        def __init__(self):
+            super().__init__(n=10)
+            self.requested_from = None
+
+        def get_last_datapoint_timestamp(self, name):
+            return datetime(2026, 6, 1, 0, 0, 0)
+
+        def get_first_datapoint_timestamp(self, name):
+            return datetime(2020, 1, 1, 0, 0, 0)  # years of history available
+
+        def load_datapoints(self, name, from_timestamp=None, to_timestamp=None):
+            self.requested_from = from_timestamp
+            return self._data
+
+    rec = Recording()
+    # Incident ~30 days before the last datapoint — well outside the default
+    # ~15000h recent slice would NOT be (15000h ≈ 625d), so use one that is.
+    incident_start = datetime(2024, 1, 1, 0, 0, 0)  # > 625 days before end
+    build_tune_payload(
+        metric_config=_metric(),
+        internal=rec,
+        incidents=[{"start": "2024-01-01 00:00:00", "end": "2024-01-01 06:00:00"}],
+    )
+    # The loaded window starts at or before the incident (minus leading context),
+    # so the incident is inside the series.
+    assert rec.requested_from is not None
+    assert rec.requested_from <= incident_start
+
+
+def test_seeded_incident_window_respects_point_ceiling():
+    """A wildly old incident on a minute-grained series is capped at the ceiling
+    (most-recent _TUNE_INCIDENT_MAX_POINTS), not the whole history."""
+    from detectkit.tuning.payload import _TUNE_INCIDENT_MAX_POINTS
+
+    class Recording(FakeInternal):
+        def __init__(self):
+            super().__init__(n=10)
+            self.requested_from = None
+
+        def get_last_datapoint_timestamp(self, name):
+            return datetime(2026, 6, 1, 0, 0, 0)
+
+        def get_first_datapoint_timestamp(self, name):
+            return datetime(2000, 1, 1, 0, 0, 0)  # ancient history
+
+        def load_datapoints(self, name, from_timestamp=None, to_timestamp=None):
+            self.requested_from = from_timestamp
+            return self._data
+
+    rec = Recording()
+    m = _metric(interval="1min")
+    build_tune_payload(
+        metric_config=m,
+        internal=rec,
+        incidents=[{"start": "2001-01-01 00:00:00", "end": "2001-01-01 00:05:00"}],
+    )
+    ceiling = datetime(2026, 6, 1, 0, 0, 0) - timedelta(seconds=60 * _TUNE_INCIDENT_MAX_POINTS)
+    assert rec.requested_from == ceiling
+
+
+def test_explicit_from_not_widened_by_incidents():
+    """An explicit --from wins even when a seeded incident is older."""
+
+    class Recording(FakeInternal):
+        def __init__(self):
+            super().__init__(n=10)
+            self.requested_from = None
+
+        def load_datapoints(self, name, from_timestamp=None, to_timestamp=None):
+            self.requested_from = from_timestamp
+            return self._data
+
+    rec = Recording()
+    explicit = datetime(2026, 1, 1, 0, 0, 0)
+    build_tune_payload(
+        metric_config=_metric(),
+        internal=rec,
+        start=explicit,
+        end=datetime(2026, 2, 1, 0, 0, 0),
+        incidents=[{"start": "2020-01-01 00:00:00", "end": "2020-01-01 06:00:00"}],
+    )
+    assert rec.requested_from == explicit

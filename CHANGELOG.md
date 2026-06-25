@@ -5,6 +5,33 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.36.0] - 2026-06-25
+
+### Fixed
+- **`dtk tune`: seeded incidents now render on the chart and count toward the live
+  metrics.** Previously `dtk tune` only loaded the most-recent slice of the series,
+  so any incident from `incidents/<metric>/` older than that slice showed in the
+  **Marked incidents** list but never on the chart — and dragged the recall metric
+  down because it could never be caught. The loaded window is now **widened back to
+  cover the seeded incidents** (with leading context for the detector's window,
+  clamped to the first datapoint and a `_TUNE_INCIDENT_MAX_POINTS` ceiling), and the
+  catch-rate / false-alert metrics **only score incidents that overlap the loaded
+  (possibly trimmed) window** so an out-of-range label can't mechanically skew them.
+
+### Added
+- **`dtk tune`: Threshold capture in the incident labeler.** The labeler chart gains
+  the same productivity tool as the autotune `html_labeler`: toggle **Threshold
+  capture**, set a horizontal line (click the chart or type a value), choose
+  **above**/**below**, optionally **bridge gaps** of a few intervals, and optionally
+  **drag across the chart** to limit the capture to a time window — then **Add N
+  spans** marks every contiguous run past the line in one click (overlapping spans
+  merge into existing incidents). The painted window is persisted as
+  `capture_windows` in the saved labels file and restored when `dtk tune` reopens
+  (pure metadata — `dtk autotune` ignores it). Implemented in the shared
+  `demo/chart.ts` `labeling` mode (`setThresholdMode` + an `onThresholdChange`
+  callback); the landing playground is untouched (the tool is off by default). The
+  committed `detectkit/tuning/assets/tune.js` bundle is regenerated.
+
 ## [0.35.0] - 2026-06-25
 
 ### Changed

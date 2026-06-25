@@ -45,11 +45,14 @@ rendered on the docs site under **For developers**). Read the relevant one:
   port as the landing playground) and, on **Apply**, writes the chosen config
   back into the metric YAML — validating first, archiving the previous version to
   `metrics/.history/<metric>/`, then re-emitting in place. It also hosts a
-  **synced incident-labeler chart**: mark real incidents and watch live
+  **synced incident-labeler chart**: mark real incidents (drag, or **Threshold
+  capture** every span past a horizontal line at once) and watch live
   **catch-rate (recall)** / **false-alert rate (FDR)** metrics as you tune;
   **Save incidents** writes versioned `incidents/<metric>/*.yml` (the same store
-  `dtk autotune` reads) via a `POST /labels` endpoint, reusing
-  `autotune/labels.py`. A **y = 0 reference line** toggle is shared with
+  `dtk autotune` reads, including the painted `capture_windows`) via a
+  `POST /labels` endpoint, reusing `autotune/labels.py`. Seeded incidents from that
+  store are loaded with the **window widened to cover them** (so older ones still
+  render and score). A **y = 0 reference line** toggle is shared with
   `dtk run --report`. Committed bundle `assets/tune.js` (built by
   `website/scripts/gen-tune-bundle.mjs`) ships in the wheel — regenerate it when
   the renderer TS changes. Takes no pipeline lock.

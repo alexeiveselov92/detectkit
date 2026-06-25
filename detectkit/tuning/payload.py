@@ -35,6 +35,11 @@ _TUNE_MAX_POINTS = 15000
 # scored region (the band never reaches its real width). Floor the shown points
 # at this many windows so the seeded window is actually exercised in the preview.
 _TUNE_WINDOW_COVERAGE = 3
+# Hard ceiling on the loaded point count when seeded incidents pull the window
+# back far into history — keeps a pathological (e.g. minute-grained, multi-year)
+# series from bloating the page. Any incident still left older than this slice
+# stays in the list but the client metrics ignore it (it cannot be scored).
+_TUNE_INCIDENT_MAX_POINTS = 60_000
 
 
 def default_window_points(seed_window: int) -> int:
@@ -75,6 +80,27 @@ def _normalize_seasonality_components(
     for comp in components:
         groups.append([comp] if isinstance(comp, str) else list(comp))
     return groups or None
+
+
+def _earliest_incident_start(incidents: list[dict[str, str]]) -> datetime | None:
+    """Earliest incident start (naive UTC) among seeded display dicts, or ``None``.
+
+    The display dicts carry ``"YYYY-MM-DD HH:MM:SS"`` naive-UTC strings (see
+    ``autotune.labels.incidents_to_display``), matching the naive datetimes the
+    builder compares against the loaded series bounds.
+    """
+    earliest: datetime | None = None
+    for inc in incidents:
+        raw = inc.get("start")
+        if not raw:
+            continue
+        try:
+            dt = datetime.strptime(str(raw), "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            continue
+        if earliest is None or dt < earliest:
+            earliest = dt
+    return earliest
 
 
 def _seed_detector(metric_config: MetricConfig) -> dict[str, Any]:
@@ -146,6 +172,7 @@ def build_tune_payload(
     project_name: str | None = None,
     save_url: str | None = None,
     incidents: list[dict[str, str]] | None = None,
+    capture_windows: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Assemble the interactive tuning payload from the persisted ``_dtk_datapoints``.
 
@@ -155,11 +182,16 @@ def build_tune_payload(
     (``default_window_points``), not the whole history.
 
     ``incidents`` seeds the synced labeler with already-marked spans (display dicts
-    ``{start, end, label}`` from ``incidents_to_display``). ``labels_save_url`` (the
-    POST endpoint for **Save incidents**) is injected by the server, like
-    ``save_url`` — it is ``None`` here.
+    ``{start, end, label}`` from ``incidents_to_display``). When seeded incidents
+    fall outside the recent default slice, the loaded window is pulled back to
+    cover them so they render on the chart and count toward the live recall/FDR
+    metrics (an explicit ``start``/``--from`` is still honored verbatim).
+    ``capture_windows`` seeds the threshold-capture regime scope (display dicts
+    ``{start, end}``). ``labels_save_url`` (the POST endpoint for **Save
+    incidents**) is injected by the server, like ``save_url`` — it is ``None`` here.
     """
     seed_incidents = incidents or []
+    seed_capture = capture_windows or []
     name = metric_config.name
     interval = metric_config.get_interval()
     interval_seconds = interval.seconds
@@ -177,7 +209,23 @@ def build_tune_payload(
         first = internal.get_first_datapoint_timestamp(name)
         default_points = default_window_points(int(seed["windowSize"]))
         lookback = end - timedelta(seconds=interval_seconds * default_points)
-        start = max(first, lookback) if first is not None else lookback
+        # Pull the window back to cover any seeded incidents so they actually
+        # render on the chart and can be scored — otherwise an incident older than
+        # the recent default slice shows in the list but never on the chart, and
+        # never counts toward recall/FDR. Give the earliest incident a few windows
+        # of leading context so the detector's trailing window can fill there.
+        earliest = _earliest_incident_start(seed_incidents)
+        if earliest is not None:
+            context_points = max(_TUNE_WINDOW_COVERAGE * int(seed["windowSize"]), 200)
+            lookback = min(
+                lookback, earliest - timedelta(seconds=interval_seconds * context_points)
+            )
+        # Clamp to a hard point ceiling (a pathological history can't bloat the
+        # page) and to the first datapoint.
+        ceiling = end - timedelta(seconds=interval_seconds * _TUNE_INCIDENT_MAX_POINTS)
+        start = max(lookback, ceiling)
+        if first is not None:
+            start = max(start, first)
 
     consecutive = 3
     if metric_config.alerting:
@@ -198,6 +246,7 @@ def build_tune_payload(
         "direction": direction,
         "save_url": save_url,
         "incidents": seed_incidents,
+        "capture_windows": seed_capture,
         "labels_save_url": None,
     }
     if start is None or end is None:
@@ -238,5 +287,6 @@ def build_tune_payload(
         "direction": direction,
         "save_url": save_url,
         "incidents": seed_incidents,
+        "capture_windows": seed_capture,
         "labels_save_url": None,
     }

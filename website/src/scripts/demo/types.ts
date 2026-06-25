@@ -225,6 +225,27 @@ export interface Incident {
   label?: string;
 }
 
+/**
+ * Live state of the threshold-capture tool (labeling charts only): a horizontal
+ * line that grabs every contiguous run of points on one side of it. Pushed to the
+ * UI via `ChartOptions.onThresholdChange` so it can render the run count, the line
+ * value and the active capture scope.
+ */
+export interface ThresholdInfo {
+  /** the effective line value (a pinned value wins, else the live cursor), or null. */
+  value: number | null;
+  /** true when the value is pinned (typed or clicked), false while it follows the cursor. */
+  locked: boolean;
+  /** how many spans would be captured right now. */
+  runs: number;
+  /** the painted capture window (ms), live during a drag, or null when capturing the view. */
+  window: { start: number; end: number } | null;
+  /** true once a capture window is COMMITTED (mouseup), false while merely drag-painting. */
+  committed: boolean;
+  /** duration (ms) of the active capture region (painted window or current view). */
+  windowMs: number;
+}
+
 export interface ChartData {
   series: Series;
   scored: ScoredPoint[];
@@ -274,6 +295,12 @@ export interface ChartOptions {
   /** Called (with a snapshot) whenever the user edits incidents in `labeling` mode. */
   onIncidentsChange?: (incidents: Incident[]) => void;
   /**
+   * Called whenever the threshold-capture preview changes (line value, run count
+   * or painted window) in `labeling` mode. Used by the `dtk tune` cockpit to drive
+   * the "Add N spans" button + scope readout. See `ChartHandle.setThresholdMode`.
+   */
+  onThresholdChange?: (info: ThresholdInfo) => void;
+  /**
    * Called whenever the visible window changes (zoom / pan / reset). Used to keep
    * two charts in sync — the listener typically calls the other chart's
    * `setViewWindow`. Only fires for user-driven view changes, not programmatic
@@ -300,6 +327,27 @@ export interface ChartHandle {
   setViewWindow(a: number, b: number): void;
   /** Replace the incident spans (seed/reset). Clears any selection. */
   setIncidents(incidents: Incident[]): void;
+  /**
+   * Threshold-capture (labeling charts only): grab every contiguous run of points
+   * on one side of a horizontal line in one click. `setThresholdMode` toggles the
+   * tool; while on, a plot click sets the line value, a horizontal plot drag paints
+   * a capture window, and `applyThreshold` commits the previewed spans as incidents.
+   */
+  setThresholdMode(on: boolean): void;
+  /** Capture points 'above' or 'below' the line. */
+  setThresholdDirection(dir: 'above' | 'below'): void;
+  /** Bridge gaps up to this many non-matching points when forming contiguous spans. */
+  setThresholdGap(gap: number): void;
+  /** Pin the line to a value (null → follow the cursor / last click). */
+  setThresholdValue(value: number | null): void;
+  /** Commit the previewed spans into incidents; returns how many were added. */
+  applyThreshold(): number;
+  /** Clear the painted capture window (back to capturing the current view). */
+  clearCaptureWindow(): void;
+  /** The painted capture window for persistence, or null. */
+  getCaptureWindow(): { start: number; end: number } | null;
+  /** Restore a painted capture window (seed from a saved labels file). */
+  setCaptureWindow(win: { start: number; end: number } | null): void;
   destroy(): void;
 }
 

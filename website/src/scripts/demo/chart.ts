@@ -163,6 +163,19 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   // Suppresses onViewChange re-emit during a programmatic setViewWindow (sync).
   let suppressViewEmit = false;
 
+  // Threshold-capture state (labeling mode only): paint a horizontal line and grab
+  // every contiguous run of points on the chosen side of it in one shot. All off
+  // unless the tool is toggled on, so a non-labeling chart is untouched.
+  let thMode = false;
+  let thDir: 'above' | 'below' = 'above';
+  let thGap = 0; // bridge gaps up to this many non-matching points
+  let thLockedVal: number | null = null; // a typed/clicked line value (wins over hover)
+  let thHoverVal: number | null = null; // live cursor value
+  // capWin: committed painted window; thDown/thDragWin track an in-progress press/paint.
+  let capWin: { a: number; b: number } | null = null;
+  let thDown: { x: number; ts: number } | null = null;
+  let thDragWin: { a: number; b: number } | null = null;
+
   // Domain, recomputed per render.
   let tmin = 0;
   let tmax = 1;
@@ -255,6 +268,8 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     viewMin = clampNum(a, tmin, tmax);
     viewMax = clampNum(b, tmin, tmax);
     if (!suppressViewEmit) opts.onViewChange?.(viewMin, viewMax);
+    // The default capture window is the current view, so its run count tracks pan/zoom.
+    if (thMode) emitThreshold();
     schedule();
   }
   // Set the visible window from a synced sibling WITHOUT re-emitting onViewChange
@@ -274,6 +289,13 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   const navTsAtDevX = (devX: number): number => {
     const frac = (devX - MARGINS.l * dpr) / (navW() || 1);
     return tmin + clampNum(frac, 0, 1) * fullSpan();
+  };
+  // Value at a device-px Y within the main plot (inverse of py) — reads the
+  // threshold line off the cursor.
+  const vAtDevY = (devY: number): number => {
+    const bottom = canvas.height - MARGINS.b * dpr - navTotal();
+    const frac = clampNum((bottom - devY) / (plotH() || 1), 0, 1);
+    return vmin + frac * (vmax - vmin);
   };
 
   // Inverse of px: nearest series index for a device-px X coordinate.
@@ -466,7 +488,9 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     g.clip();
 
     // 0. incident span bands (under the band/line) — read-only context on a
-    // detector chart, interactive on a labeling chart.
+    // detector chart, interactive on a labeling chart. Threshold-capture preview
+    // bands sit just beneath them.
+    drawThresholdPreview();
     drawIncidents();
 
     // Effective-zone start: the first index where the detector runs at full
@@ -584,9 +608,12 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       );
     }
 
+    // 9. threshold-capture line + capture-window dimming, on top of the series.
+    drawThresholdOverlay();
+
     g.restore();
 
-    // 9. navigator strip — the whole series in miniature with the current view
+    // 10. navigator strip — the whole series in miniature with the current view
     // window, alert ticks and a time axis, so a zoomed-in view never loses the
     // big picture.
     if (hasNav) drawNavigator(series, alerts, clay, faint, muted);
@@ -810,6 +837,147 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     g.stroke();
   }
 
+  // ---- threshold capture ----------------------------------------------------
+  // The effective line value: a locked (typed/clicked) value wins, else the live
+  // cursor value.
+  const thEff = (): number | null => (thLockedVal != null ? thLockedVal : thHoverVal);
+  // The active capture window [lo, hi] in ms: a live/committed painted window, else
+  // the current view — so the threshold only grabs the period you're looking at.
+  const thCapRange = (): [number, number] => {
+    const w = thDragWin || capWin;
+    if (w) return [Math.min(w.a, w.b), Math.max(w.a, w.b)];
+    return [xLo(), xHi()];
+  };
+  // Contiguous runs (in ms) of points on the chosen side of the line within the
+  // capture window, bridging up to `thGap` non-matching points. Ported from the
+  // autotune html_labeler threshold capture.
+  function thRuns(): Array<[number, number]> {
+    const runs: Array<[number, number]> = [];
+    const val = thEff();
+    if (val == null || !data) return runs;
+    const ts = data.series.timestamps;
+    const vs = data.series.values;
+    const [lo, hi] = thCapRange();
+    let s = -1;
+    let e = -1;
+    let gap = 0;
+    for (let i = 0; i < ts.length; i++) {
+      if (ts[i] < lo || ts[i] > hi) continue;
+      const v = vs[i];
+      const hit = isFinite(v) && (thDir === 'above' ? v > val : v < val);
+      if (hit) {
+        if (s === -1) s = ts[i];
+        e = ts[i];
+        gap = 0;
+      } else if (s !== -1) {
+        gap++;
+        if (gap > thGap) {
+          runs.push([s, e]);
+          s = -1;
+          gap = 0;
+        }
+      }
+    }
+    if (s !== -1) runs.push([s, e]);
+    return runs;
+  }
+  // Push the current preview state (run count, value, window) to the UI.
+  function emitThreshold(): void {
+    if (!opts.onThresholdChange) return;
+    const [lo, hi] = thCapRange();
+    const w = thDragWin || capWin;
+    opts.onThresholdChange({
+      value: thEff(),
+      locked: thLockedVal != null,
+      runs: thRuns().length,
+      window: w ? { start: Math.min(w.a, w.b), end: Math.max(w.a, w.b) } : null,
+      committed: capWin != null,
+      windowMs: hi - lo,
+    });
+  }
+  // Add a captured [a, b] span (ms), merging it into any overlapping incidents (a
+  // single span can bridge several) into one band keeping the first's label.
+  function addCaptured(a: number, b: number): void {
+    let host: Incident | null = null;
+    for (let i = incidents.length - 1; i >= 0; i--) {
+      const iv = incidents[i];
+      if (a <= iv.end && b >= iv.start) {
+        if (host === null) {
+          iv.start = Math.min(iv.start, a);
+          iv.end = Math.max(iv.end, b);
+          host = iv;
+        } else {
+          host.start = Math.min(host.start, iv.start);
+          host.end = Math.max(host.end, iv.end);
+          if (selIncident === iv) selIncident = host;
+          incidents.splice(i, 1);
+        }
+      }
+    }
+    if (host === null) incidents.push({ start: a, end: b, label: '' });
+  }
+  // Amber preview bands for the spans the current threshold would capture (drawn
+  // under the committed incident bands). No-op unless threshold mode is active.
+  function drawThresholdPreview(): void {
+    if (!thMode) return;
+    const val = thEff();
+    if (val == null) return;
+    const top = MARGINS.t * dpr;
+    const h = plotH();
+    const nodata = token('--st-nodata');
+    for (const [a, b] of thRuns()) {
+      const x0 = px(a);
+      const w = Math.max(px(b) - x0, 2 * dpr);
+      g.fillStyle = rgba(nodata, 0.22);
+      g.fillRect(x0, top, w, h);
+      g.strokeStyle = rgba(nodata, 0.6);
+      g.lineWidth = 1 * dpr;
+      g.strokeRect(x0, top, w, h);
+    }
+  }
+  // The threshold line + capture-window dimming, drawn on top of the series so the
+  // line reads over the data. No-op unless threshold mode is active.
+  function drawThresholdOverlay(): void {
+    if (!thMode) return;
+    const top = MARGINS.t * dpr;
+    const bottomFull = canvas.height - MARGINS.b * dpr - navTotal();
+    const left = MARGINS.l * dpr;
+    const right = canvas.width - MARGINS.r * dpr;
+    const nodata = token('--st-nodata');
+    const [lo, hi] = thCapRange();
+    const narrow = !!(thDragWin || capWin);
+    const xlo = clampNum(px(lo), left, right);
+    const xhi = clampNum(px(hi), left, right);
+    if (narrow) {
+      // dim everything outside the painted capture window
+      g.fillStyle = rgba(token('--ink'), 0.5);
+      g.fillRect(left, top, Math.max(0, xlo - left), plotH());
+      g.fillRect(xhi, top, Math.max(0, right - xhi), plotH());
+      g.strokeStyle = rgba(nodata, 0.7);
+      g.lineWidth = 1 * dpr;
+      g.setLineDash([3 * dpr, 3 * dpr]);
+      g.beginPath();
+      g.moveTo(xlo, top);
+      g.lineTo(xlo, bottomFull);
+      g.moveTo(xhi, top);
+      g.lineTo(xhi, bottomFull);
+      g.stroke();
+      g.setLineDash([]);
+    }
+    const val = thEff();
+    if (val != null && val >= vmin && val <= vmax) {
+      const yy = py(val);
+      g.strokeStyle = nodata;
+      g.lineWidth = 1.5 * dpr;
+      g.setLineDash([6 * dpr, 4 * dpr]);
+      g.beginPath();
+      g.moveTo(xlo, yy);
+      g.lineTo(xhi, yy);
+      g.stroke();
+      g.setLineDash([]);
+    }
+  }
+
   // Shaded incident bands. Read-only on a detector chart (just fill + faint
   // edges); on a labeling chart they gain edge handles, a selection highlight, a
   // ✕ delete handle and a live drag preview.
@@ -952,6 +1120,22 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       canvas.style.cursor = hit === 'l' || hit === 'r' ? 'ew-resize' : hit === 'move' ? 'grab' : 'pointer';
       return;
     }
+    if (labeling && thMode) {
+      // threshold capture: the cursor's Y sets the candidate line (unless pinned).
+      // While a press is active (thDown), the drag is a window paint handled in
+      // onWinMove — don't also move the line here.
+      if (hoverIndex !== -1) {
+        hoverIndex = -1;
+        emitHover();
+      }
+      if (thLockedVal == null && !thDown) {
+        thHoverVal = vAtDevY(devY);
+        emitThreshold();
+        schedule();
+      }
+      canvas.style.cursor = 'crosshair';
+      return;
+    }
     if (labeling) {
       // over the plot in labeling mode: hint create/move/resize/delete; no point hover.
       if (hoverIndex !== -1) {
@@ -1011,6 +1195,16 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     }
     // plot area (everything above the navigator strip / bottom margin)
     if (devY > MARGINS.t * dpr && devY < canvas.height - MARGINS.b * dpr - navTotal()) {
+      if (labeling && thMode) {
+        // a press either sets the line (a click) or paints a capture window (a
+        // horizontal drag) — resolved on mouseup by how far it moved.
+        thDown = { x: devX, ts: tsAtDevX(devX) };
+        if (thLockedVal == null) thHoverVal = vAtDevY(devY);
+        emitThreshold();
+        schedule();
+        ev.preventDefault();
+        return;
+      }
       if (labeling) {
         const t = tsAtDevX(devX);
         const hit = hitIncident(devX, devY);
@@ -1044,7 +1238,20 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
 
   function onWinMove(ev: MouseEvent): void {
     if (!data) return;
-    const { x: devX } = devOf(ev);
+    const { x: devX, y: devY } = devOf(ev);
+    if (thMode && thDown) {
+      // a far-enough horizontal move paints a capture window; otherwise keep
+      // tracking the cursor's Y as the candidate line value.
+      if (Math.abs(devX - thDown.x) > 6 * dpr) {
+        thDragWin = { a: thDown.ts, b: tsAtDevX(devX) };
+      } else {
+        thDragWin = null;
+        if (thLockedVal == null) thHoverVal = vAtDevY(devY);
+      }
+      emitThreshold();
+      schedule();
+      return;
+    }
     if (incidentDrag) {
       const t = tsAtDevX(devX);
       if (incidentDrag.mode === 'new') {
@@ -1086,7 +1293,24 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     }
   }
 
-  function onUp(): void {
+  function onUp(ev: MouseEvent): void {
+    if (thMode && thDown) {
+      const { x: devX, y: devY } = devOf(ev);
+      if (Math.abs(devX - thDown.x) > 6 * dpr) {
+        // a drag → commit the painted capture window
+        const a = thDown.ts;
+        const b = tsAtDevX(devX);
+        capWin = { a: Math.min(a, b), b: Math.max(a, b) };
+      } else {
+        // a click → pin the line value at the cursor's Y
+        thLockedVal = vAtDevY(devY);
+      }
+      thDown = null;
+      thDragWin = null;
+      emitThreshold();
+      schedule();
+      return;
+    }
     if (incidentDrag) {
       const drag = incidentDrag;
       if (drag.mode === 'new') {
@@ -1120,7 +1344,8 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   function onKey(ev: KeyboardEvent): void {
     const t = ev.target as HTMLElement | null;
     const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
-    if (typing || !selIncident) return;
+    // In threshold mode the selection is inert — don't let Delete remove a band.
+    if (thMode || typing || !selIncident) return;
     if (ev.key === 'Delete' || ev.key === 'Backspace') {
       ev.preventDefault();
       removeIncident(selIncident);
@@ -1192,6 +1417,60 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     schedule();
   }
 
+  // ---- threshold-capture public API (labeling charts only) ------------------
+  function setThresholdMode(on: boolean): void {
+    if (!labeling) return;
+    thMode = on;
+    if (!on) {
+      thHoverVal = null;
+      thDown = null;
+      thDragWin = null;
+    } else {
+      selIncident = null;
+    }
+    canvas.style.cursor = 'crosshair';
+    emitThreshold();
+    schedule();
+  }
+  function setThresholdDirection(dir: 'above' | 'below'): void {
+    thDir = dir;
+    emitThreshold();
+    schedule();
+  }
+  function setThresholdGap(gap: number): void {
+    thGap = Math.max(0, Math.floor(gap) || 0);
+    emitThreshold();
+    schedule();
+  }
+  function setThresholdValue(value: number | null): void {
+    thLockedVal = value != null && isFinite(value) ? value : null;
+    emitThreshold();
+    schedule();
+  }
+  function applyThreshold(): number {
+    const runs = thRuns();
+    for (const [a, b] of runs) addCaptured(a, b);
+    if (runs.length) emitIncidents();
+    emitThreshold();
+    schedule();
+    return runs.length;
+  }
+  function clearCaptureWindow(): void {
+    capWin = null;
+    thDragWin = null;
+    emitThreshold();
+    schedule();
+  }
+  function getCaptureWindow(): { start: number; end: number } | null {
+    if (!capWin) return null;
+    return { start: Math.min(capWin.a, capWin.b), end: Math.max(capWin.a, capWin.b) };
+  }
+  function setCaptureWindow(win: { start: number; end: number } | null): void {
+    capWin = win ? { a: win.start, b: win.end } : null;
+    emitThreshold();
+    schedule();
+  }
+
   function resize(): void {
     fit();
     if (data) {
@@ -1217,5 +1496,20 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   }
 
   fit();
-  return { render, resize, setZeroLine, setViewWindow, setIncidents, destroy };
+  return {
+    render,
+    resize,
+    setZeroLine,
+    setViewWindow,
+    setIncidents,
+    setThresholdMode,
+    setThresholdDirection,
+    setThresholdGap,
+    setThresholdValue,
+    applyThreshold,
+    clearCaptureWindow,
+    getCaptureWindow,
+    setCaptureWindow,
+    destroy,
+  };
 }

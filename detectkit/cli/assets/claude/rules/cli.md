@@ -90,14 +90,20 @@ to a single metric.
 
 **Mark incidents + see alert quality live.** A second, **synced** chart beneath
 the detector view lets you **mark the real incidents** (drag to create a span,
-drag its edges/middle to adjust, ✕ or Delete to remove). As you tune, a metrics
+drag its edges/middle to adjust, ✕ or Delete to remove), or **Threshold capture**
+every contiguous span past a horizontal line in one shot (set the line by click or
+value, above/below, optional gap-bridging, optionally limited to a painted time
+window — the same tool as the autotune labeler; the window is saved as
+`capture_windows` and restored on reopen). As you tune, a metrics
 bar shows two operator numbers: **incident catch rate (recall)** — how many marked
 incidents your config catches — and **false-alert rate** — what share of alerts
-fall outside any real incident ("≈1 in N false"). **Save incidents** writes a
+fall outside any real incident ("≈1 in N false"); only incidents within the loaded
+window are scored. **Save incidents** writes a
 versioned `incidents/<metric>/*.yml` — the same store `dtk autotune` reads, so the
-same labels feed the next supervised tune (it seeds from the newest file on open).
-Saving incidents does not end the session; only **Apply** does. A **y = 0 line**
-toggle (shared with `dtk run --report`) shows the metric relative to zero.
+same labels feed the next supervised tune (it seeds from the newest file on open,
+**widening the loaded window to cover seeded incidents** so older ones still render
+and count). Saving incidents does not end the session; only **Apply** does. A
+**y = 0 line** toggle (shared with `dtk run --report`) shows the metric relative to zero.
 
 Safe write-back: the config is validated before anything is written, the previous
 YAML is archived under `metrics/.history/<metric>/`, and only then is the metric

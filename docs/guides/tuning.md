@@ -114,10 +114,24 @@ mark the **real incidents** on the same series:
 - **Drag** across the lower chart to mark an incident span; **drag its edges** to
   adjust, **drag its middle** to move, and click its **✕** (or select it and press
   **Delete**) to remove it.
+- **Threshold capture** — for a metric with many incidents, click **Threshold
+  capture** to grab every contiguous span past a horizontal line in one shot
+  (the same tool as the [autotune labeler](autotuning.md)). Click the chart to set
+  the line (or type a value), choose **above**/**below**, optionally **bridge
+  gaps** of a few intervals, and **drag across the chart** to limit the capture to a
+  time window (handy when the metric behaves differently across periods). **Add N
+  spans** marks them all — overlapping spans merge into existing incidents. The
+  painted window is saved alongside the incidents (as `capture_windows`) and
+  restored on reopen.
 - The two charts move together — the same zoom/pan, the same vertical scale, the
   same "Points shown" trim — and the detector chart shades the same incident spans
   read-only, so you can see at a glance whether the alerts (▼ markers) line up with
   real incidents.
+
+Already-saved incidents are seeded from the newest file in `incidents/<metric>/`
+when `dtk tune` opens, and the loaded window is **widened to include them** (an
+incident older than the recent default slice still renders and counts), so the
+metrics below reflect every labeled incident in view.
 
 As you turn the detector knobs, a **metrics bar** at the top recomputes two
 operator-facing numbers:

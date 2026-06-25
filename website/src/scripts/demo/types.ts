@@ -230,6 +230,15 @@ export interface ChartOptions {
    * false/absent the whole series is fitted to the canvas width as before.
    */
   navigable?: boolean;
+  /**
+   * Vertical autoscale source. 'band' (default) fits the y-axis to the union of
+   * the data and the confidence band, so the whole band is always visible — right
+   * for the read-only report. 'data' fits to the data values only (the band may
+   * extend past the plot edges, clipped); used by `dtk tune` so that turning the
+   * threshold visibly widens/narrows the band relative to the data instead of the
+   * axis rescaling in lockstep and hiding the change.
+   */
+  yFit?: 'band' | 'data';
 }
 
 export interface ChartHandle {

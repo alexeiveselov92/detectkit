@@ -137,6 +137,16 @@ detectors:
 Minimum samples required in each seasonality group for applying multipliers.
 Groups below this threshold fall back to global statistics.
 
+> **Advanced — size the window to fill a group.** A group's multiplier engages
+> only when the trailing window holds `min_samples_per_group` points sharing the
+> current point's key, and same-key points recur once per *cardinality* of the
+> key — so you need `window_size ≳ min_samples_per_group × distinct_keys`. For
+> hourly data grouped by `hour` (24 keys), the default `min_samples_per_group =
+> 10` needs `window_size ≳ 240`; with the default `window_size = 100` no group
+> ever fills and **the seasonality silently has no effect** (every point uses the
+> global band). The detector logs a one-time warning in this case. Raise
+> `window_size`, lower `min_samples_per_group`, or use a coarser grouping.
+
 **Example:**
 ```yaml
 detectors:

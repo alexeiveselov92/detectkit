@@ -131,6 +131,10 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   const g = ctx; // non-null alias
 
   const navigable = !!opts.navigable;
+  // 'data' fits the y-axis to the metric values only (band may clip past the
+  // edges); 'band' (default) also folds in the confidence band so it's fully
+  // visible. See ChartOptions.yFit.
+  const yFitData = opts.yFit === 'data';
 
   let dpr = 1;
   let data: ChartData | null = null;
@@ -287,10 +291,16 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
         if (v > hi) hi = v;
       }
     }
-    for (const p of scored) {
-      if (p.scored) {
-        if (isFinite(p.lower) && p.lower < lo) lo = p.lower;
-        if (isFinite(p.upper) && p.upper > hi) hi = p.upper;
+    // Fold the band into the vertical extent only in 'band' mode. In 'data' mode
+    // the axis tracks the values alone, so widening the threshold visibly grows
+    // the band toward (and past) the plot edges instead of the axis growing with
+    // it. The band fill is clipped to the plot rect, so this never overdraws.
+    if (!yFitData) {
+      for (const p of scored) {
+        if (p.scored) {
+          if (isFinite(p.lower) && p.lower < lo) lo = p.lower;
+          if (isFinite(p.upper) && p.upper > hi) hi = p.upper;
+        }
       }
     }
     if (!isFinite(lo) || !isFinite(hi)) {

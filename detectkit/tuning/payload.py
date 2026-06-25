@@ -30,12 +30,25 @@ from detectkit.reporting.builder import _ms, _num_or_none, _parse_seasonality
 _TUNE_COMPUTE_BUDGET = 20_000_000  # ~points x window per recompute (off-thread)
 _TUNE_MIN_POINTS = 3000
 _TUNE_MAX_POINTS = 15000
+# A point only gets a band where the trailing window can fill, so showing fewer
+# than a few windows of history would leave a large-window metric with almost no
+# scored region (the band never reaches its real width). Floor the shown points
+# at this many windows so the seeded window is actually exercised in the preview.
+_TUNE_WINDOW_COVERAGE = 3
 
 
 def default_window_points(seed_window: int) -> int:
-    """Smart default point count for a seeded window size (budget-bound + clamped)."""
+    """Smart default point count for a seeded window size.
+
+    Inversely sized to the window under a recompute budget (small windows can
+    afford far more points), but floored at a few windows' worth of history so a
+    large-window metric still has a meaningful scored region, and clamped to a
+    render/payload-comfortable range.
+    """
     w = max(int(seed_window or 0), 1)
-    return max(_TUNE_MIN_POINTS, min(_TUNE_MAX_POINTS, round(_TUNE_COMPUTE_BUDGET / w)))
+    budget_points = round(_TUNE_COMPUTE_BUDGET / w)
+    fill_points = w * _TUNE_WINDOW_COVERAGE
+    return max(_TUNE_MIN_POINTS, min(_TUNE_MAX_POINTS, max(budget_points, fill_points)))
 
 
 # Per-type interval-width defaults (mirror the detector class defaults and the

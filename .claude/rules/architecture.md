@@ -231,6 +231,13 @@ pipeline: preprocessing → trailing window (current point excluded) with NaN
 filtering → optional **time-aware recency weighting** → optional **robust linear
 detrending** (split-median slope) → global statistics + per-seasonality-group
 multipliers → confidence interval, anomaly flag, severity/direction metadata.
+A seasonality group's multiplier engages only when the trailing window holds
+`min_samples_per_group` points of the current point's key; since same-key points
+recur once per *cardinality*, the window must span ≈ `min_samples_per_group ×
+distinct_keys` (hourly `hour` ⇒ ≈ 240) or **every** point falls back to the global
+band — a silent no-op at the default `window_size = 100`. `detect()` logs a
+one-time warning (`_warn_if_groups_cannot_fill`) when the window is too small to
+ever fill a group.
 Subclasses add only class-level defaults plus three hooks — `_compute_stats`,
 `_build_interval`, `_severity`:
 
@@ -475,7 +482,12 @@ prior winners. Stages (`AutoTuner.tune()`), each appending to a decision log:
    so a heavy-tailed metric can widen the band under the flag-rate budget instead
    of being trapped flagging its tail.
 4. **Window selection** (`window_select.py`) — window grid in natural seasonal
-   units; the tie-break is **trend-gated** by `trend_present` (a midpoint-median
+   units, **plus a seasonality-fill candidate** (`seasonal_fill_window` =
+   `min_samples_per_group × max_seasonal_cardinality`, capped to the fold budget)
+   so CV can evaluate a window where a chosen grouping actually engages instead of
+   silently falling back to global; if even the largest fold-feasible window can't
+   fill the groups, `grid_search` logs a `window` advisory. The tie-break is
+   **trend-gated** by `trend_present` (a midpoint-median
    test): stationary → prefer the **larger** window ("more history is better");
    trend / regime shift present → prefer the **smaller** (fresher baseline).
    Supervised runs also sweep `consecutive_anomalies` for the alert window.

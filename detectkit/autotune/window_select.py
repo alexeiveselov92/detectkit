@@ -16,6 +16,15 @@ import numpy as np
 from detectkit.autotune._base import _AutoTuneBase
 from detectkit.autotune._types import CandidateEval
 from detectkit.detectors.factory import DetectorFactory
+from detectkit.detectors.seasonality import parse_seasonality_data
+from detectkit.detectors.statistical._windowed import WindowedStatDetector
+
+# Reference per-group floor used to size a seasonality-fill window candidate. The
+# windowed detectors share this default (MAD 10 is the largest); using it makes
+# the fill window cover every windowed type so cross-validation can actually
+# discover whether conditioning on a seasonal key helps. See
+# ``seasonal_fill_window``.
+_MSPG_REF = int(WindowedStatDetector.MIN_SAMPLES_PER_GROUP_DEFAULT)
 
 
 def min_samples_for(window_size: int, floor: int) -> int:
@@ -23,8 +32,54 @@ def min_samples_for(window_size: int, floor: int) -> int:
     return min(window_size, max(floor, round(window_size / 4)))
 
 
+def max_seasonal_cardinality(tuner: _AutoTuneBase) -> int:
+    """Largest distinct-key count among the available single seasonality columns.
+
+    Per-group statistics only engage once the window holds
+    ``min_samples_per_group`` points sharing the current point's key, and same-key
+    points recur every *cardinality* grid positions — so this is the recurrence
+    period the window must cover. We use the most granular single column (e.g.
+    ``hour_of_day`` → 24) as the representative key; conjunctive groupings are
+    rarer and are backstopped by the detector's runtime under-fill warning.
+    Returns 0 when no seasonality columns are present.
+    """
+    columns = [c for c in tuner.data.get("seasonality_columns", []) if c != "is_holiday"]
+    if not columns:
+        return 0
+    season = parse_seasonality_data(tuner.data.get("seasonality_data", np.array([])), columns)
+    card = 0
+    for col in columns:
+        vals = season.get(col)
+        if vals is None or len(vals) == 0:
+            continue
+        distinct = {v for v in vals.tolist() if v is not None}
+        card = max(card, len(distinct))
+    return card
+
+
+def seasonal_fill_window(tuner: _AutoTuneBase) -> int:
+    """Smallest window that can fill a single-column seasonal group, else 0.
+
+    ``min_samples_per_group * cardinality``. None of the natural-unit candidates
+    (≈1 day, ≈1 week) reach this for hourly ``hour_of_day`` data (24 keys → 240),
+    so without this the chosen seasonality silently never engages at the tuned
+    window. Returns 0 when there is no seasonality to fill.
+    """
+    card = max_seasonal_cardinality(tuner)
+    return _MSPG_REF * card if card > 0 else 0
+
+
 def window_grid(tuner: _AutoTuneBase) -> list[int]:
-    """Candidate window sizes (≈1 day, ≈1 week, default 100), clamped to fit folds."""
+    """Candidate window sizes (≈1 day, ≈1 week, default 100), clamped to fit folds.
+
+    When the data carries seasonality columns, also offer a window large enough to
+    fill the most granular seasonal group (``min_samples_per_group * cardinality``)
+    so that — if seasonality is chosen downstream — cross-validation can evaluate a
+    window where the per-group band actually engages instead of silently falling
+    back to global statistics. Capped (like the other candidates) so it never
+    exceeds the fold budget; if it doesn't fit, seasonality simply can't fill on
+    this much history and the detector's runtime warning will say so.
+    """
     fixed = tuner.settings.fixed_params.get("window_size")
     if isinstance(fixed, int):
         return [fixed]
@@ -34,6 +89,9 @@ def window_grid(tuner: _AutoTuneBase) -> list[int]:
     cap = max(20, n // (fold_count + 1))
     pts_per_day = max(1, round(86400 / tuner.interval_seconds))
     candidates = {100, pts_per_day, 7 * pts_per_day}
+    fill = seasonal_fill_window(tuner)
+    if fill:
+        candidates.add(fill)
     grid = sorted({w for w in candidates if 20 <= w <= cap})
     if not grid:
         grid = [max(2, min(cap, 100))]

@@ -313,6 +313,36 @@ class TestSeasonalityRobustness:
             "(whole-window selection means parsing silently failed)"
         )
 
+    @staticmethod
+    def _hourly_seasonality_data(n):
+        hours = np.arange(n) % 24
+        values = np.random.default_rng(7).normal(100, 1, n) + np.where(hours == 12, 40.0, 0.0)
+        data = make_data(values)
+        data["seasonality_data"] = np.array([json.dumps({"hour_of_day": int(h)}) for h in hours])
+        data["seasonality_columns"] = ["hour_of_day"]
+        return data
+
+    def test_window_too_small_for_seasonal_groups_warns(self, caplog):
+        """A window that can't hold min_samples_per_group same-key points (here
+        floor(100/24)=4 < 10) silently falls back to global — warn loudly once."""
+        data = self._hourly_seasonality_data(600)
+        det = MADDetector(window_size=100, seasonality_components=["hour_of_day"])  # mspg=10
+        with caplog.at_level("WARNING"):
+            det.detect(data)
+        warnings = [r for r in caplog.records if "seasonality" in r.getMessage().lower()]
+        assert len(warnings) == 1, "must warn exactly once per instance"
+        assert "window_size=100" in warnings[0].getMessage()
+        assert ">= 240" in warnings[0].getMessage()  # 10 * 24 distinct hours
+
+    def test_window_large_enough_for_seasonal_groups_does_not_warn(self, caplog):
+        data = self._hourly_seasonality_data(600)
+        det = MADDetector(
+            window_size=240, seasonality_components=["hour_of_day"]
+        )  # floor(240/24)=10
+        with caplog.at_level("WARNING"):
+            det.detect(data)
+        assert not [r for r in caplog.records if "seasonality" in r.getMessage().lower()]
+
 
 class TestEmaNanHandling:
     def test_leading_nan_does_not_poison_series(self):

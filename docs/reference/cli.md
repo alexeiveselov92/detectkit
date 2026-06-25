@@ -803,13 +803,20 @@ what will be written. A **y = 0 line** toggle shows the metric relative to zero.
 
 A second, **synced** chart beneath the detector view lets you **mark real
 incidents** (drag to create a span; drag its edges/middle to adjust; ✕ or Delete to
-remove). As you tune, a metrics bar shows **incident catch rate (recall)** — the
-share of marked incidents caught by an alert — and **false-alert rate** — the share
-of fired alerts outside every incident ("≈1 in N false"). **Save incidents** writes
+remove), or use **Threshold capture** to grab every contiguous span past a
+horizontal line at once (set the line by click or value, pick **above**/**below**,
+optionally bridge a few intervals of gap, and drag across the chart to limit the
+capture to a time window — the painted window is saved as `capture_windows` and
+restored on reopen). As you tune, a metrics bar shows **incident catch rate
+(recall)** — the share of marked incidents caught by an alert — and **false-alert
+rate** — the share of fired alerts outside every incident ("≈1 in N false"); only
+incidents within the loaded window are scored. **Save incidents** writes
 a versioned `incidents/<metric>/<…>.yml`, the **same store
-[`dtk autotune`](#dtk-autotune) reads** (it seeds from the newest such file on
-open), so a labeling round here also feeds the next supervised tune. Saving
-incidents does not end the session; only **Apply** does.
+[`dtk autotune`](#dtk-autotune) reads** (it seeds incidents *and* capture windows
+from the newest such file on open, **widening the loaded window to cover seeded
+incidents** so older ones still render and count), so a labeling round here also
+feeds the next supervised tune. Saving incidents does not end the session; only
+**Apply** does.
 
 #### How Apply writes back
 

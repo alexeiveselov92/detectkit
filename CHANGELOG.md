@@ -5,6 +5,18 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.36.1] - 2026-06-25
+
+### Fixed
+- **`dtk tune` crashed with `TypeError: can't compare offset-naive and
+  offset-aware datetimes` when widening the window to seeded incidents on a
+  backend that returns tz-aware timestamps.** The 0.36.0 window-widening compared
+  the DB's last-datapoint timestamp (tz-aware on some backends) against an
+  incident start parsed from a naive-UTC display string. The earliest incident is
+  now aligned to the DB timestamp's awareness (both represent UTC) before the
+  comparison, so `dtk tune` opens for metrics with saved incidents regardless of
+  backend.
+
 ## [0.36.0] - 2026-06-25
 
 ### Fixed

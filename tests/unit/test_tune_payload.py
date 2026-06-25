@@ -1,6 +1,6 @@
 """Tests for the dtk tune payload builder + HTML shell."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
 
@@ -349,6 +349,39 @@ def test_seeded_incident_window_respects_point_ceiling():
     )
     ceiling = datetime(2026, 6, 1, 0, 0, 0) - timedelta(seconds=60 * _TUNE_INCIDENT_MAX_POINTS)
     assert rec.requested_from == ceiling
+
+
+def test_seeded_incident_with_tz_aware_db_timestamps():
+    """A backend that returns tz-aware datetimes must not crash when widening the
+    window to a (naive-UTC) seeded incident (regression: 'can't compare
+    offset-naive and offset-aware datetimes')."""
+
+    class AwareRecording(FakeInternal):
+        def __init__(self):
+            super().__init__(n=10)
+            self.requested_from = None
+
+        def get_last_datapoint_timestamp(self, name):
+            return datetime(2026, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+        def get_first_datapoint_timestamp(self, name):
+            return datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+        def load_datapoints(self, name, from_timestamp=None, to_timestamp=None):
+            self.requested_from = from_timestamp
+            return self._data
+
+    rec = AwareRecording()
+    incident_start = datetime(2024, 1, 1, 0, 0, 0)  # naive UTC, well before the slice
+    build_tune_payload(
+        metric_config=_metric(),
+        internal=rec,
+        incidents=[{"start": "2024-01-01 00:00:00", "end": "2024-01-01 06:00:00"}],
+    )
+    assert rec.requested_from is not None
+    # widened to (at/before) the incident, and stays tz-aware like the DB timestamps
+    assert rec.requested_from.tzinfo is not None
+    assert rec.requested_from <= incident_start.replace(tzinfo=timezone.utc)
 
 
 def test_explicit_from_not_widened_by_incidents():

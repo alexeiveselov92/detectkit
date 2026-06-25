@@ -276,10 +276,10 @@ class WebhookChannel(BaseAlertChannel):
             short("Expected", code(ctx["expected_range"]))
             short("Quorum", f"{ctx['detector_count']}/{ctx['min_detectors']} · {ctx['direction']}")
             short("Severity", f"{alert_data.severity:.2f}")
-            # The problematic span: when it started and the latest point in it.
+            # The problematic span: when the anomaly began and its latest point.
             if ctx["started_display"]:
-                short("Started", ctx["started_display"])
-                short("Latest", ctx["timestamp"])
+                short("Anomaly began", ctx["started_display"])
+                short("Latest reading", ctx["timestamp"])
             else:
                 full("Detected at", ctx["timestamp"])
             full("Detectors", code(ctx["detector_name"]))
@@ -289,10 +289,12 @@ class WebhookChannel(BaseAlertChannel):
             lead = f"{ctx['recovery_lead']}\n{rule_chip}"
             short("Value", code(ctx["value_display"]))
             short("Expected", code(ctx["expected_range"]))
-            # The incident span: when it started and when it cleared.
+            # The incident timeline: anomaly onset → when the alert fired →
+            # when it recovered. ``short`` skips the fired field when unknown.
             if ctx["started_display"]:
-                short("Started", ctx["started_display"])
-                short("Cleared", ctx["timestamp"])
+                short("Anomaly began", ctx["started_display"])
+                short("Alert fired", ctx["fired_display"])
+                short("Recovered", ctx["timestamp"])
             else:
                 full("Cleared at", ctx["timestamp"])
             full("Detectors", code(ctx["detector_name"]))

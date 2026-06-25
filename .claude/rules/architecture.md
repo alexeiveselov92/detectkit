@@ -330,7 +330,8 @@ with the brand name (`detectkit · <project>`). Direct-API callers leave it
   metric, linking to `dashboard_url` when set), a short markdown lead (the
   duration sentence, see "Incident timing" below) with the **Rule** chip beneath
   it, and a compact fields grid: short fields Value / Expected / Quorum /
-  Severity / Started / Latest (Started / Cleared on recovery), then full-width
+  Severity / Anomaly began / Latest reading (Anomaly began / Alert fired /
+  Recovered on recovery), then full-width
   Detectors / Parameters, plus a branded footer + footer_icon. `@mentions` ride
   in the **top-level** message text so they notify on Slack. A custom `template`
   still renders as a plain text-only attachment (color/title/branding kept, no
@@ -339,14 +340,15 @@ with the brand name (`detectkit · <project>`). Direct-API callers leave it
   message is structured and HTML-escaped: a colored status dot (red anomaly /
   green recovery / yellow no-data / blue error), a bold headline, the lead +
   rule, then evidence in `<code>` (value / expected / quorum / severity /
-  started → latest / detector / params), an inline "Open dashboard" link, then
+  began → latest / detector / params), an inline "Open dashboard" link, then
   mentions. This fixes a real bug — the old Markdown mode raised `can't parse
   entities` on params JSON containing underscores (e.g. `window_size`). Custom
   templates are sent verbatim under the parse mode (so keep them HTML-safe; set
   `parse_mode: Markdown` for the old behavior).
 - **Email** sends a branded HTML card (inline-CSS, table-based, Outlook-safe) —
   colored accent + status pill, the metric, the lead + Rule chip, a 2-col stat
-  grid (value / expected / severity / quorum / started / latest), a monospace
+  grid (value / expected / severity / quorum / anomaly began / latest reading;
+  began / alert fired / recovered on recovery), a monospace
   params box, an optional "Open dashboard" button, and a footer; the plain-text
   body remains the multipart fallback.
 
@@ -365,9 +367,17 @@ same order.
 **Incident timing — "how long has this been going on".** Every default-rendered
 anomaly leads with a plain-language sentence — `Anomalous for 2h 30m — 15
 consecutive 10min intervals.` — that surfaces the metric **interval**, the
-**true streak length** and the wall-clock **duration**; the Started/Latest
-fields bound the span. Recovery is symmetric (`Incident lasted …`, Started /
-Cleared). The decision only needs `consecutive_anomalies` points, so the *true*
+**true streak length** and the wall-clock **duration**; the **Anomaly began /
+Latest reading** fields bound the span. The timing labels are deliberately
+self-describing so a stakeholder can't misread the onset as the alert-fire
+moment: **Anomaly began** is the resolved onset (first anomalous point), **not**
+when the alert fired. Recovery shows the fuller **began → fired → recovered**
+timeline (`Incident lasted …`): **Alert fired** is the on-grid moment the rule
+first tripped, computed in `build_context` as `onset + (consecutive_required −
+1) × interval` (so no orchestrator change), exposed as `fired_display` and
+omitted when the run is capped (onset is only a lower bound) or timing isn't
+wired in; the firing message doesn't show it (it coincides with the latest
+point). The decision only needs `consecutive_anomalies` points, so the *true*
 streak/onset is resolved **only when an alert fires/clears**: `_decision.py`
 (`_resolve_streak`) and `_recovery.py` (`_resolve_incident`) load up to
 `STREAK_LOOKBACK_POINTS` (`_base.py`) detections and re-walk the same
@@ -375,8 +385,8 @@ direction-aware quorum logic; a run older than the window renders as `over …`.
 The result rides on `AlertData.interval_seconds` / `onset_timestamp` /
 `streak_capped` (`consecutive_count` now carries the *true* streak), and
 `BaseAlertChannel.build_context` turns it into the shared `anomaly_lead` /
-`recovery_lead` / `window_line` / `duration_display` values. The hot no-alert
-path is untouched (no extra query).
+`recovery_lead` / `window_line` / `duration_display` / `fired_display` values.
+The hot no-alert path is untouched (no extra query).
 
 Two `AlertConfig` fields (`detectkit/config/metric_config.py`) drive the action
 links, surfaced as first-class actions on every channel: **`dashboard_url`** (a

@@ -183,12 +183,16 @@ class BaseAlertChannel(ABC):
         - {interval_display} — metric interval as a string (e.g. "10min")
         - {duration_display} — how long the streak/incident lasted
           (e.g. "2h 30m"; "over …" when it predates the lookback window)
-        - {onset_display} / {started_display} — first timestamp of the run
-          ({started_display} adds "or earlier" when the run is capped)
+        - {onset_display} / {started_display} — first anomalous timestamp of
+          the run ({started_display} adds "or earlier" when the run is capped)
+        - {fired_display} — on-grid moment the alert first fired
+          (onset + (consecutive_required − 1) × interval); empty when the run
+          is capped or timing isn't wired in
         - {anomaly_lead} / {recovery_lead} — the ready-made plain-language
           lead sentence ("Anomalous for …" / "… Incident lasted …")
-        - {window_line} — "Started: … | Latest/Cleared: …" (or a single
-          "Detected at: …" line when the onset is unknown)
+        - {window_line} — "Anomaly began: … | Latest reading: …" (anomaly) /
+          "Anomaly began: … | Alert fired: … | Recovered: …" (recovery), or a
+          single "Detected at: …" line when the onset is unknown
         - {severity}
         - {status}
 
@@ -249,7 +253,7 @@ class BaseAlertChannel(ABC):
         templates use, plus a few extras (``dashboard_url``, ``dashboard_line``).
         """
         import math
-        from datetime import datetime
+        from datetime import datetime, timedelta
         from zoneinfo import ZoneInfo
 
         import numpy as np
@@ -268,6 +272,14 @@ class BaseAlertChannel(ABC):
                 t = t.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo(alert_data.timezone))
                 return f"{t.strftime('%Y-%m-%d %H:%M:%S')} ({alert_data.timezone})"
             return t.strftime("%Y-%m-%d %H:%M:%S")
+
+        def _shift_ts(value: Any, seconds: int) -> Any:
+            """Shift a timestamp forward by *seconds*, preserving its type."""
+            if isinstance(value, np.datetime64):
+                return value + np.timedelta64(int(seconds), "s")
+            if isinstance(value, datetime):
+                return value + timedelta(seconds=int(seconds))
+            return value
 
         ts_str = _fmt_ts(alert_data.timestamp)
         onset_str = _fmt_ts(alert_data.onset_timestamp)
@@ -359,13 +371,31 @@ class BaseAlertChannel(ABC):
                 "expected bounds."
             )
 
+        # "Alert fired" — the on-grid moment the rule's consecutive threshold was
+        # first met: onset + (consecutive_required - 1) * interval. Recovery
+        # messages render it as the middle of the "anomaly began → alert fired →
+        # recovered" timeline so a stakeholder can tell the onset apart from when
+        # detectkit actually notified. Skipped when the run is capped (onset is
+        # only a lower bound, so the fire time is unknown) or timing isn't wired
+        # in (direct-API callers). The firing message doesn't show it: there it
+        # coincides with the latest point the alert is firing on.
+        fired_display = ""
+        if alert_data.onset_timestamp is not None and interval_seconds and not capped:
+            req = (
+                consecutive_required if (consecutive_required and consecutive_required >= 1) else 1
+            )
+            fired_ts = _shift_ts(alert_data.onset_timestamp, (req - 1) * interval_seconds)
+            fired_display = _fmt_ts(fired_ts)
+
         # Kind-aware "window" line for the plain-text templates: the anomalous
-        # span (onset → latest/cleared) when known, else the single point.
+        # span (began → latest, or began → fired → recovered) when known, else
+        # the single point.
         kind = self.status_kind(alert_data)
         if started_display and kind == "anomaly":
-            window_line = f"Started: {started_display} | Latest: {ts_str}\n"
+            window_line = f"Anomaly began: {started_display} | Latest reading: {ts_str}\n"
         elif started_display and kind == "recovery":
-            window_line = f"Started: {started_display} | Cleared: {ts_str}\n"
+            fired_part = f"Alert fired: {fired_display} | " if fired_display else ""
+            window_line = f"Anomaly began: {started_display} | {fired_part}Recovered: {ts_str}\n"
         else:
             window_label = {
                 "recovery": "Cleared at",
@@ -443,6 +473,7 @@ class BaseAlertChannel(ABC):
             "streak_capped": capped,
             "onset_display": onset_str,
             "started_display": started_display,
+            "fired_display": fired_display,
             "anomaly_lead": anomaly_lead,
             "recovery_lead": recovery_lead,
             "window_line": window_line,

@@ -299,11 +299,11 @@ const tgTextHtml = (sev: 'anomaly' | 'recovery') => {
       ? '• Value: <code>4.2</code> · Expected: <code>&lt;= 1.1</code>\n' +
         '• Quorum: <code>1/1 · above</code>\n' +
         '• Severity: <code>3.40</code>\n' +
-        '• Started: <code>2026-06-19 11:14:00 (Europe/Moscow)</code> · Latest: <code>2026-06-19 12:04:00 (Europe/Moscow)</code>\n' +
+        '• Anomaly began: <code>2026-06-19 11:14:00 (Europe/Moscow)</code> · Latest reading: <code>2026-06-19 12:04:00 (Europe/Moscow)</code>\n' +
         '• Detector: <code>mad</code>\n' +
         '• Parameters: <code>{"threshold": 3.0, "window_size": 2016, "half_life": "1d"}</code>\n'
       : '• Value: <code>1.0</code> · Expected: <code>&lt;= 1.1</code>\n' +
-        '• Started: <code>2026-06-19 11:36:00 (Europe/Moscow)</code> · Cleared: <code>2026-06-19 12:36:00 (Europe/Moscow)</code>\n' +
+        '• Anomaly began: <code>2026-06-19 11:36:00 (Europe/Moscow)</code> · Alert fired: <code>2026-06-19 11:56:00 (Europe/Moscow)</code> · Recovered: <code>2026-06-19 12:36:00 (Europe/Moscow)</code>\n' +
         '• Detector: <code>mad</code>\n';
   return (
     head +

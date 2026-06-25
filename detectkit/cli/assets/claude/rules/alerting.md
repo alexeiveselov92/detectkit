@@ -196,15 +196,15 @@ leads with a colored **status circle** — 🔴 anomaly, 🟢 recovery, 🟡 no-
   status-colored accent bar, a clickable title (the metric; links to
   `dashboard_url` when set), a short markdown lead (the duration sentence — see
   "Incident timing" below) with the **Rule** chip beneath it, and a compact
-  fields grid: short fields Value / Expected / Quorum / Severity / Started /
-  Latest (Started / Cleared on recovery), then full-width Detectors / Parameters,
+  fields grid: short fields Value / Expected / Quorum / Severity / Anomaly began /
+  Latest reading (Anomaly began / Alert fired / Recovered on recovery), then full-width Detectors / Parameters,
   plus a branded footer + footer icon. @mentions ride in the **top-level**
   message text so they notify. A custom `template` instead renders as a plain
   text-only attachment (color/title/ branding kept, no fields grid).
 - **Telegram** — default `parse_mode` is now **HTML**. The default message is
   structured and HTML-escaped: a colored status dot (red anomaly / green
   recovery / yellow no-data / blue error), a bold headline, the lead + rule, then
-  evidence in `<code>` (value/expected/quorum/severity/started → latest/detector/
+  evidence in `<code>` (value/expected/quorum/severity/began → latest/detector/
   params), an inline "Open dashboard" link, then mentions. This fixes the old
   Markdown mode raising "can't parse entities" on params JSON containing
   underscores (e.g. `window_size`). Custom templates are sent verbatim under the
@@ -212,7 +212,7 @@ leads with a colored **status circle** — 🔴 anomaly, 🟢 recovery, 🟡 no-
   old behavior.
 - **Email** — a branded HTML card (inline-CSS, table-based, Outlook-safe):
   colored accent + status pill, the metric, the lead + Rule chip, a 2-col stat
-  grid (value/expected/severity/quorum/started/latest), a monospace params box,
+  grid (value/expected/severity/quorum/anomaly began/latest reading; began/alert fired/recovered on recovery), a monospace params box,
   an optional "Open dashboard" button, and a footer. The plain-text body remains
   the multipart fallback.
 
@@ -226,15 +226,20 @@ identical everywhere.
 
 **Incident timing — "how long has this been going on".** Each default anomaly
 leads with `Anomalous for 2h 30m — 15 consecutive 10min intervals.` (metric
-interval + true streak length + wall-clock duration); Started/Latest bound the
-span. Recovery is symmetric (`Incident lasted …`, Started / Cleared). The true
+interval + true streak length + wall-clock duration); the **Anomaly began /
+Latest reading** fields bound the span. Labels are self-describing so the onset
+isn't misread as the alert-fire moment: **Anomaly began** is the resolved onset,
+**not** when the alert fired. Recovery shows the fuller **began → fired →
+recovered** timeline (`Incident lasted …`), where **Alert fired** =
+`onset + (consecutive_required − 1) × interval` (computed in `build_context`,
+exposed as `{fired_display}`, omitted when the run is capped). The true
 streak/onset is resolved only when an alert fires/clears (a bounded lookback over
 the detection history; a run older than the window shows `over …`), so the hot
 no-alert path stays cheap. Exposed to templates as `{anomaly_lead}` /
 `{recovery_lead}` / `{duration_display}` / `{interval_display}` /
-`{started_display}` / `{window_line}` — and `{consecutive_count}` now carries the
-*true* streak length. Custom templates and the plain-text fallbacks follow the
-same order.
+`{started_display}` / `{fired_display}` / `{window_line}` — and
+`{consecutive_count}` now carries the *true* streak length. Custom templates and
+the plain-text fallbacks follow the same order.
 
 ## Project label (multi-project channels)
 
@@ -294,7 +299,7 @@ referenced by path). Key variables:
 | `{direction}`, `{severity}` | observed values |
 | `{consecutive_count}` | **true** streak length (resolved at fire time, not capped at the rule) |
 | `{anomaly_lead}` / `{recovery_lead}` | ready-made "how long" lead sentence |
-| `{interval_display}` / `{duration_display}` / `{started_display}` / `{window_line}` | incident-timing bits (interval, duration, onset, `Started… \| Latest…` line) |
+| `{interval_display}` / `{duration_display}` / `{started_display}` / `{fired_display}` / `{window_line}` | incident-timing bits (interval, duration, onset, alert-fire moment, `Anomaly began… \| Latest reading…` line) |
 | `{status}` | `ANOMALY` / `RECOVERED` / `NO_DATA` / `ERROR` |
 | `{mentions}` / `{mentions_line}` | formatted mentions |
 | `{dashboard_url}` | raw `dashboard_url` (empty string when unset) |

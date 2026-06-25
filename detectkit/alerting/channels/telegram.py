@@ -182,8 +182,8 @@ class TelegramChannel(BaseAlertChannel):
             lines.append(f"• Severity: <code>{alert_data.severity:.2f}</code>")
             if ctx["started_display"]:
                 lines.append(
-                    f"• Started: <code>{esc(ctx['started_display'])}</code> · "
-                    f"Latest: <code>{esc(ctx['timestamp'])}</code>"
+                    f"• Anomaly began: <code>{esc(ctx['started_display'])}</code> · "
+                    f"Latest reading: <code>{esc(ctx['timestamp'])}</code>"
                 )
             else:
                 lines.append(f"• Time: <code>{esc(ctx['timestamp'])}</code>")
@@ -204,12 +204,17 @@ class TelegramChannel(BaseAlertChannel):
                 f"Expected: <code>{esc(ctx['expected_range'])}</code>"
             )
             if ctx["started_display"]:
+                fired = (
+                    f"Alert fired: <code>{esc(ctx['fired_display'])}</code> · "
+                    if ctx["fired_display"]
+                    else ""
+                )
                 lines.append(
-                    f"• Started: <code>{esc(ctx['started_display'])}</code> · "
-                    f"Cleared: <code>{esc(ctx['timestamp'])}</code>"
+                    f"• Anomaly began: <code>{esc(ctx['started_display'])}</code> · "
+                    f"{fired}Recovered: <code>{esc(ctx['timestamp'])}</code>"
                 )
             else:
-                lines.append(f"• Cleared: <code>{esc(ctx['timestamp'])}</code>")
+                lines.append(f"• Recovered: <code>{esc(ctx['timestamp'])}</code>")
             lines.append(f"• Detector: <code>{esc(ctx['detector_name'])}</code>")
         elif kind == "no_data":
             lines.append("Query returned no datapoint for the latest expected interval.")

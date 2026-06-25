@@ -216,6 +216,13 @@ def build_tune_payload(
         # of leading context so the detector's trailing window can fill there.
         earliest = _earliest_incident_start(seed_incidents)
         if earliest is not None:
+            # The DB backend may return tz-aware timestamps (end/first) while
+            # incident display strings parse to naive UTC; align earliest to end's
+            # awareness (both represent UTC) so the comparison below is valid.
+            if end.tzinfo is not None and earliest.tzinfo is None:
+                earliest = earliest.replace(tzinfo=end.tzinfo)
+            elif end.tzinfo is None and earliest.tzinfo is not None:
+                earliest = earliest.replace(tzinfo=None)
             context_points = max(_TUNE_WINDOW_COVERAGE * int(seed["windowSize"]), 200)
             lookback = min(
                 lookback, earliest - timedelta(seconds=interval_seconds * context_points)

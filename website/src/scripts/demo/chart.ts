@@ -30,6 +30,7 @@ import type {
   ChartHandle,
   ChartOptions,
   HoverInfo,
+  Incident,
   ScoredPoint,
   Series,
 } from './types';
@@ -131,15 +132,36 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   const g = ctx; // non-null alias
 
   const navigable = !!opts.navigable;
+  // The navigator/minimap strip: on by default with `navigable`, suppressible so
+  // a chart keeps wheel-zoom + drag-pan but yields the strip to a synced sibling.
+  const hasNav = navigable && opts.showNavigator !== false;
   // 'data' fits the y-axis to the metric values only (band may clip past the
   // edges); 'band' (default) also folds in the confidence band so it's fully
   // visible. See ChartOptions.yFit.
   const yFitData = opts.yFit === 'data';
+  // Incident-labeling mode: plot-drag marks/edits incident spans (pan via the
+  // strip). Off → incidents (if any) are read-only shaded context.
+  const labeling = !!opts.labeling;
 
   let dpr = 1;
   let data: ChartData | null = null;
   let hoverIndex = -1;
   let raf = 0;
+  // y = 0 reference line + 0-relative scaling (toggled via setZeroLine).
+  let showZero = !!opts.showZeroLine;
+  // Incident spans drawn as bands. On a labeling chart this is the owned, mutable
+  // source of truth; on a read-only chart it is replaced from render data.
+  let incidents: Incident[] = [];
+  // Labeling interaction state.
+  let selIncident: Incident | null = null;
+  let hoverDelIdx = -1;
+  let incidentDrag:
+    | { mode: 'new'; a: number; b: number; moved: boolean }
+    | { mode: 'edge'; iv: Incident; edge: 'a' | 'b'; moved: boolean }
+    | { mode: 'move'; iv: Incident; grab: number; a0: number; b0: number; moved: boolean }
+    | null = null;
+  // Suppresses onViewChange re-emit during a programmatic setViewWindow (sync).
+  let suppressViewEmit = false;
 
   // Domain, recomputed per render.
   let tmin = 0;
@@ -158,9 +180,9 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     dpr = fitCanvas(canvas);
   }
 
-  // Reserve a navigator strip at the bottom in navigable mode; the main plot
-  // shrinks by exactly that much so nothing else moves.
-  const navTotal = (): number => (navigable ? (NAV_GAP + NAV_H) * dpr : 0);
+  // Reserve a navigator strip at the bottom when shown; the main plot shrinks by
+  // exactly that much so nothing else moves.
+  const navTotal = (): number => (hasNav ? (NAV_GAP + NAV_H) * dpr : 0);
   const plotW = (): number => canvas.width - (MARGINS.l + MARGINS.r) * dpr;
   const plotH = (): number => canvas.height - (MARGINS.t + MARGINS.b) * dpr - navTotal();
   // X domain = the visible window when navigable, else the whole series.
@@ -232,7 +254,16 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     }
     viewMin = clampNum(a, tmin, tmax);
     viewMax = clampNum(b, tmin, tmax);
+    if (!suppressViewEmit) opts.onViewChange?.(viewMin, viewMax);
     schedule();
+  }
+  // Set the visible window from a synced sibling WITHOUT re-emitting onViewChange
+  // (so A→B→A never loops). No-op when not navigable.
+  function setViewWindow(a: number, b: number): void {
+    if (!navigable) return;
+    suppressViewEmit = true;
+    setView(a, b);
+    suppressViewEmit = false;
   }
   // Timestamp at a device-px X within the main plot.
   const tsAtDevX = (devX: number): number => {
@@ -307,6 +338,12 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       lo = 0;
       hi = 1;
     }
+    // Fold 0 into the extent so the metric reads relative to zero (the y=0 line is
+    // then always in view, not clipped off an all-positive / all-negative series).
+    if (showZero) {
+      if (lo > 0) lo = 0;
+      if (hi < 0) hi = 0;
+    }
     if (hi <= lo) {
       hi = lo + 1;
     }
@@ -377,6 +414,19 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       g.textAlign = 'right';
       g.fillText(fmtVal(v), (MARGINS.l - 8) * dpr, yy);
     }
+    // y = 0 reference line (distinct from the faint gridlines) when in view.
+    if (showZero && vmin <= 0 && vmax >= 0) {
+      const y0 = py(0);
+      g.strokeStyle = rgba(muted, 0.6);
+      g.lineWidth = 1.25 * dpr;
+      g.beginPath();
+      g.moveTo(MARGINS.l * dpr, y0);
+      g.lineTo(canvas.width - MARGINS.r * dpr, y0);
+      g.stroke();
+      g.fillStyle = muted;
+      g.textAlign = 'right';
+      g.fillText('0', (MARGINS.l - 8) * dpr, y0);
+    }
     g.textBaseline = 'top';
     const mainBot = canvas.height - MARGINS.b * dpr - navTotal();
     if (navigable) {
@@ -414,6 +464,10 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     g.beginPath();
     g.rect(MARGINS.l * dpr, MARGINS.t * dpr, plotW(), plotH());
     g.clip();
+
+    // 0. incident span bands (under the band/line) — read-only context on a
+    // detector chart, interactive on a labeling chart.
+    drawIncidents();
 
     // Effective-zone start: the first index where the detector runs at full
     // power. Everything before it (the degraded warm-up lead-in) gets no band,
@@ -532,10 +586,10 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
 
     g.restore();
 
-    // 9. navigator strip (navigable mode) — the whole series in miniature with
-    // the current view window, alert ticks and a time axis, so a zoomed-in view
-    // never loses the big picture.
-    if (navigable) drawNavigator(series, alerts, clay, faint, muted);
+    // 9. navigator strip — the whole series in miniature with the current view
+    // window, alert ticks and a time axis, so a zoomed-in view never loses the
+    // big picture.
+    if (hasNav) drawNavigator(series, alerts, clay, faint, muted);
   }
 
   // The bottom navigator/minimap: full-series mini line + faint time gridlines,
@@ -590,6 +644,17 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     g.fillStyle = 'rgba(27,25,22,0.55)';
     g.fillRect(left, top, vx0 - left, navPlotH());
     g.fillRect(vx1, top, right - vx1, navPlotH());
+
+    // incident spans (faint bands) so labeled incidents are locatable at a glance
+    if (incidents.length) {
+      const anomalyCol = token('--st-anomaly');
+      g.fillStyle = rgba(anomalyCol, 0.28);
+      for (const iv of incidents) {
+        const x0 = navPx(iv.start);
+        const w = Math.max(navPx(iv.end) - x0, 2 * dpr);
+        g.fillRect(x0, top, w, navPlotH());
+      }
+    }
 
     // alert ticks (full strength on top of the dim) — every firing, locatable
     if (alerts && alerts.length) {
@@ -709,6 +774,129 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     }
   }
 
+  // ---- incident bands -------------------------------------------------------
+  // A rounded-rect path (for the ✕ delete handle), ported from html_labeler.
+  function roundRect(x: number, y: number, w: number, h: number, r: number): void {
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.arcTo(x + w, y, x + w, y + h, r);
+    g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r);
+    g.arcTo(x, y, x + w, y, r);
+    g.closePath();
+  }
+
+  // The ✕ delete handle at a band's top-right (device px); `hot` brightens it.
+  function drawDelHandle(x1: number, hot: boolean): void {
+    const anomaly = token('--st-anomaly');
+    const s = 14 * dpr;
+    const m = 3 * dpr;
+    const bx = x1 - s - m;
+    const by = MARGINS.t * dpr + m;
+    g.fillStyle = hot ? rgba(anomaly, 0.95) : 'rgba(27,25,22,0.82)';
+    g.strokeStyle = rgba(anomaly, 0.9);
+    g.lineWidth = 1 * dpr;
+    roundRect(bx, by, s, s, 3 * dpr);
+    g.fill();
+    g.stroke();
+    g.strokeStyle = hot ? '#fff' : anomaly;
+    g.lineWidth = 1.5 * dpr;
+    const p = 4 * dpr;
+    g.beginPath();
+    g.moveTo(bx + p, by + p);
+    g.lineTo(bx + s - p, by + s - p);
+    g.moveTo(bx + s - p, by + p);
+    g.lineTo(bx + p, by + s - p);
+    g.stroke();
+  }
+
+  // Shaded incident bands. Read-only on a detector chart (just fill + faint
+  // edges); on a labeling chart they gain edge handles, a selection highlight, a
+  // ✕ delete handle and a live drag preview.
+  function drawIncidents(): void {
+    const top = MARGINS.t * dpr;
+    const h = plotH();
+    const anomaly = token('--st-anomaly');
+    const left = MARGINS.l * dpr;
+    const right = canvas.width - MARGINS.r * dpr;
+    for (let idx = 0; idx < incidents.length; idx++) {
+      const iv = incidents[idx];
+      const x0 = px(iv.start);
+      const x1 = px(iv.end);
+      if (x1 < left - 1 || x0 > right + 1) continue;
+      const w = Math.max(x1 - x0, 2 * dpr);
+      const isSel = labeling && iv === selIncident;
+      g.fillStyle = rgba(anomaly, isSel ? 0.3 : 0.16);
+      g.fillRect(x0, top, w, h);
+      g.strokeStyle = rgba(anomaly, isSel ? 0.95 : 0.5);
+      g.lineWidth = (isSel ? 2 : 1) * dpr;
+      g.strokeRect(x0, top, w, h);
+      if (labeling) {
+        g.fillStyle = rgba(anomaly, 0.95);
+        g.fillRect(x0 - 1.5 * dpr, top, 3 * dpr, h);
+        g.fillRect(x1 - 1.5 * dpr, top, 3 * dpr, h);
+        if (x1 - x0 >= 22 * dpr || isSel) drawDelHandle(x1, isSel || idx === hoverDelIdx);
+      }
+    }
+    if (labeling && incidentDrag && incidentDrag.mode === 'new') {
+      const x0 = px(incidentDrag.a);
+      const x1 = px(incidentDrag.b);
+      g.fillStyle = rgba(token('--st-nodata'), 0.28);
+      g.fillRect(Math.min(x0, x1), top, Math.abs(x1 - x0), h);
+    }
+  }
+
+  // Emit the LIVE array (not a copy) so the caller and chart share one source of
+  // truth — list-edited labels and drag-edited spans never diverge.
+  function emitIncidents(): void {
+    opts.onIncidentsChange?.(incidents);
+  }
+
+  function removeIncident(iv: Incident): void {
+    const k = incidents.indexOf(iv);
+    if (k < 0) return;
+    incidents.splice(k, 1);
+    if (selIncident === iv) selIncident = null;
+    hoverDelIdx = -1;
+    emitIncidents();
+    schedule();
+  }
+
+  // Hit-test incidents in device px: ✕ handle first, then edges, then body.
+  function hitIncident(devX: number, devY: number): { i: number; edge: 'del' | 'a' | 'b' | 'move' } | null {
+    const top = MARGINS.t * dpr;
+    const EDGE = 6 * dpr;
+    for (let i = 0; i < incidents.length; i++) {
+      const x1 = px(incidents[i].end);
+      if (x1 - px(incidents[i].start) >= 22 * dpr || incidents[i] === selIncident) {
+        const s = 14 * dpr;
+        const m = 3 * dpr;
+        const hx0 = x1 - s - m;
+        const hy0 = top + m;
+        if (devX >= hx0 && devX <= hx0 + s && devY >= hy0 && devY <= hy0 + s) return { i, edge: 'del' };
+      }
+    }
+    for (let i = 0; i < incidents.length; i++) {
+      const xa = px(incidents[i].start);
+      const xb = px(incidents[i].end);
+      if (Math.abs(devX - xa) <= EDGE) return { i, edge: 'a' };
+      if (Math.abs(devX - xb) <= EDGE) return { i, edge: 'b' };
+    }
+    for (let i = 0; i < incidents.length; i++) {
+      const xa = px(incidents[i].start);
+      const xb = px(incidents[i].end);
+      if (devX > xa + EDGE && devX < xb - EDGE) return { i, edge: 'move' };
+    }
+    return null;
+  }
+
+  // Smallest editable span (a few grid steps) so an edge/move never collapses.
+  const incidentMinStep = (): number => {
+    const s = data?.series;
+    const n = s ? s.timestamps.length : 0;
+    return n > 1 ? Math.max(fullSpan() / (n - 1), 1) : 1000;
+  };
+
   function schedule(): void {
     if (raf === 0) raf = requestAnimationFrame(paint);
   }
@@ -738,7 +926,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     const r = canvas.getBoundingClientRect();
     return { x: (ev.clientX - r.left) * dpr, y: (ev.clientY - r.top) * dpr };
   };
-  const inNav = (devY: number): boolean => navigable && devY >= navTop();
+  const inNav = (devY: number): boolean => hasNav && devY >= navTop();
   const navHit = (devX: number): 'l' | 'r' | 'move' | 'out' => {
     const xl = navPx(viewMin);
     const xr = navPx(viewMax);
@@ -752,7 +940,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   function onMove(ev: MouseEvent): void {
     if (!data) return;
     const { x: devX, y: devY } = devOf(ev);
-    if (pan || navDrag) return; // active drag is handled on window
+    if (pan || navDrag || incidentDrag) return; // active drag is handled on window
     if (inNav(devY)) {
       // over the navigator strip: no hover; hint the grab/resize affordance
       if (hoverIndex !== -1) {
@@ -762,6 +950,27 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       }
       const hit = navHit(devX);
       canvas.style.cursor = hit === 'l' || hit === 'r' ? 'ew-resize' : hit === 'move' ? 'grab' : 'pointer';
+      return;
+    }
+    if (labeling) {
+      // over the plot in labeling mode: hint create/move/resize/delete; no point hover.
+      if (hoverIndex !== -1) {
+        hoverIndex = -1;
+        emitHover();
+      }
+      const hit = hitIncident(devX, devY);
+      const nextDel = hit && hit.edge === 'del' ? hit.i : -1;
+      if (nextDel !== hoverDelIdx) {
+        hoverDelIdx = nextDel;
+        schedule();
+      }
+      canvas.style.cursor = hit
+        ? hit.edge === 'del'
+          ? 'pointer'
+          : hit.edge === 'move'
+            ? 'grab'
+            : 'ew-resize'
+        : 'crosshair';
       return;
     }
     if (navigable) canvas.style.cursor = 'grab';
@@ -784,7 +993,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   function onDown(ev: MouseEvent): void {
     if (!navigable || !data) return;
     const { x: devX, y: devY } = devOf(ev);
-    if (devY >= navTop()) {
+    if (hasNav && devY >= navTop()) {
       const hit = navHit(devX);
       if (hit === 'l') navDrag = { type: 'l', grab: 0, vMin: viewMin, vMax: viewMax };
       else if (hit === 'r') navDrag = { type: 'r', grab: 0, vMin: viewMin, vMax: viewMax };
@@ -798,7 +1007,35 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       }
       canvas.style.cursor = 'grabbing';
       ev.preventDefault();
-    } else if (devY > MARGINS.t * dpr && devY < navTop() - NAV_GAP * dpr) {
+      return;
+    }
+    // plot area (everything above the navigator strip / bottom margin)
+    if (devY > MARGINS.t * dpr && devY < canvas.height - MARGINS.b * dpr - navTotal()) {
+      if (labeling) {
+        const t = tsAtDevX(devX);
+        const hit = hitIncident(devX, devY);
+        if (hit && hit.edge === 'del') {
+          removeIncident(incidents[hit.i]);
+          ev.preventDefault();
+          return;
+        }
+        if (hit && hit.edge === 'move') {
+          const iv = incidents[hit.i];
+          selIncident = iv;
+          incidentDrag = { mode: 'move', iv, grab: t, a0: iv.start, b0: iv.end, moved: false };
+        } else if (hit) {
+          const iv = incidents[hit.i];
+          selIncident = iv;
+          incidentDrag = { mode: 'edge', iv, edge: hit.edge, moved: false };
+        } else {
+          selIncident = null;
+          incidentDrag = { mode: 'new', a: t, b: t, moved: false };
+        }
+        canvas.style.cursor = 'crosshair';
+        schedule();
+        ev.preventDefault();
+        return;
+      }
       pan = { x: devX, vMin: viewMin, vMax: viewMax };
       canvas.style.cursor = 'grabbing';
       ev.preventDefault();
@@ -808,6 +1045,36 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   function onWinMove(ev: MouseEvent): void {
     if (!data) return;
     const { x: devX } = devOf(ev);
+    if (incidentDrag) {
+      const t = tsAtDevX(devX);
+      if (incidentDrag.mode === 'new') {
+        incidentDrag.b = t;
+        if (Math.abs(px(incidentDrag.b) - px(incidentDrag.a)) > 4 * dpr) incidentDrag.moved = true;
+      } else if (incidentDrag.mode === 'edge') {
+        const iv = incidentDrag.iv;
+        const ms = incidentMinStep();
+        if (incidentDrag.edge === 'a') iv.start = clampNum(Math.min(t, iv.end - ms), tmin, tmax);
+        else iv.end = clampNum(Math.max(t, iv.start + ms), tmin, tmax);
+        incidentDrag.moved = true;
+      } else {
+        const iv = incidentDrag.iv;
+        let na = incidentDrag.a0 + (t - incidentDrag.grab);
+        let nb = incidentDrag.b0 + (t - incidentDrag.grab);
+        if (na < tmin) {
+          nb += tmin - na;
+          na = tmin;
+        }
+        if (nb > tmax) {
+          na -= nb - tmax;
+          nb = tmax;
+        }
+        iv.start = clampNum(na, tmin, tmax);
+        iv.end = clampNum(nb, tmin, tmax);
+        incidentDrag.moved = true;
+      }
+      schedule();
+      return;
+    }
     if (pan) {
       const d = ((devX - pan.x) * (pan.vMax - pan.vMin)) / (plotW() || 1);
       setView(pan.vMin - d, pan.vMax - d);
@@ -820,10 +1087,46 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   }
 
   function onUp(): void {
+    if (incidentDrag) {
+      const drag = incidentDrag;
+      if (drag.mode === 'new') {
+        if (drag.moved) {
+          const a = clampNum(Math.min(drag.a, drag.b), tmin, tmax);
+          const b = clampNum(Math.max(drag.a, drag.b), tmin, tmax);
+          const iv: Incident = { start: a, end: b, label: '' };
+          incidents.push(iv);
+          selIncident = iv;
+        } else {
+          selIncident = null; // a plain click on empty space clears the selection
+        }
+      } else if (drag.iv.start > drag.iv.end) {
+        const t = drag.iv.start;
+        drag.iv.start = drag.iv.end;
+        drag.iv.end = t;
+      }
+      incidentDrag = null;
+      canvas.style.cursor = 'crosshair';
+      if (drag.moved) emitIncidents();
+      schedule();
+      return;
+    }
     if (pan || navDrag) {
       pan = null;
       navDrag = null;
       canvas.style.cursor = 'grab';
+    }
+  }
+
+  function onKey(ev: KeyboardEvent): void {
+    const t = ev.target as HTMLElement | null;
+    const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+    if (typing || !selIncident) return;
+    if (ev.key === 'Delete' || ev.key === 'Backspace') {
+      ev.preventDefault();
+      removeIncident(selIncident);
+    } else if (ev.key === 'Escape') {
+      selIncident = null;
+      schedule();
     }
   }
 
@@ -857,12 +1160,35 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     window.addEventListener('mousemove', onWinMove);
     window.addEventListener('mouseup', onUp);
   }
+  if (labeling) {
+    window.addEventListener('keydown', onKey);
+    canvas.style.cursor = 'crosshair';
+  }
 
   // ---- public handle --------------------------------------------------------
   function render(next: ChartData): void {
     data = next;
+    // A read-only chart takes incidents from render data; a labeling chart owns
+    // them (seed/replace via setIncidents), so don't clobber in-progress edits.
+    if (!labeling && next.incidents) incidents = next.incidents;
     computeDomain(next.series, next.scored);
     if (hoverIndex >= next.series.timestamps.length) hoverIndex = -1;
+    schedule();
+  }
+
+  function setZeroLine(on: boolean): void {
+    if (showZero === on) return;
+    showZero = on;
+    if (data) computeDomain(data.series, data.scored);
+    schedule();
+  }
+
+  // Adopt the array by reference (shared source of truth — see emitIncidents) and
+  // drop any stale selection into it.
+  function setIncidents(list: Incident[]): void {
+    incidents = list;
+    selIncident = null;
+    hoverDelIdx = -1;
     schedule();
   }
 
@@ -884,11 +1210,12 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       window.removeEventListener('mousemove', onWinMove);
       window.removeEventListener('mouseup', onUp);
     }
+    if (labeling) window.removeEventListener('keydown', onKey);
     if (raf !== 0) cancelAnimationFrame(raf);
     raf = 0;
     data = null;
   }
 
   fit();
-  return { render, resize, destroy };
+  return { render, resize, setZeroLine, setViewWindow, setIncidents, destroy };
 }

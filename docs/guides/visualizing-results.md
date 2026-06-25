@@ -85,7 +85,9 @@ period:
 - a short **summary** of the period.
 
 Use the built-in **period selector** (24h / 7d / 30d / All, with zoom and pan) to
-move around the history. The report is **offline and self-contained**: the chart
+move around the history, and the **y = 0** toggle to draw a reference line at zero
+and scale the chart to include it — handy for a real-valued metric best read
+relative to zero. The report is **offline and self-contained**: the chart
 and data are inlined into the single file, so nothing is fetched and nothing
 leaves the page — you can email it or commit it as a snapshot.
 

@@ -14,6 +14,7 @@ When no labels are supplied the tuner falls back to unsupervised mode.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -279,3 +280,43 @@ def load_capture_windows(
     """Load a labels file and render its capture windows as labeler display dicts."""
     labels = parse_labels_file(path, interval_seconds=interval_seconds, metric_name=metric_name)
     return capture_windows_to_display(labels)
+
+
+# Versioned labels store helpers (shared by the autotune labeler server and the
+# `dtk tune` labeler so both name + discover files the same way).
+_LABELS_GLOBS = ("*.yml", "*.yaml", "*.json")
+_NAME_RE = re.compile(r"[^a-z0-9_-]+")
+
+
+def newest_labels_file(directory: str | Path) -> Path | None:
+    """Newest versioned labels file in *directory* (``None`` if empty/absent).
+
+    Versioned names (``<metric>[-<set>]-<UTCstamp>.yml``) sort chronologically by
+    name; mtime tie-breaks.
+    """
+    d = Path(directory)
+    if not d.is_dir():
+        return None
+    files: list[Path] = []
+    for pattern in _LABELS_GLOBS:
+        files.extend(d.glob(pattern))
+    if not files:
+        return None
+    return sorted(files, key=lambda p: (p.name, p.stat().st_mtime))[-1]
+
+
+def sanitize_label_set_name(name: str) -> str:
+    """Filesystem-safe slug for an optional label-set name (``""`` when blank)."""
+    return _NAME_RE.sub("-", name.strip().lower()).strip("-")
+
+
+def versioned_labels_path(incidents_dir: str | Path, metric: str, name: str = "") -> Path:
+    """Versioned labels path ``<metric>[-<slug>]-<UTCstamp>.yml`` in *incidents_dir*.
+
+    The single source of the labels filename convention: the optional set *name*
+    is sanitized to a suffix, blank → just the metric name.
+    """
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    slug = sanitize_label_set_name(name)
+    stem = f"{metric}-{slug}" if slug else metric
+    return Path(incidents_dir) / f"{stem}-{stamp}.yml"

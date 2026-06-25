@@ -5,6 +5,33 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.34.0] - 2026-06-25
+
+### Added
+- **`dtk tune` is now a full config cockpit: mark real incidents and see alert
+  quality live.** Beneath the detector chart there is a **synced incident-labeler
+  chart** — drag to mark a real incident span, drag its edges to adjust / its
+  middle to move, click its ✕ (or select + Delete) to remove. The two charts share
+  x-zoom/pan, y-scale and the "Points shown" trim, and the detector chart overlays
+  the same spans (read-only) so alerts vs incidents read together. A prominent
+  metrics bar updates as you tune, with two operator-facing numbers:
+  - **incident catch rate (recall)** — what share of the marked incidents your
+    current config actually catches; and
+  - **false-alert rate (FDR / type-I control)** — what share of fired alerts fall
+    outside any real incident, shown as a percentage and "≈1 in N false".
+
+  **Save incidents** writes a versioned `incidents/<metric>/<…>.yml` (the **same**
+  store `dtk autotune` reads), so a labeling round in `dtk tune` also feeds the next
+  supervised autotune — one source of truth. `dtk tune` seeds the labeler from the
+  newest file in that directory on open. Saving labels does not end the session
+  (only **Apply** does); `dtk tune --no-serve` downloads the labels file instead.
+  The labels schema, validation and versioned filenames are shared with the
+  autotune labeler.
+- **`y = 0` reference line on the `dtk tune` and `dtk run --report` charts.** A
+  toggle draws a horizontal line at zero and folds 0 into the vertical scale, so a
+  real-valued metric can be read **relative to zero**. Off by default; the landing
+  playground is unchanged.
+
 ## [0.33.0] - 2026-06-25
 
 ### Fixed

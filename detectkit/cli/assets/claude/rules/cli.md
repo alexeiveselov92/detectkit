@@ -88,13 +88,24 @@ config back into the metric YAML **in place** (autotune, by contrast, writes a n
 datapoints (run `dtk run --steps load` first if empty); the selector must resolve
 to a single metric.
 
+**Mark incidents + see alert quality live.** A second, **synced** chart beneath
+the detector view lets you **mark the real incidents** (drag to create a span,
+drag its edges/middle to adjust, ✕ or Delete to remove). As you tune, a metrics
+bar shows two operator numbers: **incident catch rate (recall)** — how many marked
+incidents your config catches — and **false-alert rate** — what share of alerts
+fall outside any real incident ("≈1 in N false"). **Save incidents** writes a
+versioned `incidents/<metric>/*.yml` — the same store `dtk autotune` reads, so the
+same labels feed the next supervised tune (it seeds from the newest file on open).
+Saving incidents does not end the session; only **Apply** does. A **y = 0 line**
+toggle (shared with `dtk run --report`) shows the metric relative to zero.
+
 Safe write-back: the config is validated before anything is written, the previous
 YAML is archived under `metrics/.history/<metric>/`, and only then is the metric
 overwritten. Takes **no pipeline lock** (it only edits a config file); re-run
 `dtk run` afterward to recompute detections under the new config.
-`--no-serve` writes a static read-only preview HTML instead (no write-back);
-`--from` / `--to` bound the window; `--no-open` prints the URL without opening a
-browser.
+`--no-serve` writes a static read-only preview HTML instead (no write-back —
+**Save incidents** downloads the labels file); `--from` / `--to` bound the window;
+`--no-open` prints the URL without opening a browser.
 
 ## `dtk test-alert <metric>`
 

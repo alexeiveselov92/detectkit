@@ -569,14 +569,44 @@ seeded from the metric's alerting `direction` (multi-detector `same` → `any`).
 window-size and half-life sliders echo their wall-clock span next to the point
 count.
 
+**Incident labeling + live alert-quality metrics (the "cockpit").** Beneath the
+detector chart `tune.ts` mounts a **second, synced labeler chart** (the shared
+`demo/chart.ts` in a new opt-in `labeling` mode): drag the plot to mark a real
+incident span, drag its edges to resize / its middle to move, click its ✕ (or
+select + Delete) to remove. The two charts share one incident array (by
+reference), so list-edited labels and drag-edited spans never diverge; they also
+share **x-zoom/pan** (each chart's `onViewChange` drives the other's
+`setViewWindow`, suppressing re-emit so it never loops), **y-scale** (both
+`yFit:'data'`) and the **"Points shown"** trim. The detector chart hides its own
+navigator strip (`showNavigator:false`) and overlays the same spans **read-only**
+so alerts vs incidents read together; the labeler chart owns the strip. A
+prominent **metrics bar** recomputes as you tune from the worker's fired-alert
+timestamps vs the marked spans: **incident catch rate (recall)** = incidents
+containing ≥1 alert / total, and **false-alert rate (FDR)** = alerts outside every
+span / total (shown as `%` and "≈1 in N false"). Labeling is anchored here (not the
+read-only report) because the labels are fixed ground truth while only the alerts
+move as you tune. **Save incidents** POSTs to the server's `/labels` endpoint,
+which writes a versioned `incidents/<metric>/<…>.yml` — the **same store
+`dtk autotune` reads**, so a labeling round here also feeds the next supervised
+autotune; the command seeds the labeler from the newest file in that directory on
+open. The whole labels stack (schema, validation, versioned filenames) is shared
+with the autotune labeler via `autotune/labels.py` (`parse_incident_labels`,
+`incidents_to_display`, `newest_labels_file`, `versioned_labels_path`). A **y = 0
+reference line** toggle (shared chart `showZeroLine` + `setZeroLine`, also on
+`dtk run --report`) draws a horizontal line at zero and folds 0 into the scale, for
+real-valued metrics best read relative to zero. All these chart additions default
+off, so the landing playground is untouched.
+
 Three pure-ish pieces + a server:
 
 - `payload.build_tune_payload(...)` reads `_dtk_datapoints` and bakes the **raw
   gap-filled series + per-point seasonality keys + the metric's current detector
   config (camelCased to seed the controls, including any `manual_bounds` lower/upper)
-  + the alert `consecutive_anomalies` and seeded `direction`** into a JSON payload —
+  + the alert `consecutive_anomalies` and seeded `direction` + seeded `incidents`**
+  (newest `incidents/<metric>/` file → display dicts) into a JSON payload —
   everything the client port needs to *recompute*. It bakes **no** precomputed
-  detection (the browser runs the detector itself).
+  detection (the browser runs the detector itself). `labels_save_url` (like
+  `save_url`) is injected by the server.
 - `html.render_tune_html(payload)` inlines `assets/tune.js` + the payload into one
   self-contained HTML page (mirrors `reporting/html_report.py`; assigns
   `window.__DTK_TUNE__`).
@@ -591,12 +621,17 @@ Three pure-ish pieces + a server:
   the `detectors` list with the single tuned detector and optionally updates the
   first alerting block's `consecutive_anomalies` (it never invents alerting).
 - `server.serve_tuner(...)` / `build_tune_server(...)` is the localhost write-back
-  server, modeled exactly on `autotune/label_server.py`: bound to `127.0.0.1:0`
-  with a one-shot `secrets` token, serves the page, accepts **one** `POST /apply`
-  on the **Apply** click → `apply_tuned_config` → responds + self-shuts-down so the
-  command reports what changed. An invalid config returns **400 and keeps serving**
-  (fix the knobs and retry). `dtk tune --no-serve` writes a static read-only
-  preview file (sliders recompute, no write-back).
+  server, modeled on `autotune/label_server.py`: bound to `127.0.0.1:0`
+  with a one-shot `secrets` token, serves the page, and handles **two** token-guarded
+  POSTs. `POST /apply` (the **Apply** click) → `apply_tuned_config` → responds +
+  **self-shuts-down** so the command reports what changed; an invalid config returns
+  **400 and keeps serving**. `POST /labels` (the **Save incidents** click) validates
+  via `parse_incident_labels` and writes a versioned file through
+  `versioned_labels_path` into `incidents/<metric>/`, then **keeps serving** (labels
+  save repeatedly while you tune; only Apply ends the session); invalid labels return
+  **400 and keep serving**. `dtk tune --no-serve` writes a static read-only preview
+  file (sliders recompute, no write-back; **Save incidents** downloads the labels
+  file instead).
 
 Unlike `run`/`autotune`, `dtk tune` takes **no pipeline lock** — it neither runs
 the pipeline nor persists detections, it only edits a config file. Changing the

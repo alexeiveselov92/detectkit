@@ -779,7 +779,8 @@ Restrict the window the tuner shows and recomputes over (`YYYY-MM-DD` or
 
 Write a static, read-only tuner HTML file (`metrics/<metric>__tuner.html`) and
 exit instead of starting the local server. The sliders still recompute the band
-live, but there is **no Apply / write-back**.
+live and you can still mark incidents, but there is **no Apply / write-back** —
+**Save incidents** downloads the labels file instead of writing it.
 
 ##### `--no-open` (flag)
 
@@ -791,11 +792,24 @@ Profile override (default: from the project config).
 
 #### What you can tune
 
-Detector **type** (MAD / Z-Score / IQR), **threshold**, **window size**, recency
-**weighting** + **half-life**, **detrend**, **smoothing**, **seasonality
-conditioning** (per available seasonality column, optionally conjoined into one
-group), and the alert **`consecutive_anomalies`** window. The "effective config"
-readout shows exactly what will be written.
+Detector **type** (MAD / Z-Score / IQR / Manual bounds), **threshold**, **window
+size**, recency **weighting** + **half-life**, **detrend**, **smoothing**,
+**seasonality conditioning** (per available seasonality column, optionally conjoined
+into one group), **direction** (both/up/down) and the alert
+**`consecutive_anomalies`** window. The "effective config" readout shows exactly
+what will be written. A **y = 0 line** toggle shows the metric relative to zero.
+
+#### Mark incidents & alert-quality metrics
+
+A second, **synced** chart beneath the detector view lets you **mark real
+incidents** (drag to create a span; drag its edges/middle to adjust; ✕ or Delete to
+remove). As you tune, a metrics bar shows **incident catch rate (recall)** — the
+share of marked incidents caught by an alert — and **false-alert rate** — the share
+of fired alerts outside every incident ("≈1 in N false"). **Save incidents** writes
+a versioned `incidents/<metric>/<…>.yml`, the **same store
+[`dtk autotune`](#dtk-autotune) reads** (it seeds from the newest such file on
+open), so a labeling round here also feeds the next supervised tune. Saving
+incidents does not end the session; only **Apply** does.
 
 #### How Apply writes back
 

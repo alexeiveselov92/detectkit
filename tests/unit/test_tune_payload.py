@@ -259,3 +259,19 @@ def test_render_tune_html_bakes_payload_and_bundle():
     # no leftover placeholders
     for placeholder in ("__PAYLOAD__", "__METRIC__", "__FAVICON__", "__TUNE_JS__"):
         assert placeholder not in html
+
+
+def test_payload_includes_incidents_seed():
+    incidents = [{"start": "2026-01-01 00:00:00", "end": "2026-01-01 02:00:00", "label": "x"}]
+    payload = build_tune_payload(
+        metric_config=_metric(), internal=FakeInternal(), incidents=incidents
+    )
+    assert payload["incidents"] == incidents
+    # labels_save_url is injected by the server, not the builder.
+    assert payload["labels_save_url"] is None
+
+
+def test_payload_incidents_default_empty():
+    payload = build_tune_payload(metric_config=_metric(), internal=FakeInternal())
+    assert payload["incidents"] == []
+    assert payload["labels_save_url"] is None

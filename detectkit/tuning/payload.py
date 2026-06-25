@@ -145,6 +145,7 @@ def build_tune_payload(
     end: datetime | None = None,
     project_name: str | None = None,
     save_url: str | None = None,
+    incidents: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Assemble the interactive tuning payload from the persisted ``_dtk_datapoints``.
 
@@ -152,7 +153,13 @@ def build_tune_payload(
     is ``None`` for a static (read-only, no write-back) preview. With no explicit
     ``start``/``end`` the window defaults to a budget-sized recent slice
     (``default_window_points``), not the whole history.
+
+    ``incidents`` seeds the synced labeler with already-marked spans (display dicts
+    ``{start, end, label}`` from ``incidents_to_display``). ``labels_save_url`` (the
+    POST endpoint for **Save incidents**) is injected by the server, like
+    ``save_url`` — it is ``None`` here.
     """
+    seed_incidents = incidents or []
     name = metric_config.name
     interval = metric_config.get_interval()
     interval_seconds = interval.seconds
@@ -190,6 +197,8 @@ def build_tune_payload(
         "consecutive_anomalies": consecutive,
         "direction": direction,
         "save_url": save_url,
+        "incidents": seed_incidents,
+        "labels_save_url": None,
     }
     if start is None or end is None:
         return empty
@@ -228,4 +237,6 @@ def build_tune_payload(
         "consecutive_anomalies": consecutive,
         "direction": direction,
         "save_url": save_url,
+        "incidents": seed_incidents,
+        "labels_save_url": None,
     }

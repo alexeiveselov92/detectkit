@@ -212,12 +212,31 @@ export interface ChartAlert {
   kind: string;
 }
 
+/**
+ * A labeled real-world incident span (ms-epoch). Drawn as a shaded band on the
+ * chart; on a `labeling` chart it can be created/moved/resized/deleted, and the
+ * `dtk tune` cockpit overlays the same spans (read-only) on the detector chart to
+ * compute the live catch-rate / false-alert metrics. A point incident is a
+ * degenerate span with `start === end`.
+ */
+export interface Incident {
+  start: number;
+  end: number;
+  label?: string;
+}
+
 export interface ChartData {
   series: Series;
   scored: ScoredPoint[];
   params: DetectorParams;
   /** all fired alerts, drawn as colored markers along the top axis. */
   alerts?: ChartAlert[];
+  /**
+   * Labeled incident spans drawn as shaded bands. On a non-`labeling` chart they
+   * are read-only context (e.g. the tune detector chart); a `labeling` chart owns
+   * its own incidents (seed/replace via `ChartHandle.setIncidents`).
+   */
+  incidents?: Incident[];
 }
 
 export interface ChartOptions {
@@ -239,6 +258,35 @@ export interface ChartOptions {
    * axis rescaling in lockstep and hiding the change.
    */
   yFit?: 'band' | 'data';
+  /**
+   * Draw a horizontal reference line at y = 0 and fold 0 into the y-domain, so a
+   * real-valued metric can be read RELATIVE TO ZERO. Off by default (the landing
+   * playground / report are unaffected); toggle live via `setZeroLine`.
+   */
+  showZeroLine?: boolean;
+  /**
+   * Incident-labeling mode: drag on the plot to mark an incident span, drag its
+   * edges to resize / its middle to move, click its ✕ (or select + Delete) to
+   * remove it. Pan/zoom stays available via the navigator strip + wheel. Used by
+   * the `dtk tune` cockpit's labeler chart; off by default.
+   */
+  labeling?: boolean;
+  /** Called (with a snapshot) whenever the user edits incidents in `labeling` mode. */
+  onIncidentsChange?: (incidents: Incident[]) => void;
+  /**
+   * Called whenever the visible window changes (zoom / pan / reset). Used to keep
+   * two charts in sync — the listener typically calls the other chart's
+   * `setViewWindow`. Only fires for user-driven view changes, not programmatic
+   * `setViewWindow` (which suppresses re-emit to avoid feedback loops).
+   */
+  onViewChange?: (viewMin: number, viewMax: number) => void;
+  /**
+   * Show the bottom navigator/minimap strip. Defaults to true when `navigable`.
+   * Set false to keep wheel-zoom + drag-pan but hide the strip (e.g. the tune
+   * cockpit's detector chart, whose strip is provided by the synced labeler chart
+   * beneath it).
+   */
+  showNavigator?: boolean;
 }
 
 export interface ChartHandle {
@@ -246,6 +294,12 @@ export interface ChartHandle {
   render(data: ChartData): void;
   /** re-fit the backing store to the element size (call on resize). */
   resize(): void;
+  /** Toggle the y = 0 reference line + 0-relative scaling (see ChartOptions.showZeroLine). */
+  setZeroLine(on: boolean): void;
+  /** Set the visible window programmatically WITHOUT re-emitting onViewChange (for sync). */
+  setViewWindow(a: number, b: number): void;
+  /** Replace the incident spans (seed/reset). Clears any selection. */
+  setIncidents(incidents: Incident[]): void;
   destroy(): void;
 }
 

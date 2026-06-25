@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import click
 
+from detectkit.autotune.labels import load_incidents_for_display, newest_labels_file
 from detectkit.cli._output import echo_done, echo_error, echo_noop
 from detectkit.cli.commands.autotune import _load_project
 from detectkit.cli.commands.run import parse_date, select_metrics
@@ -56,6 +57,26 @@ def run_tune(
 
     metric_path, config = metrics[0]
     name = config.name
+    interval_seconds = config.get_interval().seconds
+
+    # Seed the synced labeler with the newest already-marked incidents from the
+    # shared store incidents/<metric>/ (the same files dtk autotune reads), so
+    # labeling round-trips across both tools. Best-effort — a missing/bad file
+    # just yields no seed.
+    incidents_dir = project_root / "incidents" / name
+    preload_incidents: list[dict[str, str]] = []
+    newest = newest_labels_file(incidents_dir)
+    if newest is not None:
+        try:
+            preload_incidents = load_incidents_for_display(
+                newest, interval_seconds=interval_seconds, metric_name=name
+            )
+            click.echo(
+                f"  Seeded {len(preload_incidents)} incident(s) from "
+                f"{newest.relative_to(project_root)}"
+            )
+        except Exception as exc:  # noqa: BLE001 — preload is a best-effort convenience
+            click.echo(click.style(f"  Could not preload {newest}: {exc}", fg="yellow"))
 
     from_dt = parse_date(from_date) if from_date else None
     to_dt = parse_date(to_date) if to_date else None
@@ -68,6 +89,7 @@ def run_tune(
         start=from_dt,
         end=to_dt,
         project_name=project_name,
+        incidents=preload_incidents,
     )
     n_points = len(payload["points"])
     if n_points == 0:
@@ -97,6 +119,9 @@ def run_tune(
         project_root=project_root,
         open_browser=not no_open,
         echo=click.echo,
+        metric_name=name,
+        incidents_dir=incidents_dir,
+        interval_seconds=interval_seconds,
     )
     if applied is None:
         echo_noop(name, "tuning cancelled — metric unchanged")

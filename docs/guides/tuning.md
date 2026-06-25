@@ -100,6 +100,47 @@ a shorter period is enough, trimming it makes every knob-drag noticeably faster
 (and the period easier to read). Trimming only affects the live view — it never
 changes what **Apply** writes.
 
+A **y = 0 line** toggle draws a horizontal reference line at zero and folds zero
+into the vertical scale, so a real-valued metric (one best read *relative to zero*)
+shows where it sits against zero. It applies to both charts and is also available
+on the [HTML report](visualizing-results.md). Off by default.
+
+## Mark incidents & read alert quality
+
+Tuning the band is only half the job — the question that matters is **how good the
+alerts are**. Beneath the detector chart is a **second, synced chart** where you
+mark the **real incidents** on the same series:
+
+- **Drag** across the lower chart to mark an incident span; **drag its edges** to
+  adjust, **drag its middle** to move, and click its **✕** (or select it and press
+  **Delete**) to remove it.
+- The two charts move together — the same zoom/pan, the same vertical scale, the
+  same "Points shown" trim — and the detector chart shades the same incident spans
+  read-only, so you can see at a glance whether the alerts (▼ markers) line up with
+  real incidents.
+
+As you turn the detector knobs, a **metrics bar** at the top recomputes two
+operator-facing numbers:
+
+- **Incident catch rate (recall)** — what share of the marked incidents your
+  current config actually catches (an incident is *caught* when at least one alert
+  fires inside it).
+- **False-alert rate** — what share of fired alerts fall **outside** every marked
+  incident, shown as a percentage and as "≈1 in N false" (controlling false alarms
+  / type-I error). The complement is the share of alerts that are *correct*.
+
+This is the loop the request was built for: pick a detector, see the flagged
+points, mark which were real, and tune until you catch the incidents you care about
+without drowning in false alerts.
+
+Click **Save incidents** to persist the marked spans to
+`incidents/<metric>/<metric>-<timestamp>.yml` — the **same versioned store
+[`dtk autotune`](autotuning.md) reads**, so the labels you draw here also feed the
+next supervised auto-tune (one source of truth). `dtk tune` seeds the labeler from
+the newest file in that directory when it opens, so labeling round-trips across both
+tools. Saving incidents does **not** end the session (only **Apply** does) — keep
+adjusting and save again, or save labels and then tune the detector against them.
+
 ## Apply the config back
 
 Click **Apply to metric**. detectkit then, in order:
@@ -133,7 +174,9 @@ dtk tune --select api_error_rate --no-serve
 ```
 
 This writes `metrics/<metric>__tuner.html`. The sliders still recompute the band
-live, but there is no **Apply** button — the file is read-only.
+live and you can still mark incidents, but there is no **Apply** button — the file
+is read-only, and **Save incidents** downloads the labels file (drop it into
+`incidents/<metric>/` yourself) instead of writing it directly.
 
 ## See also
 

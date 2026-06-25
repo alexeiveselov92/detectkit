@@ -10,12 +10,10 @@ off the machine, and nothing is written until the user explicitly saves.
 from __future__ import annotations
 
 import json
-import re
 import secrets
 import threading
 import webbrowser
 from collections.abc import Callable
-from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, cast
@@ -24,23 +22,12 @@ from urllib.parse import parse_qs, urlparse
 import numpy as np
 
 from detectkit.autotune.html_labeler import render_labeler_html
-from detectkit.autotune.labels import parse_incident_labels
+from detectkit.autotune.labels import parse_incident_labels, versioned_labels_path
 
-_NAME_RE = re.compile(r"[^a-z0-9_-]+")
+# Re-exported under the historical name for the labeler-server tests.
+from detectkit.autotune.labels import sanitize_label_set_name as _sanitize  # noqa: F401
+
 _MAX_BODY = 5_000_000  # generous cap on the posted labels payload
-
-
-def _sanitize(name: str) -> str:
-    """Filesystem-safe slug for a label-set name; ``""`` when blank.
-
-    Used as an optional *suffix* appended to the metric-named filename, so a blank
-    name simply yields no suffix (the file is named after the metric alone).
-    """
-    return _NAME_RE.sub("-", name.strip().lower()).strip("-")
-
-
-def _stamp() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 class _LabelServer(ThreadingHTTPServer):
@@ -90,16 +77,14 @@ class _Handler(BaseHTTPRequestHandler):
 
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             yaml_text = str(payload.get("yaml", ""))
-            suffix = _sanitize(str(payload.get("name", "")))
             raw = _yaml.safe_load(yaml_text)
             # validate against the canonical schema before writing anything
             parse_incident_labels(
                 raw, interval_seconds=srv.interval_seconds, metric_name=srv.metric
             )
             srv.incidents_dir.mkdir(parents=True, exist_ok=True)
-            # Always name the file after the metric; the optional set name is a suffix.
-            stem = f"{srv.metric}-{suffix}" if suffix else srv.metric
-            out = srv.incidents_dir / f"{stem}-{_stamp()}.yml"
+            # Versioned, metric-named file (the optional set name is a suffix).
+            out = versioned_labels_path(srv.incidents_dir, srv.metric, str(payload.get("name", "")))
             out.write_text(yaml_text, encoding="utf-8")
             srv.saved_path = out
         except Exception as exc:

@@ -76,6 +76,21 @@ def _post(url_base, token, body):
     return urllib.request.urlopen(req, timeout=5)
 
 
+def _post_path(url_base, path, token, body):
+    req = urllib.request.Request(
+        f"{url_base}{path}?token={token}",
+        data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    return urllib.request.urlopen(req, timeout=5)
+
+
+_LABELS_YAML = (
+    "metric: orders\ntimezone: UTC\n"
+    'incidents:\n  - {start: "1970-01-01 00:00:00", end: "1970-01-01 01:00:00"}\n'
+)
+
+
 def test_save_url_injected_into_page(tmp_path):
     server, url = build_tune_server(
         payload=_payload(), original_path=_project(tmp_path), project_root=tmp_path
@@ -146,6 +161,80 @@ def test_server_rejects_invalid_config(tmp_path):
         # nothing written, no archive — and the server keeps serving for a retry
         assert path.read_text() == before
         assert not (tmp_path / "metrics" / ".history").exists()
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def _labels_server(tmp_path):
+    inc_dir = tmp_path / "incidents" / "orders"
+    server, url = build_tune_server(
+        payload=_payload(),
+        original_path=_project(tmp_path),
+        project_root=tmp_path,
+        metric_name="orders",
+        incidents_dir=inc_dir,
+        interval_seconds=3600,
+    )
+    return server, url, inc_dir
+
+
+def test_labels_save_url_injected_into_page(tmp_path):
+    server, _url, _inc = _labels_server(tmp_path)
+    try:
+        assert "/labels?token=" in server.html  # Save-incidents endpoint baked in
+    finally:
+        server.server_close()
+
+
+def test_server_saves_labels_and_keeps_serving(tmp_path):
+    server, url, inc_dir = _labels_server(tmp_path)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        r = _post_path(base, "/labels", token, {"name": "", "yaml": _LABELS_YAML})
+        assert r.status == 200
+        saved = json.loads(r.read())["saved"]
+        assert Path(saved).exists()
+        files = sorted(inc_dir.glob("*.yml"))
+        assert len(files) == 1 and files[0].name.startswith("orders-")
+        # /labels is repeatable: apply was never triggered and a 2nd save works.
+        assert server.applied is None
+        r2 = _post_path(base, "/labels", token, {"name": "second", "yaml": _LABELS_YAML})
+        assert r2.status == 200
+        assert any(f.name.startswith("orders-second-") for f in inc_dir.glob("*.yml"))
+        assert len(list(inc_dir.glob("*.yml"))) == 2
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_server_rejects_invalid_labels_and_keeps_serving(tmp_path):
+    server, url, inc_dir = _labels_server(tmp_path)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post_path(base, "/labels", token, {"yaml": "metric: orders\nincidents: not-a-list\n"})
+        assert ei.value.code == 400
+        assert not list(inc_dir.glob("*.yml")) if inc_dir.exists() else True
+        # still serving — a valid save now works
+        r = _post_path(base, "/labels", token, {"yaml": _LABELS_YAML})
+        assert r.status == 200
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_labels_rejects_bad_token(tmp_path):
+    server, url, inc_dir = _labels_server(tmp_path)
+    _serve(server)
+    try:
+        base = url.split("/?")[0]
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post_path(base, "/labels", "WRONG", {"yaml": _LABELS_YAML})
+        assert ei.value.code == 403
+        assert not inc_dir.exists() or not list(inc_dir.glob("*.yml"))
     finally:
         server.shutdown()
         server.server_close()

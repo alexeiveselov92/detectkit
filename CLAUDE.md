@@ -44,8 +44,14 @@ rendered on the docs site under **For developers**). Read the relevant one:
   metric's real series (recomputing the band live via the **same** TS detector
   port as the landing playground) and, on **Apply**, writes the chosen config
   back into the metric YAML — validating first, archiving the previous version to
-  `metrics/.history/<metric>/`, then re-emitting in place. Committed bundle
-  `assets/tune.js` (built by `website/scripts/gen-tune-bundle.mjs`) ships in the
-  wheel — regenerate it when the renderer TS changes. Takes no pipeline lock.
+  `metrics/.history/<metric>/`, then re-emitting in place. It also hosts a
+  **synced incident-labeler chart**: mark real incidents and watch live
+  **catch-rate (recall)** / **false-alert rate (FDR)** metrics as you tune;
+  **Save incidents** writes versioned `incidents/<metric>/*.yml` (the same store
+  `dtk autotune` reads) via a `POST /labels` endpoint, reusing
+  `autotune/labels.py`. A **y = 0 reference line** toggle is shared with
+  `dtk run --report`. Committed bundle `assets/tune.js` (built by
+  `website/scripts/gen-tune-bundle.mjs`) ships in the wheel — regenerate it when
+  the renderer TS changes. Takes no pipeline lock.
 
 Repo: https://github.com/alexeiveselov92/detectkit

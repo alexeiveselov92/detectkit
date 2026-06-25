@@ -195,6 +195,17 @@ function render(payload: ReportPayload, mount: HTMLElement): void {
     presets.appendChild(b);
   }
 
+  // y = 0 reference line toggle — for real-valued metrics best read relative to 0.
+  const zeroLabel = document.createElement('label');
+  zeroLabel.className = 'dtk-zero';
+  zeroLabel.title = 'Draw a horizontal line at y = 0 and scale the chart to include zero.';
+  const zeroBox = document.createElement('input');
+  zeroBox.type = 'checkbox';
+  zeroBox.onchange = () => chart.setZeroLine(zeroBox.checked);
+  zeroLabel.appendChild(zeroBox);
+  zeroLabel.appendChild(document.createTextNode(' y = 0'));
+  presets.appendChild(zeroLabel);
+
   // --- alerts list -----------------------------------------------------------
   root.appendChild(buildAlertsList(payload, (al) => chart.focusAlert(al)));
 
@@ -358,6 +369,7 @@ interface ReportChart {
   setView(a: number, b: number): void;
   resetView(): void;
   focusAlert(al: ReportAlert): void;
+  setZeroLine(on: boolean): void;
 }
 
 function createReportChart(
@@ -391,6 +403,8 @@ function createReportChart(
   let viewMax = tmax;
   let dpr = 1;
   let hoverTs: number | null = null;
+  // y = 0 reference line + 0-relative scaling (toggled via setZeroLine).
+  let showZero = false;
 
   function computeValueDomain(): void {
     let lo = Infinity;
@@ -411,10 +425,22 @@ function createReportChart(
       lo = 0;
       hi = 1;
     }
+    // Fold 0 into the extent so the metric reads relative to zero when toggled on.
+    if (showZero) {
+      if (lo > 0) lo = 0;
+      if (hi < 0) hi = 0;
+    }
     if (hi <= lo) hi = lo + 1;
     const pad = (hi - lo) * 0.06;
     vmin = lo - pad;
     vmax = hi + pad;
+  }
+
+  function setZeroLine(on: boolean): void {
+    if (showZero === on) return;
+    showZero = on;
+    computeValueDomain();
+    paint();
   }
 
   // Divider for the warm-up overlay: the primary detector's full-power onset —
@@ -497,6 +523,21 @@ function createReportChart(
 
     // gridlines + axes (time ticks track the current view)
     drawGridAndAxes(g, canvas, MARGINS, domain(), sc.px, sc.py, viewMin, viewMax, faint, muted, dpr);
+
+    // y = 0 reference line (distinct from the faint gridlines) when in view
+    if (showZero && vmin <= 0 && vmax >= 0) {
+      const y0 = sc.py(0);
+      g.strokeStyle = rgba(muted, 0.6);
+      g.lineWidth = 1.25 * dpr;
+      g.beginPath();
+      g.moveTo(MARGINS.l * dpr, y0);
+      g.lineTo(canvas.width - MARGINS.r * dpr, y0);
+      g.stroke();
+      g.fillStyle = muted;
+      g.textAlign = 'right';
+      g.textBaseline = 'middle';
+      g.fillText('0', (MARGINS.l - 8) * dpr, y0);
+    }
 
     // clip to plot rect
     g.save();
@@ -707,6 +748,7 @@ function createReportChart(
     setView,
     resetView,
     focusAlert,
+    setZeroLine,
   };
 }
 
@@ -764,6 +806,9 @@ function injectStyle(): void {
   font-size:12px;font-family:var(--sans);transition:border-color .12s ease,color .12s ease;}
 .${ROOT_CLASS} .dtk-preset:hover{border-color:var(--clay);color:var(--ink);}
 .${ROOT_CLASS} .dtk-preset.active{background:var(--clay);color:#fff;border-color:var(--clay);}
+.${ROOT_CLASS} .dtk-zero{display:inline-flex;align-items:center;gap:5px;margin-left:6px;
+  font-size:12px;color:var(--muted);font-family:var(--sans);cursor:pointer;user-select:none;}
+.${ROOT_CLASS} .dtk-zero input{accent-color:var(--clay);cursor:pointer;}
 .${ROOT_CLASS} .dtk-readout{font-size:11px;color:var(--muted);
   font-family:var(--mono);display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;}
 .${ROOT_CLASS} .dtk-readout .dtk-swatch{margin-right:4px;}

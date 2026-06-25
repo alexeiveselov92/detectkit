@@ -8,8 +8,11 @@ import pytest
 from detectkit.autotune._types import TuneMode
 from detectkit.autotune.labels import (
     capture_windows_to_display,
+    newest_labels_file,
     parse_incident_labels,
     parse_labels_file,
+    sanitize_label_set_name,
+    versioned_labels_path,
 )
 
 
@@ -206,3 +209,28 @@ def test_capture_windows_round_trip_to_display():
 def test_capture_windows_must_be_a_list():
     with pytest.raises(ValueError, match="capture_windows"):
         parse_incident_labels({"incidents": [], "capture_windows": "nope"}, interval_seconds=3600)
+
+
+def test_sanitize_label_set_name():
+    assert sanitize_label_set_name("My Outage!") == "my-outage"
+    assert sanitize_label_set_name("   ") == ""
+    assert sanitize_label_set_name("a/b\\c") == "a-b-c"
+    assert sanitize_label_set_name("CheckOut_5xx") == "checkout_5xx"
+
+
+def test_versioned_labels_path(tmp_path):
+    p = versioned_labels_path(tmp_path, "orders")
+    assert p.parent == tmp_path
+    assert p.name.startswith("orders-") and p.name.endswith(".yml")
+    named = versioned_labels_path(tmp_path, "orders", "Big Outage")
+    assert named.name.startswith("orders-big-outage-")
+
+
+def test_newest_labels_file(tmp_path):
+    assert newest_labels_file(tmp_path) is None  # empty dir
+    assert newest_labels_file(tmp_path / "missing") is None  # absent dir
+    older = tmp_path / "orders-20260101T000000Z.yml"
+    newer = tmp_path / "orders-20260202T000000Z.yml"
+    older.write_text("incidents: []\n", encoding="utf-8")
+    newer.write_text("incidents: []\n", encoding="utf-8")
+    assert newest_labels_file(tmp_path) == newer  # newest by versioned name

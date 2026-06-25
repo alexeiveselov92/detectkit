@@ -101,7 +101,15 @@ seasonality_components:
 - `["hour", "day_of_week"]` — two *separate* adjustments.
 - `[["hour", "day_of_week"]]` — one *combined* group per pair.
 
-`min_samples_per_group` is the floor of points required per bucket.
+`min_samples_per_group` is the floor of points required per bucket. **Size the
+window to fill a bucket:** a group engages only when the window holds
+`min_samples_per_group` points of the current key, and same-key points recur once
+per *cardinality*, so `window_size ≳ min_samples_per_group × distinct_keys`. With
+hourly `["hour"]` (24 keys, mad default 10) that's `≳ 240` — the default
+`window_size = 100` fills no bucket, so seasonality silently falls back to the
+global band (the detector logs a one-time warning). Raise `window_size`, lower
+`min_samples_per_group`, or use a coarser grouping. `dtk autotune` now offers a
+fill-sized window candidate automatically.
 
 ## Preprocessing — `input_type`
 

@@ -331,6 +331,21 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     return groups.length ? groups : null;
   };
 
+  // Distinct seasonal keys present for a grouping (max across groups). Same-key
+  // points recur once per this many positions, so the window must hold ~this many
+  // × min_samples_per_group points before a group fills; below that the detector
+  // silently falls back to the global band (seasonality has no effect).
+  const seasonalCardinality = (groups: string[][] | null): number => {
+    if (!groups || !payload.seasonality.length) return 0;
+    let card = 0;
+    for (const g of groups) {
+      const seen = new Set<string>();
+      for (const row of payload.seasonality) seen.add(g.map((c) => String(row?.[c] ?? '')).join('|'));
+      card = Math.max(card, seen.size);
+    }
+    return card;
+  };
+
   const readParams = (): DetectorParams => ({
     type: detectorCtl.get() as DetectorType,
     threshold: thresholdCtl.get(),
@@ -436,8 +451,34 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   const readout = el('div', 'dtk-tune-readout');
   main.appendChild(readout);
 
+  // Surfaces when the window is too small to fill the chosen seasonality, so the
+  // band silently uses global (un-conditioned) statistics. Mirrors the Python
+  // detector's runtime warning — without it a wide band reads like a bug.
+  const seasonWarn = el('div', 'dtk-tune-warn');
+  seasonWarn.style.display = 'none';
+  main.appendChild(seasonWarn);
+  const updateSeasonWarn = (params: DetectorParams): void => {
+    const groups = params.seasonalityComponents;
+    const card = seasonalCardinality(groups);
+    const needed = params.minSamplesPerGroup * card;
+    if (groups && card > 0 && params.windowSize < needed) {
+      seasonWarn.textContent =
+        `⚠ Seasonality inactive at this window: ${params.windowSize} < ${needed} ` +
+        `(min_samples_per_group ${params.minSamplesPerGroup} × ${card} key${card === 1 ? '' : 's'}). ` +
+        `Each point keeps only ~${Math.floor(params.windowSize / card)} same-key point(s), so the ` +
+        `band falls back to global statistics (seasonality has no effect). Raise the window to ≥ ${needed}.`;
+      seasonWarn.style.display = '';
+    } else {
+      seasonWarn.style.display = 'none';
+    }
+  };
+
   const chart: ChartHandle = createChart(canvas, {
     navigable: true,
+    // Fit the y-axis to the data, not the band — so turning the Threshold slider
+    // visibly widens/narrows the corridor relative to the metric instead of the
+    // axis rescaling in lockstep and making the change look like a no-op.
+    yFit: 'data',
     onHover: (info): void => {
       if (!info || !info.point || !info.point.scored) {
         readout.textContent = '';
@@ -476,6 +517,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     statBar.textContent =
       `${res.flagged} flagged · ${res.fires.length} alert${res.fires.length === 1 ? '' : 's'} · ` +
       `warm-up ${res.eff} pts`;
+    updateSeasonWarn(params);
     configEcho.textContent = configText(params, consecutive);
   };
   worker.onerror = (): void => {
@@ -589,15 +631,20 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     if (thresholdOut) thresholdOut.textContent = v.toFixed(1);
   };
 
-  // Cap the window at half the shown points so there's always a scored region.
-  const windowMax = Math.max(50, Math.min(2000, Math.floor(n / 2)));
+  // Slider reach: enough to explore, capped at half the shown points so there's
+  // always a scored region — but NEVER below the metric's actual window_size, so
+  // the seeded value is always representable and Apply can't silently shrink the
+  // metric's window. step=1 keeps the exact configured value addressable (a
+  // step-5 grid would snap e.g. 168 → 170 and write the wrong window back).
+  const windowReach = Math.max(50, Math.min(2000, Math.floor(n / 2)));
+  const windowMax = Math.max(windowReach, seed.windowSize);
   const windowCtl = rangeControl(
     'Window size (points)',
     {
-      min: 10,
+      min: Math.max(1, Math.min(10, seed.windowSize)),
       max: windowMax,
-      step: 5,
-      value: Math.min(seed.windowSize, windowMax),
+      step: 1,
+      value: seed.windowSize,
       // Echo the wall-clock span the window covers on the metric grid (like the
       // "Points shown" trim), so "how much history is this" reads at a glance.
       fmt: (v) => `${v} · ${fmtDur(v * payload.interval_seconds * 1000)}`,
@@ -920,6 +967,8 @@ function injectStyle(): void {
 .dtk-tune-chart canvas{width:100%;height:100%;display:block;}
 .dtk-tune-readout{font-family:var(--mono);font-size:12px;color:var(--muted);min-height:18px;}
 .dtk-tune-stat{font-family:var(--mono);font-size:12px;color:var(--ink);}
+.dtk-tune-warn{font-family:var(--mono);font-size:12px;line-height:1.5;color:var(--c7);
+  background:rgba(240,173,78,0.13);border:1px solid rgba(240,173,78,0.5);border-radius:8px;padding:8px 11px;}
 .dtk-tune-cfg{background:var(--ink);color:#c9c2b4;border-radius:8px;padding:10px 12px;font-family:var(--mono);
   font-size:12px;overflow-x:auto;}
 .dtk-tune-cfg-k{color:var(--faint);display:block;margin-bottom:4px;}

@@ -21,6 +21,7 @@ from detectkit.autotune.window_select import (
     detect_level_shift,
     half_life_grid,
     min_samples_for,
+    seasonal_fill_window,
     select_window,
     trend_present,
 )
@@ -45,6 +46,21 @@ def grid_search(
     base: dict[str, Any] = {}
     if seasonality:
         base["seasonality_components"] = seasonality
+        # Per-group stats engage only when the window holds min_samples_per_group
+        # points of the current seasonal key (~min_samples_per_group * cardinality
+        # points). If even the largest fold-feasible window can't reach that, the
+        # chosen seasonality will silently fall back to global at runtime — flag it
+        # in the decision log so the tuned config isn't trusted to be seasonal.
+        fill = seasonal_fill_window(tuner)
+        if fill and grid and max(grid) < fill:
+            tuner.log(
+                "window",
+                f"seasonality {seasonality} needs window_size >= {fill} to engage per-group "
+                f"stats, but the fold budget caps the window at {max(grid)} on this history "
+                "— the band will use global statistics (seasonality has no effect). Tune on "
+                "more history, or use `dtk tune` to set a larger window manually.",
+                seasonal_fill_window=fill,
+            )
 
     has_trend = trend_present(tuner)
     if not has_trend:

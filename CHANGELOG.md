@@ -5,6 +5,44 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.33.0] - 2026-06-25
+
+### Fixed
+- **`dtk tune`: the window slider now reflects (and preserves) the metric's real
+  `window_size`.** It was clamped to `min(2000, points_shown / 2)` and snapped to a
+  step of 5, so any metric with a larger window (common for sub-hourly metrics —
+  e.g. 4320 or 8640) showed a smaller, wrong value the slider couldn't even reach,
+  and **Apply could silently shrink the metric's window** to the clamp. The slider
+  now seeds the exact configured value (step 1) and raises its maximum to at least
+  that value, so the preview computes — and Apply writes — the metric's actual
+  window.
+- **`dtk tune`: turning the Threshold slider now visibly widens/narrows the
+  band.** The chart fitted its y-axis to the confidence band, so a wider band grew
+  the axis in lockstep and the corridor looked unchanged. The tuning chart now fits
+  the y-axis to the **data** (new opt-in `yFit: 'data'` chart option; the read-only
+  report keeps the band-inclusive fit), so threshold changes read at a glance. The
+  landing playground is unchanged.
+- **`dtk tune`: a large metric window is now actually exercised in the preview.**
+  The default shown-point count is floored at a few windows' worth of history
+  (instead of collapsing toward the minimum for big windows), so the band reaches
+  its real width instead of leaving almost no scored region.
+
+### Added
+- **Detectors warn when the window is too small to fill a seasonality group.**
+  A per-group correction engages only when the trailing window holds
+  `min_samples_per_group` points sharing the current point's seasonal key, which
+  recur once per *cardinality* — so it needs `window_size ≳ min_samples_per_group ×
+  distinct_keys` (hourly `hour` ⇒ ≳ 240). Below that the group **silently falls
+  back to the global band and the seasonality has no effect** — easy to hit with
+  the default `window_size = 100`. The windowed detectors (MAD / Z-Score / IQR) now
+  log a one-time warning naming the group, its key count and the required window.
+- **`dtk autotune` offers a seasonality-fill window candidate.** The window grid
+  now includes `min_samples_per_group × cardinality` when the data carries
+  seasonality columns (capped to the fold budget), so cross-validation can actually
+  evaluate a window where a chosen seasonal grouping engages instead of one where it
+  silently falls back to global. When even the largest fold-feasible window can't
+  fill the groups, the decision log says so.
+
 ## [0.32.0] - 2026-06-25
 
 ### Added

@@ -562,7 +562,24 @@ rate.
    `is_weekend`, `is_holiday`) or custom columns returned by the query and
    declared in `query_columns.seasonality`
 2. `seasonality_components` uses exactly those feature names
-3. Enough data per group (`min_samples_per_group`)
+3. **The window is large enough to fill a group.** A group's statistics only
+   engage once the trailing window holds at least `min_samples_per_group` points
+   sharing the current point's seasonal key — and same-key points recur only once
+   per *cardinality* of the key. So the window must span roughly:
+
+   ```
+   window_size ≳ min_samples_per_group × (number of distinct keys)
+   ```
+
+   For hourly data grouped by `hour` (24 keys) with the MAD default
+   `min_samples_per_group = 10`, that means `window_size ≳ 240`. With the **default
+   `window_size = 100`** only ~4 same-hour points land in the window (`< 10`), so
+   **every point falls back to the global band and the seasonality has no effect**
+   — which looks exactly like "the interval doesn't vary with seasonality". A
+   conjunctive group like `[["hour", "day_of_week"]]` has up to 24 × 7 = 168 keys
+   and needs `window_size ≳ 1680`. The detector logs a one-time warning when the
+   window is too small to ever fill a group; raise `window_size`, lower
+   `min_samples_per_group`, or use a coarser grouping.
 
 **Example (built-in extraction)**:
 ```yaml

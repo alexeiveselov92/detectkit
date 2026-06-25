@@ -26,6 +26,7 @@ Subclasses define:
 
 from __future__ import annotations
 
+import logging
 import math
 from abc import abstractmethod
 from typing import Any
@@ -39,6 +40,8 @@ from detectkit.detectors.seasonality import (
     parse_seasonality_data,
 )
 from detectkit.utils.stats import effective_sample_size, weighted_median
+
+logger = logging.getLogger(__name__)
 
 _INPUT_TYPES = {"values", "changes", "absolute_changes", "log_changes"}
 _CHANGE_INPUT_TYPES = {"changes", "absolute_changes", "log_changes"}
@@ -141,6 +144,10 @@ class WindowedStatDetector(BaseDetector):
             weight_decay=weight_decay,
             detrend=detrend,
         )
+        # Whether the one-time "seasonality groups can't fill this window" check
+        # has run for this instance (so the warning fires at most once per run,
+        # not once per detect() batch).
+        self._underfill_checked: bool = False
 
     # ------------------------------------------------------------------
     # Subclass hooks
@@ -386,6 +393,56 @@ class WindowedStatDetector(BaseDetector):
         # (age 0) is values + slope * age
         return (med_new - med_old) / (age_old - age_new)
 
+    def _warn_if_groups_cannot_fill(
+        self,
+        seasonality_components: list[str | list[str]],
+        seasonality_dict: dict[str, np.ndarray],
+        window_size: int,
+        min_samples_per_group: int,
+    ) -> None:
+        """Warn once if the window is too small to ever fill a seasonality group.
+
+        Per-group statistics only engage when the trailing window holds at least
+        ``min_samples_per_group`` points sharing the current point's seasonal key.
+        Same-key points recur every *cardinality* positions on the grid, so the
+        window must hold roughly ``min_samples_per_group * cardinality`` points
+        before any group fills — otherwise EVERY point silently falls back to the
+        global (un-conditioned) band and the configured seasonality has no effect.
+        This is easy to hit by accident (e.g. the default ``window_size=100`` with
+        24-key hourly seasonality needs ``>= 240``), so surface it loudly once.
+        """
+        if self._underfill_checked:
+            return
+        self._underfill_checked = True
+
+        for group in seasonality_components:
+            cols = [group] if isinstance(group, str) else list(group)
+            present = [c for c in cols if c in seasonality_dict]
+            if not present:
+                continue
+            # Distinct seasonal keys actually present in the data (conjunction of
+            # the group's columns) — the per-key recurrence period on the grid.
+            keys = set(zip(*[seasonality_dict[c].tolist() for c in present], strict=False))
+            cardinality = len(keys)
+            if cardinality <= 0:
+                continue
+            needed = min_samples_per_group * cardinality
+            if window_size < needed:
+                logger.warning(
+                    "%s: seasonality group %s has %d distinct key(s) but window_size=%d "
+                    "holds only ~%d same-key point(s) (< min_samples_per_group=%d), so this "
+                    "group falls back to global statistics and the seasonality has no effect. "
+                    "Increase window_size to >= %d (min_samples_per_group * distinct keys), "
+                    "lower min_samples_per_group, or use a coarser grouping.",
+                    self.__class__.__name__,
+                    cols,
+                    cardinality,
+                    window_size,
+                    window_size // cardinality,
+                    min_samples_per_group,
+                    needed,
+                )
+
     # ------------------------------------------------------------------
     # Detection pipeline
     # ------------------------------------------------------------------
@@ -415,6 +472,9 @@ class WindowedStatDetector(BaseDetector):
         seasonality_dict = {}
         if seasonality_components and len(seasonality_data) > 0 and seasonality_columns:
             seasonality_dict = parse_seasonality_data(seasonality_data, seasonality_columns)
+            self._warn_if_groups_cannot_fill(
+                seasonality_components, seasonality_dict, window_size, min_samples_per_group
+            )
 
         weight_lut = self._build_weight_lut(timestamps)
 

@@ -205,11 +205,17 @@ def test_default_window_is_bounded_not_full_history():
     assert rec.requested_from == expected  # bounded recent window, not 2020
 
 
-def test_default_window_points_scales_inversely_and_clamps():
-    # small window → render-capped (MAX), large window → fewer points, clamped to MIN
-    assert default_window_points(100) == 15000  # 20M/100 clamps to MAX
-    assert default_window_points(2000) == 10000  # 20M/2000
-    assert default_window_points(50000) == 3000  # clamps to MIN
+def test_default_window_points_inverse_budget_with_window_fill_floor():
+    # Small window → the inverse-budget term dominates, render-capped at MAX.
+    assert default_window_points(100) == 15000  # 20M/100 = 200k → MAX
+    assert default_window_points(2000) == 10000  # 20M/2000, fill 6000 < budget
+    # Mid-large window: the budget term drops below a few windows' worth, so the
+    # fill floor (3× window) takes over so the window is actually exercised in the
+    # preview instead of leaving almost no scored region.
+    assert default_window_points(4000) == 12000  # fill 4000*3 > budget 5000
+    # Very large window → the fill floor clamps to MAX (never collapses to MIN, as
+    # it used to — that left a big-window metric with no meaningful scored region).
+    assert default_window_points(50000) == 15000
     assert default_window_points(0) == 15000  # guards divide-by-zero
 
 

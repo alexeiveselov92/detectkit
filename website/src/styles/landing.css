@@ -2586,6 +2586,20 @@
   color: var(--clay-700);
   word-break: break-word;
 }
+.dkx-season-warn {
+  margin: 0 22px 14px;
+  padding: 9px 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--clay-700);
+  background: rgba(240, 173, 78, 0.13);
+  border: 1px solid rgba(240, 173, 78, 0.5);
+  border-radius: 8px;
+}
+.dkx-season-warn[hidden] {
+  display: none;
+}
 
 @media (max-width: 640px) {
   .dkx-controls {

@@ -125,8 +125,8 @@ const tip = (key: keyof typeof TIP) =>
             <label class="dkx-ctl">
               <span class="dkx-ctl-k">rhythm <Fragment set:html={tip('rhythm')} /></span>
               <span class="dkx-seg" data-control="seasonality">
-                <button data-v="flat" class="on">flat</button>
-                <button data-v="daily">daily</button>
+                <button data-v="flat">flat</button>
+                <button data-v="daily" class="on">daily</button>
                 <button data-v="weekly">weekly</button>
                 <button data-v="daily_weekly">daily+wk</button>
                 <button data-v="business_hours">business</button>
@@ -200,7 +200,7 @@ const tip = (key: keyof typeof TIP) =>
 
             <label class="dkx-ctl">
               <span class="dkx-ctl-k">window_size <b id="dkx-window-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('window_size')} /></span>
-              <input id="dkx-window" type="range" min="20" max="300" step="5" value="100" />
+              <input id="dkx-window" type="range" min="20" max="300" step="5" value="240" />
             </label>
 
             <label class="dkx-ctl">
@@ -237,8 +237,8 @@ const tip = (key: keyof typeof TIP) =>
             <label class="dkx-ctl">
               <span class="dkx-ctl-k">seasonality grouping <Fragment set:html={tip('seasonality')} /></span>
               <span class="dkx-seg" data-control="conditioning">
-                <button data-v="off" class="on">off</button>
-                <button data-v="hour">hour</button>
+                <button data-v="off">off</button>
+                <button data-v="hour" class="on">hour</button>
                 <button data-v="hour_dow">hour+dow</button>
               </span>
             </label>
@@ -265,6 +265,8 @@ const tip = (key: keyof typeof TIP) =>
           <span class="dkx-config-k">// effective config</span>
           <code id="dkx-config"></code>
         </div>
+
+        <div id="dkx-season-warn" class="dkx-season-warn" hidden></div>
       </div>
 
       <p class="dx-foot">

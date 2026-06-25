@@ -9,6 +9,7 @@ from detectkit.tuning.html import render_tune_html
 from detectkit.tuning.payload import (
     _normalize_seasonality_components,
     _seed_detector,
+    _seed_direction,
     build_tune_payload,
     default_window_points,
 )
@@ -85,17 +86,40 @@ def test_seed_detector_from_config():
     assert seed["detrend"] == "none"
 
 
-def test_seed_detector_falls_back_to_mad_defaults():
-    # only a manual_bounds detector → not tunable → MAD defaults
-    m = _metric(
-        detectors=[{"type": "manual_bounds", "params": {"lower_bound": 0, "upper_bound": 9}}]
-    )
+def test_seed_detector_no_detectors_falls_back_to_mad_defaults():
+    # a metric with no detectors → seed MAD defaults so the sliders open sanely
+    m = _metric(detectors=[])
     seed = _seed_detector(m)
     assert seed["type"] == "mad"
     assert seed["threshold"] == 3.0
     assert seed["windowSize"] == 100
     assert seed["windowWeights"] == "none"
     assert seed["seasonalityComponents"] is None
+    assert seed["lowerBound"] is None
+    assert seed["upperBound"] is None
+
+
+def test_seed_detector_manual_bounds():
+    # a manual_bounds metric seeds the bound sliders; the windowed knobs still
+    # carry sane defaults so switching detector type in the UI never hits empties.
+    m = _metric(
+        detectors=[{"type": "manual_bounds", "params": {"lower_bound": 0, "upper_bound": 9}}]
+    )
+    seed = _seed_detector(m)
+    assert seed["type"] == "manual_bounds"
+    assert seed["lowerBound"] == 0
+    assert seed["upperBound"] == 9
+    assert seed["windowSize"] == 100  # windowed default present for the UI switch
+
+
+def test_seed_direction_from_alerting():
+    assert _seed_direction(_metric()) == "any"  # no alerting → any
+    up = _metric(alerting=[{"channels": ["x"], "direction": "up"}])
+    assert _seed_direction(up) == "up"
+    # 'same' is a multi-detector agreement policy → reads as 'any' for the
+    # single-detector tuning preview.
+    same = _metric(alerting=[{"channels": ["x"], "direction": "same"}])
+    assert _seed_direction(same) == "any"
 
 
 def test_seed_detector_duration_half_life_falls_back_to_adaptive():

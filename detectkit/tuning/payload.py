@@ -43,7 +43,9 @@ def default_window_points(seed_window: int) -> int:
 _THRESHOLD_DEFAULT = {"mad": 3.0, "zscore": 3.0, "iqr": 1.5}
 # Per-type min-samples-per-group defaults (mirror the detector subclasses).
 _MIN_SAMPLES_PER_GROUP_DEFAULT = {"mad": 10, "zscore": 3, "iqr": 4}
-_TUNABLE_TYPES = ("mad", "zscore", "iqr")
+# Detector types the interactive tuner can seed/emit: the windowed statistical
+# detectors plus the stateless manual_bounds (lower/upper threshold) detector.
+_TUNABLE_TYPES = ("mad", "zscore", "iqr", "manual_bounds")
 
 
 def _normalize_seasonality_components(
@@ -65,9 +67,12 @@ def _normalize_seasonality_components(
 def _seed_detector(metric_config: MetricConfig) -> dict[str, Any]:
     """Map the metric's current detector config to the TS ``DetectorParams`` shape.
 
-    Picks the first tunable (mad/zscore/iqr) detector to seed the sliders; falls
-    back to MAD defaults when the metric has none (e.g. only ``manual_bounds``).
-    Param names are camelCased to match the client port.
+    Picks the first tunable (mad/zscore/iqr/manual_bounds) detector to seed the
+    sliders; falls back to MAD defaults when the metric has none. Param names are
+    camelCased to match the client port. The windowed knobs always carry sane
+    defaults (even for a manual_bounds seed) so switching detector type in the UI
+    never hits an empty slider; ``lowerBound``/``upperBound`` carry the manual
+    thresholds (``None`` for a windowed metric — the client picks a data default).
     """
     chosen = next(
         (d for d in metric_config.detectors if d.type in _TUNABLE_TYPES),
@@ -99,8 +104,24 @@ def _seed_detector(metric_config: MetricConfig) -> dict[str, Any]:
         "minSamplesPerGroup": params.get(
             "min_samples_per_group", _MIN_SAMPLES_PER_GROUP_DEFAULT.get(dtype, 10)
         ),
+        # manual_bounds thresholds (None for a windowed metric).
+        "lowerBound": params.get("lower_bound"),
+        "upperBound": params.get("upper_bound"),
     }
     return seed
+
+
+def _seed_direction(metric_config: MetricConfig) -> str:
+    """Seed the tuner's direction view-filter from the first alerting block.
+
+    The tuner offers ``any``/``up``/``down``; the alerting policy may also be
+    ``same`` (a multi-detector agreement rule). Tuning is single-detector, so
+    ``same`` reads as ``any`` for the preview. Defaults to ``any``.
+    """
+    if not metric_config.alerting:
+        return "any"
+    raw = (metric_config.alerting[0].direction or "any").lower()
+    return raw if raw in ("up", "down", "any") else "any"
 
 
 def build_tune_payload(
@@ -141,6 +162,7 @@ def build_tune_payload(
     consecutive = 3
     if metric_config.alerting:
         consecutive = metric_config.alerting[0].consecutive_anomalies
+    direction = _seed_direction(metric_config)
 
     empty: dict[str, Any] = {
         "metric": name,
@@ -153,6 +175,7 @@ def build_tune_payload(
         "seasonality_columns": [],
         "detector": seed,
         "consecutive_anomalies": consecutive,
+        "direction": direction,
         "save_url": save_url,
     }
     if start is None or end is None:
@@ -190,5 +213,6 @@ def build_tune_payload(
         "seasonality_columns": season_cols,
         "detector": seed,
         "consecutive_anomalies": consecutive,
+        "direction": direction,
         "save_url": save_url,
     }

@@ -44,6 +44,8 @@ my_monitoring/
 ├── README.md                  # Project readme with quick commands
 ├── metrics/                   # Metric definitions
 │   └── example_cpu_usage.yml  # Working starter metric (mad + zscore, alerting)
+├── incidents/                 # Labeled incidents for supervised `dtk autotune`
+│   └── example_cpu_usage.yml  # Example labels file
 └── sql/                       # SQL queries
     └── .gitkeep
 ```

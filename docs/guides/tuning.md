@@ -48,19 +48,36 @@ dtk tune --select api_error_rate --from 2026-05-01 --to 2026-06-01
 
 In the browser you can adjust:
 
-- **Detector** — MAD, Z-Score or IQR.
+- **Detector** — MAD, Z-Score, IQR (all windowed statistical) or **Manual**
+  (fixed bounds; see below). Switching to Manual swaps the windowed knobs for the
+  bound sliders.
 - **Threshold** — interval width in σ-equivalent units.
-- **Window size** — the trailing window each point is compared against.
+- **Window size** — the trailing window each point is compared against. The
+  readout shows the equivalent **wall-clock span** on the metric grid next to the
+  point count (e.g. `2000 · 83d 8h`), so "how much history is this window" reads
+  at a glance.
 - **Recency weighting** + **half-life** — none / exponential / linear, with the
-  half-life (in points) when exponential.
+  half-life (in points) when exponential. Half-life also echoes its wall-clock
+  span next to the point count.
 - **Detrend** — none / linear (robust split-median slope).
 - **Smoothing** — none / EMA / SMA.
+- **Lower bound** / **Upper bound** *(Manual detector only)* — the fixed
+  thresholds a value is compared against. They are seeded from the metric's bounds
+  (or the data's p5/p95 band when switching from a windowed detector) and ranged
+  over the real value domain, so you can drag them in and watch how many points
+  fall outside (and how many alerts that yields). **Apply** writes a stateless
+  [`manual_bounds`](../reference/detectors/manual_bounds.md) detector.
 - **Seasonality groups** — assign each seasonality column the metric has to a
   group (Off, G1, G2, …). Columns in the **same** group are conjoined into one
   seasonal key (e.g. `dow`×`hour`); **separate** groups each apply their own
   correction. This is the full `seasonality_components` grouping — you can mix one
   conjunctive group with other standalone columns, not just "all-separate" or
   "all-in-one".
+- **Direction** — **both / up / down**: which anomalies are shown and counted
+  toward alerts. Pick *up* to focus on spikes above the band, *down* for drops
+  below it. It is a preview filter mirroring the alert `direction` policy (seeded
+  from the metric's alerting, with the multi-detector `same` reading as `any`) —
+  it never changes the band itself.
 - **Alert: consecutive anomalies** — the alert window (`consecutive_anomalies`).
 
 Every control carries an **ⓘ tooltip** explaining what it does. The confidence

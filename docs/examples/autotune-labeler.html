@@ -231,7 +231,11 @@ const TICK_STEPS=[MS_S,2*MS_S,5*MS_S,10*MS_S,15*MS_S,30*MS_S,
   MS_H,2*MS_H,3*MS_H,6*MS_H,12*MS_H, MS_D,2*MS_D,3*MS_D,5*MS_D,7*MS_D,14*MS_D];
 function niceTimeTicks(lo, hi, target) {
   const span=Math.max(hi-lo, 1);
-  if (span > target*28*MS_D) {  // month/year calendar ticks for long spans
+  // Escalate to calendar months/years once even the coarsest sub-monthly step
+  // (14d) would exceed the target count (span > target*14d). The old threshold
+  // (target*28d) left a gap where no sub-monthly step fit and the loop fell
+  // through to a 14d step, packing ~13 labels in and overlapping.
+  if (span > target*14*MS_D) {  // month/year calendar ticks for long spans
     const mSteps=[1,2,3,6,12,24,36,60,120,240]; let stepM=mSteps[mSteps.length-1];
     for (const m of mSteps) { if (span/(m*30.44*MS_D) <= target) { stepM=m; break; } }
     const d=new Date(lo); let y=d.getUTCFullYear(), mo=d.getUTCMonth();
@@ -258,6 +262,17 @@ const fmtAxis = (ts, step) => { const s=new Date(ts).toISOString();
   if (step >= MS_D) return s.slice(5,10);
   if (step >= MS_H) return s.slice(5,16).replace('T',' ');
   return s.slice(5,19).replace('T',' '); };
+// Which ticks may show a TEXT label without colliding: keep the first, then keep
+// each only if its x clears the previous kept label by its width + a gutter.
+// Gridlines/ticks still draw for every entry; only text is thinned. Measures with
+// the passed context's CURRENT font, so set it before calling.
+function labelMask(g, ticks, xOf, step) {
+  const show=new Array(ticks.length).fill(false); if (!ticks.length) return show;
+  const minGap=g.measureText(fmtAxis(ticks[0], step)).width + 16*dpr; let lastX=-Infinity;
+  for (let i=0;i<ticks.length;i++) { const xx=xOf(ticks[i]);
+    if (xx-lastX >= minGap) { show[i]=true; lastX=xx; } }
+  return show;
+};
 function fmtDur(ms) { const m = Math.round(ms/60000); if (m<60) return m+'m';
   const h = Math.floor(m/60), mm = m%60; if (h<24) return h+'h'+(mm?(' '+mm+'m'):'');
   const d = Math.floor(h/24), hh = h%24; return d+'d'+(hh?(' '+hh+'h'):''); }
@@ -375,9 +390,11 @@ function draw() {
   // in real time reads off the grid (not only by chasing the cursor).
   ctx.textBaseline = 'top';
   const xtk=niceTimeTicks(viewMin, viewMax, 7);
-  xtk.ticks.forEach(ts => { const xx=px(ts);
+  const showXL=labelMask(ctx, xtk.ticks, px, xtk.step);
+  xtk.ticks.forEach((ts,ti) => { const xx=px(ts);
     ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1*dpr;
     ctx.beginPath(); ctx.moveTo(xx, M.t*dpr); ctx.lineTo(xx, c.height-M.b*dpr); ctx.stroke();
+    if (!showXL[ti]) return;
     ctx.fillStyle='#6e675b';
     ctx.textAlign = xx < (M.l+24)*dpr ? 'left' : xx > c.width-(M.r+24)*dpr ? 'right' : 'center';
     ctx.fillText(fmtAxis(ts, xtk.step), xx, c.height-(M.b-8)*dpr); });
@@ -514,9 +531,11 @@ function drawOverview() {
   // absolute-time anchors under the strip, so a point's real time is readable
   // across the whole series without hovering.
   octx.font=(10*dpr)+'px ui-monospace, monospace'; octx.textBaseline='top';
-  otk.ticks.forEach(ts => { const xx=ovpx(ts);
+  const showOL=labelMask(octx, otk.ticks, ovpx, otk.step);
+  otk.ticks.forEach((ts,ti) => { const xx=ovpx(ts);
     octx.strokeStyle='rgba(201,194,180,0.25)'; octx.lineWidth=1*dpr;
     octx.beginPath(); octx.moveTo(xx, plotBot); octx.lineTo(xx, plotBot+3*dpr); octx.stroke();
+    if (!showOL[ti]) return;
     octx.fillStyle='#6e675b';
     octx.textAlign = xx < (OM.l+26)*dpr ? 'left' : xx > ov.width-(OM.r+26)*dpr ? 'right' : 'center';
     octx.fillText(fmtAxis(ts, otk.step), xx, plotBot+5*dpr); });

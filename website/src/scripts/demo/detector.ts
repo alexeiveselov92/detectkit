@@ -24,10 +24,10 @@
 import type {
   AnomalyDirection,
   DetectorParams,
-  DetectorType,
   ScoredPoint,
   ScoreReason,
   Series,
+  WindowedType,
 } from './types';
 
 // Normal-consistency constant: sigma ~= 1.4826 * MAD for Gaussian data, so the
@@ -35,7 +35,7 @@ import type {
 const MAD_SCALE = 1.4826;
 
 /** Per-type minimum-valid-samples floor (max'd against params.minSamples). */
-const MIN_SAMPLES_FLOOR: Record<DetectorType, number> = {
+const MIN_SAMPLES_FLOOR: Record<WindowedType, number> = {
   mad: 1,
   zscore: 2,
   iqr: 4,
@@ -378,7 +378,7 @@ export function estimateSlope(values: number[], ages: number[], weights: number[
 type Stats = Record<string, number>;
 
 /** Ordered (name, kind) stat spec per detector; "spread" guards with >0. */
-const STATS: Record<DetectorType, ReadonlyArray<readonly [string, 'center' | 'spread']>> = {
+const STATS: Record<WindowedType, ReadonlyArray<readonly [string, 'center' | 'spread']>> = {
   mad: [
     ['median', 'center'],
     ['mad', 'spread'],
@@ -395,7 +395,7 @@ const STATS: Record<DetectorType, ReadonlyArray<readonly [string, 'center' | 'sp
 };
 
 /** Compute the named statistics for a detector type over a weighted window. */
-function computeStats(type: DetectorType, values: number[], weights: number[]): Stats {
+function computeStats(type: WindowedType, values: number[], weights: number[]): Stats {
   if (type === 'mad') {
     const median = weightedMedian(values, weights);
     return { median, mad: weightedMad(values, weights, median) };
@@ -410,7 +410,7 @@ function computeStats(type: DetectorType, values: number[], weights: number[]): 
 }
 
 /** Build the (lower, upper) confidence interval from the adjusted statistics. */
-function buildInterval(type: DetectorType, stats: Stats, threshold: number): [number, number] {
+function buildInterval(type: WindowedType, stats: Stats, threshold: number): [number, number] {
   if (type === 'mad') {
     if (stats.mad === 0) return [stats.median - 1e-10, stats.median + 1e-10];
     const margin = threshold * MAD_SCALE * stats.mad;
@@ -425,7 +425,7 @@ function buildInterval(type: DetectorType, stats: Stats, threshold: number): [nu
 }
 
 /** Severity (spread units beyond the breached bound). Inf when spread <= 0. */
-function severity(type: DetectorType, stats: Stats, distance: number): number {
+function severity(type: WindowedType, stats: Stats, distance: number): number {
   if (type === 'mad') {
     const sigmaEst = MAD_SCALE * stats.mad;
     return sigmaEst > 0 ? distance / sigmaEst : Infinity;
@@ -437,7 +437,7 @@ function severity(type: DetectorType, stats: Stats, distance: number): number {
 }
 
 /** Band center for the ScoredPoint, from the adjusted statistics. */
-function bandCenter(type: DetectorType, stats: Stats): number {
+function bandCenter(type: WindowedType, stats: Stats): number {
   if (type === 'mad') return stats.median;
   if (type === 'zscore') return stats.mean;
   return (stats.q1 + stats.q3) / 2.0; // midhinge
@@ -472,11 +472,86 @@ function unscored(
 }
 
 /**
+ * Stateless manual-bounds scoring (port of ManualBoundsDetector). No window, no
+ * statistics — each PROCESSED value is compared against the user's lower/upper
+ * thresholds. NO smoothing (the Python detector applies only input_type). A
+ * `null` bound leaves that side open. The band fields carry the bounds verbatim
+ * so the chart draws a flat corridor; severity is the distance beyond the bound,
+ * normalized by the bound range when both are set (else absolute).
+ */
+function runManualBounds(series: Series, params: DetectorParams): ScoredPoint[] {
+  const { timestamps, values } = series;
+  const n = timestamps.length;
+  const processed = preprocessInput(values, params); // input_type only, no smoothing
+  const lower = params.lowerBound ?? null;
+  const upper = params.upperBound ?? null;
+
+  const results: ScoredPoint[] = [];
+  for (let i = 0; i < n; i++) {
+    const value = values[i];
+    const pv = processed[i];
+    const ts = timestamps[i];
+
+    if (Number.isNaN(pv)) {
+      results.push(unscored(i, ts, value, pv, 'missing_data'));
+      continue;
+    }
+
+    let isAnomaly = false;
+    let direction: AnomalyDirection = null;
+    let distance = 0;
+    if (lower !== null && pv < lower) {
+      isAnomaly = true;
+      direction = 'below';
+      distance = lower - pv;
+    }
+    if (upper !== null && pv > upper) {
+      isAnomaly = true;
+      direction = 'above';
+      distance = pv - upper;
+    }
+
+    let sev = 0;
+    if (isAnomaly) {
+      if (lower !== null && upper !== null) {
+        const range = upper - lower;
+        sev = range > 0 ? distance / range : Infinity;
+      } else {
+        sev = distance; // one-sided: absolute distance (matches Python)
+      }
+    }
+
+    const lo = lower ?? -Infinity;
+    const up = upper ?? Infinity;
+    const center =
+      lower !== null && upper !== null ? (lower + upper) / 2 : (lower ?? upper ?? NaN);
+
+    results.push({
+      index: i,
+      timestamp: ts,
+      value,
+      processedValue: pv,
+      scored: true,
+      isAnomaly,
+      lower: lo,
+      upper: up,
+      center,
+      direction,
+      severity: sev,
+      reason: 'ok',
+    });
+  }
+  return results;
+}
+
+/**
  * Score every point of `series` under `params`. Pure and deterministic;
- * reproduces the Python windowed detectors within 1e-6.
+ * reproduces the Python detectors within 1e-6.
  */
 export function runDetector(series: Series, params: DetectorParams): ScoredPoint[] {
-  const { type } = params;
+  if (params.type === 'manual_bounds') return runManualBounds(series, params);
+
+  const type = params.type as WindowedType;
   const effectiveMinSamples = Math.max(params.minSamples, MIN_SAMPLES_FLOOR[type]);
   const statSpec = STATS[type];
 
@@ -663,7 +738,12 @@ function seasonalityCardinality(series: Series, groups: string[][]): number {
  */
 export function effectiveStartIndex(series: Series, params: DetectorParams): number {
   const n = series.timestamps.length;
-  let warm = Math.max(params.minSamples, MIN_SAMPLES_FLOOR[params.type]);
+  // manual_bounds is stateless: no warm-up except the first change point being
+  // undefined when input_type transforms to changes.
+  if (params.type === 'manual_bounds') {
+    return Math.min(params.inputType !== 'values' ? 1 : 0, n);
+  }
+  let warm = Math.max(params.minSamples, MIN_SAMPLES_FLOOR[params.type as WindowedType]);
   if (params.smoothing === 'sma') warm = Math.max(warm, params.smoothingWindow - 1);
   if (params.smoothing === 'ema') warm = Math.max(warm, Math.ceil(5 / params.smoothingAlpha));
   if (params.inputType !== 'values') warm = Math.max(warm, 1);

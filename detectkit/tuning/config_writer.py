@@ -20,9 +20,10 @@ import yaml
 from detectkit.config.metric_config import MetricConfig
 from detectkit.detectors.factory import DetectorFactory
 
-# The detector types the interactive tuner can emit (windowed statistical). Other
-# types (e.g. manual_bounds) need domain thresholds, not interactive tuning.
-_TUNABLE_TYPES = {"mad", "zscore", "iqr"}
+# The detector types the interactive tuner can emit: the windowed statistical
+# detectors plus the stateless manual_bounds (lower/upper threshold) detector,
+# whose bounds the tuner lets you drag against the real series.
+_TUNABLE_TYPES = {"mad", "zscore", "iqr", "manual_bounds"}
 
 _RULE = "# " + "─" * 61
 

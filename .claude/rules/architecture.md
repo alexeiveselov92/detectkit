@@ -50,7 +50,7 @@ abort the remaining metrics (`detectkit/orchestration/error_dispatch.py`).
 detectkit/
 ├── cli/                         # Click CLI (dtk)
 │   ├── main.py                  # entry point, command wiring
-│   ├── commands/                # run, init, init_claude, test_alert, unlock, clean
+│   ├── commands/                # run, autotune, tune, init, init_claude, test_alert, unlock, clean
 │   └── assets/claude/           # context shipped by `dtk init-claude` (rules, skills)
 ├── config/                      # pydantic config models
 │   ├── project_config.py        # ProjectConfig + paths/tables/timeouts/error_alerting
@@ -95,6 +95,12 @@ detectkit/
 │   ├── builder.py               # build_report_payload: reads _dtk_* + replays alerts → JSON
 │   ├── html_report.py           # render_report_html: inlines assets/report.js + payload
 │   └── assets/report.js         # committed renderer bundle (shared core; ships in the wheel)
+├── tuning/                      # `dtk tune` interactive manual tuning (write-back into metric YAML)
+│   ├── payload.py               # build_tune_payload: bakes raw series + seeded detector config → JSON
+│   ├── html.py                  # render_tune_html: inlines assets/tune.js + payload
+│   ├── config_writer.py         # apply_tuned_config: validate → archive to metrics/.history → re-emit in place
+│   ├── server.py                # serve_tuner/build_tune_server: localhost one-shot write-back (POST /apply)
+│   └── assets/tune.js           # committed renderer bundle (shared detector port; ships in the wheel)
 └── utils/                       # datetime, json (sorted/orjson), env interpolation, stats
 ```
 
@@ -149,8 +155,9 @@ database-agnostic schema spec the manager turns into backend-specific DDL.
 
 `InternalTablesManager` (`detectkit/database/internal_tables/`) is a high-level
 façade over a `BaseDatabaseManager`, assembled from per-table mixins
-(`_datapoints`, `_detections`, `_tasks`, `_metrics`, `_alert_states`, `_schema`,
-`_maintenance`). It owns all `_dtk_*` knowledge; the base manager stays generic.
+(`_datapoints`, `_detections`, `_tasks`, `_metrics`, `_alert_states`,
+`_autotune_runs`, `_schema`, `_maintenance`). It owns all `_dtk_*` knowledge; the
+base manager stays generic.
 Alongside the resume-cursor readers (`get_last_datapoint_timestamp` /
 `get_last_detection_timestamp`) and `load_datapoints`, it exposes
 `load_detections(metric_name, detector_id=None, from_timestamp=None,
@@ -539,15 +546,25 @@ points and re-posts to the worker, so recompute — cost ∝ points × window �
 up; view-only, never written), a **legend**, per-control **ⓘ tooltips**, a
 recompute **spinner**, and a **per-column seasonality group** selector that emits
 the full `seasonality_components` `string[][]` (columns in one group are conjoined,
-separate groups apply independent corrections).
+separate groups apply independent corrections). The detector picker also offers
+**Manual** (`manual_bounds`): selecting it swaps the windowed knobs for **lower /
+upper bound** sliders ranged over the real value domain (seeded from the metric's
+bounds, else the data p5/p95), recomputed by the same parity-checked detector port
+(`runManualBounds`, a stateless branch of `runDetector`). A **Direction** control
+(`both / up / down`) is a worker-side *view filter* — it drops anomalies of the
+other direction from the dots **and** the alert tally without touching the band —
+seeded from the metric's alerting `direction` (multi-detector `same` → `any`). The
+window-size and half-life sliders echo their wall-clock span next to the point
+count.
 
 Three pure-ish pieces + a server:
 
 - `payload.build_tune_payload(...)` reads `_dtk_datapoints` and bakes the **raw
   gap-filled series + per-point seasonality keys + the metric's current detector
-  config (camelCased to seed the controls) + the alert `consecutive_anomalies`**
-  into a JSON payload — everything the client port needs to *recompute*. It bakes
-  **no** precomputed detection (the browser runs the detector itself).
+  config (camelCased to seed the controls, including any `manual_bounds` lower/upper)
+  + the alert `consecutive_anomalies` and seeded `direction`** into a JSON payload —
+  everything the client port needs to *recompute*. It bakes **no** precomputed
+  detection (the browser runs the detector itself).
 - `html.render_tune_html(payload)` inlines `assets/tune.js` + the payload into one
   self-contained HTML page (mirrors `reporting/html_report.py`; assigns
   `window.__DTK_TUNE__`).

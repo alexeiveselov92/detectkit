@@ -320,6 +320,51 @@ def _make_cases() -> list[dict[str, Any]]:
         }
     )
 
+    # 9. Manual bounds — stateless lower/upper thresholds on the raw values.
+    #    No window/min_samples: every non-NaN point is scored straight away.
+    vals = _noisy_level(909, 360, level=50.0, sigma=4.0, spikes={120: 30.0, 240: -30.0})
+    cases.append(
+        {
+            "name": "manual_bounds_values",
+            "detector_type": "manual_bounds",
+            "interval_seconds": _DEFAULT_INTERVAL,
+            "values": vals,
+            "seasonality_data": None,
+            "seasonality_columns": None,
+            "detector_params": {"lower_bound": 40.0, "upper_bound": 60.0},
+            "ts_params": {
+                "type": "manual_bounds",
+                "lowerBound": 40.0,
+                "upperBound": 60.0,
+            },
+        }
+    )
+
+    # 10. Manual bounds on absolute point-to-point changes — exercises the
+    #     input_type preprocessing path (the first point is NaN -> not scored).
+    vals = _noisy_level(1010, 360, level=300.0, sigma=8.0, spikes={150: 70.0, 270: -65.0})
+    cases.append(
+        {
+            "name": "manual_bounds_abs_changes",
+            "detector_type": "manual_bounds",
+            "interval_seconds": _DEFAULT_INTERVAL,
+            "values": vals,
+            "seasonality_data": None,
+            "seasonality_columns": None,
+            "detector_params": {
+                "lower_bound": -15.0,
+                "upper_bound": 15.0,
+                "input_type": "absolute_changes",
+            },
+            "ts_params": {
+                "type": "manual_bounds",
+                "lowerBound": -15.0,
+                "upperBound": 15.0,
+                "inputType": "absolute_changes",
+            },
+        }
+    )
+
     return cases
 
 
@@ -357,6 +402,11 @@ _TS_PARAM_DEFAULTS: dict[str, Any] = {
     "seasonalityComponents": None,
     "minSamplesPerGroup": 10,
     "consecutiveAnomalies": 1,
+    # manual_bounds thresholds (None for the windowed detectors) + the alert-layer
+    # direction filter (ignored by runDetector, present for object completeness).
+    "lowerBound": None,
+    "upperBound": None,
+    "direction": "any",
 }
 
 

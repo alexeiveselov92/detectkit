@@ -2887,8 +2887,10 @@
       "params": {
         "consecutiveAnomalies": 1,
         "detrend": "none",
+        "direction": "any",
         "halfLife": null,
         "inputType": "values",
+        "lowerBound": null,
         "minSamples": 30,
         "minSamplesPerGroup": 10,
         "seasonalityComponents": null,
@@ -2897,6 +2899,7 @@
         "smoothingWindow": 10,
         "threshold": 3.0,
         "type": "mad",
+        "upperBound": null,
         "windowSize": 100,
         "windowWeights": "none"
       },
@@ -6515,8 +6518,10 @@
       "params": {
         "consecutiveAnomalies": 1,
         "detrend": "none",
+        "direction": "any",
         "halfLife": null,
         "inputType": "values",
+        "lowerBound": null,
         "minSamples": 30,
         "minSamplesPerGroup": 10,
         "seasonalityComponents": null,
@@ -6525,6 +6530,7 @@
         "smoothingWindow": 10,
         "threshold": 3.0,
         "type": "zscore",
+        "upperBound": null,
         "windowSize": 100,
         "windowWeights": "none"
       },
@@ -10143,8 +10149,10 @@
       "params": {
         "consecutiveAnomalies": 1,
         "detrend": "none",
+        "direction": "any",
         "halfLife": null,
         "inputType": "values",
+        "lowerBound": null,
         "minSamples": 30,
         "minSamplesPerGroup": 10,
         "seasonalityComponents": null,
@@ -10153,6 +10161,7 @@
         "smoothingWindow": 10,
         "threshold": 1.5,
         "type": "iqr",
+        "upperBound": null,
         "windowSize": 100,
         "windowWeights": "none"
       },
@@ -13771,8 +13780,10 @@
       "params": {
         "consecutiveAnomalies": 1,
         "detrend": "none",
+        "direction": "any",
         "halfLife": 25,
         "inputType": "values",
+        "lowerBound": null,
         "minSamples": 30,
         "minSamplesPerGroup": 10,
         "seasonalityComponents": null,
@@ -13781,6 +13792,7 @@
         "smoothingWindow": 10,
         "threshold": 3.0,
         "type": "mad",
+        "upperBound": null,
         "windowSize": 100,
         "windowWeights": "exponential"
       },
@@ -17399,8 +17411,10 @@
       "params": {
         "consecutiveAnomalies": 1,
         "detrend": "linear",
+        "direction": "any",
         "halfLife": null,
         "inputType": "values",
+        "lowerBound": null,
         "minSamples": 30,
         "minSamplesPerGroup": 10,
         "seasonalityComponents": null,
@@ -17409,6 +17423,7 @@
         "smoothingWindow": 10,
         "threshold": 3.0,
         "type": "zscore",
+        "upperBound": null,
         "windowSize": 100,
         "windowWeights": "none"
       },
@@ -21027,8 +21042,10 @@
       "params": {
         "consecutiveAnomalies": 1,
         "detrend": "none",
+        "direction": "any",
         "halfLife": null,
         "inputType": "values",
+        "lowerBound": null,
         "minSamples": 30,
         "minSamplesPerGroup": 10,
         "seasonalityComponents": null,
@@ -21037,6 +21054,7 @@
         "smoothingWindow": 10,
         "threshold": 3.0,
         "type": "mad",
+        "upperBound": null,
         "windowSize": 100,
         "windowWeights": "none"
       },
@@ -24655,8 +24673,10 @@
       "params": {
         "consecutiveAnomalies": 1,
         "detrend": "none",
+        "direction": "any",
         "halfLife": null,
         "inputType": "changes",
+        "lowerBound": null,
         "minSamples": 30,
         "minSamplesPerGroup": 10,
         "seasonalityComponents": null,
@@ -24665,6 +24685,7 @@
         "smoothingWindow": 10,
         "threshold": 3.0,
         "type": "zscore",
+        "upperBound": null,
         "windowSize": 100,
         "windowWeights": "none"
       },
@@ -29435,8 +29456,10 @@
       "params": {
         "consecutiveAnomalies": 1,
         "detrend": "none",
+        "direction": "any",
         "halfLife": null,
         "inputType": "values",
+        "lowerBound": null,
         "minSamples": 30,
         "minSamplesPerGroup": 3,
         "seasonalityComponents": [
@@ -29449,6 +29472,7 @@
         "smoothingWindow": 10,
         "threshold": 3.0,
         "type": "mad",
+        "upperBound": null,
         "windowSize": 168,
         "windowWeights": "none"
       },
@@ -31982,6 +32006,7268 @@
           72.15259805232785,
           75.5870335566712,
           86.4559428977835
+        ]
+      }
+    },
+    {
+      "expected": [
+        {
+          "index": 0,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 1,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 2,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 3,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 4,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 5,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 6,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 7,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 8,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 9,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 10,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 11,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 12,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 13,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 14,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 15,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 16,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 17,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 18,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 19,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 20,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 21,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 22,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 23,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 24,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 25,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 26,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 27,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 28,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 29,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 30,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 31,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 32,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 33,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 34,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 35,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 36,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 37,
+          "isAnomaly": true,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 38,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 39,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 40,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 41,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 42,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 43,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 44,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 45,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 46,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 47,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 48,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 49,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 50,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 51,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 52,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 53,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 54,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 55,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 56,
+          "isAnomaly": true,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 57,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 58,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 59,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 60,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 61,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 62,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 63,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 64,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 65,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 66,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 67,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 68,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 69,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 70,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 71,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 72,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 73,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 74,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 75,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 76,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 77,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 78,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 79,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 80,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 81,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 82,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 83,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 84,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 85,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 86,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 87,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 88,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 89,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 90,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 91,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 92,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 93,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 94,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 95,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 96,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 97,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 98,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 99,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 100,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 101,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 102,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 103,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 104,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 105,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 106,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 107,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 108,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 109,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 110,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 111,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 112,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 113,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 114,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 115,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 116,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 117,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 118,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 119,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 120,
+          "isAnomaly": true,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 121,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 122,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 123,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 124,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 125,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 126,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 127,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 128,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 129,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 130,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 131,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 132,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 133,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 134,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 135,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 136,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 137,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 138,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 139,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 140,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 141,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 142,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 143,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 144,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 145,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 146,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 147,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 148,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 149,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 150,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 151,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 152,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 153,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 154,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 155,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 156,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 157,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 158,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 159,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 160,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 161,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 162,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 163,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 164,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 165,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 166,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 167,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 168,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 169,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 170,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 171,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 172,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 173,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 174,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 175,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 176,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 177,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 178,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 179,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 180,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 181,
+          "isAnomaly": true,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 182,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 183,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 184,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 185,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 186,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 187,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 188,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 189,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 190,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 191,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 192,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 193,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 194,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 195,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 196,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 197,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 198,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 199,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 200,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 201,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 202,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 203,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 204,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 205,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 206,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 207,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 208,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 209,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 210,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 211,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 212,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 213,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 214,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 215,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 216,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 217,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 218,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 219,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 220,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 221,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 222,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 223,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 224,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 225,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 226,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 227,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 228,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 229,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 230,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 231,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 232,
+          "isAnomaly": true,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 233,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 234,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 235,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 236,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 237,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 238,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 239,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 240,
+          "isAnomaly": true,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 241,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 242,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 243,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 244,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 245,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 246,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 247,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 248,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 249,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 250,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 251,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 252,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 253,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 254,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 255,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 256,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 257,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 258,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 259,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 260,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 261,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 262,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 263,
+          "isAnomaly": true,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 264,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 265,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 266,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 267,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 268,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 269,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 270,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 271,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 272,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 273,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 274,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 275,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 276,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 277,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 278,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 279,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 280,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 281,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 282,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 283,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 284,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 285,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 286,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 287,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 288,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 289,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 290,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 291,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 292,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 293,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 294,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 295,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 296,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 297,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 298,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 299,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 300,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 301,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 302,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 303,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 304,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 305,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 306,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 307,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 308,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 309,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 310,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 311,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 312,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 313,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 314,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 315,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 316,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 317,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 318,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 319,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 320,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 321,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 322,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 323,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 324,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 325,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 326,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 327,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 328,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 329,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 330,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 331,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 332,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 333,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 334,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 335,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 336,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 337,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 338,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 339,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 340,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 341,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 342,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 343,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 344,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 345,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 346,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 347,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 348,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 349,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 350,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 351,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 352,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 353,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 354,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 355,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 356,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 357,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 358,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        },
+        {
+          "index": 359,
+          "isAnomaly": false,
+          "lower": 40.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.0
+        }
+      ],
+      "name": "manual_bounds_values",
+      "params": {
+        "consecutiveAnomalies": 1,
+        "detrend": "none",
+        "direction": "any",
+        "halfLife": null,
+        "inputType": "values",
+        "lowerBound": 40.0,
+        "minSamples": 30,
+        "minSamplesPerGroup": 10,
+        "seasonalityComponents": null,
+        "smoothing": "none",
+        "smoothingAlpha": 0.3,
+        "smoothingWindow": 10,
+        "threshold": 3.0,
+        "type": "manual_bounds",
+        "upperBound": 60.0,
+        "windowSize": 100,
+        "windowWeights": "none"
+      },
+      "series": {
+        "intervalSeconds": 600,
+        "timestamps": [
+          1767225600000,
+          1767226200000,
+          1767226800000,
+          1767227400000,
+          1767228000000,
+          1767228600000,
+          1767229200000,
+          1767229800000,
+          1767230400000,
+          1767231000000,
+          1767231600000,
+          1767232200000,
+          1767232800000,
+          1767233400000,
+          1767234000000,
+          1767234600000,
+          1767235200000,
+          1767235800000,
+          1767236400000,
+          1767237000000,
+          1767237600000,
+          1767238200000,
+          1767238800000,
+          1767239400000,
+          1767240000000,
+          1767240600000,
+          1767241200000,
+          1767241800000,
+          1767242400000,
+          1767243000000,
+          1767243600000,
+          1767244200000,
+          1767244800000,
+          1767245400000,
+          1767246000000,
+          1767246600000,
+          1767247200000,
+          1767247800000,
+          1767248400000,
+          1767249000000,
+          1767249600000,
+          1767250200000,
+          1767250800000,
+          1767251400000,
+          1767252000000,
+          1767252600000,
+          1767253200000,
+          1767253800000,
+          1767254400000,
+          1767255000000,
+          1767255600000,
+          1767256200000,
+          1767256800000,
+          1767257400000,
+          1767258000000,
+          1767258600000,
+          1767259200000,
+          1767259800000,
+          1767260400000,
+          1767261000000,
+          1767261600000,
+          1767262200000,
+          1767262800000,
+          1767263400000,
+          1767264000000,
+          1767264600000,
+          1767265200000,
+          1767265800000,
+          1767266400000,
+          1767267000000,
+          1767267600000,
+          1767268200000,
+          1767268800000,
+          1767269400000,
+          1767270000000,
+          1767270600000,
+          1767271200000,
+          1767271800000,
+          1767272400000,
+          1767273000000,
+          1767273600000,
+          1767274200000,
+          1767274800000,
+          1767275400000,
+          1767276000000,
+          1767276600000,
+          1767277200000,
+          1767277800000,
+          1767278400000,
+          1767279000000,
+          1767279600000,
+          1767280200000,
+          1767280800000,
+          1767281400000,
+          1767282000000,
+          1767282600000,
+          1767283200000,
+          1767283800000,
+          1767284400000,
+          1767285000000,
+          1767285600000,
+          1767286200000,
+          1767286800000,
+          1767287400000,
+          1767288000000,
+          1767288600000,
+          1767289200000,
+          1767289800000,
+          1767290400000,
+          1767291000000,
+          1767291600000,
+          1767292200000,
+          1767292800000,
+          1767293400000,
+          1767294000000,
+          1767294600000,
+          1767295200000,
+          1767295800000,
+          1767296400000,
+          1767297000000,
+          1767297600000,
+          1767298200000,
+          1767298800000,
+          1767299400000,
+          1767300000000,
+          1767300600000,
+          1767301200000,
+          1767301800000,
+          1767302400000,
+          1767303000000,
+          1767303600000,
+          1767304200000,
+          1767304800000,
+          1767305400000,
+          1767306000000,
+          1767306600000,
+          1767307200000,
+          1767307800000,
+          1767308400000,
+          1767309000000,
+          1767309600000,
+          1767310200000,
+          1767310800000,
+          1767311400000,
+          1767312000000,
+          1767312600000,
+          1767313200000,
+          1767313800000,
+          1767314400000,
+          1767315000000,
+          1767315600000,
+          1767316200000,
+          1767316800000,
+          1767317400000,
+          1767318000000,
+          1767318600000,
+          1767319200000,
+          1767319800000,
+          1767320400000,
+          1767321000000,
+          1767321600000,
+          1767322200000,
+          1767322800000,
+          1767323400000,
+          1767324000000,
+          1767324600000,
+          1767325200000,
+          1767325800000,
+          1767326400000,
+          1767327000000,
+          1767327600000,
+          1767328200000,
+          1767328800000,
+          1767329400000,
+          1767330000000,
+          1767330600000,
+          1767331200000,
+          1767331800000,
+          1767332400000,
+          1767333000000,
+          1767333600000,
+          1767334200000,
+          1767334800000,
+          1767335400000,
+          1767336000000,
+          1767336600000,
+          1767337200000,
+          1767337800000,
+          1767338400000,
+          1767339000000,
+          1767339600000,
+          1767340200000,
+          1767340800000,
+          1767341400000,
+          1767342000000,
+          1767342600000,
+          1767343200000,
+          1767343800000,
+          1767344400000,
+          1767345000000,
+          1767345600000,
+          1767346200000,
+          1767346800000,
+          1767347400000,
+          1767348000000,
+          1767348600000,
+          1767349200000,
+          1767349800000,
+          1767350400000,
+          1767351000000,
+          1767351600000,
+          1767352200000,
+          1767352800000,
+          1767353400000,
+          1767354000000,
+          1767354600000,
+          1767355200000,
+          1767355800000,
+          1767356400000,
+          1767357000000,
+          1767357600000,
+          1767358200000,
+          1767358800000,
+          1767359400000,
+          1767360000000,
+          1767360600000,
+          1767361200000,
+          1767361800000,
+          1767362400000,
+          1767363000000,
+          1767363600000,
+          1767364200000,
+          1767364800000,
+          1767365400000,
+          1767366000000,
+          1767366600000,
+          1767367200000,
+          1767367800000,
+          1767368400000,
+          1767369000000,
+          1767369600000,
+          1767370200000,
+          1767370800000,
+          1767371400000,
+          1767372000000,
+          1767372600000,
+          1767373200000,
+          1767373800000,
+          1767374400000,
+          1767375000000,
+          1767375600000,
+          1767376200000,
+          1767376800000,
+          1767377400000,
+          1767378000000,
+          1767378600000,
+          1767379200000,
+          1767379800000,
+          1767380400000,
+          1767381000000,
+          1767381600000,
+          1767382200000,
+          1767382800000,
+          1767383400000,
+          1767384000000,
+          1767384600000,
+          1767385200000,
+          1767385800000,
+          1767386400000,
+          1767387000000,
+          1767387600000,
+          1767388200000,
+          1767388800000,
+          1767389400000,
+          1767390000000,
+          1767390600000,
+          1767391200000,
+          1767391800000,
+          1767392400000,
+          1767393000000,
+          1767393600000,
+          1767394200000,
+          1767394800000,
+          1767395400000,
+          1767396000000,
+          1767396600000,
+          1767397200000,
+          1767397800000,
+          1767398400000,
+          1767399000000,
+          1767399600000,
+          1767400200000,
+          1767400800000,
+          1767401400000,
+          1767402000000,
+          1767402600000,
+          1767403200000,
+          1767403800000,
+          1767404400000,
+          1767405000000,
+          1767405600000,
+          1767406200000,
+          1767406800000,
+          1767407400000,
+          1767408000000,
+          1767408600000,
+          1767409200000,
+          1767409800000,
+          1767410400000,
+          1767411000000,
+          1767411600000,
+          1767412200000,
+          1767412800000,
+          1767413400000,
+          1767414000000,
+          1767414600000,
+          1767415200000,
+          1767415800000,
+          1767416400000,
+          1767417000000,
+          1767417600000,
+          1767418200000,
+          1767418800000,
+          1767419400000,
+          1767420000000,
+          1767420600000,
+          1767421200000,
+          1767421800000,
+          1767422400000,
+          1767423000000,
+          1767423600000,
+          1767424200000,
+          1767424800000,
+          1767425400000,
+          1767426000000,
+          1767426600000,
+          1767427200000,
+          1767427800000,
+          1767428400000,
+          1767429000000,
+          1767429600000,
+          1767430200000,
+          1767430800000,
+          1767431400000,
+          1767432000000,
+          1767432600000,
+          1767433200000,
+          1767433800000,
+          1767434400000,
+          1767435000000,
+          1767435600000,
+          1767436200000,
+          1767436800000,
+          1767437400000,
+          1767438000000,
+          1767438600000,
+          1767439200000,
+          1767439800000,
+          1767440400000,
+          1767441000000
+        ],
+        "values": [
+          46.92745545601949,
+          49.7081400230492,
+          47.33738805216047,
+          45.04753614802773,
+          48.76270380092101,
+          44.845861890501894,
+          47.18659874795555,
+          54.53222871872212,
+          50.18790348116726,
+          46.8412426111063,
+          51.83660312232611,
+          48.37051827331527,
+          51.621095260058034,
+          48.16418756630818,
+          55.910557403764095,
+          56.13438402615052,
+          48.547932439597275,
+          51.39478461224873,
+          43.33447860101882,
+          48.421422836957944,
+          48.99415802645844,
+          47.55866864507447,
+          49.69437136259724,
+          48.70445776089183,
+          49.153302037797495,
+          51.088907239032764,
+          48.458419540511834,
+          50.24755021532352,
+          43.08791457706235,
+          54.45157891395027,
+          53.65965383513513,
+          51.503067156284686,
+          52.27582138970457,
+          53.16046110187891,
+          54.94149355826902,
+          55.482461626733276,
+          53.97107568830714,
+          35.85336766505907,
+          46.031982325569935,
+          47.83985052919136,
+          53.681015288459875,
+          46.22172300464847,
+          58.830652341522025,
+          55.238805945024225,
+          49.260367660194966,
+          53.56940853161551,
+          54.901290808170266,
+          46.65468497071309,
+          48.96656658559775,
+          49.86229357905108,
+          51.090444219443434,
+          42.76702258724869,
+          50.97026977773247,
+          47.87535516322504,
+          46.34200766754915,
+          48.6592647430025,
+          60.102203518530956,
+          52.78324425628155,
+          48.78650873097687,
+          52.281752998143396,
+          50.12364210214997,
+          49.00202487178067,
+          54.68025278163476,
+          52.541024092726595,
+          47.1907459663763,
+          45.439511870864564,
+          47.70042262119356,
+          45.23387265825091,
+          53.31803115580399,
+          48.711240856595936,
+          52.65488888997844,
+          46.416570099264376,
+          51.560272121497235,
+          51.26251675191392,
+          51.670311063829686,
+          43.61463284553686,
+          53.68166423628138,
+          48.494746756517266,
+          44.46784320698246,
+          52.530861579389835,
+          56.74853488341569,
+          56.18844989222714,
+          45.014895399005894,
+          49.907161929717745,
+          57.806125728236225,
+          47.70113722195459,
+          49.59125773817984,
+          51.325736116309045,
+          59.11391393309115,
+          52.0058419544225,
+          49.718712656888606,
+          53.96976013485335,
+          48.61170978842516,
+          47.499883014634264,
+          58.67188623469417,
+          55.221393367044485,
+          47.504281053853994,
+          47.846373727728825,
+          46.849122345034225,
+          49.3712008864738,
+          52.01898308750782,
+          52.190350316972456,
+          51.237443419454806,
+          49.543575457841264,
+          47.73351969384179,
+          50.27033705612397,
+          46.10393410235661,
+          58.92642412244999,
+          42.47769877717302,
+          51.325699609115766,
+          45.90960345222308,
+          47.78086324828667,
+          52.412371695633894,
+          53.326384526812866,
+          51.99238612136125,
+          48.87571042691372,
+          47.02707281126389,
+          48.4399856203715,
+          51.72960634459866,
+          46.2187999734773,
+          79.79857308976304,
+          52.49730728783709,
+          47.452792000563726,
+          50.97830389102216,
+          46.2928680275894,
+          55.59064957270003,
+          48.07473229397073,
+          51.171898128082056,
+          51.45161153171077,
+          44.47396225008184,
+          49.506866617452374,
+          49.86487305963142,
+          56.119591710958815,
+          54.28292289302024,
+          50.748485944177446,
+          50.46077165763737,
+          50.990441955149954,
+          53.55881239601647,
+          43.45816922817683,
+          48.81977681239778,
+          52.27787561882181,
+          50.17840009909005,
+          56.53458916508331,
+          45.74938941109552,
+          57.54936405310853,
+          55.48847339969101,
+          54.13930548831108,
+          49.769557110466074,
+          49.039935917734184,
+          54.109034702889375,
+          47.646378318556636,
+          51.953341817631625,
+          42.12118006516918,
+          53.59481888266197,
+          48.91434875427236,
+          46.14604730234372,
+          49.781163598452366,
+          43.009786404257,
+          47.926479751805886,
+          47.552995138683805,
+          44.10887467178075,
+          50.25525264705739,
+          46.19287564052678,
+          44.96603636607833,
+          45.27844498750749,
+          45.76298824657469,
+          52.51957964048874,
+          50.76755717391809,
+          53.86664265793498,
+          52.53920281000516,
+          53.67613634668244,
+          51.73027773005028,
+          54.49861815773593,
+          55.59748296702407,
+          50.45549435281576,
+          46.84037820066302,
+          49.63884925917524,
+          54.091854063683414,
+          53.360888587748555,
+          50.97526606897943,
+          53.02430094307638,
+          60.28885288425809,
+          46.62542722782867,
+          47.06216772002494,
+          55.915842532090736,
+          51.57215985961256,
+          48.146683419527676,
+          47.780246070468436,
+          48.5425108509813,
+          42.819502909732684,
+          45.61767886507212,
+          49.47188625233712,
+          55.08956141623002,
+          51.10822556048848,
+          41.13712189279291,
+          43.911316088048025,
+          54.056637008979195,
+          48.43885464586703,
+          55.24487941224964,
+          50.60964492835229,
+          56.56354250563845,
+          47.968323611599104,
+          47.09875075454335,
+          53.61728932903207,
+          55.70092705950728,
+          45.06566152537128,
+          51.542045759904795,
+          50.62391899237868,
+          52.54576950109146,
+          47.82942600753921,
+          49.42857927232889,
+          51.768007593910895,
+          54.05680440703287,
+          45.79863361528031,
+          48.3624733531761,
+          48.89771129098018,
+          54.02719424266616,
+          51.59249393391078,
+          56.121781651426986,
+          52.195966223522596,
+          46.42467093651593,
+          50.68130849739218,
+          47.314708341182836,
+          50.65220754820569,
+          55.34456177575197,
+          47.91273644153614,
+          47.48820298434279,
+          45.32878220367505,
+          53.70959966189619,
+          49.437694000617405,
+          54.57720195599397,
+          47.25538225420776,
+          60.24001550074127,
+          41.81751456078777,
+          52.001944063585015,
+          46.29289198797102,
+          51.10617493393731,
+          49.20808628895277,
+          48.38761696788223,
+          49.47438317319499,
+          19.914288053845745,
+          51.318788809482456,
+          50.97076688667298,
+          46.533436903764276,
+          55.252028271419384,
+          51.84855707050574,
+          47.32156917488349,
+          59.72897331171932,
+          54.789808526000286,
+          50.343468006163825,
+          44.891776524723014,
+          45.950480564038656,
+          47.94336447189708,
+          46.25621242240695,
+          51.50180144766011,
+          54.760730022494904,
+          48.15369973045796,
+          57.48194820115306,
+          52.23553453505998,
+          49.779055359757955,
+          46.594690185744994,
+          46.587319796819514,
+          53.91786839469916,
+          39.277827626548216,
+          50.52939393602726,
+          52.680227014572466,
+          48.842814693604076,
+          52.21596105081698,
+          49.68049400468342,
+          56.061834161307836,
+          51.1825689283276,
+          51.013590213974126,
+          53.13636593031196,
+          46.37295605478445,
+          47.93181457856531,
+          45.292142605359814,
+          50.41265255530643,
+          46.35352998955132,
+          54.593636181808286,
+          55.683893008186686,
+          49.778525944272886,
+          42.543739554178515,
+          59.39831457680908,
+          46.96870188591288,
+          46.908627303956116,
+          50.602934760132776,
+          47.770695964056955,
+          48.07614255587484,
+          48.61014862312886,
+          47.012122562234985,
+          52.509756730094615,
+          50.86815630896961,
+          54.71613324800695,
+          53.748233135526036,
+          45.78509518350219,
+          57.37349364384876,
+          52.029743057565604,
+          46.435723113618806,
+          47.34663841379972,
+          43.91372873997433,
+          43.10480815488676,
+          55.811048578468196,
+          43.682817389970275,
+          42.08087852783288,
+          44.66961565275976,
+          50.79511569444879,
+          43.74499597548094,
+          49.71736625427506,
+          44.81443103911516,
+          56.024968821853804,
+          59.90278966344637,
+          48.916868686911776,
+          49.535247580965176,
+          48.23816663373796,
+          53.028312287596165,
+          49.58819171655543,
+          49.98145664929292,
+          45.78314247215322,
+          48.10451334837096,
+          50.20779511979605,
+          49.42197732007449,
+          58.30693276029996,
+          49.99408040970297,
+          49.602325049417544,
+          47.58747965060633,
+          49.409847241440005,
+          53.202269504772325,
+          50.78554702432247,
+          46.280052677329856,
+          53.19755573151898,
+          46.15958488335781,
+          45.86211033369056,
+          50.46448875518405,
+          48.901091599195404,
+          46.21653567240039,
+          59.84931957953089,
+          48.18689969094214,
+          50.24199562761205,
+          53.30923219770529,
+          50.49691859266609,
+          48.471119246263704,
+          54.264616943299316,
+          53.58841804125119,
+          43.6772744858927,
+          57.294536364560486,
+          54.85357931506707,
+          52.73832031562015,
+          49.12286974566229,
+          45.50348771649003,
+          46.694271219216304,
+          51.280106868009,
+          49.957642955214524,
+          50.298857852355944,
+          48.919945879750834,
+          57.73291317776399,
+          57.98418046351437,
+          49.102342097633574,
+          45.814606910551014,
+          49.95092209433227,
+          50.44844213470863
+        ]
+      }
+    },
+    {
+      "expected": [
+        {
+          "index": 0,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "missing_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 1,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 2,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 3,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 4,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 5,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 6,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 7,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 8,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 9,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 10,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 11,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 12,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 13,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 14,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 15,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 16,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 17,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 18,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 19,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 20,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 21,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 22,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 23,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 24,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 25,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 26,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 27,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 28,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 29,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 30,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 31,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 32,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 33,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 34,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 35,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 36,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 37,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 38,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 39,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 40,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 41,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 42,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 43,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 44,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 45,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 46,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 47,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 48,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 49,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 50,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 51,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 52,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 53,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 54,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 55,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 56,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 57,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 58,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 59,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 60,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 61,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 62,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 63,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 64,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 65,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 66,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 67,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 68,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 69,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 70,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 71,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 72,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 73,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 74,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 75,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 76,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 77,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 78,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 79,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 80,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 81,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 82,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 83,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 84,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 85,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 86,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 87,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 88,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 89,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 90,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 91,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 92,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 93,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 94,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 95,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 96,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 97,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 98,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 99,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 100,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 101,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 102,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 103,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 104,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 105,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 106,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 107,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 108,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 109,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 110,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 111,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 112,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 113,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 114,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 115,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 116,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 117,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 118,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 119,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 120,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 121,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 122,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 123,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 124,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 125,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 126,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 127,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 128,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 129,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 130,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 131,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 132,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 133,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 134,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 135,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 136,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 137,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 138,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 139,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 140,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 141,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 142,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 143,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 144,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 145,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 146,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 147,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 148,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 149,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 150,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 151,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 152,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 153,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 154,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 155,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 156,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 157,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 158,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 159,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 160,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 161,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 162,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 163,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 164,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 165,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 166,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 167,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 168,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 169,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 170,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 171,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 172,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 173,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 174,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 175,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 176,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 177,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 178,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 179,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 180,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 181,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 182,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 183,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 184,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 185,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 186,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 187,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 188,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 189,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 190,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 191,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 192,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 193,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 194,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 195,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 196,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 197,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 198,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 199,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 200,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 201,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 202,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 203,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 204,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 205,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 206,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 207,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 208,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 209,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 210,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 211,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 212,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 213,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 214,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 215,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 216,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 217,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 218,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 219,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 220,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 221,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 222,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 223,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 224,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 225,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 226,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 227,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 228,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 229,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 230,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 231,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 232,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 233,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 234,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 235,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 236,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 237,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 238,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 239,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 240,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 241,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 242,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 243,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 244,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 245,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 246,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 247,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 248,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 249,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 250,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 251,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 252,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 253,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 254,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 255,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 256,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 257,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 258,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 259,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 260,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 261,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 262,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 263,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 264,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 265,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 266,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 267,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 268,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 269,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 270,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 271,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 272,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 273,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 274,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 275,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 276,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 277,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 278,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 279,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 280,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 281,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 282,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 283,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 284,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 285,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 286,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 287,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 288,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 289,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 290,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 291,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 292,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 293,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 294,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 295,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 296,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 297,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 298,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 299,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 300,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 301,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 302,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 303,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 304,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 305,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 306,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 307,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 308,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 309,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 310,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 311,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 312,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 313,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 314,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 315,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 316,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 317,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 318,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 319,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 320,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 321,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 322,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 323,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 324,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 325,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 326,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 327,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 328,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 329,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 330,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 331,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 332,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 333,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 334,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 335,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 336,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 337,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 338,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 339,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 340,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 341,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 342,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 343,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 344,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 345,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 346,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 347,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 348,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 349,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 350,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 351,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 352,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 353,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 354,
+          "isAnomaly": true,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 355,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 356,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 357,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 358,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        },
+        {
+          "index": 359,
+          "isAnomaly": false,
+          "lower": -15.0,
+          "reason": "ok",
+          "scored": true,
+          "upper": 15.0
+        }
+      ],
+      "name": "manual_bounds_abs_changes",
+      "params": {
+        "consecutiveAnomalies": 1,
+        "detrend": "none",
+        "direction": "any",
+        "halfLife": null,
+        "inputType": "absolute_changes",
+        "lowerBound": -15.0,
+        "minSamples": 30,
+        "minSamplesPerGroup": 10,
+        "seasonalityComponents": null,
+        "smoothing": "none",
+        "smoothingAlpha": 0.3,
+        "smoothingWindow": 10,
+        "threshold": 3.0,
+        "type": "manual_bounds",
+        "upperBound": 15.0,
+        "windowSize": 100,
+        "windowWeights": "none"
+      },
+      "series": {
+        "intervalSeconds": 600,
+        "timestamps": [
+          1767225600000,
+          1767226200000,
+          1767226800000,
+          1767227400000,
+          1767228000000,
+          1767228600000,
+          1767229200000,
+          1767229800000,
+          1767230400000,
+          1767231000000,
+          1767231600000,
+          1767232200000,
+          1767232800000,
+          1767233400000,
+          1767234000000,
+          1767234600000,
+          1767235200000,
+          1767235800000,
+          1767236400000,
+          1767237000000,
+          1767237600000,
+          1767238200000,
+          1767238800000,
+          1767239400000,
+          1767240000000,
+          1767240600000,
+          1767241200000,
+          1767241800000,
+          1767242400000,
+          1767243000000,
+          1767243600000,
+          1767244200000,
+          1767244800000,
+          1767245400000,
+          1767246000000,
+          1767246600000,
+          1767247200000,
+          1767247800000,
+          1767248400000,
+          1767249000000,
+          1767249600000,
+          1767250200000,
+          1767250800000,
+          1767251400000,
+          1767252000000,
+          1767252600000,
+          1767253200000,
+          1767253800000,
+          1767254400000,
+          1767255000000,
+          1767255600000,
+          1767256200000,
+          1767256800000,
+          1767257400000,
+          1767258000000,
+          1767258600000,
+          1767259200000,
+          1767259800000,
+          1767260400000,
+          1767261000000,
+          1767261600000,
+          1767262200000,
+          1767262800000,
+          1767263400000,
+          1767264000000,
+          1767264600000,
+          1767265200000,
+          1767265800000,
+          1767266400000,
+          1767267000000,
+          1767267600000,
+          1767268200000,
+          1767268800000,
+          1767269400000,
+          1767270000000,
+          1767270600000,
+          1767271200000,
+          1767271800000,
+          1767272400000,
+          1767273000000,
+          1767273600000,
+          1767274200000,
+          1767274800000,
+          1767275400000,
+          1767276000000,
+          1767276600000,
+          1767277200000,
+          1767277800000,
+          1767278400000,
+          1767279000000,
+          1767279600000,
+          1767280200000,
+          1767280800000,
+          1767281400000,
+          1767282000000,
+          1767282600000,
+          1767283200000,
+          1767283800000,
+          1767284400000,
+          1767285000000,
+          1767285600000,
+          1767286200000,
+          1767286800000,
+          1767287400000,
+          1767288000000,
+          1767288600000,
+          1767289200000,
+          1767289800000,
+          1767290400000,
+          1767291000000,
+          1767291600000,
+          1767292200000,
+          1767292800000,
+          1767293400000,
+          1767294000000,
+          1767294600000,
+          1767295200000,
+          1767295800000,
+          1767296400000,
+          1767297000000,
+          1767297600000,
+          1767298200000,
+          1767298800000,
+          1767299400000,
+          1767300000000,
+          1767300600000,
+          1767301200000,
+          1767301800000,
+          1767302400000,
+          1767303000000,
+          1767303600000,
+          1767304200000,
+          1767304800000,
+          1767305400000,
+          1767306000000,
+          1767306600000,
+          1767307200000,
+          1767307800000,
+          1767308400000,
+          1767309000000,
+          1767309600000,
+          1767310200000,
+          1767310800000,
+          1767311400000,
+          1767312000000,
+          1767312600000,
+          1767313200000,
+          1767313800000,
+          1767314400000,
+          1767315000000,
+          1767315600000,
+          1767316200000,
+          1767316800000,
+          1767317400000,
+          1767318000000,
+          1767318600000,
+          1767319200000,
+          1767319800000,
+          1767320400000,
+          1767321000000,
+          1767321600000,
+          1767322200000,
+          1767322800000,
+          1767323400000,
+          1767324000000,
+          1767324600000,
+          1767325200000,
+          1767325800000,
+          1767326400000,
+          1767327000000,
+          1767327600000,
+          1767328200000,
+          1767328800000,
+          1767329400000,
+          1767330000000,
+          1767330600000,
+          1767331200000,
+          1767331800000,
+          1767332400000,
+          1767333000000,
+          1767333600000,
+          1767334200000,
+          1767334800000,
+          1767335400000,
+          1767336000000,
+          1767336600000,
+          1767337200000,
+          1767337800000,
+          1767338400000,
+          1767339000000,
+          1767339600000,
+          1767340200000,
+          1767340800000,
+          1767341400000,
+          1767342000000,
+          1767342600000,
+          1767343200000,
+          1767343800000,
+          1767344400000,
+          1767345000000,
+          1767345600000,
+          1767346200000,
+          1767346800000,
+          1767347400000,
+          1767348000000,
+          1767348600000,
+          1767349200000,
+          1767349800000,
+          1767350400000,
+          1767351000000,
+          1767351600000,
+          1767352200000,
+          1767352800000,
+          1767353400000,
+          1767354000000,
+          1767354600000,
+          1767355200000,
+          1767355800000,
+          1767356400000,
+          1767357000000,
+          1767357600000,
+          1767358200000,
+          1767358800000,
+          1767359400000,
+          1767360000000,
+          1767360600000,
+          1767361200000,
+          1767361800000,
+          1767362400000,
+          1767363000000,
+          1767363600000,
+          1767364200000,
+          1767364800000,
+          1767365400000,
+          1767366000000,
+          1767366600000,
+          1767367200000,
+          1767367800000,
+          1767368400000,
+          1767369000000,
+          1767369600000,
+          1767370200000,
+          1767370800000,
+          1767371400000,
+          1767372000000,
+          1767372600000,
+          1767373200000,
+          1767373800000,
+          1767374400000,
+          1767375000000,
+          1767375600000,
+          1767376200000,
+          1767376800000,
+          1767377400000,
+          1767378000000,
+          1767378600000,
+          1767379200000,
+          1767379800000,
+          1767380400000,
+          1767381000000,
+          1767381600000,
+          1767382200000,
+          1767382800000,
+          1767383400000,
+          1767384000000,
+          1767384600000,
+          1767385200000,
+          1767385800000,
+          1767386400000,
+          1767387000000,
+          1767387600000,
+          1767388200000,
+          1767388800000,
+          1767389400000,
+          1767390000000,
+          1767390600000,
+          1767391200000,
+          1767391800000,
+          1767392400000,
+          1767393000000,
+          1767393600000,
+          1767394200000,
+          1767394800000,
+          1767395400000,
+          1767396000000,
+          1767396600000,
+          1767397200000,
+          1767397800000,
+          1767398400000,
+          1767399000000,
+          1767399600000,
+          1767400200000,
+          1767400800000,
+          1767401400000,
+          1767402000000,
+          1767402600000,
+          1767403200000,
+          1767403800000,
+          1767404400000,
+          1767405000000,
+          1767405600000,
+          1767406200000,
+          1767406800000,
+          1767407400000,
+          1767408000000,
+          1767408600000,
+          1767409200000,
+          1767409800000,
+          1767410400000,
+          1767411000000,
+          1767411600000,
+          1767412200000,
+          1767412800000,
+          1767413400000,
+          1767414000000,
+          1767414600000,
+          1767415200000,
+          1767415800000,
+          1767416400000,
+          1767417000000,
+          1767417600000,
+          1767418200000,
+          1767418800000,
+          1767419400000,
+          1767420000000,
+          1767420600000,
+          1767421200000,
+          1767421800000,
+          1767422400000,
+          1767423000000,
+          1767423600000,
+          1767424200000,
+          1767424800000,
+          1767425400000,
+          1767426000000,
+          1767426600000,
+          1767427200000,
+          1767427800000,
+          1767428400000,
+          1767429000000,
+          1767429600000,
+          1767430200000,
+          1767430800000,
+          1767431400000,
+          1767432000000,
+          1767432600000,
+          1767433200000,
+          1767433800000,
+          1767434400000,
+          1767435000000,
+          1767435600000,
+          1767436200000,
+          1767436800000,
+          1767437400000,
+          1767438000000,
+          1767438600000,
+          1767439200000,
+          1767439800000,
+          1767440400000,
+          1767441000000
+        ],
+        "values": [
+          290.59641679518654,
+          296.9348185686513,
+          288.2290705680789,
+          285.5954518034539,
+          301.04080334296907,
+          312.7649490116147,
+          307.94528540033883,
+          281.09034242835696,
+          296.1632618709883,
+          286.7969444505237,
+          295.6520827058728,
+          306.236891616753,
+          295.9791297471809,
+          302.28711608369156,
+          321.6258990453162,
+          299.40386544640387,
+          289.0391787338917,
+          302.86869773359257,
+          304.78439900861815,
+          297.54560645491875,
+          306.1037496162418,
+          292.008977643901,
+          308.0741137510378,
+          298.0177163602774,
+          279.3318608274477,
+          306.05777073142133,
+          285.7883157404254,
+          293.76243594620246,
+          292.6517204236398,
+          296.8400902132946,
+          301.9840468441539,
+          302.384302057664,
+          302.2705330397931,
+          296.2302168017603,
+          307.6162248153109,
+          294.891174557792,
+          289.9127942731801,
+          295.53203836355334,
+          301.38194767564903,
+          299.5524191196244,
+          288.54217363670904,
+          297.5786233305322,
+          295.3235696098311,
+          306.375503292644,
+          293.7100860930647,
+          289.11062694085945,
+          299.6410681901945,
+          303.831371593382,
+          294.5021347065153,
+          315.4914032588673,
+          301.01407861198817,
+          284.07764712229056,
+          303.1667636796997,
+          315.8097809852312,
+          298.102857466285,
+          292.02921639477876,
+          294.2383798867513,
+          296.248111659364,
+          305.296831762397,
+          315.00494607418193,
+          299.73304043351493,
+          289.6676216992796,
+          304.05472864290175,
+          303.3013670852822,
+          296.250119866962,
+          299.4960771389752,
+          294.7878470563576,
+          297.8882886551249,
+          306.3339638585193,
+          284.4530359587791,
+          303.14665160241094,
+          310.32771816984865,
+          304.01248450193003,
+          297.78922928512,
+          295.0420235370549,
+          304.7621455346505,
+          302.99512229044615,
+          310.8284503298129,
+          300.547282941721,
+          297.70575346980957,
+          293.25301381605357,
+          301.266794504625,
+          300.9559160000744,
+          298.9011047902485,
+          290.51023887074683,
+          304.70672338372924,
+          288.40827302597586,
+          292.8537139537899,
+          294.14930749434797,
+          297.87169917695536,
+          299.32071888534,
+          315.3642423948426,
+          297.9637597928802,
+          282.2832300633297,
+          298.10520657965014,
+          301.9957099986268,
+          303.4524363368564,
+          306.705189770162,
+          293.37992945073216,
+          311.3573634576112,
+          303.5424176014799,
+          307.0321350676775,
+          299.67732123312584,
+          310.91173935181064,
+          300.77946538588947,
+          287.6839879349478,
+          296.7107317447884,
+          293.03823342841014,
+          303.7300506334993,
+          310.62714947508,
+          284.1025480195242,
+          281.4519856503982,
+          290.38960670983005,
+          294.6029275987087,
+          303.33849130571804,
+          299.91322344311425,
+          306.8684181859125,
+          296.51920605807976,
+          296.7061826383432,
+          289.53685639968853,
+          309.54214240469724,
+          302.5463845619391,
+          311.6607029356971,
+          306.3136410063009,
+          296.2643529663086,
+          299.7088399226491,
+          311.2732082771752,
+          311.9248317374543,
+          285.71949593949466,
+          297.441441671747,
+          299.6428830865934,
+          308.73159381411716,
+          284.43125727463683,
+          304.9725353501208,
+          291.35036213718513,
+          287.72595008710323,
+          305.4200637352851,
+          298.8919764013241,
+          306.5626905536589,
+          302.55762890806466,
+          294.7019156336395,
+          302.1998876449083,
+          296.59125840359746,
+          316.5271777702752,
+          292.6151139020276,
+          304.6127063918593,
+          286.52975645558115,
+          296.1815108972562,
+          306.8302952741281,
+          304.6920894104808,
+          385.8994727528512,
+          309.790838039933,
+          299.38448719128303,
+          303.52840690086117,
+          311.7288153091899,
+          298.89813168853806,
+          311.2796657427473,
+          300.51820015507667,
+          303.1463496092899,
+          302.40931286497687,
+          284.16143242910596,
+          302.70535727260665,
+          292.0497524408168,
+          303.6062784451283,
+          297.8947380646392,
+          286.5612903572751,
+          304.75962214794134,
+          283.3128092766502,
+          301.3641272318084,
+          294.03516233219716,
+          297.25817836634496,
+          286.0704822663898,
+          307.0917450868382,
+          306.8904786100819,
+          296.47584721225843,
+          283.95751296368553,
+          296.17444196118686,
+          301.6557237576157,
+          289.5908662870365,
+          312.1168841264831,
+          294.1137684632991,
+          300.1375974751496,
+          317.2267306857407,
+          293.8746374379311,
+          293.99516503673703,
+          302.91837862756176,
+          287.63055810950556,
+          295.7423022754212,
+          287.96680843909934,
+          288.3414325804486,
+          306.33666782007975,
+          311.01340924933123,
+          298.3033329241286,
+          288.305701504626,
+          298.2056787506108,
+          296.07508725180315,
+          300.44737946997833,
+          297.76787419236365,
+          288.3040673686831,
+          302.6597559783105,
+          302.0142882777964,
+          291.579745486008,
+          301.37315305369884,
+          304.7338880576243,
+          280.71391632594697,
+          303.7765060694491,
+          291.68334484771776,
+          295.4196499134396,
+          293.78845806810784,
+          302.38139828526766,
+          294.3922603453057,
+          294.103423974061,
+          311.735849218272,
+          303.04353338836586,
+          283.4045493276105,
+          301.7278670881658,
+          307.4320075202207,
+          293.2193085950322,
+          299.1169560901554,
+          302.014860297761,
+          298.3863791827086,
+          305.7199018543412,
+          305.19761853153176,
+          300.8458976428265,
+          310.0495166001042,
+          307.7657666069196,
+          298.16401289706187,
+          299.3156091312317,
+          289.16604270863667,
+          297.4580299022246,
+          306.97230374300966,
+          299.9032297876116,
+          304.34863184040194,
+          300.0867108930125,
+          294.00432380529963,
+          316.5606661706844,
+          299.0656734700519,
+          306.43677334309336,
+          309.8739922803284,
+          295.7976047571569,
+          306.1792253532682,
+          296.24285210668245,
+          308.12698704730497,
+          303.932045096543,
+          319.74347081064315,
+          306.4585813185896,
+          302.49208792538775,
+          309.9202048413887,
+          316.64425949708146,
+          307.79487277256817,
+          300.91501768209645,
+          299.87893184789016,
+          294.5113346870558,
+          309.00053544542607,
+          290.5106932226266,
+          301.6286642724335,
+          306.5557172317845,
+          288.76257155729724,
+          299.71901897769294,
+          291.83405587259324,
+          306.5572484778929,
+          305.6077328454023,
+          303.9072428611994,
+          295.5998593005866,
+          292.64857887663237,
+          307.78808902920844,
+          298.67392346588935,
+          308.209674992276,
+          299.17451056769534,
+          299.7328904379465,
+          228.52074195077006,
+          303.3156123588599,
+          308.46171430373755,
+          299.95919908529385,
+          309.4539879287213,
+          301.17431503323996,
+          299.14920008013087,
+          302.690023098295,
+          303.94555034613614,
+          310.800236427093,
+          310.37456968414017,
+          308.21419450068606,
+          307.1559182144864,
+          311.4397438659027,
+          306.0938817272596,
+          296.44155016960514,
+          309.29653364490986,
+          300.62129600105067,
+          310.7383826344706,
+          296.47798674480975,
+          304.336760740209,
+          297.92021355763484,
+          298.31046124291663,
+          296.0932202006518,
+          286.40883981039104,
+          290.7363507016557,
+          292.80972912787144,
+          303.9810152012839,
+          299.7131523045146,
+          298.149467507908,
+          301.08339678388944,
+          309.33541852197646,
+          293.97985882450524,
+          290.7245849959287,
+          303.0380959513256,
+          297.14126414125906,
+          307.55489152990503,
+          303.5751339576629,
+          301.095594066416,
+          297.7057781071467,
+          298.34385364703724,
+          307.7282781383939,
+          295.97091903869034,
+          305.81858632735145,
+          302.82079173853737,
+          295.97829762656977,
+          322.97483318266677,
+          302.16830835803034,
+          306.8923334318398,
+          286.23247349742064,
+          295.25547678155,
+          291.34183629042434,
+          304.61736388791536,
+          296.5937598726125,
+          305.02148475322815,
+          302.74803438885834,
+          304.5125225440142,
+          293.90940593499585,
+          296.66753971086655,
+          302.16014756801866,
+          284.0083023285988,
+          295.40571160444694,
+          307.47587277103037,
+          291.8091342678384,
+          314.6892769305462,
+          305.3746181422764,
+          303.2581024693467,
+          310.2936712929641,
+          315.3560547049242,
+          300.53651013608015,
+          310.9820803948909,
+          293.50354432835354,
+          299.5107595260579,
+          295.98048981410284,
+          302.10782150047936,
+          296.0332291805371,
+          298.8839343438211,
+          293.782262928243,
+          295.2608591599167,
+          289.9863029726353,
+          299.11088818748675,
+          306.3643990113285,
+          301.6772181868471,
+          314.6049538131116,
+          290.4026661848685,
+          301.5423266521811,
+          306.0864415425374,
+          304.6228925051861,
+          289.9902821140316,
+          294.17881293483185
         ]
       }
     }

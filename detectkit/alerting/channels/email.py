@@ -326,8 +326,8 @@ class EmailChannel(BaseAlertChannel):
                 ("Quorum", f"{ctx['detector_count']}/{ctx['min_detectors']} · {ctx['direction']}"),
             ]
             if ctx["started_display"]:
-                stats.append(("Started", ctx["started_display"]))
-                stats.append(("Latest", ctx["timestamp"]))
+                stats.append(("Anomaly began", ctx["started_display"]))
+                stats.append(("Latest reading", ctx["timestamp"]))
             else:
                 stats.append(("Detected at", ctx["timestamp"]))
             parts.append(self._stat_grid(stats))
@@ -341,8 +341,10 @@ class EmailChannel(BaseAlertChannel):
                 ("Expected", ctx["expected_range"]),
             ]
             if ctx["started_display"]:
-                stats.append(("Started", ctx["started_display"]))
-                stats.append(("Cleared", ctx["timestamp"]))
+                stats.append(("Anomaly began", ctx["started_display"]))
+                if ctx["fired_display"]:
+                    stats.append(("Alert fired", ctx["fired_display"]))
+                stats.append(("Recovered", ctx["timestamp"]))
             else:
                 stats.append(("Cleared at", ctx["timestamp"]))
             stats.append(("Detector", ctx["detector_name"]))

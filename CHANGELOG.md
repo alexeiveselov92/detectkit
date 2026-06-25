@@ -5,6 +5,26 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.35.0] - 2026-06-25
+
+### Changed
+- **Alert timing fields renamed so the onset can't be mistaken for the alert
+  time, and recovery now shows the full timeline.** The previously ambiguous
+  **Started** / **Latest** / **Cleared** labels are now self-describing:
+  - anomaly alerts show **Anomaly began** (the resolved onset — the *first*
+    anomalous point) and **Latest reading** (the most recent point);
+  - recovery alerts show the full **Anomaly began → Alert fired → Recovered**
+    timeline, where **Alert fired** is the on-grid moment the rule first tripped
+    (`onset + (consecutive_required − 1) × interval`).
+
+  This fixes the confusion where "Started" could read as *when the alert fired*
+  rather than *when the metric first went bad* — the two differ whenever the
+  rule waits for several consecutive intervals. Applies to every channel
+  (Slack/Mattermost/webhook, Telegram, email) and the plain-text `{window_line}`.
+  A new `{fired_display}` template variable exposes the alert-fire moment (empty
+  when the run predates the lookback window or no interval is wired in). Purely a
+  rendering change — no detector-ID resets and no stored-data changes.
+
 ## [0.34.0] - 2026-06-25
 
 ### Added

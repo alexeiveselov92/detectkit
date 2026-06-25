@@ -17,8 +17,9 @@ also leads with the **project name** (`[name] `) — see
   project + metric; links to `dashboard_url` when set), a short markdown lead —
   *how long it has been going on* ("Anomalous for 2h 30m — 15 consecutive 10min
   intervals.") with the **Rule** chip right beneath it — and a compact fields
-  grid: short fields Value / Expected / Quorum / Severity / Started / Latest
-  (Started / Cleared on recovery), then full-width Detectors / Parameters, and a
+  grid: short fields Value / Expected / Quorum / Severity / Anomaly began /
+  Latest reading (Anomaly began / Alert fired / Recovered on recovery), then
+  full-width Detectors / Parameters, and a
   compact **Links** field of clickable labels (Dashboard / any extra links /
   "How to read this alert") — never raw URLs — plus a branded footer
   (`detectkit · <project>`) and footer icon. `@mentions` ride in
@@ -29,7 +30,7 @@ also leads with the **project name** (`[name] `) — see
   `HTML`) — a colored status dot (red anomaly / green recovery / yellow no-data /
   blue error), a bold headline (`[project] Status · metric`), the lead (how long
   it has been going on) followed by the rule, then the evidence in `<code>`
-  (value / expected / quorum / severity / started → latest / detector / params),
+  (value / expected / quorum / severity / began → latest / detector / params),
   a links line with an inline "Open dashboard" link followed by a "How to read
   this alert" link, then mentions. Custom templates are sent
   verbatim under the parse mode, so keep them HTML-safe (or set
@@ -37,8 +38,9 @@ also leads with the **project name** (`[name] `) — see
 - **Email**: a branded HTML card (inline-CSS, table-based, Outlook-safe) — a
   colored accent and status pill, a small project eyebrow above the metric, the
   metric, the lead (how long it has been going on) with the **Rule** chip beneath
-  it, a 2-column stat grid (value / expected / severity / quorum / started /
-  latest), a monospace params box, an optional "Open dashboard" button, and a
+  it, a 2-column stat grid (value / expected / severity / quorum / anomaly began
+  / latest reading; began / alert fired / recovered on recovery), a monospace
+  params box, an optional "Open dashboard" button, and a
   footer (`Sent by detectkit · <project>`) that ends with a clay-colored "How to
   read this alert ->" link. The subject is prefixed with `[project]` and the
   plain-text body remains the multipart fallback.
@@ -311,4 +313,3 @@ alerting:
 ```
 
 All channels receive the same alert message.
-

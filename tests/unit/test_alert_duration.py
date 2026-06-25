@@ -4,7 +4,8 @@ Covers the "how long has this been going on" story:
 - ``format_duration`` rendering,
 - ``build_context`` duration / onset / lead values (and graceful fallback),
 - the unified ``description → Rule → Value/Expected`` ordering on the webhook
-  channel plus the ``Started``/``Latest``/``Cleared`` fields,
+  channel plus the ``Anomaly began``/``Latest reading``/``Alert fired``/
+  ``Recovered`` timeline fields,
 - the orchestrator resolving the *true* streak length + onset at fire time
   (and the symmetric incident span on recovery).
 """
@@ -85,9 +86,40 @@ def test_build_context_duration_fields():
     assert "11:56:00" in ctx["started_display"]
     assert ctx["anomaly_lead"] == "Anomalous for 50m — 5 consecutive 10min intervals."
     assert "Incident lasted 50m (5 consecutive 10min intervals)." in ctx["recovery_lead"]
-    # window line carries onset → latest
-    assert ctx["window_line"].startswith("Started: ")
-    assert "Latest: 2026-06-19 12:36:00" in ctx["window_line"]
+    # window line carries "anomaly began" → "latest reading"
+    assert ctx["window_line"].startswith("Anomaly began: ")
+    assert "Latest reading: 2026-06-19 12:36:00" in ctx["window_line"]
+
+
+def test_build_context_fired_display():
+    """``fired_display`` is the on-grid first-fire moment: onset + (req-1)*interval."""
+    ch = WebhookChannel(webhook_url="https://example.com/hook")
+    # onset 11:56:00, consecutive_required=3, interval 10min → 11:56 + 20min = 12:16.
+    ctx = ch.build_context(_anomaly_alert())
+    assert "12:16:00" in ctx["fired_display"]
+
+    # Recovery window line is "began → fired → recovered".
+    rec = ch.build_context(_anomaly_alert(is_recovery=True, direction="none", severity=0.0))
+    assert rec["window_line"].startswith("Anomaly began: ")
+    assert "Alert fired: 2026-06-19 12:16:00" in rec["window_line"]
+    assert "Recovered: 2026-06-19 12:36:00" in rec["window_line"]
+
+
+def test_build_context_fired_display_omitted_when_capped():
+    """A capped run has only a lower-bound onset, so the precise fire time is hidden."""
+    ch = WebhookChannel(webhook_url="https://example.com/hook")
+    ctx = ch.build_context(_anomaly_alert(consecutive_count=1000, streak_capped=True))
+    assert ctx["fired_display"] == ""
+    rec = ch.build_context(
+        _anomaly_alert(
+            is_recovery=True,
+            direction="none",
+            severity=0.0,
+            consecutive_count=1000,
+            streak_capped=True,
+        )
+    )
+    assert "Alert fired:" not in rec["window_line"]
 
 
 def test_build_context_singular_interval():
@@ -128,11 +160,11 @@ def test_webhook_anomaly_layout():
     assert lead.index("Anomalous for") < lead.index("Rule")
 
     titles = [f["title"] for f in att["fields"]]
-    assert "Started" in titles
-    assert "Latest" in titles
+    assert "Anomaly began" in titles
+    assert "Latest reading" in titles
     assert "Quorum" in titles
-    # Value/Expected precede the Started/Latest span.
-    assert titles.index("Value") < titles.index("Started")
+    # Value/Expected precede the began/latest span.
+    assert titles.index("Value") < titles.index("Anomaly began")
 
 
 def test_webhook_recovery_layout():
@@ -148,8 +180,9 @@ def test_webhook_recovery_layout():
 
     assert "Incident lasted" in att["text"]
     titles = [f["title"] for f in att["fields"]]
-    assert "Started" in titles
-    assert "Cleared" in titles
+    assert "Anomaly began" in titles
+    assert "Alert fired" in titles
+    assert "Recovered" in titles
 
 
 # --------------------------------------------------------------------------- #

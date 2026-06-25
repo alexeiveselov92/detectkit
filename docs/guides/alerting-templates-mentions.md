@@ -131,7 +131,10 @@ avatar. See [Channels](alerting-channels.md) for where each channel surfaces it.
 interval, the true streak length and the wall-clock duration). The `Rule:` line
 sits right above the evidence it explains and restates the configured
 thresholds; `{window_line}` gives the problematic span as
-`Started: … | Latest: …` (and `Started: … | Cleared: …` on recovery).
+`Anomaly began: … | Latest reading: …` (and
+`Anomaly began: … | Alert fired: … | Recovered: …` on recovery — where
+**Alert fired** is the on-grid moment the rule first tripped, distinct from the
+onset).
 `{expected_range}` renders one-sided detector bounds cleanly (e.g. `>= 7.00`
 for a lower-only `manual_bounds`) instead of `[7.00, nan]`.
 
@@ -195,9 +198,10 @@ alerting:
 | `consecutive_required` | Configured consecutive threshold the alert fired on (the rule) | anomaly, recovery |
 | `interval_display` | Metric interval as a string (e.g. `"10min"`) (v0.17.0) | all |
 | `duration_display` | How long the streak/incident has run (e.g. `"2h 30m"`; `"over …"` when older than the lookback window) (v0.17.0) | anomaly, recovery |
-| `onset_display` / `started_display` | First timestamp of the run (formatted in `{timezone}`); `started_display` adds `"or earlier"` when the run is capped (v0.17.0) | anomaly, recovery |
+| `onset_display` / `started_display` | First **anomalous** timestamp of the run — the onset, **not** the alert-fire time (formatted in `{timezone}`); `started_display` adds `"or earlier"` when the run is capped (v0.17.0) | anomaly, recovery |
+| `fired_display` | On-grid moment the alert first fired — `onset + (consecutive_required − 1) × interval` (formatted in `{timezone}`); empty when the run is capped or no interval is wired in (v0.35.0) | recovery |
 | `anomaly_lead` / `recovery_lead` | Ready-made plain-language lead — `"Anomalous for …"` / `"… Incident lasted …"` (falls back to `"Latest X/Y consecutive points met the quorum."` when no interval is wired in) (v0.17.0) | anomaly, recovery |
-| `window_line` | `"Started: … \| Latest/Cleared: …\n"` (or a single `"Detected at: …"` line when the onset is unknown) (v0.17.0) | all |
+| `window_line` | `"Anomaly began: … \| Latest reading: …\n"` (anomaly) / `"Anomaly began: … \| Alert fired: … \| Recovered: …\n"` (recovery), or a single `"Detected at: …"` line when the onset is unknown (v0.17.0; relabeled v0.35.0) | all |
 | `status` | `"ANOMALY"`, `"RECOVERED"`, `"NO_DATA"`, or `"ERROR"` | all (v0.5.0 added NO_DATA / ERROR) |
 | `error_type` / `error_message` | Exception details | error only (v0.5.0) |
 | `description` / `description_line` | Metric description | all |
@@ -254,7 +258,7 @@ Rule: min_detectors=1 · direction=same · consecutive=3
 Value: 0.8532 | Expected: [0.45, 0.62]
 Quorum: 1/1 · up
 Severity: 4.52
-Started: 2026-06-12 14:10:00 (UTC) | Latest: 2026-06-12 14:30:00 (UTC)
+Anomaly began: 2026-06-12 14:10:00 (UTC) | Latest reading: 2026-06-12 14:30:00 (UTC)
 Detectors: MADDetector:threshold=3.0
 Parameters: {"threshold": 3.0, "window_size": 8640}
 ```
@@ -264,4 +268,3 @@ Parameters: {"threshold": 3.0, "window_size": 8640}
 - Check alert formatting
 - Test custom templates
 - Validate channel permissions
-

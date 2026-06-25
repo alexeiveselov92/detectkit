@@ -33,6 +33,20 @@ interface SeriesMsg {
 
 let series: Series | null = null;
 
+/**
+ * Alert-layer direction filter (view only, never touches the band math): when a
+ * direction is chosen, anomalies of the other direction stop counting as flags —
+ * for the dots, the alert runs and the flagged tally alike. Mutates the freshly
+ * scored array in place ('up' keeps 'above', 'down' keeps 'below').
+ */
+function applyDirection(scored: ScoredPoint[], direction: DetectorParams['direction']): void {
+  if (!direction || direction === 'any') return;
+  const want = direction === 'up' ? 'above' : 'below';
+  for (const s of scored) {
+    if (s.isAnomaly && s.direction !== want) s.isAnomaly = false;
+  }
+}
+
 /** One fire index per maximal run of grid-adjacent flagged points reaching `consecutive`. */
 function alertFireIndexes(scored: ScoredPoint[], intervalMs: number, consecutive: number): number[] {
   const fires: number[] = [];
@@ -60,6 +74,7 @@ self.onmessage = (e: { data: unknown }): void => {
   if (msg.type === 'run' && series) {
     const params = msg.params;
     const scored = runDetector(series, params);
+    applyDirection(scored, params.direction);
     const intervalMs = series.intervalSeconds * 1000;
     const fires = alertFireIndexes(scored, intervalMs, params.consecutiveAnomalies);
     const eff = effectiveStartIndex(series, params);

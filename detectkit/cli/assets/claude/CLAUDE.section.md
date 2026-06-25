@@ -37,6 +37,7 @@ version — **read the relevant one on demand** instead of guessing:
 | Choosing/tuning detectors, preprocessing, trends, seasonality | `.claude/rules/detectkit/detectors.md` |
 | Alert rules (quorum/direction/consecutive), cooldown, recovery, templates | `.claude/rules/detectkit/alerting.md` |
 | Auto-tuning a detector (`dtk autotune`), labels file, the `autotune:` block, `_dtk_autotune_runs` | `.claude/rules/detectkit/autotune.md` |
+| Manually/interactively tuning a detector in the browser and writing it back in place (`dtk tune`) | `.claude/rules/detectkit/cli.md` |
 
 ### Skills
 
@@ -48,7 +49,10 @@ version — **read the relevant one on demand** instead of guessing:
   to a YAML file that validates and is ready to run.
 - **Tune / pick a detector, or build an alert from scratch and tune it** — use
   the **`dtk-autotune`** skill; it gathers seasonality + incidents, runs
-  `dtk autotune`, and explains the chosen, annotated config.
+  `dtk autotune`, and explains the chosen, annotated config (an automatic,
+  cross-validated search). For **hands-on** tuning instead, `dtk tune` opens a
+  browser view where you drag the detector's knobs against the real series and
+  write the result back in place (see `cli.md`).
 - **Hit a detectkit bug, or have feedback** — once you've ruled out a local
   config fix (see the gotchas below), use the **`dtk-feedback`** skill to file a
   redacted bug report, feature request, or comment as a GitHub issue on the

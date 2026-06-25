@@ -16,6 +16,7 @@
 
 import { createChart } from '../demo/chart';
 import type {
+  AlertDirection,
   ChartAlert,
   ChartHandle,
   Detrend,
@@ -46,8 +47,8 @@ interface WorkerResult {
 // Payload contract — kept in lockstep with detectkit/tuning/payload.py
 // ---------------------------------------------------------------------------
 
-/** The detector seed (camelCase DetectorParams minus the alert-only knob). */
-type DetectorSeed = Omit<DetectorParams, 'consecutiveAnomalies'>;
+/** The detector seed (camelCase DetectorParams minus the alert-only knobs). */
+type DetectorSeed = Omit<DetectorParams, 'consecutiveAnomalies' | 'direction'>;
 
 interface TunePoint {
   t: number;
@@ -66,13 +67,20 @@ interface TunePayload {
   seasonality_columns: string[];
   detector: DetectorSeed;
   consecutive_anomalies: number;
+  /** alert-layer direction the view filter seeds to ('any' = both). */
+  direction?: AlertDirection;
   /** localhost POST endpoint for Apply; null = static read-only preview. */
   save_url: string | null;
 }
 
 // Per-type interval-width default (mirrors the detector classes / the demo).
-const THRESHOLD_DEFAULT: Record<DetectorType, number> = { mad: 3.0, zscore: 3.0, iqr: 1.5 };
-const MIN_SAMPLES_PER_GROUP_DEFAULT: Record<DetectorType, number> = { mad: 10, zscore: 3, iqr: 4 };
+// Partial: manual_bounds has no threshold / per-group default.
+const THRESHOLD_DEFAULT: Partial<Record<DetectorType, number>> = { mad: 3.0, zscore: 3.0, iqr: 1.5 };
+const MIN_SAMPLES_PER_GROUP_DEFAULT: Partial<Record<DetectorType, number>> = {
+  mad: 10,
+  zscore: 3,
+  iqr: 4,
+};
 
 const ROOT_CLASS = 'dtk-tune';
 
@@ -202,6 +210,15 @@ function rangeControl(
 
 /** Build the snake_case params written to YAML (omitting defaults/none). */
 function applyParams(p: DetectorParams): Record<string, unknown> {
+  if (p.type === 'manual_bounds') {
+    // Stateless thresholds — no window/threshold/weights/etc. Both bounds are
+    // always emitted by the tuner (the controls keep lower < upper).
+    const mb: Record<string, unknown> = {};
+    if (p.lowerBound != null) mb.lower_bound = p.lowerBound;
+    if (p.upperBound != null) mb.upper_bound = p.upperBound;
+    if (p.inputType !== 'values') mb.input_type = p.inputType;
+    return mb;
+  }
   const out: Record<string, unknown> = {
     threshold: p.threshold,
     window_size: p.windowSize,
@@ -226,6 +243,7 @@ function configText(p: DetectorParams, consecutive: number): string {
   for (const [k, v] of Object.entries(ap)) {
     parts.push(`${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`);
   }
+  if (p.direction && p.direction !== 'any') parts.push(`direction=${p.direction}`);
   parts.push(`consecutive_anomalies=${consecutive}`);
   return parts.join('  ·  ');
 }
@@ -274,6 +292,24 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   // ---- mutable parameter state, seeded from the metric's current config -----
   const seed = payload.detector;
   let consecutive = payload.consecutive_anomalies;
+
+  // manual_bounds support: derive the value domain from the REAL series so the
+  // lower/upper sliders have a sensible range, and seed default bounds. If the
+  // metric already uses manual_bounds, its seeded bounds win; otherwise default
+  // to the p5/p95 band so switching to manual_bounds shows feedback immediately.
+  const finiteVals = fullSeries.values.filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
+  const dataMin = finiteVals.length ? finiteVals[0] : 0;
+  const dataMax = finiteVals.length ? finiteVals[finiteVals.length - 1] : 1;
+  const pct = (q: number): number =>
+    finiteVals.length
+      ? finiteVals[Math.min(finiteVals.length - 1, Math.max(0, Math.round(q * (finiteVals.length - 1))))]
+      : 0;
+  const boundPad = Math.max((dataMax - dataMin) * 0.05, 1e-9);
+  const boundMin = dataMin - boundPad;
+  const boundMax = dataMax + boundPad;
+  const boundStep = Math.max((boundMax - boundMin) / 400, 1e-9);
+  const seedLower = seed.lowerBound != null ? seed.lowerBound : pct(0.05);
+  const seedUpper = seed.upperBound != null ? seed.upperBound : pct(0.95);
   // seasonality: each available column is assigned to a group id (0 = off).
   // Columns sharing a group are conjoined into one seasonal key; separate groups
   // apply independent (cumulative) corrections — the full string[][] the detector
@@ -311,6 +347,11 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     minSamplesPerGroup:
       MIN_SAMPLES_PER_GROUP_DEFAULT[detectorCtl.get() as DetectorType] ?? seed.minSamplesPerGroup,
     consecutiveAnomalies: consecutive,
+    direction: directionCtl.get() as AlertDirection,
+    // Read from the bound sliders regardless of type; the windowed detectors
+    // ignore these, the manual_bounds port reads them.
+    lowerBound: lowerBoundCtl.get(),
+    upperBound: upperBoundCtl.get(),
   });
 
   // ---- header ---------------------------------------------------------------
@@ -481,17 +522,51 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       { label: 'MAD', value: 'mad' },
       { label: 'Z-Score', value: 'zscore' },
       { label: 'IQR', value: 'iqr' },
+      { label: 'Manual', value: 'manual_bounds' },
     ],
     seed.type,
     (v) => {
       // reset threshold to the new type's default for a sane starting point
       thresholdCtl_setDefault(THRESHOLD_DEFAULT[v as DetectorType] ?? 3.0);
+      refreshVisibility();
       recompute();
     },
-    'The statistic used for the center/spread of the band: MAD (robust median, ' +
-      'default), Z-Score (mean/std) or IQR (quartiles). All share the same windowing.',
+    'The statistic for the band: MAD (robust median, default), Z-Score (mean/std) or IQR ' +
+      '(quartiles) — all windowed — or Manual (fixed lower/upper thresholds, no window/history).',
   );
   controls.appendChild(detectorCtl.row);
+
+  // manual_bounds: lower/upper threshold sliders (shown only for that detector).
+  // The value domain is the real series range padded a little; both bounds are
+  // always written on Apply (the Python detector requires lower < upper).
+  const lowerBoundCtl = rangeControl(
+    'Lower bound',
+    {
+      min: boundMin,
+      max: boundMax,
+      step: boundStep,
+      value: seedLower,
+      fmt: (v) => fmtNum(v),
+      hint: 'Manual bounds: values below this read as anomalous. Drag in from the data range to ' +
+        'see how many points fall outside (and how many alerts that yields).',
+    },
+    recompute,
+  );
+  controls.appendChild(lowerBoundCtl.row);
+
+  const upperBoundCtl = rangeControl(
+    'Upper bound',
+    {
+      min: boundMin,
+      max: boundMax,
+      step: boundStep,
+      value: seedUpper,
+      fmt: (v) => fmtNum(v),
+      hint: 'Manual bounds: values above this read as anomalous.',
+    },
+    recompute,
+  );
+  controls.appendChild(upperBoundCtl.row);
 
   const thresholdCtl = rangeControl(
     'Threshold (σ-equivalent)',
@@ -541,8 +616,8 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       { label: 'linear', value: 'linear' },
     ],
     seed.windowWeights,
-    (v) => {
-      halfLifeRow.style.display = v === 'exponential' ? '' : 'none';
+    () => {
+      refreshVisibility();
       recompute();
     },
     'Weight recent points in the window more heavily: none (flat), exponential (half-life ' +
@@ -600,9 +675,11 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   // Each column is assigned a group: Off, or G1/G2/G3… Columns sharing a group
   // are conjoined into ONE seasonal key (e.g. dow×hour); separate groups apply
   // independent corrections — the full string[][] grouping the detector supports.
+  let seasonalityRow: HTMLElement | null = null;
   if (payload.seasonality_columns.length) {
     const cols = payload.seasonality_columns;
     const row = el('div', 'dtk-ctl');
+    seasonalityRow = row;
     row.appendChild(
       ctlLabel(
         'Seasonality groups',
@@ -643,6 +720,22 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     controls.appendChild(row);
   }
 
+  // Direction filter (alert-layer / view): which anomalies show + count as alerts.
+  const directionCtl = segControl(
+    'Direction',
+    [
+      { label: 'both', value: 'any' },
+      { label: 'up', value: 'up' },
+      { label: 'down', value: 'down' },
+    ],
+    payload.direction ?? 'any',
+    recompute,
+    'Which anomalies to show and count toward alerts: both directions, only spikes ABOVE the ' +
+      'band (up) or only drops BELOW it (down). A preview filter mirroring the alert direction ' +
+      'policy — it never changes the band itself.',
+  );
+  controls.appendChild(directionCtl.row);
+
   const consecutiveCtl = rangeControl(
     'Alert: consecutive anomalies',
     {
@@ -660,6 +753,27 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     },
   );
   controls.appendChild(consecutiveCtl.row);
+
+  // Show only the controls relevant to the selected detector: the windowed knobs
+  // for MAD/Z-Score/IQR, or the bound sliders for manual_bounds. Direction +
+  // consecutive (alert-layer) are always shown.
+  const windowedRows = [
+    thresholdCtl.row,
+    windowCtl.row,
+    weightsCtl.row,
+    detrendCtl.row,
+    smoothingCtl.row,
+  ];
+  if (seasonalityRow) windowedRows.push(seasonalityRow);
+  function refreshVisibility(): void {
+    const manual = (detectorCtl.get() as DetectorType) === 'manual_bounds';
+    for (const row of windowedRows) row.style.display = manual ? 'none' : '';
+    lowerBoundCtl.row.style.display = manual ? '' : 'none';
+    upperBoundCtl.row.style.display = manual ? '' : 'none';
+    // half-life only when windowed AND exponential weighting.
+    halfLifeRow.style.display = !manual && weightsCtl.get() === 'exponential' ? '' : 'none';
+  }
+  refreshVisibility();
 
   // ---- stat bar + effective config + apply ----------------------------------
   const statBar = el('div', 'dtk-tune-stat');

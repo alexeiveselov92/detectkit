@@ -59,7 +59,12 @@ const TICK_STEPS = [
 
 function niceTimeTicks(lo: number, hi: number, target: number): { ticks: number[]; step: number } {
   const span = Math.max(hi - lo, 1);
-  if (span > target * 28 * MS_D) {
+  // Escalate to calendar months/years once even the coarsest sub-monthly step
+  // (14d, the last TICK_STEPS entry) would exceed the target count — i.e. span >
+  // target*14d. The old threshold (target*28d) left a gap [target*14d, target*28d]
+  // (~3-6 months at target 7) where no sub-monthly step satisfied the target and
+  // the loop fell through to a 14d step, packing ~13 labels in and overlapping.
+  if (span > target * 14 * MS_D) {
     const mSteps = [1, 2, 3, 6, 12, 24, 36, 60, 120, 240];
     let stepM = mSteps[mSteps.length - 1];
     for (const m of mSteps) {
@@ -171,6 +176,26 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     MARGINS.l * dpr + ((ts - tmin) / fullSpan()) * navW();
   const navVy = (v: number): number =>
     navTop() + navPlotH() - ((v - vmin) / (vmax - vmin || 1)) * navPlotH();
+
+  // Which ticks may show a TEXT label without colliding: keep the first, then
+  // keep each only if its x clears the previous kept label by the label width +
+  // a gutter. Gridlines/ticks still draw for every entry; only text is thinned.
+  // A robust backstop for any width/zoom/format (measures with the current font,
+  // so set g.font before calling). Same per-step format ⇒ uniform label width.
+  const labelMask = (ticks: number[], xOf: (t: number) => number, step: number): boolean[] => {
+    const show = new Array<boolean>(ticks.length).fill(false);
+    if (ticks.length === 0) return show;
+    const minGap = g.measureText(fmtAxis(ticks[0], step)).width + 16 * dpr;
+    let lastX = -Infinity;
+    for (let i = 0; i < ticks.length; i++) {
+      const xx = xOf(ticks[i]);
+      if (xx - lastX >= minGap) {
+        show[i] = true;
+        lastX = xx;
+      }
+    }
+    return show;
+  };
 
   const clampNum = (x: number, a: number, b: number): number => Math.max(a, Math.min(b, x));
   const minSpan = (): number => {
@@ -347,7 +372,9 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     if (navigable) {
       // Adaptive vertical time gridlines + round-boundary labels over the view.
       const xtk = niceTimeTicks(xLo(), xHi(), 7);
-      for (const ts of xtk.ticks) {
+      const showLabel = labelMask(xtk.ticks, px, xtk.step);
+      for (let ti = 0; ti < xtk.ticks.length; ti++) {
+        const ts = xtk.ticks[ti];
         const xx = px(ts);
         g.strokeStyle = rgba(faint, 0.1);
         g.lineWidth = 1 * dpr;
@@ -355,6 +382,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
         g.moveTo(xx, MARGINS.t * dpr);
         g.lineTo(xx, mainBot);
         g.stroke();
+        if (!showLabel[ti]) continue;
         g.fillStyle = muted;
         g.textAlign =
           xx < (MARGINS.l + 24) * dpr ? 'left' : xx > canvas.width - (MARGINS.r + 24) * dpr ? 'right' : 'center';
@@ -578,7 +606,9 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     g.font = `${10 * dpr}px ui-monospace, monospace`;
     g.textBaseline = 'top';
     g.fillStyle = muted;
-    for (const ts of otk.ticks) {
+    const showNavLabel = labelMask(otk.ticks, navPx, otk.step);
+    for (let ti = 0; ti < otk.ticks.length; ti++) {
+      const ts = otk.ticks[ti];
       const xx = navPx(ts);
       g.strokeStyle = rgba(faint, 0.25);
       g.lineWidth = 1 * dpr;
@@ -586,6 +616,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       g.moveTo(xx, bot);
       g.lineTo(xx, bot + 3 * dpr);
       g.stroke();
+      if (!showNavLabel[ti]) continue;
       g.textAlign =
         xx < (MARGINS.l + 26) * dpr ? 'left' : xx > canvas.width - (MARGINS.r + 26) * dpr ? 'right' : 'center';
       g.fillText(fmtAxis(ts, otk.step), xx, bot + 5 * dpr);

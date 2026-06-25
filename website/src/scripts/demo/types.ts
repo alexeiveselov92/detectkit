@@ -74,7 +74,11 @@ export type GenerateSeries = (opts: SynthOptions) => Series;
 // Detector (detector.ts) — faithful port of WindowedStatDetector
 // ----------------------------------------------------------------------------
 
-export type DetectorType = 'mad' | 'zscore' | 'iqr';
+export type DetectorType = 'mad' | 'zscore' | 'iqr' | 'manual_bounds';
+/** The windowed statistical detectors (everything except stateless manual_bounds). */
+export type WindowedType = 'mad' | 'zscore' | 'iqr';
+/** Alert-layer direction filter: which anomaly direction counts ('any' = both). */
+export type AlertDirection = 'any' | 'up' | 'down';
 export type InputType = 'values' | 'changes' | 'absolute_changes' | 'log_changes';
 export type Smoothing = 'none' | 'ema' | 'sma';
 export type WindowWeights = 'none' | 'exponential' | 'linear';
@@ -111,6 +115,18 @@ export interface DetectorParams {
    * / alert-timeline overlay, never by the per-point band math.
    */
   consecutiveAnomalies: number;
+  /**
+   * manual_bounds only — the user threshold the value is compared against
+   * (null = that side is open). Ignored by the windowed detectors.
+   */
+  lowerBound?: number | null;
+  upperBound?: number | null;
+  /**
+   * Alert-layer knob (NOT a band parameter): which anomaly direction is counted
+   * as a flag for the alert timeline / dots ('any' = both). Omitted = 'any'.
+   * The per-point band math is unaffected.
+   */
+  direction?: AlertDirection;
 }
 
 export type AnomalyDirection = 'above' | 'below' | null;

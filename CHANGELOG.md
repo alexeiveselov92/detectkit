@@ -5,6 +5,31 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.32.0] - 2026-06-25
+
+### Added
+- **`dtk tune`: a Manual-bounds detector option.** The detector picker now offers
+  **Manual** alongside MAD / Z-Score / IQR. Selecting it swaps the windowed knobs
+  for **Lower bound** / **Upper bound** sliders (seeded from the metric's bounds,
+  or the data's p5/p95 band) so you can drag fixed thresholds against the real
+  series and watch the flagged points — and the resulting alert count — update
+  live. **Apply** writes a stateless `manual_bounds` detector back into the metric
+  YAML (validated, previous version archived). The browser port is parity-checked
+  against the Python `ManualBoundsDetector` (golden vectors).
+- **`dtk tune`: a Direction filter.** A **both / up / down** control restricts
+  which anomalies are shown and counted toward alerts — only spikes above the
+  band (up), only drops below it (down), or both. It is a preview filter (seeded
+  from the metric's alerting `direction`, with `same` reading as `any`) that
+  mirrors the alert direction policy without changing the band.
+
+### Fixed
+- **`dtk tune` chart + autotune incident labeler: overlapping x-axis date
+  labels.** For spans of roughly 3–6 months the adaptive time-tick picker fell
+  into a gap (no sub-monthly step met the target count) and packed ~13 biweekly
+  labels onto the axis, overlapping. The picker now escalates to calendar
+  months/years at the right span, and both the main axis and the navigator strip
+  thin any labels that would still collide (gridlines are unaffected).
+
 ## [0.31.1] - 2026-06-25
 
 ### Added

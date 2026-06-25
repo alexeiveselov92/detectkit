@@ -96,8 +96,45 @@ def test_untunable_type_rejected(tmp_path):
         apply_tuned_config(
             original_path=path,
             project_root=tmp_path,
+            detector_type="prophet",  # not a tunable type
+            detector_params={"foo": 1},
+            now=_FIXED,
+        )
+    assert not (tmp_path / "metrics" / ".history").exists()
+
+
+def test_apply_manual_bounds_swaps_detector(tmp_path):
+    # manual_bounds is tunable: dragging the lower/upper sliders writes a stateless
+    # threshold detector back into the metric (no window/threshold params).
+    path = _project(tmp_path)
+    res = apply_tuned_config(
+        original_path=path,
+        project_root=tmp_path,
+        detector_type="manual_bounds",
+        detector_params={"lower_bound": 5.0, "upper_bound": 95.0},
+        consecutive_anomalies=2,
+        now=_FIXED,
+    )
+    assert res.metric == "orders"
+    body = MetricConfig.from_yaml_file(res.saved)
+    assert len(body.detectors) == 1
+    det = body.detectors[0]
+    assert det.type == "manual_bounds"
+    assert det.params["lower_bound"] == 5.0
+    assert det.params["upper_bound"] == 95.0
+    assert "window_size" not in det.params
+    assert body.alerting[0].consecutive_anomalies == 2
+
+
+def test_apply_manual_bounds_invalid_bounds_rejected(tmp_path):
+    # lower >= upper fails the detector's own validation → writes nothing.
+    path = _project(tmp_path)
+    with pytest.raises(ValueError):
+        apply_tuned_config(
+            original_path=path,
+            project_root=tmp_path,
             detector_type="manual_bounds",
-            detector_params={"lower_bound": 0, "upper_bound": 10},
+            detector_params={"lower_bound": 90.0, "upper_bound": 10.0},
             now=_FIXED,
         )
     assert not (tmp_path / "metrics" / ".history").exists()

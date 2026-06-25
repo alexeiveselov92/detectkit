@@ -255,13 +255,16 @@ function init(): void {
     el.classList.add('on');
   };
 
-  // Fit the y-axis to the DATA, not the confidence band (same as `dtk tune`).
-  // Otherwise widening the Threshold grows the band AND the axis in lockstep, so
-  // the corridor always looks thin — even when it has ballooned past zero and the
+  // navigable: mouse-wheel zoom + drag-to-pan + double-click reset + a bottom
+  // navigator strip, so a dense series (many tight cycles) can be zoomed in to
+  // inspect individual peaks (same control as `dtk tune`).
+  // yFit:'data': fit the y-axis to the DATA, not the confidence band. Otherwise
+  // widening the Threshold grows the band AND the axis in lockstep, so the
+  // corridor always looks thin — even when it has ballooned past zero and the
   // metric is effectively useless. With data-fit the band visibly widens (and
   // clips past the plot edges) as you raise the threshold, so the real trade-off —
   // fewer flags, but an ever-wider, eventually-meaningless band — is on screen.
-  const chart = createChart(canvas, { onHover, yFit: 'data' });
+  const chart = createChart(canvas, { onHover, yFit: 'data', navigable: true });
 
   let currentSeries: Series | null = null;
 

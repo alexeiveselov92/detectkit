@@ -5,6 +5,22 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.36.2] - 2026-06-25
+
+### Fixed
+- **`dtk tune` loaded the entire history (and hung the recompute) when a metric
+  had many saved incidents.** The 0.36.0 window-widening pulled the loaded window
+  back to the *earliest* seeded incident, so a single old outlier among the
+  incidents dragged in the whole series (e.g. 33k points instead of the budgeted
+  ~9k) and the client-side recompute — O(points × window) — never finished. The
+  window is now kept **budget-sized** (`default_window_points`) and **anchored on
+  the incident region**: it ends just past the *latest* incident (with a few
+  windows of recovery context) rather than at the last datapoint, so recent
+  incidents still render and score while the load stays bounded. Incidents older
+  than the loaded window remain in the list (and are excluded from the live
+  metrics); use `--from`/`--to` to tune against a specific older window. Removes
+  the now-unreachable `_TUNE_INCIDENT_MAX_POINTS` ceiling.
+
 ## [0.36.1] - 2026-06-25
 
 ### Fixed

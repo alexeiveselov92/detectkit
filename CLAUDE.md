@@ -51,8 +51,9 @@ rendered on the docs site under **For developers**). Read the relevant one:
   **Save incidents** writes versioned `incidents/<metric>/*.yml` (the same store
   `dtk autotune` reads, including the painted `capture_windows`) via a
   `POST /labels` endpoint, reusing `autotune/labels.py`. Seeded incidents from that
-  store are loaded with the **window widened to cover them** (so older ones still
-  render and score). A **y = 0 reference line** toggle is shared with
+  store **anchor the (budget-sized) loaded window** — it ends just past the latest
+  incident rather than at the last datapoint, so they render/score without an old
+  outlier dragging the whole history in. A **y = 0 reference line** toggle is shared with
   `dtk run --report`. Committed bundle `assets/tune.js` (built by
   `website/scripts/gen-tune-bundle.mjs`) ships in the wheel — regenerate it when
   the renderer TS changes. Takes no pipeline lock.

@@ -608,10 +608,12 @@ autotune ignores it). **Save incidents** POSTs to the server's `/labels` endpoin
 which writes a versioned `incidents/<metric>/<…>.yml` — the **same store
 `dtk autotune` reads**, so a labeling round here also feeds the next supervised
 autotune; the command seeds the labeler (incidents **and** capture windows) from
-the newest file in that directory on open, and `build_tune_payload` **widens the
-loaded window back to cover the seeded incidents** (capped at
-`_TUNE_INCIDENT_MAX_POINTS`) so an incident older than the recent default slice
-still renders and counts instead of showing only in the list. The whole labels stack (schema, validation, versioned filenames) is shared
+the newest file in that directory on open, and `build_tune_payload` **anchors the
+(still budget-sized) loaded window on the seeded incidents** — ending it just past
+the *latest* incident rather than at the last datapoint — so they render and count
+without a single old outlier incident dragging the whole history in (which would
+blow the recompute budget and hang the page); incidents older than the bounded
+window stay list-only and are excluded from the live metrics. The whole labels stack (schema, validation, versioned filenames) is shared
 with the autotune labeler via `autotune/labels.py` (`parse_incident_labels`,
 `incidents_to_display`, `newest_labels_file`, `versioned_labels_path`). A **y = 0
 reference line** toggle (shared chart `showZeroLine` + `setZeroLine`, also on
@@ -626,10 +628,10 @@ Three pure-ish pieces + a server:
   config (camelCased to seed the controls, including any `manual_bounds` lower/upper)
   + the alert `consecutive_anomalies` and seeded `direction` + seeded `incidents`
   and `capture_windows`** (newest `incidents/<metric>/` file → display dicts) into a
-  JSON payload — everything the client port needs to *recompute*. When seeded
-  incidents fall outside the recent default slice it **pulls the loaded window back
-  to cover them** (clamped to the first datapoint and `_TUNE_INCIDENT_MAX_POINTS`),
-  so they render and score. It bakes **no** precomputed
+  JSON payload — everything the client port needs to *recompute*. With seeded
+  incidents it **anchors the budget-sized window on the incident region** (ending
+  just past the latest incident via `_incident_span`, clamped to the first
+  datapoint) so they render and score while the load stays bounded. It bakes **no** precomputed
   detection (the browser runs the detector itself). `labels_save_url` (like
   `save_url`) is injected by the server.
 - `html.render_tune_html(payload)` inlines `assets/tune.js` + the payload into one

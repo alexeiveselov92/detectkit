@@ -129,9 +129,11 @@ mark the **real incidents** on the same series:
   real incidents.
 
 Already-saved incidents are seeded from the newest file in `incidents/<metric>/`
-when `dtk tune` opens, and the loaded window is **widened to include them** (an
-incident older than the recent default slice still renders and counts), so the
-metrics below reflect every labeled incident in view.
+when `dtk tune` opens, and the (budget-sized) loaded window is **anchored on your
+incidents** — it ends just past the latest one rather than at the last datapoint —
+so they render and count without loading the whole history (which would make
+recompute crawl). Incidents older than the loaded window stay in the list but
+aren't scored; pass `--from`/`--to` to tune against a specific older window.
 
 As you turn the detector knobs, a **metrics bar** at the top recomputes two
 operator-facing numbers:

@@ -35,11 +35,6 @@ _TUNE_MAX_POINTS = 15000
 # scored region (the band never reaches its real width). Floor the shown points
 # at this many windows so the seeded window is actually exercised in the preview.
 _TUNE_WINDOW_COVERAGE = 3
-# Hard ceiling on the loaded point count when seeded incidents pull the window
-# back far into history — keeps a pathological (e.g. minute-grained, multi-year)
-# series from bloating the page. Any incident still left older than this slice
-# stays in the list but the client metrics ignore it (it cannot be scored).
-_TUNE_INCIDENT_MAX_POINTS = 60_000
 
 
 def default_window_points(seed_window: int) -> int:
@@ -82,25 +77,34 @@ def _normalize_seasonality_components(
     return groups or None
 
 
-def _earliest_incident_start(incidents: list[dict[str, str]]) -> datetime | None:
-    """Earliest incident start (naive UTC) among seeded display dicts, or ``None``.
+def _incident_span(incidents: list[dict[str, str]]) -> tuple[datetime, datetime] | None:
+    """``(earliest start, latest end)`` (naive UTC) over seeded display dicts, or ``None``.
 
     The display dicts carry ``"YYYY-MM-DD HH:MM:SS"`` naive-UTC strings (see
     ``autotune.labels.incidents_to_display``), matching the naive datetimes the
     builder compares against the loaded series bounds.
     """
-    earliest: datetime | None = None
-    for inc in incidents:
-        raw = inc.get("start")
+
+    def _parse(raw: Any) -> datetime | None:
         if not raw:
-            continue
+            return None
         try:
-            dt = datetime.strptime(str(raw), "%Y-%m-%d %H:%M:%S")
+            return datetime.strptime(str(raw), "%Y-%m-%d %H:%M:%S")
         except ValueError:
-            continue
-        if earliest is None or dt < earliest:
-            earliest = dt
-    return earliest
+            return None
+
+    earliest: datetime | None = None
+    latest: datetime | None = None
+    for inc in incidents:
+        start = _parse(inc.get("start"))
+        end = _parse(inc.get("end")) or start
+        if start is not None and (earliest is None or start < earliest):
+            earliest = start
+        if end is not None and (latest is None or end > latest):
+            latest = end
+    if earliest is None or latest is None:
+        return None
+    return earliest, latest
 
 
 def _seed_detector(metric_config: MetricConfig) -> dict[str, Any]:
@@ -182,10 +186,12 @@ def build_tune_payload(
     (``default_window_points``), not the whole history.
 
     ``incidents`` seeds the synced labeler with already-marked spans (display dicts
-    ``{start, end, label}`` from ``incidents_to_display``). When seeded incidents
-    fall outside the recent default slice, the loaded window is pulled back to
-    cover them so they render on the chart and count toward the live recall/FDR
-    metrics (an explicit ``start``/``--from`` is still honored verbatim).
+    ``{start, end, label}`` from ``incidents_to_display``). When incidents are
+    seeded the (still budget-sized) window is anchored on the incident region — it
+    ends just past the latest incident rather than at the last datapoint — so they
+    render on the chart and count toward the live recall/FDR metrics, while the
+    window stays bounded (a single old outlier incident can't pull the whole
+    history in). An explicit ``start``/``--from`` is still honored verbatim.
     ``capture_windows`` seeds the threshold-capture regime scope (display dicts
     ``{start, end}``). ``labels_save_url`` (the POST endpoint for **Save
     incidents**) is injected by the server, like ``save_url`` — it is ``None`` here.
@@ -208,29 +214,29 @@ def build_tune_payload(
     if start is None and end is not None:
         first = internal.get_first_datapoint_timestamp(name)
         default_points = default_window_points(int(seed["windowSize"]))
-        lookback = end - timedelta(seconds=interval_seconds * default_points)
-        # Pull the window back to cover any seeded incidents so they actually
-        # render on the chart and can be scored — otherwise an incident older than
-        # the recent default slice shows in the list but never on the chart, and
-        # never counts toward recall/FDR. Give the earliest incident a few windows
-        # of leading context so the detector's trailing window can fill there.
-        earliest = _earliest_incident_start(seed_incidents)
-        if earliest is not None:
-            # The DB backend may return tz-aware timestamps (end/first) while
-            # incident display strings parse to naive UTC; align earliest to end's
-            # awareness (both represent UTC) so the comparison below is valid.
-            if end.tzinfo is not None and earliest.tzinfo is None:
-                earliest = earliest.replace(tzinfo=end.tzinfo)
-            elif end.tzinfo is None and earliest.tzinfo is not None:
-                earliest = earliest.replace(tzinfo=None)
-            context_points = max(_TUNE_WINDOW_COVERAGE * int(seed["windowSize"]), 200)
-            lookback = min(
-                lookback, earliest - timedelta(seconds=interval_seconds * context_points)
+        budget = timedelta(seconds=interval_seconds * default_points)
+        # When incidents are seeded, ANCHOR the (still budget-sized) window on the
+        # incident region instead of always ending at the last datapoint, so the
+        # incidents render and can be scored. Crucially the window stays bounded:
+        # the end is pulled back to just past the LATEST incident (a few windows of
+        # recovery context) only when that is older than the last datapoint, so a
+        # single old outlier incident can't drag the whole history in — it would
+        # blow the recompute budget (the page hangs). Incidents older than the
+        # bounded window stay in the list and are excluded from the live metrics.
+        span = _incident_span(seed_incidents)
+        if span is not None:
+            _, latest = span
+            # Align awareness to end (both represent UTC) so the comparison is valid
+            # on backends that return tz-aware timestamps.
+            if end.tzinfo is not None and latest.tzinfo is None:
+                latest = latest.replace(tzinfo=end.tzinfo)
+            elif end.tzinfo is None and latest.tzinfo is not None:
+                latest = latest.replace(tzinfo=None)
+            context = timedelta(
+                seconds=interval_seconds * max(_TUNE_WINDOW_COVERAGE * int(seed["windowSize"]), 200)
             )
-        # Clamp to a hard point ceiling (a pathological history can't bloat the
-        # page) and to the first datapoint.
-        ceiling = end - timedelta(seconds=interval_seconds * _TUNE_INCIDENT_MAX_POINTS)
-        start = max(lookback, ceiling)
+            end = min(end, latest + context)
+        start = end - budget
         if first is not None:
             start = max(start, first)
 

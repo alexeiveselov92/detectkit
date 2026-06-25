@@ -101,8 +101,10 @@ fall outside any real incident ("≈1 in N false"); only incidents within the lo
 window are scored. **Save incidents** writes a
 versioned `incidents/<metric>/*.yml` — the same store `dtk autotune` reads, so the
 same labels feed the next supervised tune (it seeds from the newest file on open,
-**widening the loaded window to cover seeded incidents** so older ones still render
-and count). Saving incidents does not end the session; only **Apply** does. A
+**anchoring the budget-sized loaded window on the seeded incidents** — ending just
+past the latest one rather than at the last datapoint — so they render/count
+without an old outlier pulling the whole history in). Saving incidents does not end
+the session; only **Apply** does. A
 **y = 0 line** toggle (shared with `dtk run --report`) shows the metric relative to zero.
 
 Safe write-back: the config is validated before anything is written, the previous

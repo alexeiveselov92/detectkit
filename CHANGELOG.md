@@ -5,6 +5,18 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.39.2] - 2026-06-27
+
+### Changed
+- **`dtk tune` colour legend moved to the top, visible in every mode.** The chart
+  colour key (alert markers — **red** fired / **green** confirmed valid / **slate**
+  false alarm — plus anomaly dot, metric line, expected range and band centre) was
+  in the stage footer below the chart, where it was easy to miss. It is now a pinned
+  legend bar **directly under the HUD, above the chart**, leading with the three
+  alert colours, so the marker colours are decoded almost immediately — and because
+  it lives in the stage (not the mode-aware rail) it stays put across **Tune /
+  Review / Label**. Regenerated `detectkit/tuning/assets/tune.js`.
+
 ## [0.39.1] - 2026-06-27
 
 ### Changed

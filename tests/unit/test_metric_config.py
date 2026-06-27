@@ -478,6 +478,25 @@ class TestAlertConfigDashboardLinks:
             AlertConfig(links={"x": "data:text/html,<script>"})
 
 
+class TestMetricFalseAlertBudget:
+    """Per-metric false-alert-rate budget for the `dtk tune` quality bar."""
+
+    def _m(self, **kw):
+        return MetricConfig(name="orders", interval="1h", query="SELECT 1", **kw)
+
+    def test_default_is_none(self):
+        assert self._m().false_alert_budget is None
+
+    def test_valid_fraction_accepted(self):
+        assert self._m(false_alert_budget=0.3).false_alert_budget == 0.3
+        assert self._m(false_alert_budget=1.0).false_alert_budget == 1.0
+
+    def test_out_of_range_rejected(self):
+        for bad in (0.0, -0.1, 1.5):
+            with pytest.raises(ValueError, match="false_alert_budget"):
+                self._m(false_alert_budget=bad)
+
+
 class TestAutoTuneInlineIncidents:
     """Inline incidents on the autotune block (alternative to labels_file)."""
 

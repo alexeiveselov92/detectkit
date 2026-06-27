@@ -31,10 +31,16 @@ timeouts:                      # per-step, seconds
   alert: 300                   # alert step (default 300)
 
 alert_help_url: null           # optional, see below — "How to read this alert" link
+false_alert_budget: null       # optional — `dtk tune` target FDR (0,1]; per-metric override wins
 
 error_alerting:                # optional, see below
   enabled: false
 ```
+
+`false_alert_budget` is a project-wide **target false-alert rate** (a fraction in
+`(0, 1]`, e.g. `0.3` = 30%) for manual tuning: the `dtk tune` cockpit gently flags a
+metric when its false-alert rate exceeds it. A per-metric `false_alert_budget`
+overrides it; unset → a built-in `0.5`. Tuning-only — it never touches the pipeline.
 
 ### `alert_help_url` — "How to read this alert" link
 

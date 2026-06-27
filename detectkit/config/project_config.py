@@ -196,6 +196,30 @@ class ProjectConfig(BaseModel):
             "or false to hide it."
         ),
     )
+    # Project-wide default false-alert-rate (FDR) budget for manual tuning. The
+    # `dtk tune` cockpit flags — non-intrusively — when the share of fired alerts
+    # that don't overlap a real incident exceeds this fraction, so you have a
+    # target to tune against. A per-metric `false_alert_budget` overrides it.
+    # Labeling stays optional: the budget only colours an already-computed number,
+    # it never blocks anything or affects the load/detect/alert pipeline.
+    false_alert_budget: float | None = Field(
+        default=None,
+        description=(
+            "Default false-alert-rate budget (a fraction in (0, 1], e.g. 0.3 = "
+            "30%) the `dtk tune` cockpit flags when exceeded. Per-metric "
+            "`false_alert_budget` takes priority; unset → a built-in default."
+        ),
+    )
+
+    @field_validator("false_alert_budget")
+    @classmethod
+    def validate_false_alert_budget(cls, v: float | None) -> float | None:
+        """A budget, if set, is a false-alert-rate fraction in ``(0, 1]``."""
+        if v is None:
+            return v
+        if not 0.0 < v <= 1.0:
+            raise ValueError("false_alert_budget must be a fraction in (0, 1] (e.g. 0.3 = 30%)")
+        return v
 
     @field_validator("alert_help_url")
     @classmethod

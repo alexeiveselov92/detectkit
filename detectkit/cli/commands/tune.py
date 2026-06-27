@@ -93,6 +93,11 @@ def run_tune(
 
     from_dt = parse_date(from_date) if from_date else None
     to_dt = parse_date(to_date) if to_date else None
+    # False-alert-rate budget for the cockpit's quality bar: metric overrides
+    # project; the builder falls back to a built-in default when both are unset.
+    budget = config.false_alert_budget
+    if budget is None:
+        budget = getattr(project_config, "false_alert_budget", None)
     # The builder resolves the window itself (recent ~TUNE_DEFAULT_POINTS by
     # default, or the explicit --from/--to span) and reads only that slice — no
     # need to pull the whole history just to find the bounds.
@@ -105,6 +110,7 @@ def run_tune(
         incidents=preload_incidents,
         capture_windows=preload_capture,
         alert_reviews=preload_reviews,
+        false_alert_budget=budget,
     )
     n_points = len(payload["points"])
     if n_points == 0:

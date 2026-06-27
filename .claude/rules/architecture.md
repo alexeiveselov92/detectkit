@@ -624,21 +624,36 @@ about reviews, reading the verdict from the marker's `kind` —
 `anomaly`/`anomaly-validated`/`anomaly-false`, colored red/green/slate via the
 `drawAlertMarkers` color closure). `tune.ts` stores verdicts by **streak span**
 (`reviews[]`, re-bound to the moved alerts by overlap on each recompute) and rebuilds
-the alert `kind`s. A confirmed **valid** alert is the user asserting a real incident
-happened there: its span folds into the ground-truth set as a **virtual incident**, so
-`computeQuality` counts it caught (recall) + correct (FDR) with no extra scoring code
-(no hand-drawn span needed), and it is written as a normal incident on **Save**
-(feeding the next supervised autotune); a `false` verdict stays a false alarm. A
-**Confirm all unreviewed valid** button does the lot; the metrics bar gains a
-**reviewed N/M** chip; verdicts persist as an `alert_reviews:` metadata block
+the alert `kind`s. **Confirming an alert valid IS marking an incident** there: a valid
+verdict is the user asserting a real incident happened in that span, so it is a
+first-class **ground-truth incident** — `validatedSpans()` derives one per valid
+review **from the stored verdict span** (NOT the current `lastFireSpans`, so a
+confirmed incident stays scored even when the detector no longer fires there — then it
+correctly registers as a recall *miss*). `validatedExtra()` drops any validated span
+already covered by a hand-marked incident (overlap dedup); `groundTruth()` =
+`incidents` ∪ `validatedExtra()` is what the **Marked-incidents list** and **Save**
+read, so confirmed alerts appear in the list (a read-only "✓ confirmed alert" row
+whose ✕ clears the verdict via `unconfirmAlert`) and are written as incidents on Save
+(feeding the next supervised autotune) with no double-count after a Save→reopen. The
+live metrics build the **same** union but **window-filter first** and dedup the
+confirmed spans against only the in-window incidents (not the full set), so trimming a
+hand-marked incident out of the active window can't silently drop an overlapping
+in-window confirmed span from recall. A `false` verdict stays
+a false alarm. A **Confirm all unreviewed valid** button does the lot; the metrics bar
+gains a **reviewed N/M** chip; verdicts persist as an `alert_reviews:` metadata block
 (`autotune/labels.py` parses it like `capture_windows`; autotune ignores it).
 
 A prominent **metrics bar** recomputes as you tune from the worker's fired-alert
-**streak spans** vs the ground-truth incidents (marked **+ validated**): **incident
+**streak spans** vs `groundTruth()` (marked incidents **+** confirmed-valid alerts,
+overlap-deduped): **incident
 catch rate (recall)** = incidents whose span **overlaps** an alert's anomaly streak /
 total, and **false-alert rate (FDR)** = alerts whose streak overlaps no incident and
 aren't confirmed valid / total (shown as `%` and "≈1 in N false", kept to one decimal
-below 10 so a mostly-false rate doesn't round to a misleading "1 in 1"). Matching on
+below 10 so a mostly-false rate doesn't round to a misleading "1 in 1"). An optional
+**false-alert budget** — `false_alert_budget` resolved metric → project → built-in
+`0.5` (`DEFAULT_FALSE_ALERT_BUDGET`), baked into the payload — gently marks the
+false-alert chip (`▲ over N% budget`) when the FDR exceeds it; it is tuning-only
+(labeling stays optional, the pipeline is untouched). Matching on
 the whole streak span (not just the fire instant, which lands `consecutive-1` intervals
 into the streak) is the recall-undercount fix: `tune.worker.ts` returns a `fireSpans`
 array (the maximal grid-adjacent flagged run per fire) alongside `fires`, and

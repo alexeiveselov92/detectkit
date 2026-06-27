@@ -816,9 +816,12 @@ to it:
   a point for its window).
 - **Review** — confirm the fired alerts: **click an alert marker** to cycle its
   verdict un-reviewed (red) → **valid** (green) → **false alarm** (slate); **Confirm
-  all unreviewed valid** does the lot. A confirmed alert asserts a real incident
-  happened there — it counts toward recall + correct (so a clean metric is validated
-  in a few clicks **without drawing spans**) and is written as an incident on Save.
+  all unreviewed valid** does the lot. **Confirming an alert valid IS marking an
+  incident** — the confirmed streak becomes a first-class incident that shows in the
+  **Marked incidents** list (a "✓ confirmed alert" row; remove it to un-confirm),
+  counts toward recall + correct (so a clean metric is validated in a few clicks
+  **without drawing spans**), and is written as an incident on Save. The list, the
+  metrics and Save share one ground-truth set (marked spans + confirmed alerts).
 - **Label** — mark real incidents: **drag** a span (edges/middle to adjust, ✕/Delete
   to remove), **Lasso anomalies** (loop a cloud of anomaly dots — each consecutive
   run, gaps bridged up to `consecutive_anomalies`, becomes one span sized to the
@@ -832,7 +835,10 @@ ground-truth incidents (marked + confirmed-valid alerts) caught by an alert (cau
 when an alert's anomaly **streak overlaps** it, not just the fire instant) —
 **false-alert rate** — the share of fired alerts outside every incident and not
 confirmed valid ("≈1 in N false") — and **reviewed N/M**; only incidents within the
-loaded window are scored. **Save incidents** writes
+loaded window are scored. An optional **false-alert budget** (`false_alert_budget`, a
+fraction in `(0, 1]` on the **metric** then **project**, default `0.5`) gently flags
+the false-alert chip when the rate exceeds it — tuning-only, labeling stays optional.
+**Save incidents** writes
 a versioned `incidents/<metric>/<…>.yml`, the **same store
 [`dtk autotune`](#dtk-autotune) reads** (it seeds incidents *and* capture windows
 from the newest such file on open, **anchoring the budget-sized loaded window on

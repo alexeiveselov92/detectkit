@@ -612,7 +612,30 @@ class MetricConfig(BaseModel):
     autotune: AutoTuneConfig | None = Field(
         default=None, description="Optional auto-tuning constraints (for `dtk autotune`)"
     )
+    # Per-metric false-alert-rate (FDR) budget for manual tuning, overriding the
+    # project-wide `false_alert_budget`. The `dtk tune` cockpit flags — non
+    # intrusively — when the share of fired alerts that don't overlap a real
+    # incident exceeds this fraction. Tuning-only: it never affects load/detect/
+    # alert and labeling stays optional.
+    false_alert_budget: float | None = Field(
+        default=None,
+        description=(
+            "False-alert-rate budget (a fraction in (0, 1], e.g. 0.3 = 30%) the "
+            "`dtk tune` cockpit flags when exceeded. Overrides the project-wide "
+            "default; unset → fall back to project, then a built-in default."
+        ),
+    )
     enabled: bool = Field(default=True, description="Whether metric is enabled")
+
+    @field_validator("false_alert_budget")
+    @classmethod
+    def validate_false_alert_budget(cls, v: float | None) -> float | None:
+        """A budget, if set, is a false-alert-rate fraction in ``(0, 1]``."""
+        if v is None:
+            return v
+        if not 0.0 < v <= 1.0:
+            raise ValueError("false_alert_budget must be a fraction in (0, 1] (e.g. 0.3 = 30%)")
+        return v
 
     # Parsed interval (computed from string/int)
     _interval: Interval | None = None

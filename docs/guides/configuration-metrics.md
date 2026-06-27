@@ -457,6 +457,22 @@ tables:
 See the [Internal Tables reference](../reference/internal-tables.md) for the full
 schema (columns, primary keys, engines) of every `_dtk_*` table.
 
+### Tuning aids
+
+#### `false_alert_budget` (float, optional)
+
+A **target false-alert rate** (FDR) for this metric — a fraction in `(0, 1]`, e.g.
+`0.3` for "at most 30% of fired alerts should be false". The [`dtk tune`](tuning.md)
+cockpit flags, gently, when the metric's false-alert rate exceeds this budget.
+
+```yaml
+false_alert_budget: 0.3
+```
+
+Overrides the project-wide `false_alert_budget`; unset, the project default (then a
+built-in `0.5`) applies. Tuning-only — it never affects the load/detect/alert
+pipeline, and labeling stays optional.
+
 ## Complete Examples
 
 ### Simple Metric

@@ -7,6 +7,7 @@ import numpy as np
 from detectkit.config.metric_config import MetricConfig
 from detectkit.tuning.html import render_tune_html
 from detectkit.tuning.payload import (
+    DEFAULT_FALSE_ALERT_BUDGET,
     _normalize_seasonality_components,
     _seed_detector,
     _seed_direction,
@@ -284,6 +285,34 @@ def test_payload_includes_capture_windows_seed():
         metric_config=_metric(), internal=FakeInternal(), capture_windows=capture
     )
     assert payload["capture_windows"] == capture
+
+
+def test_payload_false_alert_budget_defaults_when_unset():
+    # No budget passed → the built-in default is baked, so the cockpit always has a
+    # number to flag against.
+    payload = build_tune_payload(metric_config=_metric(), internal=FakeInternal())
+    assert payload["false_alert_budget"] == DEFAULT_FALSE_ALERT_BUDGET
+
+
+def test_payload_false_alert_budget_honored_when_passed():
+    payload = build_tune_payload(
+        metric_config=_metric(), internal=FakeInternal(), false_alert_budget=0.2
+    )
+    assert payload["false_alert_budget"] == 0.2
+
+    # ...and on the empty (no-datapoints) payload path too.
+    class Empty(FakeInternal):
+        def load_datapoints(self, name, from_timestamp=None, to_timestamp=None):
+            return {
+                "timestamp": np.array([], dtype="datetime64[ms]"),
+                "value": np.array([], dtype=float),
+                "seasonality_data": np.array([], dtype=object),
+                "seasonality_columns": [],
+            }
+
+    empty = build_tune_payload(metric_config=_metric(), internal=Empty(), false_alert_budget=0.2)
+    assert empty["points"] == []
+    assert empty["false_alert_budget"] == 0.2
 
 
 class _WindowRecording(FakeInternal):

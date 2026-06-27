@@ -194,3 +194,19 @@ alert_help_url: https://wiki.example.com/runbooks/reading-detectkit-alerts
   (`"How to read this alert: <url>\n"`, empty when unset), mirroring the
   existing `{dashboard_url}` / `{dashboard_line}`.
 
+#### `false_alert_budget` (float, optional)
+
+A project-wide **target false-alert rate** (FDR) for manual tuning — a fraction in
+`(0, 1]`, e.g. `0.3` for "at most 30% of fired alerts should be false". The
+[`dtk tune`](tuning.md) cockpit flags, gently, when a metric's false-alert rate
+exceeds this budget. A per-metric `false_alert_budget` overrides it; unset, a lax
+built-in default of `0.5` is used.
+
+```yaml
+# detectkit_project.yml
+false_alert_budget: 0.3
+```
+
+This is purely a tuning aid — it only annotates a number you can already see in the
+cockpit; it never affects the load/detect/alert pipeline.
+

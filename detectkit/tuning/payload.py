@@ -60,6 +60,11 @@ _MIN_SAMPLES_PER_GROUP_DEFAULT = {"mad": 10, "zscore": 3, "iqr": 4}
 # detectors plus the stateless manual_bounds (lower/upper threshold) detector.
 _TUNABLE_TYPES = ("mad", "zscore", "iqr", "manual_bounds")
 
+# Built-in false-alert-rate budget used by the cockpit's quality bar when neither
+# the metric nor the project sets one. Lax on purpose (warn only when more than
+# half the alerts are false) — a per-metric/project `false_alert_budget` tightens it.
+DEFAULT_FALSE_ALERT_BUDGET = 0.5
+
 
 def _normalize_seasonality_components(
     components: list[str | list[str]] | None,
@@ -178,6 +183,7 @@ def build_tune_payload(
     incidents: list[dict[str, str]] | None = None,
     capture_windows: list[dict[str, str]] | None = None,
     alert_reviews: list[dict[str, str]] | None = None,
+    false_alert_budget: float | None = None,
 ) -> dict[str, Any]:
     """Assemble the interactive tuning payload from the persisted ``_dtk_datapoints``.
 
@@ -200,6 +206,7 @@ def build_tune_payload(
     seed_incidents = incidents or []
     seed_capture = capture_windows or []
     seed_reviews = alert_reviews or []
+    fa_budget = false_alert_budget if false_alert_budget is not None else DEFAULT_FALSE_ALERT_BUDGET
     name = metric_config.name
     interval = metric_config.get_interval()
     interval_seconds = interval.seconds
@@ -263,6 +270,7 @@ def build_tune_payload(
         "incidents": seed_incidents,
         "capture_windows": seed_capture,
         "alert_reviews": seed_reviews,
+        "false_alert_budget": fa_budget,
         "labels_save_url": None,
     }
     if start is None or end is None:
@@ -305,5 +313,6 @@ def build_tune_payload(
         "incidents": seed_incidents,
         "capture_windows": seed_capture,
         "alert_reviews": seed_reviews,
+        "false_alert_budget": fa_budget,
         "labels_save_url": None,
     }

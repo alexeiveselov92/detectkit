@@ -5,6 +5,33 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.40.0] - 2026-06-27
+
+### Added
+- **`dtk tune`: confirmed alerts now show up as incidents, and an optional
+  false-alert budget.** Two connected changes to the manual-tuning cockpit:
+  - **Confirming an alert *is* marking an incident.** A **valid** alert (the green
+    markers from Review mode) is now a first-class entry in the **Marked incidents**
+    list — a "✓ confirmed alert" row you can focus or remove (removing it un-confirms
+    the alert). The list, the live **recall / false-alert** metrics, and **Save
+    incidents** all read one ground-truth set (hand-marked spans **plus**
+    confirmed-valid alerts, deduped by overlap so neither is counted twice), so
+    "validate the alerts" is simply a fast way to label incidents — no hand-drawn span
+    needed, and what you confirmed is exactly what gets saved. Confirmed-valid spans
+    are now derived from the **stored verdict** rather than the current fire, so a
+    confirmed incident stays in the ground truth (and correctly registers as a recall
+    *miss*) even if you then tune the detector so it no longer fires there. Fixes a
+    latent double-count after a Save→reopen (the same incident was seeded as both an
+    incident and a review).
+  - **Optional false-alert-rate (FDR) budget.** New `false_alert_budget` config (a
+    fraction in `(0, 1]`, e.g. `0.3` = 30%) on a **metric** (priority) and the
+    **project** (default); unset → a built-in default of `0.5`. The quality bar
+    flags — gently, non-intrusively — when your false-alert rate exceeds the budget
+    (the "false alerts" chip turns and reads `▲ over 30% budget`). Labeling stays
+    entirely optional and the budget never affects the load/detect/alert pipeline — it
+    only colours an already-computed number, so you can ignore it or label a short
+    window to put a number on your error. Regenerated `detectkit/tuning/assets/tune.js`.
+
 ## [0.39.2] - 2026-06-27
 
 ### Changed

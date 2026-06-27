@@ -104,17 +104,23 @@ the lot), and **Label** (band hides; **mark the real incidents** by drag, **Lass
 anomalies** — loop a cloud of anomaly dots, each consecutive run, gaps bridged up to
 `consecutive_anomalies`, becomes one span — or **Threshold capture** every span past
 a horizontal line, each widened to a full interval so the alert lands inside; the
-painted window saves as `capture_windows`). A confirmed (valid) alert is the user
-asserting a real incident happened there — it folds in as a virtual incident (counts
-toward recall + correct) so a clean metric whose alerts are all good is validated in
-a few clicks **without hand-drawing spans**, and is written as an incident on Save.
+painted window saves as `capture_windows`). **Confirming an alert valid IS marking an
+incident**: the confirmed streak becomes a first-class **ground-truth incident** that
+shows in the Marked-incidents list (a read-only "✓ confirmed alert" row; its ✕
+un-confirms the alert), counts toward recall + correct, and is written on Save — so a
+clean metric whose alerts are all good is validated in a few clicks **without
+hand-drawing spans**. The list, the live metrics and Save share **one** ground-truth
+set (hand-marked spans **plus** confirmed-valid alerts, deduped by overlap).
 As you tune, a metrics bar shows **incident catch rate (recall)** — how many
-ground-truth incidents (marked + validated) your config catches (an incident is
+ground-truth incidents (marked + confirmed) your config catches (an incident is
 caught when an alert's anomaly **streak overlaps** it, not just the fire instant) —
 **false-alert rate** (what share of alerts fall outside any incident and aren't
 confirmed valid; "≈1 in N false", a decimal so a mostly-false rate doesn't round to
 a misleading "1 in 1") — and **reviewed N/M**; only incidents within the loaded
-window are scored. **Save incidents** writes a
+window are scored. An optional **false-alert budget** (`false_alert_budget`, a
+fraction in `(0, 1]`, on the **metric** then **project**, default `0.5`) gently flags
+the false-alert chip when the rate exceeds it (tuning-only; labeling stays optional).
+**Save incidents** writes a
 versioned `incidents/<metric>/*.yml` — the same store `dtk autotune` reads, so the
 same labels feed the next supervised tune (it seeds from the newest file on open,
 **anchoring the budget-sized loaded window on the seeded incidents** — ending just

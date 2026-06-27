@@ -54,7 +54,14 @@ alerting:                      # optional — see alerting.md
 tables:                        # optional — per-metric internal table overrides
   datapoints: _dtk_datapoints_api
   detections: _dtk_detections_api
+
+false_alert_budget: 0.3        # optional — `dtk tune` target false-alert rate (0,1]; overrides project
 ```
+
+`false_alert_budget` is a per-metric **target false-alert rate** (a fraction in
+`(0, 1]`) the `dtk tune` cockpit gently flags when exceeded. It overrides the
+project-wide default; unset → project, then a built-in `0.5`. Tuning-only — it never
+affects the load/detect/alert pipeline.
 
 ## `interval` (required)
 

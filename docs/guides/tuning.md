@@ -139,13 +139,18 @@ marker** to cycle its verdict:
 - **green** → **valid** (you confirmed it's a real alert)
 - **slate** → **false alarm**
 
-A confirmed (valid) alert is you asserting *a real incident happened here*, so it
-counts toward recall and as a correct alert — a clean metric can be validated in a
-few clicks **without drawing any spans**. **Confirm all unreviewed valid** does the
-lot. Confirmed alerts are also **written as incidents on Save**, so they feed the
-next supervised [`dtk autotune`](autotuning.md) too; the verdicts themselves persist
-as `alert_reviews` metadata and re-seed (re-bound to the moved alerts by streak
-overlap) when you reopen.
+**Confirming an alert valid is just a fast way to mark an incident.** A valid alert
+is you asserting *a real incident happened here*, so the confirmed streak becomes a
+first-class incident: it shows up in the **Marked incidents** list (in Label mode) as
+a read-only **"✓ confirmed alert"** row — focus it, or remove it to un-confirm the
+alert — and it counts toward recall and as a correct alert. So a clean metric can be
+validated in a few clicks **without drawing any spans**. **Confirm all unreviewed
+valid** does the lot. Confirmed alerts are **written as incidents on Save**, so they
+feed the next supervised [`dtk autotune`](autotuning.md) too; the verdicts themselves
+also persist as `alert_reviews` metadata and re-seed (re-bound to the moved alerts by
+streak overlap) when you reopen. A confirmed incident stays in the ground truth even
+if you then tune the detector so it no longer fires there — which correctly shows up
+as a **recall miss**, not a silent disappearance.
 
 ## Mark incidents (Label mode)
 
@@ -189,6 +194,34 @@ As you tune, the **metrics bar** under the chart recomputes:
   complement is the share of alerts that are *correct*.
 - **Reviewed N/M** — how many of the fired alerts you've looked at (and how many you
   confirmed valid).
+
+The marked incidents and the confirmed-valid alerts are **one** ground-truth set, so
+it never matters whether you draw a span or confirm an alert — both feed recall and
+the false-alert rate, and both are saved.
+
+### A false-alert budget (optional)
+
+You can give a metric a **target false-alert rate** so the cockpit tells you when
+you've drifted past it:
+
+```yaml
+# metrics/<name>.yml
+false_alert_budget: 0.3   # at most 30% of fired alerts should be false
+```
+
+or project-wide as a default (a per-metric value wins):
+
+```yaml
+# detectkit_project.yml
+false_alert_budget: 0.3
+```
+
+When the false-alert rate exceeds the budget, the **false alerts** chip flags it
+(`▲ over 30% budget`) — gently, never blocking anything. Unset, a lax built-in
+default of `0.5` is used. This is purely a tuning aid: it only colours a number you
+can already see, it never affects the load/detect/alert pipeline, and labeling stays
+entirely optional — mark a short window when you want to put a number on your error,
+or ignore it and just work with the alerts.
 
 This is the loop the cockpit was built for: pick a detector, see the flagged points
 and the alerts they'd fire, confirm the good ones (or mark the real incidents), and

@@ -83,6 +83,8 @@ interface TunePayload {
   capture_windows?: Array<{ start: string; end: string }>;
   /** seeded per-alert review verdicts (span + 'valid'/'false') from the saved file. */
   alert_reviews?: Array<{ start: string; end: string; verdict: string }>;
+  /** false-alert-rate (FDR) budget the quality bar flags when exceeded (fraction 0..1). */
+  false_alert_budget?: number | null;
   /** localhost POST endpoint for Save labels; null = download instead (no server). */
   labels_save_url?: string | null;
 }
@@ -359,11 +361,31 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     }
     if (v) reviews.push({ start: s, end: e, verdict: v });
   };
-  // Validated streak spans within the active window — virtual incidents for scoring.
+  // Confirming an alert valid IS marking an incident there: a valid verdict is the
+  // user asserting "a real incident happened in this span". So a valid review is a
+  // first-class ground-truth incident — derived from the STORED review span (not the
+  // current fire span), so it stays in the ground truth even if the current knob
+  // setting no longer fires there (that's a recall MISS the metrics should show) and
+  // survives recompute. These show up as rows in the Marked-incidents list and feed
+  // recall/FDR alongside the hand-marked incidents — the two are one set, not two.
+  const overlapIv = (
+    a: { start: number; end: number },
+    b: { start: number; end: number },
+  ): boolean => {
+    const tol = spanTol();
+    return a.end >= b.start - tol && a.start <= b.end + tol;
+  };
   const validatedSpans = (): Incident[] =>
-    lastFireSpans
-      .filter(([s, e]) => reviewFor(s, e) === 'valid')
-      .map(([s, e]) => ({ start: s, end: e, label: 'alert ✓' }));
+    reviews
+      .filter((r) => r.verdict === 'valid')
+      .map((r) => ({ start: r.start, end: r.end, label: 'confirmed alert' }));
+  // Validated spans NOT already covered by a hand-marked incident (dedup by overlap)
+  // — so the same real incident is never listed/scored/saved twice (e.g. after a
+  // Save→reopen, where a confirmed alert is seeded both as an incident and a review).
+  const validatedExtra = (): Incident[] =>
+    validatedSpans().filter((v) => !incidents.some((iv) => overlapIv(v, iv)));
+  // The full ground-truth incident set the live metrics, the list and Save all share.
+  const groundTruth = (): Incident[] => [...incidents, ...validatedExtra()];
   // Build the alert markers with their review-verdict color (red / green / slate).
   const buildAlerts = (): ChartAlert[] =>
     lastFireTs.map((t, i) => {
@@ -670,17 +692,28 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     /** alerts with any verdict (valid or false) — review progress. */
     reviewed: number;
   }
-  const computeQuality = (spans: Array<[number, number]>, manualIvs: Incident[]): Quality => {
+  const computeQuality = (spans: Array<[number, number]>): Quality => {
     const tol = spanTol(); // ±½ interval grid tolerance
     // Only score incidents that overlap the active (possibly trimmed) series — an
     // incident outside the loaded window can never be caught, so counting it would
-    // wrongly drag recall down. The chart still LISTS every marked incident. The
-    // ground-truth set is the marked incidents PLUS the validated-alert spans (a
-    // confirmed alert is the user asserting "a real incident happened here").
+    // wrongly drag recall down. The list still shows every marked incident. The
+    // ground-truth set is the hand-marked incidents PLUS the confirmed-valid alert
+    // spans (a confirmed alert is the user asserting "a real incident happened
+    // here"), deduped by overlap so neither is double-counted.
     const ts = series.timestamps;
     const lo = (ts.length ? ts[0] : 0) - tol;
     const hi = (ts.length ? ts[ts.length - 1] : 0) + tol;
-    const ivs = [...manualIvs, ...validatedSpans()].filter((iv) => iv.end >= lo && iv.start <= hi);
+    const inWindow = (iv: { start: number; end: number }): boolean => iv.end >= lo && iv.start <= hi;
+    // Build the ground truth from the IN-WINDOW incidents, then dedup the confirmed
+    // spans against THOSE — not the full set. Deduping against an out-of-window manual
+    // incident (which is itself window-filtered away here) would drop an in-window
+    // confirmed span too, silently losing a real region from recall. (The list and
+    // Save keep the full-set dedup via groundTruth() — they show/save everything.)
+    const manualIn = incidents.filter(inWindow);
+    const validatedIn = validatedSpans()
+      .filter(inWindow)
+      .filter((v) => !manualIn.some((iv) => overlapIv(v, iv)));
+    const ivs = [...manualIn, ...validatedIn];
     // An alert is "for" an incident when its anomaly STREAK overlaps the span (not
     // just the fire point, which sits consecutive-1 intervals into the streak).
     const overlaps = (sp: [number, number], iv: Incident): boolean =>
@@ -712,16 +745,35 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     };
   };
   const pctOrDash = (v: number): string => (Number.isFinite(v) ? `${Math.round(v * 100)}%` : '—');
-  const metricChip = (value: string, label: string, sub: string, color: string): string =>
-    `<span class="dtk-m-chip"><span class="dtk-m-dot" style="background:${color}"></span>` +
+  // The false-alert-rate budget the quality bar flags when exceeded (a fraction in
+  // (0, 1]); resolved metric → project → built-in default by the payload builder.
+  const budget =
+    typeof payload.false_alert_budget === 'number' && payload.false_alert_budget > 0
+      ? payload.false_alert_budget
+      : null;
+  const metricChip = (
+    value: string,
+    label: string,
+    sub: string,
+    color: string,
+    opts?: { cls?: string; title?: string },
+  ): string =>
+    `<span class="dtk-m-chip${opts?.cls ? ' ' + opts.cls : ''}"${opts?.title ? ` title="${opts.title}"` : ''}>` +
+    `<span class="dtk-m-dot" style="background:${color}"></span>` +
     `<span class="dtk-m-v">${value}</span><span class="dtk-m-l">${label}</span>` +
     (sub ? `<span class="dtk-m-sub">${sub}</span>` : '') +
     `</span>`;
   function renderMetrics(): void {
-    const q = computeQuality(lastFireSpans, incidents);
+    const q = computeQuality(lastFireSpans);
     // Without any marked incidents there is no ground truth, so catch-rate and
     // false-alert rate are undefined (not "100% false") — prompt to mark some.
     const haveTruth = q.realIncidents > 0;
+    // Over budget = we have ground truth, alerts fired, and the false-alert rate
+    // exceeds the configured budget. A gentle, optional signal — it only colours an
+    // already-computed number; labeling and tuning are never blocked by it.
+    const budgetPct = budget != null ? `${Math.round(budget * 100)}%` : '';
+    const overBudget =
+      haveTruth && q.totalAlerts > 0 && budget != null && Number.isFinite(q.fdr) && q.fdr > budget;
     let falseSub: string;
     if (!haveTruth) falseSub = 'mark incidents to measure';
     else if (q.totalAlerts === 0) falseSub = 'no alerts';
@@ -733,12 +785,19 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       const nStr = ratio >= 9.5 ? String(Math.round(ratio)) : String(Math.round(ratio * 10) / 10);
       falseSub = `${pctOrDash(q.fdr)} · ≈1 in ${nStr} false`;
     }
+    // Append the budget verdict (non-intrusive: only flag when over).
+    if (overBudget) falseSub += ` · ▲ over ${budgetPct} budget`;
     // Review progress: how many fired alerts you've confirmed/dismissed, and how
     // many you confirmed valid (the green markers).
     const reviewSub =
       q.totalAlerts === 0
         ? 'no alerts'
         : `${q.validated} valid${q.totalAlerts > q.reviewed ? ` · ${q.totalAlerts - q.reviewed} left` : ' · all reviewed'}`;
+    const falseTitle = budget
+      ? `Budget: at most ${budgetPct} of fired alerts false (false-alert rate / FDR). ` +
+        'Set per metric or project via false_alert_budget. Labeling is optional — this just ' +
+        'flags when you exceed the budget.'
+      : '';
     metricsBar.innerHTML =
       metricChip(String(q.realIncidents), 'real incidents', '', 'var(--c)') +
       metricChip(
@@ -748,7 +807,10 @@ function render(payload: TunePayload, mount: HTMLElement): void {
         'var(--green)',
       ) +
       metricChip(String(q.totalAlerts), 'alerts', '', 'var(--c)') +
-      metricChip(haveTruth ? String(q.falseAlerts) : '—', 'false alerts', falseSub, 'var(--anom)') +
+      metricChip(haveTruth ? String(q.falseAlerts) : '—', 'false alerts', falseSub, 'var(--anom)', {
+        cls: overBudget ? 'over' : '',
+        title: falseTitle,
+      }) +
       metricChip(`${q.reviewed}/${q.totalAlerts}`, 'reviewed', reviewSub, 'var(--green)');
   }
 
@@ -804,6 +866,9 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       chart.render({ series, scored: lastScored, params: lastParams, alerts: lastAlerts, incidents });
     }
     renderMetrics();
+    // A confirmed-valid alert IS an incident, so keep the list in lockstep with the
+    // verdicts — confirming one in Review mode makes it show up in the incident list.
+    refreshIncidentList();
   };
 
   // ---- threshold-capture toolbar (above the labeler chart) ------------------
@@ -1357,35 +1422,61 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     refreshIncidentList();
     renderMetrics();
   }
+  // Un-confirm a validated-alert incident: clear its verdict (the green marker
+  // reverts to an un-reviewed alert), then repaint everything — this is the inverse
+  // of confirming the alert in Review mode, exposed here so the list is the single
+  // place to add/remove every kind of incident.
+  function unconfirmAlert(iv: Incident): void {
+    setReview(iv.start, iv.end, null);
+    chart.setIncidents(incidents);
+    repaintAlerts(); // re-colours markers + recomputes metrics + refreshes this list
+  }
   function refreshIncidentList(): void {
     incidentsList.innerHTML = '';
-    const sorted = [...incidents].sort((a, b) => a.start - b.start);
-    if (!sorted.length) {
+    // One list, two provenances: hand-marked incidents (editable label/delete) and
+    // confirmed-valid alerts (a read-only "✓ alert" badge; ✕ un-confirms). Deduped:
+    // a validated span already covered by a hand-marked incident shows once, as the
+    // editable manual row. Sorted together so the list reads chronologically.
+    type Row = { iv: Incident; kind: 'manual' | 'alert' };
+    const rows: Row[] = [
+      ...incidents.map((iv) => ({ iv, kind: 'manual' as const })),
+      ...validatedExtra().map((iv) => ({ iv, kind: 'alert' as const })),
+    ].sort((a, b) => a.iv.start - b.iv.start);
+    if (!rows.length) {
       incidentsList.appendChild(
         el('div', 'dtk-inc-empty', 'None yet — switch to Label mode and drag across the chart, or confirm alerts in Review mode.'),
       );
       return;
     }
-    for (const iv of sorted) {
-      const row = el('div', 'dtk-inc-row');
+    for (const { iv, kind } of rows) {
+      const row = el('div', 'dtk-inc-row' + (kind === 'alert' ? ' dtk-inc-fromalert' : ''));
       row.appendChild(el('span', 'dtk-inc-span', `${fmtTs(iv.start)} → ${fmtTs(iv.end)}`));
       row.appendChild(el('span', 'dtk-inc-dur', fmtDur(Math.max(0, iv.end - iv.start))));
-      const lbl = el('input', 'dtk-inc-label');
-      lbl.type = 'text';
-      lbl.value = iv.label || '';
-      lbl.placeholder = 'label (optional)';
-      lbl.oninput = (): void => {
-        iv.label = lbl.value;
-      };
-      row.appendChild(lbl);
+      if (kind === 'alert') {
+        // Confirmed-from-alert: a static badge (the verdict, not a free label) +
+        // an ✕ that clears the verdict instead of editing a hand-marked span.
+        const badge = el('span', 'dtk-inc-badge', '✓ confirmed alert');
+        badge.title = 'A fired alert you confirmed valid (in Review mode). It counts as a real ' +
+          'incident — remove it here to un-confirm the alert.';
+        row.appendChild(badge);
+      } else {
+        const lbl = el('input', 'dtk-inc-label');
+        lbl.type = 'text';
+        lbl.value = iv.label || '';
+        lbl.placeholder = 'label (optional)';
+        lbl.oninput = (): void => {
+          iv.label = lbl.value;
+        };
+        row.appendChild(lbl);
+      }
       const focus = el('button', 'dtk-inc-btn', 'focus');
       focus.type = 'button';
       focus.onclick = (): void => focusIncident(iv);
       row.appendChild(focus);
       const del = el('button', 'dtk-inc-btn dtk-inc-del', '✕');
       del.type = 'button';
-      del.title = 'remove this incident';
-      del.onclick = (): void => deleteIncident(iv);
+      del.title = kind === 'alert' ? 'un-confirm this alert' : 'remove this incident';
+      del.onclick = (): void => (kind === 'alert' ? unconfirmAlert(iv) : deleteIncident(iv));
       row.appendChild(del);
       incidentsList.appendChild(row);
     }
@@ -1497,13 +1588,12 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   const fmtUtc = (ms: number): string => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
   const buildLabelsYaml = (): string => {
     const lines = [`metric: ${payload.metric}`, 'timezone: UTC'];
-    // Manual incidents PLUS a derived incident for each confirmed (valid) alert, so
-    // confirming alerts feeds the next supervised `dtk autotune` too. De-dup by span.
-    const validIvs: Incident[] = reviews
-      .filter((r) => r.verdict === 'valid')
-      .map((r) => ({ start: r.start, end: r.end, label: 'alert (confirmed)' }));
+    // Hand-marked incidents PLUS a derived incident for each confirmed (valid) alert
+    // not already covered by one (groundTruth() = incidents ∪ overlap-deduped
+    // validatedExtra), so confirming alerts feeds the next supervised `dtk autotune`
+    // too. The seen-set below guards exact-span repeats.
     const seen = new Set<string>();
-    const sorted = [...incidents, ...validIvs]
+    const sorted = groundTruth()
       .sort((a, b) => a.start - b.start)
       .filter((iv) => {
         const k = `${Math.round(iv.start)}:${Math.round(iv.end)}`;
@@ -1766,6 +1856,8 @@ function injectStyle(): void {
 .dtk-m-v{font-family:var(--mono);font-weight:700;font-size:15px;color:var(--ink);}
 .dtk-m-l{color:var(--faint);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
 .dtk-m-sub{color:var(--muted);font-family:var(--mono);font-size:11.5px;}
+.dtk-m-chip.over{border-color:var(--anom);box-shadow:inset 0 0 0 1px rgba(214,50,50,.5);}
+.dtk-m-chip.over .dtk-m-sub{color:var(--anom);font-weight:600;}
 .dtk-tune-modes{display:inline-flex;gap:4px;background:var(--ink);border-radius:9px;padding:4px;margin:0;flex:0 0 auto;}
 .dtk-mode-btn{border:0;background:transparent;color:#c9c2b4;font-family:var(--sans);font-size:13px;font-weight:600;
   padding:7px 16px;border-radius:6px;cursor:pointer;transition:background .12s,color .12s;}
@@ -1805,6 +1897,9 @@ function injectStyle(): void {
   padding:3px 8px;font-size:11px;cursor:pointer;font-family:var(--sans);}
 .dtk-inc-btn:hover{border-color:var(--c);color:var(--c7);}
 .dtk-inc-del{color:var(--anom);}
+.dtk-inc-fromalert{border-color:rgba(46,158,115,.5);background:rgba(46,158,115,.08);}
+.dtk-inc-badge{flex:1 1 90px;min-width:70px;font-family:var(--mono);font-size:10.5px;color:var(--green);
+  display:inline-flex;align-items:center;font-weight:600;}
 .dtk-setname{background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:8px;
   padding:9px 11px;font-family:var(--sans);font-size:13px;min-width:180px;}
 .dtk-setname::placeholder{color:var(--faint);}

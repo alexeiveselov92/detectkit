@@ -57,13 +57,23 @@ rendered on the docs site under **For developers**). Read the relevant one:
   **y = 0** toggle). A **mode switch** picks which layers lead / dim / hide and
   which interactions are armed — **Tune** (band leads), **Review** (confirm the
   fired alerts: click a marker to cycle un-reviewed → valid (green) → false alarm
-  (slate); a confirmed alert folds in as a virtual incident, so a clean metric is
-  validated in a few clicks without hand-drawing spans), **Label** (band hides,
+  (slate); **confirming an alert valid IS marking an incident** — the confirmed
+  streak becomes a first-class **ground-truth incident** that shows in the
+  Marked-incidents list as a "✓ confirmed alert" row, counts toward recall/FDR, and
+  is written on Save, so a clean metric is validated in a few clicks without
+  hand-drawing spans), **Label** (band hides,
   incidents editable; **Lasso anomalies** loops a cloud of anomaly dots into
   per-streak incident spans, **Threshold capture** grabs every span past a line).
+  The incident list, the live metrics and Save share **one** ground-truth set —
+  hand-marked spans **plus** confirmed-valid alerts (derived from the stored
+  verdict, not the current fire, so a confirmed incident stays scored — as a recall
+  *miss* — even if the detector no longer fires there), deduped by overlap.
   Watch live **catch-rate (recall)** / **false-alert rate (FDR)** / **reviewed**
   metrics — matched on each alert's anomaly **streak span**, not just the fire
-  instant — as you tune;
+  instant — as you tune; an optional **false-alert budget** (`false_alert_budget`,
+  a fraction in `(0, 1]`, on the **metric** then **project**, default `0.5`) gently
+  flags the false-alert chip when the FDR exceeds it (tuning-only — labeling stays
+  optional and it never touches the pipeline).
   **Save incidents** writes versioned `incidents/<metric>/*.yml` (the same store
   `dtk autotune` reads, including the painted `capture_windows` and per-alert
   `alert_reviews` metadata; confirmed alerts are written as incidents too) via a

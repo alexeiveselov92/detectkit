@@ -80,38 +80,45 @@ view of the metric's **real** persisted series and lets you turn the detector's
 knobs (type — including **Manual bounds** with lower/upper sliders — threshold,
 window, recency weighting + half-life, detrend, smoothing, **seasonality groups**,
 **direction** (both/up/down), alert `consecutive_anomalies`) while the confidence
-band and flagged anomalies **recompute live**. The chart is **zoomable** (scroll/drag +
-a navigator strip) and a **"Points shown"** slider trims the active sample to speed
-up recompute on a long metric. Clicking **Apply** writes the chosen
+band and flagged anomalies **recompute live**. The whole screen is a **chart-first
+cockpit**: ONE chart (the windshield) fills the view, every knob lives in a
+**collapsible dock under it**, the metrics ride beneath the chart, and the chart is
+**zoomable** (scroll/drag + navigator strip) with a **"Points shown"** trim slider.
+Clicking **Apply** writes the chosen
 config back into the metric YAML **in place** (autotune, by contrast, writes a new
 `__tuned_<id>.yml` and never edits the original). Reads the metric's loaded
 datapoints (run `dtk run --steps load` first if empty); the selector must resolve
 to a single metric.
 
-**Mark incidents + see alert quality live.** A second, **synced** chart beneath
-the detector view **mirrors the detector's anomaly dots** and lets you **mark the
-real incidents** (drag to create a span, drag its edges/middle to adjust, ✕ or
-Delete to remove), **Lasso anomalies** (loop around a cloud of anomaly dots — each
-run of consecutive anomalies, small gaps bridged up to `consecutive_anomalies`,
-becomes one incident span), or **Threshold capture**
-every contiguous span past a horizontal line in one shot (set the line by click or
-value, above/below, optional gap-bridging, optionally limited to a painted time
-window — the same tool as the autotune labeler; the window is saved as
-`capture_windows` and restored on reopen; each captured span is widened to a full
-interval so the alert lands inside). As you tune, a metrics
-bar shows two operator numbers: **incident catch rate (recall)** — how many marked
-incidents your config catches (an incident is caught when an alert's anomaly
-**streak overlaps** it, not just the fire instant) — and **false-alert rate** —
-what share of alerts fall outside any real incident ("≈1 in N false", keeping a
-decimal so a mostly-false rate doesn't round to a misleading "1 in 1"); only
-incidents within the loaded window are scored. **Save incidents** writes a
+**Modes + alert review + live quality.** A **mode switch** picks which layers lead
+and which interactions are armed on the one chart: **Tune** (band leads; incidents
+recede to read-only context; hover a point for its window), **Review** (the fired
+alerts lead, band ghosts — click an alert marker to cycle its verdict un-reviewed →
+**valid** (green) → **false alarm** (slate); **Confirm all unreviewed valid** does
+the lot), and **Label** (band hides; **mark the real incidents** by drag, **Lasso
+anomalies** — loop a cloud of anomaly dots, each consecutive run, gaps bridged up to
+`consecutive_anomalies`, becomes one span — or **Threshold capture** every span past
+a horizontal line, each widened to a full interval so the alert lands inside; the
+painted window saves as `capture_windows`). A confirmed (valid) alert is the user
+asserting a real incident happened there — it folds in as a virtual incident (counts
+toward recall + correct) so a clean metric whose alerts are all good is validated in
+a few clicks **without hand-drawing spans**, and is written as an incident on Save.
+As you tune, a metrics bar shows **incident catch rate (recall)** — how many
+ground-truth incidents (marked + validated) your config catches (an incident is
+caught when an alert's anomaly **streak overlaps** it, not just the fire instant) —
+**false-alert rate** (what share of alerts fall outside any incident and aren't
+confirmed valid; "≈1 in N false", a decimal so a mostly-false rate doesn't round to
+a misleading "1 in 1") — and **reviewed N/M**; only incidents within the loaded
+window are scored. **Save incidents** writes a
 versioned `incidents/<metric>/*.yml` — the same store `dtk autotune` reads, so the
 same labels feed the next supervised tune (it seeds from the newest file on open,
 **anchoring the budget-sized loaded window on the seeded incidents** — ending just
 past the latest one rather than at the last datapoint — so they render/count
-without an old outlier pulling the whole history in). Saving incidents does not end
-the session; only **Apply** does. A
-**y = 0 line** toggle (shared with `dtk run --report`) shows the metric relative to zero.
+without an old outlier pulling the whole history in; per-alert verdicts persist as
+an `alert_reviews:` metadata block and re-seed on reopen, re-bound to the moved
+alerts by streak overlap). Saving incidents does not end the session; only **Apply**
+does. A **y = 0 line** toggle (shared with `dtk run --report`) shows the metric
+relative to zero.
 
 Safe write-back: the config is validated before anything is written, the previous
 YAML is archived under `metrics/.history/<metric>/`, and only then is the metric

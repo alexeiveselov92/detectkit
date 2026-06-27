@@ -177,6 +177,7 @@ def build_tune_payload(
     save_url: str | None = None,
     incidents: list[dict[str, str]] | None = None,
     capture_windows: list[dict[str, str]] | None = None,
+    alert_reviews: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Assemble the interactive tuning payload from the persisted ``_dtk_datapoints``.
 
@@ -198,6 +199,7 @@ def build_tune_payload(
     """
     seed_incidents = incidents or []
     seed_capture = capture_windows or []
+    seed_reviews = alert_reviews or []
     name = metric_config.name
     interval = metric_config.get_interval()
     interval_seconds = interval.seconds
@@ -260,6 +262,7 @@ def build_tune_payload(
         "save_url": save_url,
         "incidents": seed_incidents,
         "capture_windows": seed_capture,
+        "alert_reviews": seed_reviews,
         "labels_save_url": None,
     }
     if start is None or end is None:
@@ -301,5 +304,6 @@ def build_tune_payload(
         "save_url": save_url,
         "incidents": seed_incidents,
         "capture_windows": seed_capture,
+        "alert_reviews": seed_reviews,
         "labels_save_url": None,
     }

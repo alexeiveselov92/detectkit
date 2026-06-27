@@ -19,6 +19,7 @@ import type {
   AlertDirection,
   ChartAlert,
   ChartHandle,
+  ChartMode,
   Detrend,
   DetectorParams,
   DetectorType,
@@ -80,6 +81,8 @@ interface TunePayload {
   incidents?: Array<{ start: string; end: string; label?: string }>;
   /** seeded threshold-capture window(s) ({start,end} naive-UTC strings) — regime scope. */
   capture_windows?: Array<{ start: string; end: string }>;
+  /** seeded per-alert review verdicts (span + 'valid'/'false') from the saved file. */
+  alert_reviews?: Array<{ start: string; end: string; verdict: string }>;
   /** localhost POST endpoint for Save labels; null = download instead (no server). */
   labels_save_url?: string | null;
 }
@@ -327,6 +330,48 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   let lastScored: ScoredPoint[] = [];
   let lastAlerts: ChartAlert[] = [];
 
+  // ---- per-alert review verdicts (validated / false alarm) -------------------
+  // The user can confirm each fired alert right on the chart (Review mode / a click
+  // on a marker). Stored by STREAK SPAN so a verdict survives a recompute that moves
+  // the alerts — it re-binds by overlap, not by an exact timestamp. A 'valid' span
+  // also counts as a VIRTUAL incident for recall/FDR (and is written as an incident
+  // on Save, so confirming alerts also feeds dtk autotune). 'false' is an explicit
+  // false-alarm mark (slate marker); it never rescues the alert from the FDR.
+  type Verdict = 'valid' | 'false';
+  const reviews: Array<{ start: number; end: number; verdict: Verdict }> = (payload.alert_reviews || [])
+    .map((r) => ({
+      start: parseDisplayTs(r.start),
+      end: parseDisplayTs(r.end),
+      verdict: (r.verdict === 'false' ? 'false' : 'valid') as Verdict,
+    }))
+    .filter((r) => Number.isFinite(r.start) && Number.isFinite(r.end));
+  const spanTol = (): number => (payload.interval_seconds * 1000) / 2;
+  const reviewFor = (s: number, e: number): Verdict | null => {
+    const tol = spanTol();
+    for (const r of reviews) if (e >= r.start - tol && s <= r.end + tol) return r.verdict;
+    return null;
+  };
+  const setReview = (s: number, e: number, v: Verdict | null): void => {
+    const tol = spanTol();
+    for (let i = reviews.length - 1; i >= 0; i--) {
+      const r = reviews[i];
+      if (e >= r.start - tol && s <= r.end + tol) reviews.splice(i, 1);
+    }
+    if (v) reviews.push({ start: s, end: e, verdict: v });
+  };
+  // Validated streak spans within the active window — virtual incidents for scoring.
+  const validatedSpans = (): Incident[] =>
+    lastFireSpans
+      .filter(([s, e]) => reviewFor(s, e) === 'valid')
+      .map(([s, e]) => ({ start: s, end: e, label: 'alert ✓' }));
+  // Build the alert markers with their review-verdict color (red / green / slate).
+  const buildAlerts = (): ChartAlert[] =>
+    lastFireTs.map((t, i) => {
+      const sp = lastFireSpans[i] ?? [t, t];
+      const v = reviewFor(sp[0], sp[1]);
+      return { t, kind: v === 'valid' ? 'anomaly-validated' : v === 'false' ? 'anomaly-false' : 'anomaly' };
+    });
+
   // ---- mutable parameter state, seeded from the metric's current config -----
   const seed = payload.detector;
   let consecutive = payload.consecutive_anomalies;
@@ -425,20 +470,34 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   if (payload.description) header.appendChild(el('div', 'dtk-tune-desc', payload.description));
   root.appendChild(header);
 
-  // ---- alert-quality metrics bar (top, prominent) --------------------------
-  // Two operator-facing numbers, recomputed live: how many real incidents the
-  // current config CATCHES (recall) and what share of fired alerts are FALSE
-  // (FDR / type-I control). Filled by renderMetrics() once it's defined.
+  // ---- alert-quality metrics bar -------------------------------------------
+  // Operator-facing numbers, recomputed live (real incidents / caught / alerts /
+  // false / reviewed). Created here, mounted under the chart by the layout below.
   const metricsBar = el('div', 'dtk-tune-metrics');
-  root.appendChild(metricsBar);
 
-  // ---- layout: controls | main ---------------------------------------------
-  const grid = el('div', 'dtk-tune-grid');
-  const controls = el('div', 'dtk-tune-controls');
+  // ---- layout: chart is the windshield, controls dock below it -------------
+  // The chart + its status rail + metrics fill the top; every knob lives in a
+  // collapsible dock UNDER the chart, so the first interaction is "turn a knob,
+  // watch the band" with no scroll, and you can reclaim the full chart anytime.
   const main = el('div', 'dtk-tune-main');
-  grid.appendChild(controls);
-  grid.appendChild(main);
-  root.appendChild(grid);
+  root.appendChild(main);
+  const dock = el('div', 'dtk-tune-dock');
+  const dockHead = el('div', 'dtk-tune-dockhead');
+  const dockToggle = el('button', 'dtk-dock-toggle', '⚙ Controls');
+  dockToggle.type = 'button';
+  dockToggle.title = 'Show or hide the control dock — collapse it to give the chart the whole screen.';
+  dockHead.appendChild(dockToggle);
+  const controls = el('div', 'dtk-tune-controls');
+  dock.appendChild(dockHead);
+  dock.appendChild(controls);
+  root.appendChild(dock);
+  let dockOpen = true;
+  const setDock = (open: boolean): void => {
+    dockOpen = open;
+    controls.style.display = open ? '' : 'none';
+    dockToggle.classList.toggle('on', open);
+    dockToggle.textContent = open ? '⚙ Controls ▾' : '⚙ Controls ▸';
+  };
 
   // ---- trim slider (above the chart) ---------------------------------------
   // Shorten the active sample to the most-recent N points. The fitted period
@@ -477,6 +536,34 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   chartWrap.appendChild(spinner);
   main.appendChild(chartWrap);
 
+  // ---- mode switch (Tune / Review / Label) ----------------------------------
+  // One chart, three jobs: the mode picks which layers lead and which interactions
+  // are armed. 'tune' steers the band, 'review' confirms the fired alerts, 'label'
+  // marks incidents. setUiMode (defined once the tool bars exist) drives the chart
+  // + reveals the matching tools.
+  const modeRow = el('div', 'dtk-tune-modes');
+  const modeBtns: Partial<Record<ChartMode, HTMLButtonElement>> = {};
+  const MODES: Array<{ v: ChartMode; label: string; hint: string }> = [
+    { v: 'tune', label: 'Tune', hint: 'Steer the band — the confidence corridor leads; incidents recede to read-only context. Hover a point for its window.' },
+    { v: 'review', label: 'Review alerts', hint: 'Confirm the fired alerts — click a marker to cycle un-reviewed → valid (green) → false (slate). The band ghosts so the alerts lead.' },
+    { v: 'label', label: 'Label incidents', hint: 'Mark real incidents — drag a span, lasso the anomaly cloud, or threshold-capture. The band hides so incidents lead.' },
+  ];
+  MODES.forEach((md) => {
+    const b = el('button', 'dtk-mode-btn', md.label);
+    b.type = 'button';
+    b.title = md.hint;
+    b.dataset.v = md.v;
+    b.onclick = (): void => setUiMode(md.v);
+    modeBtns[md.v] = b;
+    modeRow.appendChild(b);
+  });
+  main.appendChild(modeRow);
+  // The live metrics ride right under the chart + mode switch (attached to the
+  // windshield, not buried at the page bottom).
+  main.appendChild(metricsBar);
+  dockToggle.onclick = (): void => setDock(!dockOpen);
+  setDock(true);
+
   // legend
   const legend = el('div', 'dtk-tune-legend');
   const legItem = (sw: string, text: string, hint: string): void => {
@@ -490,7 +577,9 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   legItem('band', 'expected range', "The detector's confidence band — values inside it read as normal.");
   legItem('center', 'band center', 'The expected value at the middle of the band.');
   legItem('dot', 'anomaly', 'A point the detector flagged as anomalous (outside the band).');
-  legItem('alert', 'alert', 'Where an alert fired — enough consecutive anomalies to meet the rule.');
+  legItem('alert', 'alert', 'A fired alert, not yet reviewed — enough consecutive anomalies to meet the rule.');
+  legItem('alert-ok', 'valid alert', 'An alert you confirmed is real (click a marker in Review mode). Counts toward recall.');
+  legItem('alert-no', 'false alarm', 'An alert you marked a false positive. Stays in the false-alert rate.');
   main.appendChild(legend);
 
   const readout = el('div', 'dtk-tune-readout');
@@ -518,28 +607,6 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     }
   };
 
-  // ---- labeler chart (synced beneath the detector chart) -------------------
-  // Same series, same x-zoom/pan + y-scale; here the user MARKS real incidents
-  // (drag to create, edges to resize, ✕/Delete to remove). The detector chart
-  // overlays the same spans read-only, so alerts vs incidents read together.
-  const labHead = el('div', 'dtk-tune-labhead');
-  labHead.appendChild(
-    ctlLabel(
-      'Real incidents',
-      'Drag on this chart to mark each real incident span — drag its edges to adjust, drag the ' +
-        'middle to move, click its ✕ (or select + Delete) to remove. Pan via the strip below, ' +
-        'scroll to zoom (both charts move together). The metrics above update as you tune.',
-    ),
-  );
-  labHead.appendChild(
-    el('span', 'dtk-tune-labhint', 'drag to mark · edges adjust · ✕/Delete remove · strip pans'),
-  );
-  main.appendChild(labHead);
-  const labChartWrap = el('div', 'dtk-tune-chart dtk-tune-labchart');
-  const labCanvas = el('canvas');
-  labChartWrap.appendChild(labCanvas);
-  main.appendChild(labChartWrap);
-
   // ---- live alert-quality metrics ------------------------------------------
   interface Quality {
     realIncidents: number;
@@ -549,23 +616,37 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     correctAlerts: number;
     falseAlerts: number;
     fdr: number;
+    /** alerts the user confirmed valid. */
+    validated: number;
+    /** alerts with any verdict (valid or false) — review progress. */
+    reviewed: number;
   }
-  const computeQuality = (spans: Array<[number, number]>, allIvs: Incident[]): Quality => {
-    const tol = (payload.interval_seconds * 1000) / 2; // ±½ interval grid tolerance
+  const computeQuality = (spans: Array<[number, number]>, manualIvs: Incident[]): Quality => {
+    const tol = spanTol(); // ±½ interval grid tolerance
     // Only score incidents that overlap the active (possibly trimmed) series — an
     // incident outside the loaded window can never be caught, so counting it would
-    // wrongly drag recall down. The chart still LISTS every marked incident.
+    // wrongly drag recall down. The chart still LISTS every marked incident. The
+    // ground-truth set is the marked incidents PLUS the validated-alert spans (a
+    // confirmed alert is the user asserting "a real incident happened here").
     const ts = series.timestamps;
     const lo = (ts.length ? ts[0] : 0) - tol;
     const hi = (ts.length ? ts[ts.length - 1] : 0) + tol;
-    const ivs = allIvs.filter((iv) => iv.end >= lo && iv.start <= hi);
+    const ivs = [...manualIvs, ...validatedSpans()].filter((iv) => iv.end >= lo && iv.start <= hi);
     // An alert is "for" an incident when its anomaly STREAK overlaps the span (not
-    // just the fire point, which sits consecutive-1 intervals into the streak and
-    // would miss a narrow incident — the recall-undercount bug).
+    // just the fire point, which sits consecutive-1 intervals into the streak).
     const overlaps = (sp: [number, number], iv: Incident): boolean =>
       sp[1] >= iv.start - tol && sp[0] <= iv.end + tol;
     let correct = 0;
-    for (const sp of spans) if (ivs.some((iv) => overlaps(sp, iv))) correct++;
+    let validated = 0;
+    let reviewed = 0;
+    for (const sp of spans) {
+      const v = reviewFor(sp[0], sp[1]);
+      if (v) reviewed++;
+      if (v === 'valid') validated++;
+      // 'false' stays a false alarm even if it grazes an incident; 'valid' is always
+      // correct (it overlaps its own virtual incident); else by incident overlap.
+      if (v === 'valid' || (v !== 'false' && ivs.some((iv) => overlaps(sp, iv)))) correct++;
+    }
     let caught = 0;
     for (const iv of ivs) if (spans.some((sp) => overlaps(sp, iv))) caught++;
     const total = spans.length;
@@ -577,6 +658,8 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       correctAlerts: correct,
       falseAlerts: total - correct,
       fdr: total ? (total - correct) / total : NaN,
+      validated,
+      reviewed,
     };
   };
   const pctOrDash = (v: number): string => (Number.isFinite(v) ? `${Math.round(v * 100)}%` : '—');
@@ -601,31 +684,41 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       const nStr = ratio >= 9.5 ? String(Math.round(ratio)) : String(Math.round(ratio * 10) / 10);
       falseSub = `${pctOrDash(q.fdr)} · ≈1 in ${nStr} false`;
     }
+    // Review progress: how many fired alerts you've confirmed/dismissed, and how
+    // many you confirmed valid (the green markers).
+    const reviewSub =
+      q.totalAlerts === 0
+        ? 'no alerts'
+        : `${q.validated} valid${q.totalAlerts > q.reviewed ? ` · ${q.totalAlerts - q.reviewed} left` : ' · all reviewed'}`;
     metricsBar.innerHTML =
       metricChip(String(q.realIncidents), 'real incidents', '', 'var(--c)') +
       metricChip(
         haveTruth ? `${q.caught}/${q.realIncidents}` : '—',
         'caught',
-        haveTruth ? `recall ${pctOrDash(q.recall)}` : 'mark incidents',
+        haveTruth ? `recall ${pctOrDash(q.recall)}` : 'mark or confirm',
         'var(--green)',
       ) +
       metricChip(String(q.totalAlerts), 'alerts', '', 'var(--c)') +
-      metricChip(haveTruth ? String(q.falseAlerts) : '—', 'false alerts', falseSub, 'var(--anom)');
+      metricChip(haveTruth ? String(q.falseAlerts) : '—', 'false alerts', falseSub, 'var(--anom)') +
+      metricChip(`${q.reviewed}/${q.totalAlerts}`, 'reviewed', reviewSub, 'var(--green)');
   }
 
-  // Forward declaration so the detector chart's onViewChange can sync the labeler.
-  let labelerChart: ChartHandle;
-
+  // Filled once the capture toolbars are built (the chart pushes preview state here
+  // on every hover / window paint / knob change / lasso draw).
+  let updateThresholdUI: (info: ThresholdInfo) => void = () => {};
+  let updateLassoUI: (info: LassoInfo) => void = () => {};
+  // ONE chart for the whole cockpit: band + anomaly dots + alert markers + incident
+  // spans on a single windshield. The MODE (tune / review / label) decides which
+  // layers lead and which recede, and which interactions are armed — so tuning,
+  // confirming alerts and marking incidents share one canvas (no stacked half-charts).
   const chart: ChartHandle = createChart(canvas, {
     navigable: true,
-    // The labeler chart beneath provides the shared navigator strip; this one
-    // keeps wheel-zoom + drag-pan but hides its own strip so the two align.
-    showNavigator: false,
+    labeling: true,
+    mode: 'tune',
     // Fit the y-axis to the data, not the band — so turning the Threshold slider
     // visibly widens/narrows the corridor relative to the metric instead of the
     // axis rescaling in lockstep and making the change look like a no-op.
     yFit: 'data',
-    onViewChange: (a, b): void => labelerChart.setViewWindow(a, b),
     onHover: (info): void => {
       if (!info || !info.point || !info.point.scored) {
         readout.textContent = '';
@@ -637,53 +730,31 @@ function render(payload: TunePayload, mount: HTMLElement): void {
         `band=[${fmtNum(p.lower)}, ${fmtNum(p.upper)}]` +
         (p.isAnomaly ? `  ⚠ ${p.direction} (sev ${p.severity.toFixed(2)})` : '');
     },
-  });
-
-  // The synced labeler: raw series + editable incident spans (no band/dots).
-  const LABELER_PARAMS: DetectorParams = {
-    type: 'mad',
-    threshold: 3,
-    windowSize: 100,
-    minSamples: 30,
-    inputType: 'values',
-    smoothing: 'none',
-    smoothingAlpha: 0.3,
-    smoothingWindow: 10,
-    windowWeights: 'none',
-    halfLife: null,
-    detrend: 'none',
-    seasonalityComponents: null,
-    minSamplesPerGroup: 10,
-    consecutiveAnomalies: 1,
-  };
-  // Filled once the capture toolbars are built (the chart pushes preview state here
-  // on every hover / window paint / knob change / lasso draw).
-  let updateThresholdUI: (info: ThresholdInfo) => void = () => {};
-  let updateLassoUI: (info: LassoInfo) => void = () => {};
-  labelerChart = createChart(labCanvas, {
-    navigable: true,
-    labeling: true,
-    yFit: 'data',
-    onViewChange: (a, b): void => chart.setViewWindow(a, b),
     onIncidentsChange: (): void => {
       // The chart mutates `incidents` in place (shared ref); reflect it.
       refreshIncidentList();
       renderMetrics();
-      chart.setIncidents(incidents); // live read-only shading on the detector chart
     },
     onThresholdChange: (info): void => updateThresholdUI(info),
     onLassoChange: (info): void => updateLassoUI(info),
+    onAlertReviewChange: (fireTs, verdict): void => {
+      // Map the clicked marker back to its streak span and store the verdict by span.
+      const idx = lastFireTs.indexOf(fireTs);
+      const sp = idx >= 0 ? lastFireSpans[idx] : [fireTs, fireTs];
+      setReview(sp[0], sp[1], verdict === 'unreviewed' ? null : (verdict as Verdict));
+      repaintAlerts();
+    },
   });
-  labelerChart.setIncidents(incidents);
-  if (seedCaptureWin) labelerChart.setCaptureWindow(seedCaptureWin);
-  // The labeler mirrors the detector's anomaly dots (so the lasso has a cloud to
-  // grab) — fed the latest scored array once it matches the active series length
-  // (after a trim, the next recompute refills it a frame later). It draws the raw
-  // line + dots + alert ticks, never the band (that's the detector chart's job).
-  const renderLabeler = (): void => {
-    const sc = lastScored.length === series.timestamps.length ? lastScored : [];
-    const params = lastParams ?? LABELER_PARAMS;
-    labelerChart.render({ series, scored: sc, params, alerts: lastAlerts, incidents });
+  chart.setIncidents(incidents);
+  if (seedCaptureWin) chart.setCaptureWindow(seedCaptureWin);
+  // Rebuild the alert markers' verdict colors, re-render the chart and refresh the
+  // metrics — after a recompute (alerts moved) or a single review click.
+  const repaintAlerts = (): void => {
+    lastAlerts = buildAlerts();
+    if (lastParams) {
+      chart.render({ series, scored: lastScored, params: lastParams, alerts: lastAlerts, incidents });
+    }
+    renderMetrics();
   };
 
   // ---- threshold-capture toolbar (above the labeler chart) ------------------
@@ -763,7 +834,50 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   lassoBar.appendChild(lassoDone);
   lassoBar.style.display = 'none';
   thWrap.appendChild(lassoBar);
-  main.insertBefore(thWrap, labChartWrap);
+  // The capture toolbar belongs to Label mode (revealed by setUiMode).
+  thWrap.style.display = 'none';
+  main.appendChild(thWrap);
+
+  // ---- review bar (Review mode): confirm/clear all alerts at once -----------
+  const reviewBar = el('div', 'dtk-th-bar dtk-tune-reviewbar');
+  reviewBar.appendChild(
+    el(
+      'span',
+      'dtk-th-scope',
+      'Click a red alert marker to confirm it valid (green) or mark it a false alarm — cycle un-reviewed → valid → false.',
+    ),
+  );
+  const confirmAllBtn = el('button', 'dtk-apply-btn dtk-th-add', 'Confirm all unreviewed valid');
+  confirmAllBtn.type = 'button';
+  confirmAllBtn.onclick = (): void => {
+    for (const [s, e] of lastFireSpans) if (!reviewFor(s, e)) setReview(s, e, 'valid');
+    repaintAlerts();
+  };
+  const clearReviewBtn = el('button', 'dtk-inc-btn', 'Clear verdicts');
+  clearReviewBtn.type = 'button';
+  clearReviewBtn.onclick = (): void => {
+    reviews.length = 0;
+    repaintAlerts();
+  };
+  reviewBar.appendChild(confirmAllBtn);
+  reviewBar.appendChild(clearReviewBtn);
+  reviewBar.style.display = 'none';
+  main.appendChild(reviewBar);
+
+  // Drive the chart mode + reveal the matching tools. Defined here (after the tool
+  // bars exist) and called by the mode buttons + on first paint.
+  function setUiMode(md: ChartMode): void {
+    chart.setMode(md);
+    (Object.keys(modeBtns) as ChartMode[]).forEach((v) =>
+      modeBtns[v]?.classList.toggle('on', v === md),
+    );
+    if (md !== 'label') {
+      setThActive(false);
+      setLassoActive(false);
+    }
+    thWrap.style.display = md === 'label' ? '' : 'none';
+    reviewBar.style.display = md === 'review' ? '' : 'none';
+  }
 
   let thActive = false;
   let lassoActive = false;
@@ -775,7 +889,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     thActive = on;
     thToggle.classList.toggle('on', on);
     thBar.style.display = on ? 'flex' : 'none';
-    labelerChart.setThresholdMode(on);
+    chart.setThresholdMode(on);
     if (on && lassoActive) setLassoActive(false); // mutually exclusive tools
   };
   // Lasso mode: commits incidents on mouseup via onIncidentsChange, so the bar is
@@ -784,7 +898,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     lassoActive = on;
     lassoToggle.classList.toggle('on', on);
     lassoBar.style.display = on ? 'flex' : 'none';
-    labelerChart.setLassoMode(on);
+    chart.setLassoMode(on);
     if (on && thActive) setThActive(false);
   };
   thToggle.onclick = (): void => setThActive(!thActive);
@@ -792,17 +906,17 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   lassoToggle.onclick = (): void => setLassoActive(!lassoActive);
   lassoDone.onclick = (): void => setLassoActive(false);
   thDirSel.onchange = (): void =>
-    labelerChart.setThresholdDirection(thDirSel.value as 'above' | 'below');
+    chart.setThresholdDirection(thDirSel.value as 'above' | 'below');
   thValInput.oninput = (): void => {
     const s = thValInput.value.trim();
     thTyping = true;
-    labelerChart.setThresholdValue(s !== '' && !isNaN(Number(s)) ? Number(s) : null);
+    chart.setThresholdValue(s !== '' && !isNaN(Number(s)) ? Number(s) : null);
     thTyping = false;
   };
-  thGapInput.oninput = (): void => labelerChart.setThresholdGap(Number(thGapInput.value) || 0);
-  thWinReset.onclick = (): void => labelerChart.clearCaptureWindow();
+  thGapInput.oninput = (): void => chart.setThresholdGap(Number(thGapInput.value) || 0);
+  thWinReset.onclick = (): void => chart.clearCaptureWindow();
   thAdd.onclick = (): void => {
-    labelerChart.applyThreshold(); // commits spans → incidents (fires onIncidentsChange)
+    chart.applyThreshold(); // commits spans → incidents (fires onIncidentsChange)
   };
   // Esc backs out of whichever capture tool is active; routed through the setters
   // so the toggle/bar state stays in sync with the chart.
@@ -849,14 +963,13 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     if (res.type !== 'result' || res.id !== reqId || !lastParams) return; // ignore stale
     spinner.classList.remove('on');
     const params = lastParams;
-    const fireTs = res.fires.map((i) => series.timestamps[i]);
-    const alerts: ChartAlert[] = fireTs.map((t) => ({ t, kind: 'anomaly' }));
-    chart.render({ series, scored: res.scored, params, alerts, incidents });
     lastScored = res.scored;
-    lastFireTs = fireTs;
+    lastFireTs = res.fires.map((i) => series.timestamps[i]);
     lastFireSpans = res.fireSpans;
-    lastAlerts = alerts;
-    renderLabeler(); // refresh the labeler's mirrored anomaly dots + alert ticks
+    // Re-bind each fired alert to its stored review verdict (by streak-span overlap)
+    // so a recompute that moves the alerts keeps the greens/slates it earned.
+    lastAlerts = buildAlerts();
+    chart.render({ series, scored: res.scored, params, alerts: lastAlerts, incidents });
     renderMetrics();
     statBar.textContent =
       `${res.flagged} flagged · ${res.fires.length} alert${res.fires.length === 1 ? '' : 's'} · ` +
@@ -886,7 +999,6 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   function setActivePoints(count: number): void {
     series = sliceSeries(count);
     worker.postMessage({ type: 'series', series });
-    renderLabeler(); // keep the labeler chart on the same active series
     recompute();
   }
   let trimDebounce = 0;
@@ -1146,14 +1258,13 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   );
   controls.appendChild(consecutiveCtl.row);
 
-  // y = 0 reference line — applies to BOTH synced charts at once.
+  // y = 0 reference line.
   const zeroRow = el('div', 'dtk-ctl');
   const zeroLab = el('label', 'dtk-check');
   const zeroBox = el('input');
   zeroBox.type = 'checkbox';
   zeroBox.onchange = (): void => {
     chart.setZeroLine(zeroBox.checked);
-    labelerChart.setZeroLine(zeroBox.checked);
   };
   zeroLab.title =
     'Draw a horizontal line at y = 0 and include zero in the scale — for real-valued metrics ' +
@@ -1163,13 +1274,13 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   zeroRow.appendChild(zeroLab);
   controls.appendChild(zeroRow);
 
-  // Marked-incidents list (label edit + focus + delete; marking happens on the
-  // lower chart). Shares the SAME `incidents` array the labeler chart edits.
+  // Marked-incidents list (label edit + focus + delete). Shares the SAME `incidents`
+  // array the chart edits in Label mode.
   const incidentsWrap = el('div', 'dtk-ctl dtk-incidents');
   incidentsWrap.appendChild(
     ctlLabel(
       'Marked incidents',
-      'The real incidents marked on the lower chart. Edit a label, focus to zoom both charts to ' +
+      'The real incidents you marked (in Label mode). Edit a label, focus to zoom the chart to ' +
         'it, or remove it. Save the set below to incidents/<metric>/ — the same store dtk autotune reads.',
     ),
   );
@@ -1180,12 +1291,10 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   function focusIncident(iv: Incident): void {
     const pad = Math.max((iv.end - iv.start) * 0.5, payload.interval_seconds * 1000 * 5);
     chart.setViewWindow(iv.start - pad, iv.end + pad);
-    labelerChart.setViewWindow(iv.start - pad, iv.end + pad);
   }
   function deleteIncident(iv: Incident): void {
     const k = incidents.indexOf(iv);
     if (k >= 0) incidents.splice(k, 1);
-    labelerChart.setIncidents(incidents);
     chart.setIncidents(incidents);
     refreshIncidentList();
     renderMetrics();
@@ -1195,7 +1304,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     const sorted = [...incidents].sort((a, b) => a.start - b.start);
     if (!sorted.length) {
       incidentsList.appendChild(
-        el('div', 'dtk-inc-empty', 'None yet — drag across the lower chart to mark one.'),
+        el('div', 'dtk-inc-empty', 'None yet — switch to Label mode and drag across the chart, or confirm alerts in Review mode.'),
       );
       return;
     }
@@ -1315,7 +1424,20 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   const fmtUtc = (ms: number): string => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
   const buildLabelsYaml = (): string => {
     const lines = [`metric: ${payload.metric}`, 'timezone: UTC'];
-    const sorted = [...incidents].sort((a, b) => a.start - b.start);
+    // Manual incidents PLUS a derived incident for each confirmed (valid) alert, so
+    // confirming alerts feeds the next supervised `dtk autotune` too. De-dup by span.
+    const validIvs: Incident[] = reviews
+      .filter((r) => r.verdict === 'valid')
+      .map((r) => ({ start: r.start, end: r.end, label: 'alert (confirmed)' }));
+    const seen = new Set<string>();
+    const sorted = [...incidents, ...validIvs]
+      .sort((a, b) => a.start - b.start)
+      .filter((iv) => {
+        const k = `${Math.round(iv.start)}:${Math.round(iv.end)}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
     if (!sorted.length) {
       lines.push('incidents: []');
     } else {
@@ -1327,10 +1449,18 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     }
     // Persist the painted threshold-capture window so the regime scope is auditable
     // and restored on reopen. Pure metadata — autotune ignores it.
-    const cap = labelerChart.getCaptureWindow();
+    const cap = chart.getCaptureWindow();
     if (cap) {
       lines.push('capture_windows:');
       lines.push(`  - {start: "${fmtUtc(cap.start)}", end: "${fmtUtc(cap.end)}"}`);
+    }
+    // Per-alert verdicts as metadata so the green/slate markers re-seed on reopen
+    // (re-bound by streak-span overlap). Autotune ignores this block.
+    if (reviews.length) {
+      lines.push('alert_reviews:');
+      for (const r of [...reviews].sort((a, b) => a.start - b.start)) {
+        lines.push(`  - {start: "${fmtUtc(r.start)}", end: "${fmtUtc(r.end)}", verdict: ${r.verdict}}`);
+      }
     }
     return lines.join('\n') + '\n';
   };
@@ -1391,7 +1521,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   main.appendChild(labelsWrap);
 
   // ---- first paint + resize -------------------------------------------------
-  renderLabeler();
+  setUiMode('tune');
   refreshIncidentList();
   runRecompute();
   renderMetrics();
@@ -1400,7 +1530,6 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     if (rafResize) cancelAnimationFrame(rafResize);
     rafResize = requestAnimationFrame(() => {
       chart.resize();
-      labelerChart.resize();
     });
   });
 }
@@ -1457,10 +1586,13 @@ function injectStyle(): void {
   color:#fff;background:var(--c);border-radius:999px;padding:3px 10px;}
 .dtk-tune-sub{color:var(--muted);font-size:13px;margin-top:4px;font-family:var(--mono);}
 .dtk-tune-desc{color:var(--muted);font-size:13px;margin-top:8px;white-space:pre-wrap;}
-.dtk-tune-grid{display:grid;grid-template-columns:280px 1fr;gap:24px;margin-top:20px;align-items:start;}
-@media(max-width:820px){.dtk-tune-grid{grid-template-columns:1fr;}}
-.dtk-tune-controls{display:flex;flex-direction:column;gap:16px;background:var(--surface);
-  border:1px solid var(--border);border-radius:12px;padding:16px;}
+.dtk-tune-dock{margin-top:14px;}
+.dtk-tune-dockhead{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.dtk-dock-toggle{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:8px;
+  padding:7px 14px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;}
+.dtk-dock-toggle:hover{border-color:var(--c);color:var(--c7);}
+.dtk-tune-controls{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:14px 22px;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;align-items:start;}
 .dtk-ctl{display:flex;flex-direction:column;gap:6px;}
 .dtk-ctl-head{display:flex;justify-content:space-between;align-items:baseline;}
 .dtk-ctl-label{font-size:12px;font-weight:600;color:var(--ink);}
@@ -1473,8 +1605,8 @@ function injectStyle(): void {
 .dtk-seg-btn.on{background:var(--c);color:#fff;font-weight:600;}
 .dtk-range{width:100%;accent-color:var(--c);cursor:pointer;}
 .dtk-check{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:2px;cursor:pointer;}
-.dtk-tune-main{display:flex;flex-direction:column;gap:10px;min-width:0;}
-.dtk-tune-chart{position:relative;width:100%;height:470px;background:var(--surface);
+.dtk-tune-main{display:flex;flex-direction:column;gap:10px;min-width:0;margin-top:14px;}
+.dtk-tune-chart{position:relative;width:100%;height:min(56vh,560px);min-height:420px;background:var(--surface);
   border:1px solid var(--border);border-radius:12px;overflow:hidden;}
 .dtk-tune-chart canvas{width:100%;height:100%;display:block;}
 .dtk-tune-readout{font-family:var(--mono);font-size:12px;color:var(--muted);min-height:18px;}
@@ -1519,6 +1651,10 @@ function injectStyle(): void {
 .dtk-leg-sw.dot{width:9px;height:9px;border-radius:50%;background:var(--anom);}
 .dtk-leg-sw.alert{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;
   border-top:7px solid var(--anom);}
+.dtk-leg-sw.alert-ok{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;
+  border-top:7px solid var(--green);}
+.dtk-leg-sw.alert-no{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;
+  border-top:7px solid #5a7a8c;}
 .dtk-leg-txt{white-space:nowrap;}
 .dtk-season-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
 .dtk-season-col{font-family:var(--mono);font-size:11.5px;color:var(--muted);
@@ -1536,6 +1672,14 @@ function injectStyle(): void {
   margin-top:4px;flex-wrap:wrap;}
 .dtk-tune-labhint{font-family:var(--mono);font-size:11px;color:var(--faint);}
 .dtk-tune-labchart{height:240px;}
+.dtk-tune-modes{display:inline-flex;gap:4px;background:var(--ink);border-radius:9px;padding:4px;margin:2px 0;align-self:flex-start;}
+.dtk-mode-btn{border:0;background:transparent;color:#c9c2b4;font-family:var(--sans);font-size:13px;font-weight:600;
+  padding:7px 16px;border-radius:6px;cursor:pointer;transition:background .12s,color .12s;}
+.dtk-mode-btn:hover{color:#fff;}
+.dtk-mode-btn.on{background:var(--c);color:#fff;}
+.dtk-tune-reviewbar{align-items:center;}
+.dtk-tune-reviewbar .dtk-apply-btn{background:var(--green);}
+.dtk-tune-reviewbar .dtk-apply-btn:hover{background:#27815d;}
 .dtk-th{display:flex;flex-direction:column;gap:8px;margin:2px 0 6px;}
 .dtk-th-toggles{display:flex;gap:8px;flex-wrap:wrap;}
 .dtk-th-toggle{align-self:flex-start;border:1px solid var(--border);background:var(--surface);
@@ -1553,8 +1697,8 @@ function injectStyle(): void {
 .dtk-th-scope{font-family:var(--mono);font-size:11px;color:var(--muted);align-self:center;flex:1 1 160px;}
 .dtk-th-add{padding:7px 14px;}
 .dtk-th-add:disabled{opacity:.5;cursor:default;}
-.dtk-incidents{gap:8px;}
-.dtk-inc-list{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto;}
+.dtk-incidents{gap:8px;grid-column:1/-1;}
+.dtk-inc-list{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow:auto;}
 .dtk-inc-empty{font-size:12px;color:var(--faint);font-style:italic;}
 .dtk-inc-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:var(--paper);
   border:1px solid var(--border);border-radius:7px;padding:6px 8px;}

@@ -579,36 +579,59 @@ seeded from the metric's alerting `direction` (multi-detector `same` → `any`).
 window-size and half-life sliders echo their wall-clock span next to the point
 count.
 
-**Incident labeling + live alert-quality metrics (the "cockpit").** Beneath the
-detector chart `tune.ts` mounts a **second, synced labeler chart** (the shared
-`demo/chart.ts` in a new opt-in `labeling` mode): drag the plot to mark a real
-incident span, drag its edges to resize / its middle to move, click its ✕ (or
-select + Delete) to remove. In `labeling` mode the chart draws the **raw line +
-the detector's anomaly dots** (the band/center/warm-up are suppressed — they
-belong to the detector chart above), fed the live `scored` array so the dots
-mirror what the band flags; this gives the lasso a cloud to grab. The two charts
-share one incident array (by
-reference), so list-edited labels and drag-edited spans never diverge; they also
-share **x-zoom/pan** (each chart's `onViewChange` drives the other's
-`setViewWindow`, suppressing re-emit so it never loops), **y-scale** (both
-`yFit:'data'`) and the **"Points shown"** trim. The detector chart hides its own
-navigator strip (`showNavigator:false`) and overlays the same spans **read-only**
-so alerts vs incidents read together; the labeler chart owns the strip. A
-prominent **metrics bar** recomputes as you tune from the worker's fired-alert
-**streak spans** vs the marked spans: **incident catch rate (recall)** = incidents
-whose span **overlaps** an alert's anomaly streak / total, and **false-alert rate
-(FDR)** = alerts whose streak overlaps no incident / total (shown as `%` and "≈1
-in N false", kept to one decimal below 10 so a mostly-false rate doesn't round to a
-misleading "1 in 1"). Matching on the whole streak span (not just the fire instant,
-which lands `consecutive-1` intervals into the streak) is the recall-undercount
-fix: `tune.worker.ts` returns a `fireSpans` array (the maximal grid-adjacent
-flagged run per fire) alongside `fires`, and `computeQuality` overlaps those
-against incidents. Only incidents overlapping the
-**loaded (possibly trimmed) series** are scored, so an out-of-window label can't
-mechanically drag recall down. Labeling is anchored here (not the
-read-only report) because the labels are fixed ground truth while only the alerts
-move as you tune. Two capture tools live in `chart.ts`'s `labeling` mode (mutually
-exclusive, each toggled from a toolbar above the labeler chart): **Threshold
+**The cockpit — one mode-driven chart (the "windshield").** `tune.ts` drives a
+**single** chart (the shared `demo/chart.ts` with `labeling:true` + a `mode`): the
+old detector and labeler charts are merged onto one canvas that fills the screen,
+the controls live in a **collapsible dock under it**, and the live metrics ride
+right beneath the chart — no scrolling past the chart to reach the knobs. A **mode
+switch** (`chart.setMode`) decides which visual LAYERS are full/dimmed/hidden and
+which interactions are armed, generalizing the old ad-hoc `runs = labeling ? [] : …`
+band-suppression into a per-layer table:
+
+| layer | `tune` | `review` | `label` |
+|---|---|---|---|
+| band fill + center | full | ghost (~0.3) | hidden |
+| anomaly dots | full | dim | dim (lasso target) |
+| alert markers | full | full (subject) | dim |
+| incident spans | dim, read-only | dim, read-only | full, **editable** |
+| capture tools (threshold/lasso) | — | — | armed |
+| hover window | on | — | — |
+
+Layers are dimmed by scaling base alpha (not removed), so the non-active job recedes
+to locatable context instead of competing for pixels. A non-labeling chart (the
+landing demo) has no `mode` and always renders the `tune` layer set — i.e. exactly
+as before.
+
+In **Label** mode you mark incidents (drag a span, edges/middle, ✕/Delete; lasso the
+anomaly cloud; threshold-capture). In **Review** mode the alerts lead and you
+**confirm each fired alert**: clicking its marker cycles the verdict un-reviewed →
+valid → false (chart-side `hitAlert` + `onAlertReviewChange`; the chart is stateless
+about reviews, reading the verdict from the marker's `kind` —
+`anomaly`/`anomaly-validated`/`anomaly-false`, colored red/green/slate via the
+`drawAlertMarkers` color closure). `tune.ts` stores verdicts by **streak span**
+(`reviews[]`, re-bound to the moved alerts by overlap on each recompute) and rebuilds
+the alert `kind`s. A confirmed **valid** alert is the user asserting a real incident
+happened there: its span folds into the ground-truth set as a **virtual incident**, so
+`computeQuality` counts it caught (recall) + correct (FDR) with no extra scoring code
+(no hand-drawn span needed), and it is written as a normal incident on **Save**
+(feeding the next supervised autotune); a `false` verdict stays a false alarm. A
+**Confirm all unreviewed valid** button does the lot; the metrics bar gains a
+**reviewed N/M** chip; verdicts persist as an `alert_reviews:` metadata block
+(`autotune/labels.py` parses it like `capture_windows`; autotune ignores it).
+
+A prominent **metrics bar** recomputes as you tune from the worker's fired-alert
+**streak spans** vs the ground-truth incidents (marked **+ validated**): **incident
+catch rate (recall)** = incidents whose span **overlaps** an alert's anomaly streak /
+total, and **false-alert rate (FDR)** = alerts whose streak overlaps no incident and
+aren't confirmed valid / total (shown as `%` and "≈1 in N false", kept to one decimal
+below 10 so a mostly-false rate doesn't round to a misleading "1 in 1"). Matching on
+the whole streak span (not just the fire instant, which lands `consecutive-1` intervals
+into the streak) is the recall-undercount fix: `tune.worker.ts` returns a `fireSpans`
+array (the maximal grid-adjacent flagged run per fire) alongside `fires`, and
+`computeQuality` overlaps those. Only incidents overlapping the **loaded (possibly
+trimmed) series** are scored, so an out-of-window label can't mechanically drag recall
+down. Two capture tools are armed only in **Label** mode (mutually exclusive, toggled
+from the dock): **Threshold
 capture** (ported from the autotune `html_labeler`, behind `setThresholdMode` +
 an `onThresholdChange` callback) grabs every contiguous run of points on the chosen
 side of a horizontal line in one click — click/value sets the line, a horizontal

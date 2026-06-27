@@ -493,8 +493,9 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   const hud = el('div', 'dtk-tune-hud');
   hud.appendChild(metricsBar);
   stage.appendChild(hud);
-  // Stage footer (hover readout + stat line + season warning + legend) — created
-  // now, filled below; attached right under the chart.
+  // Stage footer (hover readout + stat line + season warning) — created now,
+  // filled below; attached right under the chart. (The legend is a TOP strip,
+  // mounted above the chart, not here — see below.)
   const stageFoot = el('div', 'dtk-tune-stagefoot');
 
   // The control rail: a fixed header (mode-named + collapse), the scrolling control
@@ -607,7 +608,11 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   // mounted at its left), so switching modes never requires a scroll.
   hud.appendChild(modeRow);
 
-  // legend
+  // Legend — a colour key for the chart, pinned at the TOP of the stage (right
+  // under the HUD, above the chart) so it reads almost immediately and stays put
+  // in EVERY mode (it lives in the stage, not the mode-aware rail). It leads with
+  // the alert colours — red (fired), green (confirmed valid), slate (false alarm) —
+  // the three markers a user most needs decoded while reviewing.
   const legend = el('div', 'dtk-tune-legend');
   const legItem = (sw: string, text: string, hint: string): void => {
     const item = el('span', 'dtk-leg-item');
@@ -616,14 +621,15 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     item.appendChild(el('span', 'dtk-leg-txt', text));
     legend.appendChild(item);
   };
-  legItem('line', 'metric', 'The metric value over time.');
-  legItem('band', 'expected range', "The detector's confidence band — values inside it read as normal.");
-  legItem('center', 'band center', 'The expected value at the middle of the band.');
-  legItem('dot', 'anomaly', 'A point the detector flagged as anomalous (outside the band).');
   legItem('alert', 'alert', 'A fired alert, not yet reviewed — enough consecutive anomalies to meet the rule.');
   legItem('alert-ok', 'valid alert', 'An alert you confirmed is real (click a marker in Review mode). Counts toward recall.');
   legItem('alert-no', 'false alarm', 'An alert you marked a false positive. Stays in the false-alert rate.');
-  stageFoot.appendChild(legend);
+  legItem('dot', 'anomaly', 'A point the detector flagged as anomalous (outside the band).');
+  legItem('line', 'metric', 'The metric value over time.');
+  legItem('band', 'expected range', "The detector's confidence band — values inside it read as normal.");
+  legItem('center', 'band center', 'The expected value at the middle of the band.');
+  // Mount it as a top strip between the HUD and the chart, not in the footer below.
+  stage.insertBefore(legend, chartWrap);
 
   const readout = el('div', 'dtk-tune-readout');
   stageFoot.appendChild(readout);
@@ -1731,7 +1737,8 @@ function injectStyle(): void {
 .dtk-spin-ring{width:12px;height:12px;border-radius:50%;border:2px solid rgba(245,241,232,0.25);
   border-top-color:var(--c);animation:dtk-spin .7s linear infinite;}
 @keyframes dtk-spin{to{transform:rotate(360deg);}}
-.dtk-tune-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);padding:2px 2px 0;}
+.dtk-tune-legend{flex:0 0 auto;display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;font-size:12px;
+  color:var(--muted);padding:6px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px;}
 .dtk-leg-item{display:inline-flex;align-items:center;gap:6px;cursor:help;}
 .dtk-leg-sw{display:inline-block;flex:0 0 auto;}
 .dtk-leg-sw.line{width:16px;height:3px;background:var(--c);border-radius:2px;}

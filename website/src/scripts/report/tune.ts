@@ -1403,10 +1403,25 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   const statBar = el('div', 'dtk-tune-stat');
   stageFoot.appendChild(statBar);
 
+  // The effective-config readout is a vertical hog, so it's **collapsed by default**
+  // (a one-line clickable header) to give the scrolling knob column more room; click
+  // the header to expand it. configEcho stays updated even while hidden, so it shows
+  // the current config the moment it's opened.
   const cfgWrap = el('div', 'dtk-tune-cfg');
-  cfgWrap.appendChild(el('span', 'dtk-tune-cfg-k', '// effective config'));
+  const cfgToggle = el('button', 'dtk-tune-cfg-k');
+  cfgToggle.type = 'button';
+  cfgToggle.title = 'Show or hide the exact config that will be written on Apply.';
   const configEcho = el('code', 'dtk-tune-cfg-v');
+  let cfgOpen = false;
+  const setCfgOpen = (open: boolean): void => {
+    cfgOpen = open;
+    configEcho.style.display = open ? '' : 'none';
+    cfgToggle.textContent = `${open ? '▾' : '▸'} // effective config`;
+  };
+  cfgToggle.onclick = (): void => setCfgOpen(!cfgOpen);
+  cfgWrap.appendChild(cfgToggle);
   cfgWrap.appendChild(configEcho);
+  setCfgOpen(false);
   railFoot.appendChild(cfgWrap);
 
   if (payload.save_url) {
@@ -1680,10 +1695,12 @@ function injectStyle(): void {
 .dtk-tune-stat{font-family:var(--mono);font-size:12px;color:var(--ink);}
 .dtk-tune-warn{font-family:var(--mono);font-size:12px;line-height:1.5;color:var(--c7);
   background:rgba(240,173,78,0.13);border:1px solid rgba(240,173,78,0.5);border-radius:8px;padding:8px 11px;}
-.dtk-tune-cfg{background:var(--ink);color:#c9c2b4;border-radius:8px;padding:10px 12px;font-family:var(--mono);
+.dtk-tune-cfg{background:var(--ink);color:#c9c2b4;border-radius:8px;padding:8px 11px;font-family:var(--mono);
   font-size:12px;overflow-x:auto;}
-.dtk-tune-cfg-k{color:var(--faint);display:block;margin-bottom:4px;}
-.dtk-tune-cfg-v{color:#e6e0d4;white-space:pre-wrap;word-break:break-word;}
+.dtk-tune-cfg-k{display:flex;width:100%;border:0;background:transparent;color:var(--faint);
+  font-family:var(--mono);font-size:11.5px;cursor:pointer;padding:0;text-align:left;}
+.dtk-tune-cfg-k:hover{color:#e6e0d4;}
+.dtk-tune-cfg-v{display:block;color:#e6e0d4;white-space:pre-wrap;word-break:break-word;margin-top:6px;}
 .dtk-tune-apply{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .dtk-apply-btn{background:var(--c);color:#fff;border:0;border-radius:8px;padding:10px 18px;font-family:var(--sans);
   font-size:14px;font-weight:600;cursor:pointer;}

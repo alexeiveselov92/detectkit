@@ -5,6 +5,14 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.39.1] - 2026-06-27
+
+### Changed
+- **`dtk tune`: the "effective config" readout in the rail footer is now collapsed
+  by default** (a one-line clickable header) so the scrolling knob column gets more
+  vertical room; click the header to expand it. The readout stays up to date while
+  hidden, so it shows the current config the moment it's opened.
+
 ## [0.39.0] - 2026-06-27
 
 ### Changed

@@ -512,13 +512,20 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   rail.appendChild(railHead);
   const controls = el('div', 'dtk-tune-controls');
   rail.appendChild(controls);
-  // Per-mode control groups — only one is shown at a time (driven by setUiMode).
+  // Controls split into ALWAYS-visible common groups + per-mode groups. The common
+  // groups apply to every mode, so they stay put as you switch — `topCommon` (the
+  // data window: Points shown) at the top, `alertCommon` (the alert rule — direction
+  // + consecutive — and the y = 0 view toggle) at the bottom. setUiMode only toggles
+  // the per-mode group sandwiched between them. Column order: topCommon · <mode> ·
+  // alertCommon.
+  const topCommon = el('div', 'dtk-rail-group');
   const tuneGroup = el('div', 'dtk-rail-group');
   const reviewGroup = el('div', 'dtk-rail-group');
   const labelGroup = el('div', 'dtk-rail-group');
+  const alertCommon = el('div', 'dtk-rail-group');
   reviewGroup.style.display = 'none';
   labelGroup.style.display = 'none';
-  controls.append(tuneGroup, reviewGroup, labelGroup);
+  controls.append(topCommon, tuneGroup, reviewGroup, labelGroup, alertCommon);
   // Tune-only footer (effective config + Apply); hidden in Review / Label.
   const railFoot = el('div', 'dtk-tune-railfoot');
   rail.appendChild(railFoot);
@@ -537,7 +544,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   dockToggle.onclick = (): void => setDock(false);
   railOpen.onclick = (): void => setDock(true);
 
-  // ---- trim slider (top of the Tune panel) ---------------------------------
+  // ---- trim slider (top of the rail — applies to every mode) ---------------
   // Shorten the active sample to the most-recent N points. The fitted period
   // shrinks and the live recompute speeds up (cost ∝ points × window). Echo is
   // live; the actual re-slice/recompute is debounced.
@@ -561,7 +568,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   trimInput.step = String(Math.max(1, Math.round(n / 200)));
   trimInput.value = String(n);
   trimWrap.appendChild(trimInput);
-  tuneGroup.appendChild(trimWrap);
+  topCommon.appendChild(trimWrap);
 
   // chart
   const chartWrap = el('div', 'dtk-tune-chart');
@@ -1283,7 +1290,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       'band (up) or only drops BELOW it (down). A preview filter mirroring the alert direction ' +
       'policy — it never changes the band itself.',
   );
-  tuneGroup.appendChild(directionCtl.row);
+  alertCommon.appendChild(directionCtl.row);
 
   const consecutiveCtl = rangeControl(
     'Alert: consecutive anomalies',
@@ -1301,7 +1308,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       recompute();
     },
   );
-  tuneGroup.appendChild(consecutiveCtl.row);
+  alertCommon.appendChild(consecutiveCtl.row);
 
   // y = 0 reference line.
   const zeroRow = el('div', 'dtk-ctl');
@@ -1317,7 +1324,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   zeroLab.appendChild(zeroBox);
   zeroLab.appendChild(document.createTextNode(' Show y = 0 line'));
   zeroRow.appendChild(zeroLab);
-  tuneGroup.appendChild(zeroRow);
+  alertCommon.appendChild(zeroRow);
 
   // Marked-incidents list (label edit + focus + delete). Shares the SAME `incidents`
   // array the chart edits in Label mode.
@@ -1403,10 +1410,25 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   const statBar = el('div', 'dtk-tune-stat');
   stageFoot.appendChild(statBar);
 
+  // The effective-config readout is a vertical hog, so it's **collapsed by default**
+  // (a one-line clickable header) to give the scrolling knob column more room; click
+  // the header to expand it. configEcho stays updated even while hidden, so it shows
+  // the current config the moment it's opened.
   const cfgWrap = el('div', 'dtk-tune-cfg');
-  cfgWrap.appendChild(el('span', 'dtk-tune-cfg-k', '// effective config'));
+  const cfgToggle = el('button', 'dtk-tune-cfg-k');
+  cfgToggle.type = 'button';
+  cfgToggle.title = 'Show or hide the exact config that will be written on Apply.';
   const configEcho = el('code', 'dtk-tune-cfg-v');
+  let cfgOpen = false;
+  const setCfgOpen = (open: boolean): void => {
+    cfgOpen = open;
+    configEcho.style.display = open ? '' : 'none';
+    cfgToggle.textContent = `${open ? '▾' : '▸'} // effective config`;
+  };
+  cfgToggle.onclick = (): void => setCfgOpen(!cfgOpen);
+  cfgWrap.appendChild(cfgToggle);
   cfgWrap.appendChild(configEcho);
+  setCfgOpen(false);
   railFoot.appendChild(cfgWrap);
 
   if (payload.save_url) {
@@ -1659,7 +1681,7 @@ function injectStyle(): void {
 .dtk-dock-toggle{flex:0 0 auto;border:1px solid var(--border);background:var(--surface);color:var(--muted);
   border-radius:7px;padding:4px 10px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;line-height:1;}
 .dtk-dock-toggle:hover{border-color:var(--c);color:var(--c7);}
-.dtk-tune-controls{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;padding:14px;}
+.dtk-tune-controls{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:14px;}
 .dtk-rail-group{display:flex;flex-direction:column;gap:14px;}
 .dtk-ctl{display:flex;flex-direction:column;gap:6px;}
 .dtk-ctl-head{display:flex;justify-content:space-between;align-items:baseline;}
@@ -1680,10 +1702,12 @@ function injectStyle(): void {
 .dtk-tune-stat{font-family:var(--mono);font-size:12px;color:var(--ink);}
 .dtk-tune-warn{font-family:var(--mono);font-size:12px;line-height:1.5;color:var(--c7);
   background:rgba(240,173,78,0.13);border:1px solid rgba(240,173,78,0.5);border-radius:8px;padding:8px 11px;}
-.dtk-tune-cfg{background:var(--ink);color:#c9c2b4;border-radius:8px;padding:10px 12px;font-family:var(--mono);
+.dtk-tune-cfg{background:var(--ink);color:#c9c2b4;border-radius:8px;padding:8px 11px;font-family:var(--mono);
   font-size:12px;overflow-x:auto;}
-.dtk-tune-cfg-k{color:var(--faint);display:block;margin-bottom:4px;}
-.dtk-tune-cfg-v{color:#e6e0d4;white-space:pre-wrap;word-break:break-word;}
+.dtk-tune-cfg-k{display:flex;width:100%;border:0;background:transparent;color:var(--faint);
+  font-family:var(--mono);font-size:11.5px;cursor:pointer;padding:0;text-align:left;}
+.dtk-tune-cfg-k:hover{color:#e6e0d4;}
+.dtk-tune-cfg-v{display:block;color:#e6e0d4;white-space:pre-wrap;word-break:break-word;margin-top:6px;}
 .dtk-tune-apply{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .dtk-apply-btn{background:var(--c);color:#fff;border:0;border-radius:8px;padding:10px 18px;font-family:var(--sans);
   font-size:14px;font-weight:600;cursor:pointer;}

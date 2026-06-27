@@ -5,6 +5,21 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.39.1] - 2026-06-27
+
+### Changed
+- **`dtk tune` rail refinements.** The **"effective config" readout** in the rail
+  footer is now **collapsed by default** (a one-line clickable header — click to
+  expand) so the knob column gets more vertical room; it stays up to date while
+  hidden, so it shows the current config the moment it's opened.
+- **Controls that aren't detector-specific now stay visible in every mode** instead
+  of only in Tune: the **Points shown** data-window trim at the top of the rail, and
+  the alert rule (**Direction** — which way the alert fires — and **consecutive
+  anomalies** — how many in a row) plus the **Show y = 0 line** view toggle at the
+  bottom. They frame the band, the alerts you review, and the recall/FDR you watch
+  while labeling, so they apply to all three modes; only the detector knobs / verdict
+  actions / capture tools swap with the mode.
+
 ## [0.39.0] - 2026-06-27
 
 ### Changed

@@ -85,7 +85,9 @@ cockpit**: ONE chart (the windshield) fills the view, the live metrics ride
 **pinned in a HUD over the chart** (the speedometer), and every control lives in an
 **always-visible, mode-aware side rail** beside the chart (Tune shows the detector
 knobs + effective config + Apply, Review the verdict actions, Label the capture
-tools + incident list + Save). The chart is
+tools + incident list + Save), while the controls that aren't detector-specific —
+the **Points shown** data window, the alert rule (**direction** + **consecutive
+anomalies**) and the **y = 0** toggle — stay visible in every mode. The chart is
 **zoomable** (scroll/drag + navigator strip) with a **"Points shown"** trim slider.
 Clicking **Apply** writes the chosen
 config back into the metric YAML **in place** (autotune, by contrast, writes a new

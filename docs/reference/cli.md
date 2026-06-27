@@ -806,8 +806,11 @@ The whole screen is **one chart** (the windshield) with the live metrics pinned 
 a HUD over it (the speedometer) and every control in an **always-visible side rail**
 that is **mode-aware** — it shows only the current mode's panel (detector knobs +
 effective-config readout + Apply in Tune, verdict actions in Review, capture tools +
-Save in Label) and collapses to give the chart the whole width. A **mode switch**
-picks the job and dims the layers that don't matter to it:
+Save in Label) and collapses to give the chart the whole width. The controls that
+aren't detector-specific — the **Points shown** data window, the alert rule
+(**direction** + **consecutive anomalies**) and the **y = 0** toggle — stay visible
+in every mode. A **mode switch** picks the job and dims the layers that don't matter
+to it:
 
 - **Tune** — steer the band (corridor leads; incidents are read-only context; hover
   a point for its window).

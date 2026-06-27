@@ -591,9 +591,14 @@ collapses (the slim `.dtk-rail-open` tab brings it back). The rail is
 **mode-partitioned** — `setUiMode` shows only the current mode's group
 (`.dtk-rail-group`) and renames the rail header: the detector knobs + the
 effective-config echo + **Apply** (the last two in the Tune-only
-`.dtk-tune-railfoot`) in **Tune**, the verdict actions in **Review**, the capture
-tools + incident list + **Save incidents** in **Label** — never every control at
-once. A **mode switch** (`chart.setMode`, in the HUD) decides which visual LAYERS
+`.dtk-tune-railfoot`; the echo is collapsed by default) in **Tune**, the verdict
+actions in **Review**, the capture tools + incident list + **Save incidents** in
+**Label** — never every control at once. Two **always-visible common groups**
+sandwich the per-mode group (never toggled by `setUiMode`): `topCommon` (the
+**Points shown** data-window trim) above it and `alertCommon` (the alert rule —
+**direction** + **consecutive anomalies** — plus the **y = 0** view toggle) below
+it, since those shape the band / the reviewed alerts / the recall+FDR in every
+mode. A **mode switch** (`chart.setMode`, in the HUD) decides which visual LAYERS
 are full/dimmed/hidden and which interactions are armed, generalizing the old ad-hoc
 `runs = labeling ? [] : …` band-suppression into a per-layer table:
 

@@ -113,7 +113,11 @@ always in view), and every control lives in an **always-visible side rail** besi
 the chart — so the first thing you do is turn a knob and watch the band, with no
 scrolling. The rail is **mode-aware**: it shows only the controls the current mode
 needs (the detector knobs + Apply in Tune, the verdict actions in Review, the
-capture tools + Save in Label), and collapses to give the chart the whole width. A
+capture tools + Save in Label), and collapses to give the chart the whole width.
+The controls that aren't detector-specific — the **Points shown** data window, the
+alert rule (**direction** + **consecutive anomalies**) and the **y = 0** toggle —
+stay visible in every mode, since they shape the band, the alerts you review, and
+the recall/FDR you watch while labeling. A
 **mode switch** above the chart picks the job; the layers that don't matter to it
 dim to context instead of competing for pixels:
 

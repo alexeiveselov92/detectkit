@@ -512,13 +512,20 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   rail.appendChild(railHead);
   const controls = el('div', 'dtk-tune-controls');
   rail.appendChild(controls);
-  // Per-mode control groups — only one is shown at a time (driven by setUiMode).
+  // Controls split into ALWAYS-visible common groups + per-mode groups. The common
+  // groups apply to every mode, so they stay put as you switch — `topCommon` (the
+  // data window: Points shown) at the top, `alertCommon` (the alert rule — direction
+  // + consecutive — and the y = 0 view toggle) at the bottom. setUiMode only toggles
+  // the per-mode group sandwiched between them. Column order: topCommon · <mode> ·
+  // alertCommon.
+  const topCommon = el('div', 'dtk-rail-group');
   const tuneGroup = el('div', 'dtk-rail-group');
   const reviewGroup = el('div', 'dtk-rail-group');
   const labelGroup = el('div', 'dtk-rail-group');
+  const alertCommon = el('div', 'dtk-rail-group');
   reviewGroup.style.display = 'none';
   labelGroup.style.display = 'none';
-  controls.append(tuneGroup, reviewGroup, labelGroup);
+  controls.append(topCommon, tuneGroup, reviewGroup, labelGroup, alertCommon);
   // Tune-only footer (effective config + Apply); hidden in Review / Label.
   const railFoot = el('div', 'dtk-tune-railfoot');
   rail.appendChild(railFoot);
@@ -537,7 +544,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   dockToggle.onclick = (): void => setDock(false);
   railOpen.onclick = (): void => setDock(true);
 
-  // ---- trim slider (top of the Tune panel) ---------------------------------
+  // ---- trim slider (top of the rail — applies to every mode) ---------------
   // Shorten the active sample to the most-recent N points. The fitted period
   // shrinks and the live recompute speeds up (cost ∝ points × window). Echo is
   // live; the actual re-slice/recompute is debounced.
@@ -561,7 +568,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   trimInput.step = String(Math.max(1, Math.round(n / 200)));
   trimInput.value = String(n);
   trimWrap.appendChild(trimInput);
-  tuneGroup.appendChild(trimWrap);
+  topCommon.appendChild(trimWrap);
 
   // chart
   const chartWrap = el('div', 'dtk-tune-chart');
@@ -1283,7 +1290,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       'band (up) or only drops BELOW it (down). A preview filter mirroring the alert direction ' +
       'policy — it never changes the band itself.',
   );
-  tuneGroup.appendChild(directionCtl.row);
+  alertCommon.appendChild(directionCtl.row);
 
   const consecutiveCtl = rangeControl(
     'Alert: consecutive anomalies',
@@ -1301,7 +1308,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       recompute();
     },
   );
-  tuneGroup.appendChild(consecutiveCtl.row);
+  alertCommon.appendChild(consecutiveCtl.row);
 
   // y = 0 reference line.
   const zeroRow = el('div', 'dtk-ctl');
@@ -1317,7 +1324,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   zeroLab.appendChild(zeroBox);
   zeroLab.appendChild(document.createTextNode(' Show y = 0 line'));
   zeroRow.appendChild(zeroLab);
-  tuneGroup.appendChild(zeroRow);
+  alertCommon.appendChild(zeroRow);
 
   // Marked-incidents list (label edit + focus + delete). Shares the SAME `incidents`
   // array the chart edits in Label mode.
@@ -1674,7 +1681,7 @@ function injectStyle(): void {
 .dtk-dock-toggle{flex:0 0 auto;border:1px solid var(--border);background:var(--surface);color:var(--muted);
   border-radius:7px;padding:4px 10px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;line-height:1;}
 .dtk-dock-toggle:hover{border-color:var(--c);color:var(--c7);}
-.dtk-tune-controls{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;padding:14px;}
+.dtk-tune-controls{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:14px;}
 .dtk-rail-group{display:flex;flex-direction:column;gap:14px;}
 .dtk-ctl{display:flex;flex-direction:column;gap:6px;}
 .dtk-ctl-head{display:flex;justify-content:space-between;align-items:baseline;}

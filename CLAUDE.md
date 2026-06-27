@@ -51,8 +51,10 @@ rendered on the docs site under **For developers**). Read the relevant one:
   beside the chart with its own scroll. The rail is **mode-aware** — it shows only
   the current mode's panel (detector knobs + effective config + Apply in **Tune**,
   verdict actions in **Review**, capture tools + incident list + Save in **Label**)
-  and collapses to give the chart the whole width. A **mode switch** picks which
-  layers lead / dim / hide and
+  and collapses to give the chart the whole width — but the controls that aren't
+  detector-specific stay visible in **every** mode (the **Points shown** data
+  window, the alert rule — **direction** + **consecutive anomalies** — and the
+  **y = 0** toggle). A **mode switch** picks which layers lead / dim / hide and
   which interactions are armed — **Tune** (band leads), **Review** (confirm the
   fired alerts: click a marker to cycle un-reviewed → valid (green) → false alarm
   (slate); a confirmed alert folds in as a virtual incident, so a clean metric is

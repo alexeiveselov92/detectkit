@@ -5,6 +5,26 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.39.0] - 2026-06-27
+
+### Changed
+- **`dtk tune` cockpit reworked into a chart-windshield + a mode-aware control
+  rail.** The controls no longer sit in a dock below the chart (where reaching a
+  knob meant scrolling down, then scrolling back up to watch the band). Now the
+  chart fills the screen as the windshield, the live **metrics ride pinned in a
+  HUD over the chart** (the speedometer — always in view across every mode), and
+  every control lives in an **always-visible side rail** beside the chart with its
+  own scroll — so you turn a knob and watch the band change without scrolling or
+  dropping your gaze. Collapse the rail (⟩) to hand the chart the whole width; a
+  slim tab brings it back (the chart re-fits via a `ResizeObserver`).
+- **The control rail is mode-aware** — it shows only the panel the current mode
+  needs instead of every control at once: the detector knobs + the effective-config
+  echo + **Apply** in **Tune**, the verdict actions in **Review**, and the
+  **Threshold capture / Lasso anomalies** tools + the incident list + the **Save
+  incidents** field in **Label** (previously the capture tools were easy to miss and
+  the effective-config / Save controls hung around in every mode). The rail header
+  renames to the active mode's panel.
+
 ## [0.38.0] - 2026-06-27
 
 ### Added

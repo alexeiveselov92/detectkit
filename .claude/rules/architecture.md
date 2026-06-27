@@ -579,14 +579,23 @@ seeded from the metric's alerting `direction` (multi-detector `same` → `any`).
 window-size and half-life sliders echo their wall-clock span next to the point
 count.
 
-**The cockpit — one mode-driven chart (the "windshield").** `tune.ts` drives a
+**The cockpit — chart-windshield + a mode-aware control rail.** `tune.ts` drives a
 **single** chart (the shared `demo/chart.ts` with `labeling:true` + a `mode`): the
-old detector and labeler charts are merged onto one canvas that fills the screen,
-the controls live in a **collapsible dock under it**, and the live metrics ride
-right beneath the chart — no scrolling past the chart to reach the knobs. A **mode
-switch** (`chart.setMode`) decides which visual LAYERS are full/dimmed/hidden and
-which interactions are armed, generalizing the old ad-hoc `runs = labeling ? [] : …`
-band-suppression into a per-layer table:
+old detector and labeler charts are merged onto one canvas that fills the screen as
+the windshield. The live **metrics ride pinned in a HUD strip over the chart** (the
+speedometer — always in view across every mode), and every control lives in an
+**always-visible right-hand rail** (`.dtk-tune-rail`) with its own scroll, so you
+turn a knob and watch the band change with no scrolling and no gaze-drop to a dock
+below; a `ResizeObserver` on the chart box re-fits the canvas when the rail
+collapses (the slim `.dtk-rail-open` tab brings it back). The rail is
+**mode-partitioned** — `setUiMode` shows only the current mode's group
+(`.dtk-rail-group`) and renames the rail header: the detector knobs + the
+effective-config echo + **Apply** (the last two in the Tune-only
+`.dtk-tune-railfoot`) in **Tune**, the verdict actions in **Review**, the capture
+tools + incident list + **Save incidents** in **Label** — never every control at
+once. A **mode switch** (`chart.setMode`, in the HUD) decides which visual LAYERS
+are full/dimmed/hidden and which interactions are armed, generalizing the old ad-hoc
+`runs = labeling ? [] : …` band-suppression into a per-layer table:
 
 | layer | `tune` | `review` | `label` |
 |---|---|---|---|
@@ -631,7 +640,7 @@ array (the maximal grid-adjacent flagged run per fire) alongside `fires`, and
 `computeQuality` overlaps those. Only incidents overlapping the **loaded (possibly
 trimmed) series** are scored, so an out-of-window label can't mechanically drag recall
 down. Two capture tools are armed only in **Label** mode (mutually exclusive, toggled
-from the dock): **Threshold
+from the Label panel of the rail): **Threshold
 capture** (ported from the autotune `html_labeler`, behind `setThresholdMode` +
 an `onThresholdChange` callback) grabs every contiguous run of points on the chosen
 side of a horizontal line in one click — click/value sets the line, a horizontal

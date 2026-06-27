@@ -470,36 +470,74 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   if (payload.description) header.appendChild(el('div', 'dtk-tune-desc', payload.description));
   root.appendChild(header);
 
-  // ---- alert-quality metrics bar -------------------------------------------
+  // ---- alert-quality metrics bar (the "speedometer") -----------------------
   // Operator-facing numbers, recomputed live (real incidents / caught / alerts /
-  // false / reviewed). Created here, mounted under the chart by the layout below.
+  // false / reviewed). Rides pinned in the HUD over the chart so it stays in view
+  // across every mode — never scrolled past.
   const metricsBar = el('div', 'dtk-tune-metrics');
 
-  // ---- layout: chart is the windshield, controls dock below it -------------
-  // The chart + its status rail + metrics fill the top; every knob lives in a
-  // collapsible dock UNDER the chart, so the first interaction is "turn a knob,
-  // watch the band" with no scroll, and you can reclaim the full chart anytime.
-  const main = el('div', 'dtk-tune-main');
-  root.appendChild(main);
-  const dock = el('div', 'dtk-tune-dock');
-  const dockHead = el('div', 'dtk-tune-dockhead');
-  const dockToggle = el('button', 'dtk-dock-toggle', '⚙ Controls');
-  dockToggle.type = 'button';
-  dockToggle.title = 'Show or hide the control dock — collapse it to give the chart the whole screen.';
-  dockHead.appendChild(dockToggle);
-  const controls = el('div', 'dtk-tune-controls');
-  dock.appendChild(dockHead);
-  dock.appendChild(controls);
-  root.appendChild(dock);
-  let dockOpen = true;
-  const setDock = (open: boolean): void => {
-    dockOpen = open;
-    controls.style.display = open ? '' : 'none';
-    dockToggle.classList.toggle('on', open);
-    dockToggle.textContent = open ? '⚙ Controls ▾' : '⚙ Controls ▸';
-  };
+  // ---- cockpit layout: chart-windshield + always-visible control rail -------
+  // The chart fills the screen as the windshield; the live metrics ride pinned in
+  // a HUD strip over it, and every control lives in a right-hand RAIL that is
+  // always visible with its own scroll. So you turn a knob and watch the band
+  // change with no scrolling and no gaze-drop to a dock below. The rail is also
+  // MODE-AWARE: it shows only the panel the current mode needs — the detector
+  // knobs + effective config + Apply in Tune, the verdict actions in Review, the
+  // capture tools + incident list + Save in Label — instead of every control at
+  // once. Collapse it (⟩) to hand the chart the whole width.
+  const cockpit = el('div', 'dtk-tune-cockpit');
+  root.appendChild(cockpit);
+  const stage = el('div', 'dtk-tune-stage');
+  cockpit.appendChild(stage);
+  // HUD over the chart: the speedometer leads, the mode switch sits at the right.
+  const hud = el('div', 'dtk-tune-hud');
+  hud.appendChild(metricsBar);
+  stage.appendChild(hud);
+  // Stage footer (hover readout + stat line + season warning + legend) — created
+  // now, filled below; attached right under the chart.
+  const stageFoot = el('div', 'dtk-tune-stagefoot');
 
-  // ---- trim slider (above the chart) ---------------------------------------
+  // The control rail: a fixed header (mode-named + collapse), the scrolling control
+  // column split into per-mode GROUPS, and a Tune-only action footer (effective
+  // config + Apply) that never scrolls away.
+  const rail = el('div', 'dtk-tune-rail');
+  cockpit.appendChild(rail);
+  const railHead = el('div', 'dtk-tune-railhead');
+  const railTitle = el('span', 'dtk-rail-title', 'Tune · controls');
+  const dockToggle = el('button', 'dtk-dock-toggle', '⟩');
+  dockToggle.type = 'button';
+  dockToggle.title = 'Collapse the control rail to give the chart the whole width.';
+  railHead.appendChild(railTitle);
+  railHead.appendChild(dockToggle);
+  rail.appendChild(railHead);
+  const controls = el('div', 'dtk-tune-controls');
+  rail.appendChild(controls);
+  // Per-mode control groups — only one is shown at a time (driven by setUiMode).
+  const tuneGroup = el('div', 'dtk-rail-group');
+  const reviewGroup = el('div', 'dtk-rail-group');
+  const labelGroup = el('div', 'dtk-rail-group');
+  reviewGroup.style.display = 'none';
+  labelGroup.style.display = 'none';
+  controls.append(tuneGroup, reviewGroup, labelGroup);
+  // Tune-only footer (effective config + Apply); hidden in Review / Label.
+  const railFoot = el('div', 'dtk-tune-railfoot');
+  rail.appendChild(railFoot);
+  // A slim tab on the chart's right edge re-opens the rail once collapsed.
+  const railOpen = el('button', 'dtk-rail-open', '⚙');
+  railOpen.type = 'button';
+  railOpen.title = 'Show the control rail';
+  railOpen.style.display = 'none';
+  stage.appendChild(railOpen);
+
+  const setDock = (open: boolean): void => {
+    rail.style.display = open ? '' : 'none';
+    railOpen.style.display = open ? 'none' : '';
+    // The chart's ResizeObserver re-fits it when the rail hides/shows.
+  };
+  dockToggle.onclick = (): void => setDock(false);
+  railOpen.onclick = (): void => setDock(true);
+
+  // ---- trim slider (top of the Tune panel) ---------------------------------
   // Shorten the active sample to the most-recent N points. The fitted period
   // shrinks and the live recompute speeds up (cost ∝ points × window). Echo is
   // live; the actual re-slice/recompute is debounced.
@@ -523,7 +561,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   trimInput.step = String(Math.max(1, Math.round(n / 200)));
   trimInput.value = String(n);
   trimWrap.appendChild(trimInput);
-  main.appendChild(trimWrap);
+  tuneGroup.appendChild(trimWrap);
 
   // chart
   const chartWrap = el('div', 'dtk-tune-chart');
@@ -534,7 +572,8 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   spinner.appendChild(el('span', 'dtk-spin-ring'));
   spinner.appendChild(el('span', 'dtk-spin-txt', 'computing…'));
   chartWrap.appendChild(spinner);
-  main.appendChild(chartWrap);
+  stage.appendChild(chartWrap);
+  stage.appendChild(stageFoot);
 
   // ---- mode switch (Tune / Review / Label) ----------------------------------
   // One chart, three jobs: the mode picks which layers lead and which interactions
@@ -557,12 +596,9 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     modeBtns[md.v] = b;
     modeRow.appendChild(b);
   });
-  main.appendChild(modeRow);
-  // The live metrics ride right under the chart + mode switch (attached to the
-  // windshield, not buried at the page bottom).
-  main.appendChild(metricsBar);
-  dockToggle.onclick = (): void => setDock(!dockOpen);
-  setDock(true);
+  // The mode switch rides in the HUD at the right of the chart (metrics already
+  // mounted at its left), so switching modes never requires a scroll.
+  hud.appendChild(modeRow);
 
   // legend
   const legend = el('div', 'dtk-tune-legend');
@@ -580,17 +616,17 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   legItem('alert', 'alert', 'A fired alert, not yet reviewed — enough consecutive anomalies to meet the rule.');
   legItem('alert-ok', 'valid alert', 'An alert you confirmed is real (click a marker in Review mode). Counts toward recall.');
   legItem('alert-no', 'false alarm', 'An alert you marked a false positive. Stays in the false-alert rate.');
-  main.appendChild(legend);
+  stageFoot.appendChild(legend);
 
   const readout = el('div', 'dtk-tune-readout');
-  main.appendChild(readout);
+  stageFoot.appendChild(readout);
 
   // Surfaces when the window is too small to fill the chosen seasonality, so the
   // band silently uses global (un-conditioned) statistics. Mirrors the Python
   // detector's runtime warning — without it a wide band reads like a bug.
   const seasonWarn = el('div', 'dtk-tune-warn');
   seasonWarn.style.display = 'none';
-  main.appendChild(seasonWarn);
+  stageFoot.appendChild(seasonWarn);
   const updateSeasonWarn = (params: DetectorParams): void => {
     const groups = params.seasonalityComponents;
     const card = seasonalCardinality(groups);
@@ -834,9 +870,8 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   lassoBar.appendChild(lassoDone);
   lassoBar.style.display = 'none';
   thWrap.appendChild(lassoBar);
-  // The capture toolbar belongs to Label mode (revealed by setUiMode).
-  thWrap.style.display = 'none';
-  main.appendChild(thWrap);
+  // The capture tools live in the Label panel of the rail (shown in Label mode).
+  labelGroup.appendChild(thWrap);
 
   // ---- review bar (Review mode): confirm/clear all alerts at once -----------
   const reviewBar = el('div', 'dtk-th-bar dtk-tune-reviewbar');
@@ -861,11 +896,15 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   };
   reviewBar.appendChild(confirmAllBtn);
   reviewBar.appendChild(clearReviewBtn);
-  reviewBar.style.display = 'none';
-  main.appendChild(reviewBar);
+  reviewGroup.appendChild(reviewBar);
 
   // Drive the chart mode + reveal the matching tools. Defined here (after the tool
   // bars exist) and called by the mode buttons + on first paint.
+  const RAIL_TITLES: Record<ChartMode, string> = {
+    tune: 'Tune · controls',
+    review: 'Review · verdicts',
+    label: 'Label · incidents',
+  };
   function setUiMode(md: ChartMode): void {
     chart.setMode(md);
     (Object.keys(modeBtns) as ChartMode[]).forEach((v) =>
@@ -875,8 +914,14 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       setThActive(false);
       setLassoActive(false);
     }
-    thWrap.style.display = md === 'label' ? '' : 'none';
-    reviewBar.style.display = md === 'review' ? '' : 'none';
+    // Swap the rail to the current mode's panel (and rename its header): detector
+    // knobs + effective config + Apply in Tune, the verdict actions in Review, the
+    // capture tools + incident list + Save in Label — never all the controls at once.
+    tuneGroup.style.display = md === 'tune' ? '' : 'none';
+    reviewGroup.style.display = md === 'review' ? '' : 'none';
+    labelGroup.style.display = md === 'label' ? '' : 'none';
+    railFoot.style.display = md === 'tune' ? '' : 'none';
+    railTitle.textContent = RAIL_TITLES[md];
   }
 
   let thActive = false;
@@ -1033,7 +1078,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     'The statistic for the band: MAD (robust median, default), Z-Score (mean/std) or IQR ' +
       '(quartiles) — all windowed — or Manual (fixed lower/upper thresholds, no window/history).',
   );
-  controls.appendChild(detectorCtl.row);
+  tuneGroup.appendChild(detectorCtl.row);
 
   // manual_bounds: lower/upper threshold sliders (shown only for that detector).
   // The value domain is the real series range padded a little; both bounds are
@@ -1051,7 +1096,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     },
     recompute,
   );
-  controls.appendChild(lowerBoundCtl.row);
+  tuneGroup.appendChild(lowerBoundCtl.row);
 
   const upperBoundCtl = rangeControl(
     'Upper bound',
@@ -1065,7 +1110,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     },
     recompute,
   );
-  controls.appendChild(upperBoundCtl.row);
+  tuneGroup.appendChild(upperBoundCtl.row);
 
   const thresholdCtl = rangeControl(
     'Threshold (σ-equivalent)',
@@ -1080,7 +1125,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     },
     recompute,
   );
-  controls.appendChild(thresholdCtl.row);
+  tuneGroup.appendChild(thresholdCtl.row);
   const thresholdInput = thresholdCtl.row.querySelector<HTMLInputElement>('input');
   const thresholdOut = thresholdCtl.row.querySelector<HTMLElement>('.dtk-ctl-val');
   const thresholdCtl_setDefault = (v: number): void => {
@@ -1110,7 +1155,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     },
     recompute,
   );
-  controls.appendChild(windowCtl.row);
+  tuneGroup.appendChild(windowCtl.row);
 
   const weightsCtl = segControl(
     'Recency weighting',
@@ -1127,7 +1172,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     'Weight recent points in the window more heavily: none (flat), exponential (half-life ' +
       'decay) or linear. Helps the baseline track a drifting level.',
   );
-  controls.appendChild(weightsCtl.row);
+  tuneGroup.appendChild(weightsCtl.row);
 
   const halfLifeCtl = rangeControl(
     'Half-life (points)',
@@ -1146,7 +1191,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   );
   const halfLifeRow = halfLifeCtl.row;
   halfLifeRow.style.display = seed.windowWeights === 'exponential' ? '' : 'none';
-  controls.appendChild(halfLifeRow);
+  tuneGroup.appendChild(halfLifeRow);
 
   const detrendCtl = segControl(
     'Detrend',
@@ -1159,7 +1204,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     'Remove a robust linear trend from each window before computing the band, so a steadily ' +
       'rising/falling metric is not flagged for the trend itself.',
   );
-  controls.appendChild(detrendCtl.row);
+  tuneGroup.appendChild(detrendCtl.row);
 
   const smoothingCtl = segControl(
     'Smoothing',
@@ -1173,7 +1218,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     'Smooth the series before detection (EMA or SMA) so single-point jitter does not flag. ' +
       'The detector judges the smoothed line; the raw values show as a faint ghost.',
   );
-  controls.appendChild(smoothingCtl.row);
+  tuneGroup.appendChild(smoothingCtl.row);
 
   // seasonality (only when the metric has seasonality columns).
   // Each column is assigned a group: Off, or G1/G2/G3… Columns sharing a group
@@ -1221,7 +1266,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       crow.appendChild(seg);
       row.appendChild(crow);
     });
-    controls.appendChild(row);
+    tuneGroup.appendChild(row);
   }
 
   // Direction filter (alert-layer / view): which anomalies show + count as alerts.
@@ -1238,7 +1283,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       'band (up) or only drops BELOW it (down). A preview filter mirroring the alert direction ' +
       'policy — it never changes the band itself.',
   );
-  controls.appendChild(directionCtl.row);
+  tuneGroup.appendChild(directionCtl.row);
 
   const consecutiveCtl = rangeControl(
     'Alert: consecutive anomalies',
@@ -1256,7 +1301,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       recompute();
     },
   );
-  controls.appendChild(consecutiveCtl.row);
+  tuneGroup.appendChild(consecutiveCtl.row);
 
   // y = 0 reference line.
   const zeroRow = el('div', 'dtk-ctl');
@@ -1272,7 +1317,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   zeroLab.appendChild(zeroBox);
   zeroLab.appendChild(document.createTextNode(' Show y = 0 line'));
   zeroRow.appendChild(zeroLab);
-  controls.appendChild(zeroRow);
+  tuneGroup.appendChild(zeroRow);
 
   // Marked-incidents list (label edit + focus + delete). Shares the SAME `incidents`
   // array the chart edits in Label mode.
@@ -1286,7 +1331,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   );
   const incidentsList = el('div', 'dtk-inc-list');
   incidentsWrap.appendChild(incidentsList);
-  controls.appendChild(incidentsWrap);
+  labelGroup.appendChild(incidentsWrap);
 
   function focusIncident(iv: Incident): void {
     const pad = Math.max((iv.end - iv.start) * 0.5, payload.interval_seconds * 1000 * 5);
@@ -1356,13 +1401,13 @@ function render(payload: TunePayload, mount: HTMLElement): void {
 
   // ---- stat bar + effective config + apply ----------------------------------
   const statBar = el('div', 'dtk-tune-stat');
-  main.appendChild(statBar);
+  stageFoot.appendChild(statBar);
 
   const cfgWrap = el('div', 'dtk-tune-cfg');
   cfgWrap.appendChild(el('span', 'dtk-tune-cfg-k', '// effective config'));
   const configEcho = el('code', 'dtk-tune-cfg-v');
   cfgWrap.appendChild(configEcho);
-  main.appendChild(cfgWrap);
+  railFoot.appendChild(cfgWrap);
 
   if (payload.save_url) {
     const applyWrap = el('div', 'dtk-tune-apply');
@@ -1404,9 +1449,9 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     };
     applyWrap.appendChild(btn);
     applyWrap.appendChild(msg);
-    main.appendChild(applyWrap);
+    railFoot.appendChild(applyWrap);
   } else {
-    main.appendChild(
+    railFoot.appendChild(
       el(
         'div',
         'dtk-tune-note',
@@ -1518,20 +1563,26 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   labelsWrap.appendChild(setNameInput);
   labelsWrap.appendChild(saveLabelsBtn);
   labelsWrap.appendChild(labelsMsg);
-  main.appendChild(labelsWrap);
+  labelGroup.appendChild(labelsWrap);
 
   // ---- first paint + resize -------------------------------------------------
   setUiMode('tune');
   refreshIncidentList();
   runRecompute();
   renderMetrics();
+  // Re-fit the chart whenever its box changes — window resize, font reflow, AND the
+  // rail collapsing/expanding (which widens/narrows the windshield without a window
+  // resize). ResizeObserver catches all three; fall back to window resize if absent.
   let rafResize = 0;
-  window.addEventListener('resize', () => {
+  const refit = (): void => {
     if (rafResize) cancelAnimationFrame(rafResize);
-    rafResize = requestAnimationFrame(() => {
-      chart.resize();
-    });
-  });
+    rafResize = requestAnimationFrame(() => chart.resize());
+  };
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(refit).observe(chartWrap);
+  } else {
+    window.addEventListener('resize', refit);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1579,20 +1630,37 @@ function injectStyle(): void {
   --paper:#f5f1e8;--surface:#fbf9f3;--border:#e6e0d4;--green:#2e9e73;--anom:#d63232;
   --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
   --sans:'Schibsted Grotesk',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}
-.dtk-tune-root{max-width:1200px;margin:0 auto;padding:24px 20px 56px;font-family:var(--sans);color:var(--ink);}
-.dtk-tune-titlerow{display:flex;align-items:center;gap:12px;}
-.dtk-tune-title{font-size:24px;margin:0;font-weight:700;}
-.dtk-tune-badge{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;
-  color:#fff;background:var(--c);border-radius:999px;padding:3px 10px;}
-.dtk-tune-sub{color:var(--muted);font-size:13px;margin-top:4px;font-family:var(--mono);}
-.dtk-tune-desc{color:var(--muted);font-size:13px;margin-top:8px;white-space:pre-wrap;}
-.dtk-tune-dock{margin-top:14px;}
-.dtk-tune-dockhead{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
-.dtk-dock-toggle{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:8px;
-  padding:7px 14px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;}
+.dtk-tune-root{max-width:1680px;margin:0 auto;padding:12px 16px;font-family:var(--sans);color:var(--ink);
+  height:100dvh;display:flex;flex-direction:column;gap:10px;overflow:hidden;}
+.dtk-tune-header{flex:0 0 auto;}
+.dtk-tune-titlerow{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+.dtk-tune-title{font-size:19px;margin:0;font-weight:700;}
+.dtk-tune-badge{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;
+  color:#fff;background:var(--c);border-radius:999px;padding:3px 9px;}
+.dtk-tune-sub{color:var(--muted);font-size:12px;margin-top:2px;font-family:var(--mono);}
+.dtk-tune-desc{color:var(--muted);font-size:12px;margin-top:3px;white-space:pre-wrap;max-height:2.6em;overflow:auto;}
+/* cockpit: chart-windshield (stage) + always-visible mode-aware control rail */
+.dtk-tune-cockpit{display:flex;gap:12px;flex:1;min-height:0;}
+.dtk-tune-stage{position:relative;display:flex;flex-direction:column;gap:8px;flex:1;min-width:0;min-height:0;}
+.dtk-tune-hud{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;flex:0 0 auto;}
+.dtk-tune-stagefoot{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;}
+.dtk-tune-rail{flex:0 0 340px;display:flex;flex-direction:column;min-height:0;background:var(--surface);
+  border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.dtk-tune-railhead{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:9px 12px;border-bottom:1px solid var(--border);}
+.dtk-rail-title{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.06em;flex:1 1 auto;}
+.dtk-tune-railfoot{flex:0 0 auto;display:flex;flex-direction:column;gap:8px;padding:11px 12px;
+  border-top:1px solid var(--border);background:var(--paper);}
+.dtk-rail-open{position:absolute;top:50%;right:6px;transform:translateY(-50%);z-index:6;
+  border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:8px;
+  padding:13px 7px;font-size:15px;cursor:pointer;box-shadow:0 1px 6px rgba(27,25,22,.14);}
+.dtk-rail-open:hover{border-color:var(--c);color:var(--c7);}
+.dtk-dock-toggle{flex:0 0 auto;border:1px solid var(--border);background:var(--surface);color:var(--muted);
+  border-radius:7px;padding:4px 10px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;line-height:1;}
 .dtk-dock-toggle:hover{border-color:var(--c);color:var(--c7);}
-.dtk-tune-controls{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:14px 22px;
-  background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;align-items:start;}
+.dtk-tune-controls{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;padding:14px;}
+.dtk-rail-group{display:flex;flex-direction:column;gap:14px;}
 .dtk-ctl{display:flex;flex-direction:column;gap:6px;}
 .dtk-ctl-head{display:flex;justify-content:space-between;align-items:baseline;}
 .dtk-ctl-label{font-size:12px;font-weight:600;color:var(--ink);}
@@ -1605,8 +1673,7 @@ function injectStyle(): void {
 .dtk-seg-btn.on{background:var(--c);color:#fff;font-weight:600;}
 .dtk-range{width:100%;accent-color:var(--c);cursor:pointer;}
 .dtk-check{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:2px;cursor:pointer;}
-.dtk-tune-main{display:flex;flex-direction:column;gap:10px;min-width:0;margin-top:14px;}
-.dtk-tune-chart{position:relative;width:100%;height:min(56vh,560px);min-height:420px;background:var(--surface);
+.dtk-tune-chart{position:relative;width:100%;flex:1;min-height:220px;background:var(--surface);
   border:1px solid var(--border);border-radius:12px;overflow:hidden;}
 .dtk-tune-chart canvas{width:100%;height:100%;display:block;}
 .dtk-tune-readout{font-family:var(--mono);font-size:12px;color:var(--muted);min-height:18px;}
@@ -1617,7 +1684,7 @@ function injectStyle(): void {
   font-size:12px;overflow-x:auto;}
 .dtk-tune-cfg-k{color:var(--faint);display:block;margin-bottom:4px;}
 .dtk-tune-cfg-v{color:#e6e0d4;white-space:pre-wrap;word-break:break-word;}
-.dtk-tune-apply{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px;}
+.dtk-tune-apply{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .dtk-apply-btn{background:var(--c);color:#fff;border:0;border-radius:8px;padding:10px 18px;font-family:var(--sans);
   font-size:14px;font-weight:600;cursor:pointer;}
 .dtk-apply-btn:hover{background:var(--c7);}
@@ -1661,18 +1728,14 @@ function injectStyle(): void {
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .dtk-season-seg{flex:0 0 auto;padding:2px;}
 .dtk-season-seg .dtk-seg-btn{flex:0 0 auto;padding:3px 7px;font-family:var(--mono);font-size:11px;}
-.dtk-tune-metrics{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0 2px;}
+.dtk-tune-metrics{display:flex;flex-wrap:wrap;gap:8px;margin:0;flex:0 1 auto;}
 .dtk-m-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;background:var(--surface);
   border:1px solid var(--border);border-radius:10px;font-size:13px;}
 .dtk-m-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
 .dtk-m-v{font-family:var(--mono);font-weight:700;font-size:15px;color:var(--ink);}
 .dtk-m-l{color:var(--faint);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
 .dtk-m-sub{color:var(--muted);font-family:var(--mono);font-size:11.5px;}
-.dtk-tune-labhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
-  margin-top:4px;flex-wrap:wrap;}
-.dtk-tune-labhint{font-family:var(--mono);font-size:11px;color:var(--faint);}
-.dtk-tune-labchart{height:240px;}
-.dtk-tune-modes{display:inline-flex;gap:4px;background:var(--ink);border-radius:9px;padding:4px;margin:2px 0;align-self:flex-start;}
+.dtk-tune-modes{display:inline-flex;gap:4px;background:var(--ink);border-radius:9px;padding:4px;margin:0;flex:0 0 auto;}
 .dtk-mode-btn{border:0;background:transparent;color:#c9c2b4;font-family:var(--sans);font-size:13px;font-weight:600;
   padding:7px 16px;border-radius:6px;cursor:pointer;transition:background .12s,color .12s;}
 .dtk-mode-btn:hover{color:#fff;}
@@ -1697,8 +1760,8 @@ function injectStyle(): void {
 .dtk-th-scope{font-family:var(--mono);font-size:11px;color:var(--muted);align-self:center;flex:1 1 160px;}
 .dtk-th-add{padding:7px 14px;}
 .dtk-th-add:disabled{opacity:.5;cursor:default;}
-.dtk-incidents{gap:8px;grid-column:1/-1;}
-.dtk-inc-list{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow:auto;}
+.dtk-incidents{gap:8px;}
+.dtk-inc-list{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto;}
 .dtk-inc-empty{font-size:12px;color:var(--faint);font-style:italic;}
 .dtk-inc-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:var(--paper);
   border:1px solid var(--border);border-radius:7px;padding:6px 8px;}
@@ -1717,6 +1780,15 @@ function injectStyle(): void {
 .dtk-setname:focus{outline:none;border-color:var(--c);}
 .dtk-labels-btn{background:var(--surface);color:var(--ink);border:1px solid var(--border);}
 .dtk-labels-btn:hover{background:var(--paper);border-color:var(--c);color:var(--c7);}
+/* Narrow viewports: drop the cockpit to a scrolling stack (chart over rail). */
+@media (max-width:900px){
+  .dtk-tune-root{height:auto;overflow:visible;}
+  .dtk-tune-cockpit{flex-direction:column;}
+  .dtk-tune-rail{flex:0 0 auto;width:100%;}
+  .dtk-tune-controls{overflow:visible;}
+  .dtk-tune-chart{flex:0 0 auto;height:54vh;min-height:320px;}
+  .dtk-rail-open{display:none!important;}
+}
 `;
   const style = document.createElement('style');
   style.textContent = css;

@@ -641,9 +641,10 @@ dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml
 Open the interactive labeler to mark incidents visually, then tune on them in the
 same command. By default it starts a local `127.0.0.1` browser labeler; **Save &
 tune** writes a versioned file into `incidents/<metric>/` and the run continues
-into tuning. Mark incidents by click-drag, or use **Threshold capture** to grab
-every span above/below a horizontal line at once; remove one with its chart-side
-**✕** or the Delete key. It **seeds from the metric's newest saved set** (or
+into tuning. Mark incidents by click-drag, use **Threshold capture** to grab
+every span above/below a horizontal line at once, or **Lasso capture** to loop
+around a cloud of outliers (each grid-adjacent run, gaps bridged, becomes one
+incident span); remove one with its chart-side **✕** or the Delete key. It **seeds from the metric's newest saved set** (or
 `--incidents <file-or-dir>`), so re-running `--label` keeps editing in place.
 `--no-serve` instead writes a static `metrics/<metric>__labeler.html` (Export
 downloads a labels file; **Import file…** loads one back); `--no-open` prints the
@@ -801,14 +802,20 @@ what will be written. A **y = 0 line** toggle shows the metric relative to zero.
 
 #### Mark incidents & alert-quality metrics
 
-A second, **synced** chart beneath the detector view lets you **mark real
+A second, **synced** chart beneath the detector view **mirrors the detector's
+anomaly dots** and lets you **mark real
 incidents** (drag to create a span; drag its edges/middle to adjust; ✕ or Delete to
-remove), or use **Threshold capture** to grab every contiguous span past a
+remove), **Lasso anomalies** (draw a freeform loop around a cloud of anomaly dots —
+each run of consecutive anomalies, small gaps bridged, becomes one incident span
+sized to the run), or use **Threshold capture** to grab every contiguous span past a
 horizontal line at once (set the line by click or value, pick **above**/**below**,
 optionally bridge a few intervals of gap, and drag across the chart to limit the
 capture to a time window — the painted window is saved as `capture_windows` and
-restored on reopen). As you tune, a metrics bar shows **incident catch rate
-(recall)** — the share of marked incidents caught by an alert — and **false-alert
+restored on reopen; each captured span is widened to a full interval so the alert
+lands inside). As you tune, a metrics bar shows **incident catch rate
+(recall)** — the share of marked incidents caught by an alert (an incident is
+caught when an alert's anomaly **streak overlaps** it, not just the fire instant) —
+and **false-alert
 rate** — the share of fired alerts outside every incident ("≈1 in N false"); only
 incidents within the loaded window are scored. **Save incidents** writes
 a versioned `incidents/<metric>/<…>.yml`, the **same store

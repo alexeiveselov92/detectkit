@@ -111,18 +111,31 @@ Tuning the band is only half the job — the question that matters is **how good
 alerts are**. Beneath the detector chart is a **second, synced chart** where you
 mark the **real incidents** on the same series:
 
+The lower chart **mirrors the detector's anomaly dots** (the same flagged points
+the band produces above), so you can mark incidents directly against what the
+detector already finds.
+
 - **Drag** across the lower chart to mark an incident span; **drag its edges** to
   adjust, **drag its middle** to move, and click its **✕** (or select it and press
   **Delete**) to remove it.
+- **Lasso anomalies** — the fastest way to turn what the detector flags into
+  ground truth: click **Lasso anomalies**, then **draw a freeform loop** around a
+  cloud of anomaly dots on the lower chart. Each **run of consecutive anomalies**
+  (small gaps — up to your `consecutive_anomalies` setting — are bridged) becomes
+  **one proper incident span** sized to the run, not a single point; a separate
+  burst inside the loop becomes its own incident. Release to add them. This is the
+  ideal tuning loop: tighten the band, lasso the real anomalies it surfaces, and
+  watch the metrics update.
 - **Threshold capture** — for a metric with many incidents, click **Threshold
   capture** to grab every contiguous span past a horizontal line in one shot
   (the same tool as the [autotune labeler](autotuning.md)). Click the chart to set
   the line (or type a value), choose **above**/**below**, optionally **bridge
   gaps** of a few intervals, and **drag across the chart** to limit the capture to a
   time window (handy when the metric behaves differently across periods). **Add N
-  spans** marks them all — overlapping spans merge into existing incidents. The
-  painted window is saved alongside the incidents (as `capture_windows`) and
-  restored on reopen.
+  spans** marks them all — overlapping spans merge into existing incidents. Each
+  captured span is widened to a full interval, so a single matching point becomes a
+  real incident the alert lands inside. The painted window is saved alongside the
+  incidents (as `capture_windows`) and restored on reopen.
 - The two charts move together — the same zoom/pan, the same vertical scale, the
   same "Points shown" trim — and the detector chart shades the same incident spans
   read-only, so you can see at a glance whether the alerts (▼ markers) line up with
@@ -139,8 +152,10 @@ As you turn the detector knobs, a **metrics bar** at the top recomputes two
 operator-facing numbers:
 
 - **Incident catch rate (recall)** — what share of the marked incidents your
-  current config actually catches (an incident is *caught* when at least one alert
-  fires inside it).
+  current config actually catches. An incident counts as *caught* when an alert's
+  whole **anomaly streak overlaps** it — not just the instant the alert fires
+  (which lands a few intervals into the streak), so a streak that clearly covers
+  an incident is scored as caught.
 - **False-alert rate** — what share of fired alerts fall **outside** every marked
   incident, shown as a percentage and as "≈1 in N false" (controlling false alarms
   / type-I error). The complement is the share of alerts that are *correct*.

@@ -5,6 +5,36 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.37.0] - 2026-06-27
+
+### Added
+- **Lasso capture in the incident labelers — turn a cloud of anomalies into proper
+  incidents in one gesture.** In `dtk tune`, the labeler chart now **mirrors the
+  detector's anomaly dots**, and a new **Lasso anomalies** tool lets you draw a
+  freeform loop around a cluster: each **run of consecutive anomalies** (small gaps
+  bridged, up to your `consecutive_anomalies`) collapses into **one incident span**
+  sized to the run — not a point — while a separate burst inside the loop becomes
+  its own incident. This is the intended tuning loop: tighten the band, lasso the
+  real anomalies it surfaces, watch the metrics update. The standalone autotune
+  labeler (`dtk autotune --label`) gains the same **Lasso capture** over raw points
+  (no detector there), grouping consecutive points into interval incidents.
+
+### Fixed
+- **`dtk tune` undercounted the incident catch rate (recall).** An incident was
+  scored as *caught* only when an alert's single **fire timestamp** landed within
+  ±½ interval of its span — but an alert fires `consecutive_anomalies − 1` intervals
+  *into* the anomaly streak, so a streak that visibly covered an incident was
+  marked missed (e.g. 27% recall shown while almost every incident was caught).
+  Recall/FDR now match an incident against each alert's **whole anomaly-streak
+  span** by overlap (the worker returns `fireSpans` alongside `fires`), so a streak
+  covering an incident counts as caught.
+- **Threshold capture produced near-zero-width "point" incidents** that the fired
+  alert landed just outside of. Each captured span is now **widened to a full grid
+  interval** (half each side), so a single matching point becomes a real incident.
+- **The "≈1 in N false" false-alert readout rounded a mostly-false rate down to a
+  misleading "1 in 1".** It now keeps one decimal below 10 (e.g. a 73%-false rate
+  reads "≈1 in 1.4 false") so the framing matches the percentage beside it.
+
 ## [0.36.2] - 2026-06-25
 
 ### Fixed

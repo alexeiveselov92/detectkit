@@ -125,8 +125,9 @@ labels file, so the layout above is ready to fill in.
 > Can't enumerate the incidents from memory? Run
 > `dtk autotune --select api_error_rate --label`. It opens a local browser
 > labeler of the series; click-drag across the chart to mark each real incident
-> (or **Threshold capture** to grab every span past a line at once, and the
-> chart-side **✕** / Delete to remove one), then **Save & tune** writes the
+> (or **Threshold capture** to grab every span past a line at once, **Lasso
+> capture** to loop around a cloud of outliers, and the chart-side **✕** / Delete
+> to remove one), then **Save & tune** writes the
 > labels into `incidents/api_error_rate/` and tunes on them in the same command.
 > Re-running `--label` re-opens the newest set so you can keep editing over time.
 > See the [`--label` reference](../reference/autotune.md#--label-flag) for the

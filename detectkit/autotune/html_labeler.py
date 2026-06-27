@@ -10,9 +10,11 @@ It can be **seeded with existing incidents** (the ``incidents=`` argument) so a
 labels file can be opened and edited in place — the round-trip flow of filling
 incidents in over time. Beyond click-drag marking it supports **threshold
 capture** (grab every contiguous span above/below a horizontal line in one
-gesture), **on-chart deletion** (each band carries an ✕ handle; the selected
-band also responds to the Delete key), and an in-browser **Import** button that
-loads a labels file you pick (YAML/JSON).
+gesture), **lasso capture** (draw a freeform loop around a cloud of points and
+turn each grid-adjacent run — small gaps bridged — into one incident span),
+**on-chart deletion** (each band carries an ✕ handle; the selected band also
+responds to the Delete key), and an in-browser **Import** button that loads a
+labels file you pick (YAML/JSON).
 
 The page is offline-only — a browser cannot write to the project, so Export
 downloads a **versioned** file named after the metric, with the optional set name
@@ -186,6 +188,7 @@ _TEMPLATE = """<!doctype html>
     <input id="setname" class="setname" type="text" placeholder="name this set (optional)" />
     <button id="export" class="primary">Export labels</button>
     <button id="thbtn" class="ghost" title="capture every span above or below a horizontal line">Threshold capture</button>
+    <button id="lassobtn" class="ghost" title="draw a freeform loop around a cloud of points to grab them all at once">Lasso capture</button>
     <button id="clear" class="ghost">Clear all</button>
     <span id="summary" class="summary"></span>
   </div>
@@ -216,8 +219,9 @@ _TEMPLATE = """<!doctype html>
   adjust it, or its middle to move it · click its <b>✕</b> (or select it and press Delete) to remove it ·
   use <b>Threshold capture</b> to grab every span past a horizontal line at once (click sets the line; drag
   across the chart to limit it to a time window — handy when the metric behaves differently across periods) ·
-  <b>focus</b> a row to jump the chart to it · scroll to zoom, double-click to reset · drag the navigator
-  window below to pan.</div>
+  use <b>Lasso capture</b> to draw a freeform loop around a cloud of points and turn each consecutive run into
+  an incident · <b>focus</b> a row to jump the chart to it · scroll to zoom, double-click to reset · drag the
+  navigator window below to pan.</div>
   <div id="empty" class="empty">No incidents marked yet — drag across a span on the chart above.</div>
   <ul id="list"></ul>
   <footer>All times UTC · self-contained, nothing leaves your browser · re-label any time —
@@ -264,6 +268,10 @@ let selObj = null, hoverRow = -1, hoverDel = -1, thMode = false, thHover = null;
 // Threshold-capture window: thDown tracks a press, thDragWin a live drag, capWin
 // the committed custom window (null → capture within the current view).
 let thDown = null, thDragWin = null, capWin = null;
+// Lasso capture: draw a freeform loop around a cloud of points and turn each
+// grid-adjacent run (small gaps bridged) into one incident span. lassoDrag holds
+// the in-progress loop as DATA coords ({t, v}); off until the tool is toggled.
+let lassoMode = false, lassoDrag = null; const LASSO_BRIDGE = 2;
 // Restore a saved capture window so re-opening a labels file keeps the painted
 // regime scope (only shown once threshold capture is toggled on).
 if (CAPWINS && CAPWINS.length) { const w0 = CAPWINS[0];
@@ -426,8 +434,46 @@ function addCaptured(a,b) {
   if (host===null) incidents.push({a, b, label:''}); }
 function toggleTh(on) { thMode = (on===undefined) ? !thMode : !!on;
   thbtnEl.classList.toggle('active', thMode); thbarEl.style.display = thMode ? 'flex' : 'none';
-  if (thMode) { hover=null; } else { thHover=null; thDown=null; thDragWin=null; capWin=null; updateThWin(); }
+  if (thMode) { hover=null; if (lassoMode) toggleLasso(false); }
+  else { thHover=null; thDown=null; thDragWin=null; capWin=null; updateThWin(); }
   c.style.cursor = thMode ? 'crosshair' : 'crosshair'; if (thMode) { updateThWin(); thCount(); } draw(); }
+
+// ---- lasso capture --------------------------------------------------------
+// Ray-casting point-in-polygon in DATA space ({t, v}); the loop and the test
+// points map through the same per-axis affine, so screen-inside == data-inside.
+function pointInPoly(t, v, poly) { let inside=false;
+  for (let i=0,j=poly.length-1;i<poly.length;j=i++) {
+    const ti=poly[i].t, vi=poly[i].v, tj=poly[j].t, vj=poly[j].v;
+    if (((vi>v)!==(vj>v)) && t < (tj-ti)*(v-vi)/((vj-vi)||1e-9)+ti) inside=!inside; }
+  return inside; }
+// The raw point indices enclosed by the in-progress loop.
+function lassoCapturedIdx() { const out=[]; if (!lassoDrag || lassoDrag.length<3) return out;
+  for (let i=0;i<N;i++) { const p=pts[i]; if (p.v===null) continue;
+    if (pointInPoly(p.ts, p.v, lassoDrag)) out.push(i); } return out; }
+// Collapse the captured points into incident spans: a new span starts only when
+// the gap to the previous capture exceeds LASSO_BRIDGE grid steps; each span is
+// padded half a step each side so a lone point becomes one full-interval incident.
+function commitLasso() { const cap=lassoCapturedIdx(); if (!cap.length) return;
+  const maxGap=(LASSO_BRIDGE+1)*step, half=step/2; let runStart=cap[0], prev=cap[0], added=0;
+  const push=(s,e)=>{ addCaptured(pts[s].ts-half, pts[e].ts+half); added++; };
+  for (let k=1;k<cap.length;k++) { const idx=cap[k];
+    if (pts[idx].ts-pts[prev].ts > maxGap) { push(runStart, prev); runStart=idx; } prev=idx; }
+  push(runStart, prev);
+  setMsg('Added '+added+' incident'+(added===1?'':'s')+' from the lasso — review and tidy below.', 'ok');
+  render(); }
+// The lasso loop (dashed clay outline + faint fill) + a ring on every captured point.
+function drawLasso() { if (!lassoDrag || lassoDrag.length<2) return;
+  ctx.beginPath(); ctx.moveTo(px(lassoDrag[0].t), py(lassoDrag[0].v));
+  for (let i=1;i<lassoDrag.length;i++) ctx.lineTo(px(lassoDrag[i].t), py(lassoDrag[i].v));
+  ctx.closePath(); ctx.fillStyle='rgba(209,91,54,0.08)'; ctx.fill();
+  ctx.strokeStyle='rgba(209,91,54,0.9)'; ctx.lineWidth=1.5*dpr; ctx.setLineDash([5*dpr,4*dpr]);
+  ctx.stroke(); ctx.setLineDash([]);
+  lassoCapturedIdx().forEach(i => { const X=px(pts[i].ts), Y=py(pts[i].v);
+    ctx.strokeStyle='#d63232'; ctx.lineWidth=2*dpr; ctx.beginPath(); ctx.arc(X,Y,7*dpr,0,7); ctx.stroke(); }); }
+function toggleLasso(on) { lassoMode = (on===undefined) ? !lassoMode : !!on;
+  lassobtnEl.classList.toggle('active', lassoMode);
+  if (lassoMode) { hover=null; selObj=null; if (thMode) toggleTh(false); } else { lassoDrag=null; }
+  c.style.cursor='crosshair'; draw(); }
 
 function rr(g,x,y,w,h,r) { g.beginPath();
   g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
@@ -496,6 +542,7 @@ function draw() {
     if (val!==null && val>=vmin && val<=vmax) { const yy=py(val);
       ctx.strokeStyle='#f0ad4e'; ctx.lineWidth=1.5*dpr; ctx.setLineDash([6*dpr,4*dpr]);
       ctx.beginPath(); ctx.moveTo(xlo, yy); ctx.lineTo(xhi, yy); ctx.stroke(); ctx.setLineDash([]); } }
+  if (lassoMode) drawLasso();
   ctx.restore();
   if (thMode) drawThLabel();
   else if (dragging && !ovAct) drawDragLabel();
@@ -612,7 +659,9 @@ const ovTsAtCss = clientX => { const r=ov.getBoundingClientRect();
 const ovEdgeCss = ts => { const r=ov.getBoundingClientRect();
   return r.left + OM.l + (ts-tmin)/fullSpan*(r.width-(OM.l+OM.r)); };
 
-c.addEventListener('wheel', e => { e.preventDefault(); const t=tsAt(e.clientX);
+c.addEventListener('wheel', e => { e.preventDefault();
+  if (lassoMode && lassoDrag) return;  // don't distort the loop mid-draw
+  const t=tsAt(e.clientX);
   let s=clamp(vspan()*Math.pow(1.0015, e.deltaY), minSpan, fullSpan);
   const f=(t-viewMin)/(vspan()||1); setView(t-f*s, t-f*s+s); }, {passive:false});
 // Hit-test an existing incident's ✕ handle / edge / body in CSS px.
@@ -634,6 +683,8 @@ function hitIncident(clientX, clientY) {
   return null;
 }
 c.addEventListener('mousedown', e => {
+  // Lasso mode: a press starts a freeform loop accumulated on mousemove.
+  if (lassoMode) { lassoDrag = [{t: tsAt(e.clientX), v: vAt(e.clientY)}]; draw(); return; }
   // In threshold mode a press either sets the line (a click) or paints a capture
   // window (a horizontal drag) — resolved on mouseup by how far it moved.
   if (thMode) { thDown = {x:e.clientX, ts:tsAt(e.clientX)}; thHover = vAt(e.clientY); thCount(); draw(); return; }
@@ -646,6 +697,8 @@ c.addEventListener('mousedown', e => {
   else { selObj=null; dragging={mode:'new', a:t, b:t, sx:e.clientX, cx:e.clientX}; draw(); }
 });
 c.addEventListener('mousemove', e => { if (ovAct) return;
+  if (lassoMode) { if (lassoDrag) { lassoDrag.push({t: tsAt(e.clientX), v: vAt(e.clientY)}); draw(); }
+    else { c.style.cursor='crosshair'; } return; }
   if (thMode && !dragging) {
     if (thDown && Math.abs(e.clientX - thDown.x) > 6) { thDragWin = {a: thDown.ts, b: tsAt(e.clientX)}; }
     else { if (thDown) thDragWin = null; thHover = vAt(e.clientY); }
@@ -689,6 +742,7 @@ window.addEventListener('mousemove', e => { if (!ovAct) return; const t=ovTsAtCs
   else { const d=t-ovAct.grab; setView(ovAct.vMin+d, ovAct.vMax+d); } });
 window.addEventListener('mouseup', e => {
   if (ovAct) { ovAct=null; return; }
+  if (lassoMode) { if (lassoDrag) { commitLasso(); lassoDrag=null; } draw(); return; }
   if (thMode && thDown) {
     if (Math.abs(e.clientX - thDown.x) > 6) {  // a drag → set the capture window
       const a=thDown.ts, b=tsAt(e.clientX); capWin = {a:Math.min(a,b), b:Math.max(a,b)};
@@ -713,12 +767,13 @@ function removeIncident(iv) { const k=incidents.indexOf(iv); if (k<0) return;
   incidents.splice(k,1); if (selObj===iv) selObj=null; hoverDel=-1; render(); }
 window.addEventListener('keydown', e => {
   const t=e.target, typing = t && (t.tagName==='INPUT' || t.tagName==='TEXTAREA' || t.isContentEditable);
-  if (e.key==='Escape') { if (thMode) toggleTh(false); else if (selObj) { selObj=null; draw(); } return; }
-  if ((e.key==='Delete' || e.key==='Backspace') && selObj && !typing) { e.preventDefault(); removeIncident(selObj); }
+  if (e.key==='Escape') { if (lassoMode) toggleLasso(false); else if (thMode) toggleTh(false);
+    else if (selObj) { selObj=null; draw(); } return; }
+  if ((e.key==='Delete' || e.key==='Backspace') && selObj && !typing && !lassoMode) { e.preventDefault(); removeIncident(selObj); }
 });
 
 document.getElementById('zreset').onclick = () => setView(tmin, tmax);
-c.addEventListener('dblclick', () => { if (!thMode) setView(tmin, tmax); });
+c.addEventListener('dblclick', () => { if (!thMode && !lassoMode) setView(tmin, tmax); });
 document.getElementById('clear').onclick = () => { incidents.length=0; selObj=null; render(); };
 window.setLabel = (i, val) => { if (incidents[i]) incidents[i].label = val; };
 window.rm = i => { const iv=incidents[i]; if (iv && selObj===iv) selObj=null; incidents.splice(i,1); render(); };
@@ -743,6 +798,8 @@ function updateThWin() {
 thwinEl.onclick = () => { capWin=null; updateThWin(); thCount(); draw(); };
 thbtnEl.onclick = () => toggleTh();
 thdoneEl.onclick = () => toggleTh(false);
+const lassobtnEl=document.getElementById('lassobtn');
+lassobtnEl.onclick = () => toggleLasso();
 thdirEl.onchange = () => { thCount(); draw(); };
 thgapEl.oninput = () => { thCount(); draw(); };
 thvalEl.oninput = () => { thCount(); draw(); };

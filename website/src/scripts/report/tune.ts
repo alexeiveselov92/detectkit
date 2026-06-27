@@ -23,6 +23,7 @@ import type {
   DetectorParams,
   DetectorType,
   Incident,
+  LassoInfo,
   ScoredPoint,
   Series,
   Smoothing,
@@ -41,6 +42,8 @@ interface WorkerResult {
   id: number;
   scored: ScoredPoint[];
   fires: number[];
+  /** per-fire [startTs, endTs] of the whole grid-adjacent anomaly streak (ms). */
+  fireSpans: Array<[number, number]>;
   eff: number;
   flagged: number;
 }
@@ -316,8 +319,13 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
     return { start: Math.min(a, b), end: Math.max(a, b) };
   })();
-  // Most-recent fired-alert timestamps from the worker, for the live metrics.
+  // Most-recent worker output, for the live metrics + the synced labeler chart.
   let lastFireTs: number[] = [];
+  // Per-alert anomaly-streak spans (ms) — recall/FDR match incidents by OVERLAP
+  // with these, not just the fire point (which lands consecutive-1 intervals in).
+  let lastFireSpans: Array<[number, number]> = [];
+  let lastScored: ScoredPoint[] = [];
+  let lastAlerts: ChartAlert[] = [];
 
   // ---- mutable parameter state, seeded from the metric's current config -----
   const seed = payload.detector;
@@ -542,7 +550,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     falseAlerts: number;
     fdr: number;
   }
-  const computeQuality = (fires: number[], allIvs: Incident[]): Quality => {
+  const computeQuality = (spans: Array<[number, number]>, allIvs: Incident[]): Quality => {
     const tol = (payload.interval_seconds * 1000) / 2; // ±½ interval grid tolerance
     // Only score incidents that overlap the active (possibly trimmed) series — an
     // incident outside the loaded window can never be caught, so counting it would
@@ -551,12 +559,16 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     const lo = (ts.length ? ts[0] : 0) - tol;
     const hi = (ts.length ? ts[ts.length - 1] : 0) + tol;
     const ivs = allIvs.filter((iv) => iv.end >= lo && iv.start <= hi);
-    const within = (t: number, iv: Incident): boolean => t >= iv.start - tol && t <= iv.end + tol;
+    // An alert is "for" an incident when its anomaly STREAK overlaps the span (not
+    // just the fire point, which sits consecutive-1 intervals into the streak and
+    // would miss a narrow incident — the recall-undercount bug).
+    const overlaps = (sp: [number, number], iv: Incident): boolean =>
+      sp[1] >= iv.start - tol && sp[0] <= iv.end + tol;
     let correct = 0;
-    for (const t of fires) if (ivs.some((iv) => within(t, iv))) correct++;
+    for (const sp of spans) if (ivs.some((iv) => overlaps(sp, iv))) correct++;
     let caught = 0;
-    for (const iv of ivs) if (fires.some((t) => within(t, iv))) caught++;
-    const total = fires.length;
+    for (const iv of ivs) if (spans.some((sp) => overlaps(sp, iv))) caught++;
+    const total = spans.length;
     return {
       realIncidents: ivs.length,
       caught,
@@ -574,7 +586,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     (sub ? `<span class="dtk-m-sub">${sub}</span>` : '') +
     `</span>`;
   function renderMetrics(): void {
-    const q = computeQuality(lastFireTs, incidents);
+    const q = computeQuality(lastFireSpans, incidents);
     // Without any marked incidents there is no ground truth, so catch-rate and
     // false-alert rate are undefined (not "100% false") — prompt to mark some.
     const haveTruth = q.realIncidents > 0;
@@ -582,9 +594,13 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     if (!haveTruth) falseSub = 'mark incidents to measure';
     else if (q.totalAlerts === 0) falseSub = 'no alerts';
     else if (q.falseAlerts === 0) falseSub = `${pctOrDash(q.fdr)} · all correct`;
-    else
-      falseSub =
-        `${pctOrDash(q.fdr)} · ≈1 in ${Math.max(1, Math.round(q.totalAlerts / q.falseAlerts))} false`;
+    else {
+      // "≈1 in N false": N = alerts / false-alerts (≥1). Keep a decimal below 10 so
+      // a 73%-false rate reads "≈1 in 1.4 false", not a misleading round-down to 1.
+      const ratio = q.totalAlerts / q.falseAlerts;
+      const nStr = ratio >= 9.5 ? String(Math.round(ratio)) : String(Math.round(ratio * 10) / 10);
+      falseSub = `${pctOrDash(q.fdr)} · ≈1 in ${nStr} false`;
+    }
     metricsBar.innerHTML =
       metricChip(String(q.realIncidents), 'real incidents', '', 'var(--c)') +
       metricChip(
@@ -640,9 +656,10 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     minSamplesPerGroup: 10,
     consecutiveAnomalies: 1,
   };
-  // Filled once the threshold-capture bar is built (the chart pushes preview state
-  // here on every hover / window paint / knob change).
+  // Filled once the capture toolbars are built (the chart pushes preview state here
+  // on every hover / window paint / knob change / lasso draw).
   let updateThresholdUI: (info: ThresholdInfo) => void = () => {};
+  let updateLassoUI: (info: LassoInfo) => void = () => {};
   labelerChart = createChart(labCanvas, {
     navigable: true,
     labeling: true,
@@ -655,11 +672,18 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       chart.setIncidents(incidents); // live read-only shading on the detector chart
     },
     onThresholdChange: (info): void => updateThresholdUI(info),
+    onLassoChange: (info): void => updateLassoUI(info),
   });
   labelerChart.setIncidents(incidents);
   if (seedCaptureWin) labelerChart.setCaptureWindow(seedCaptureWin);
+  // The labeler mirrors the detector's anomaly dots (so the lasso has a cloud to
+  // grab) — fed the latest scored array once it matches the active series length
+  // (after a trim, the next recompute refills it a frame later). It draws the raw
+  // line + dots + alert ticks, never the band (that's the detector chart's job).
   const renderLabeler = (): void => {
-    labelerChart.render({ series, scored: [], params: LABELER_PARAMS, alerts: [] });
+    const sc = lastScored.length === series.timestamps.length ? lastScored : [];
+    const params = lastParams ?? LABELER_PARAMS;
+    labelerChart.render({ series, scored: sc, params, alerts: lastAlerts, incidents });
   };
 
   // ---- threshold-capture toolbar (above the labeler chart) ------------------
@@ -668,12 +692,23 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   // synced incident labeler. All capture state lives in the labeler chart; this bar
   // just drives it and reflects the live run count + scope.
   const thWrap = el('div', 'dtk-th');
+  const toolToggles = el('div', 'dtk-th-toggles');
   const thToggle = el('button', 'dtk-th-toggle', 'Threshold capture');
   thToggle.type = 'button';
   thToggle.title =
     'Mark incidents fast: set a horizontal line and grab every contiguous span above (or below) ' +
     'it. Click the chart to set the line, drag across it to limit the capture to a time window.';
-  thWrap.appendChild(thToggle);
+  toolToggles.appendChild(thToggle);
+  // Lasso anomalies: loop around a cloud of anomaly dots on the labeler chart →
+  // each grid-adjacent run (small gaps bridged) becomes one incident span.
+  const lassoToggle = el('button', 'dtk-th-toggle', 'Lasso anomalies');
+  lassoToggle.type = 'button';
+  lassoToggle.title =
+    'Draw a freeform loop around a cloud of anomaly dots on the chart below — each run of ' +
+    'consecutive anomalies (small gaps bridged) becomes one incident span. The ideal way to ' +
+    'turn what the detector already flags into ground-truth incidents.';
+  toolToggles.appendChild(lassoToggle);
+  thWrap.appendChild(toolToggles);
   const thBar = el('div', 'dtk-th-bar');
   const thDirSel = el('select', 'dtk-th-sel');
   for (const [v, lbl] of [
@@ -718,9 +753,20 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   thBar.appendChild(thDone);
   thBar.style.display = 'none';
   thWrap.appendChild(thBar);
+
+  // ---- lasso bar (live capture readout + done) ------------------------------
+  const lassoBar = el('div', 'dtk-th-bar');
+  const lassoInfo = el('span', 'dtk-th-scope', 'draw a loop around the anomaly dots on the chart below');
+  const lassoDone = el('button', 'dtk-inc-btn', 'Done');
+  lassoDone.type = 'button';
+  lassoBar.appendChild(lassoInfo);
+  lassoBar.appendChild(lassoDone);
+  lassoBar.style.display = 'none';
+  thWrap.appendChild(lassoBar);
   main.insertBefore(thWrap, labChartWrap);
 
   let thActive = false;
+  let lassoActive = false;
   // True only for the synchronous span of the value input's own oninput, so the UI
   // refresh below can tell a user keystroke apart from a chart-driven value change
   // (a chart click should win and write the input; typing must not be clobbered).
@@ -730,9 +776,21 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     thToggle.classList.toggle('on', on);
     thBar.style.display = on ? 'flex' : 'none';
     labelerChart.setThresholdMode(on);
+    if (on && lassoActive) setLassoActive(false); // mutually exclusive tools
+  };
+  // Lasso mode: commits incidents on mouseup via onIncidentsChange, so the bar is
+  // just a live readout + Done. The chart enforces threshold/lasso exclusivity too.
+  const setLassoActive = (on: boolean): void => {
+    lassoActive = on;
+    lassoToggle.classList.toggle('on', on);
+    lassoBar.style.display = on ? 'flex' : 'none';
+    labelerChart.setLassoMode(on);
+    if (on && thActive) setThActive(false);
   };
   thToggle.onclick = (): void => setThActive(!thActive);
   thDone.onclick = (): void => setThActive(false);
+  lassoToggle.onclick = (): void => setLassoActive(!lassoActive);
+  lassoDone.onclick = (): void => setLassoActive(false);
   thDirSel.onchange = (): void =>
     labelerChart.setThresholdDirection(thDirSel.value as 'above' | 'below');
   thValInput.oninput = (): void => {
@@ -746,11 +804,19 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   thAdd.onclick = (): void => {
     labelerChart.applyThreshold(); // commits spans → incidents (fires onIncidentsChange)
   };
-  // Esc backs out of threshold capture (parity with the autotune labeler); routed
-  // through setThActive so the toggle/bar state stays in sync with the chart.
+  // Esc backs out of whichever capture tool is active; routed through the setters
+  // so the toggle/bar state stays in sync with the chart.
   window.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape' && thActive) setThActive(false);
+    if (ev.key !== 'Escape') return;
+    if (thActive) setThActive(false);
+    else if (lassoActive) setLassoActive(false);
   });
+  updateLassoUI = (info): void => {
+    lassoInfo.textContent = info.active
+      ? `${info.anomalies} anomal${info.anomalies === 1 ? 'y' : 'ies'} → ` +
+        `${info.incidents} incident${info.incidents === 1 ? '' : 's'} — release to add`
+      : 'draw a loop around the anomaly dots on the chart below';
+  };
   updateThresholdUI = (info): void => {
     thAdd.textContent = `Add ${info.runs} span${info.runs === 1 ? '' : 's'}`;
     thAdd.disabled = info.runs === 0;
@@ -786,7 +852,11 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     const fireTs = res.fires.map((i) => series.timestamps[i]);
     const alerts: ChartAlert[] = fireTs.map((t) => ({ t, kind: 'anomaly' }));
     chart.render({ series, scored: res.scored, params, alerts, incidents });
+    lastScored = res.scored;
     lastFireTs = fireTs;
+    lastFireSpans = res.fireSpans;
+    lastAlerts = alerts;
+    renderLabeler(); // refresh the labeler's mirrored anomaly dots + alert ticks
     renderMetrics();
     statBar.textContent =
       `${res.flagged} flagged · ${res.fires.length} alert${res.fires.length === 1 ? '' : 's'} · ` +
@@ -1467,6 +1537,7 @@ function injectStyle(): void {
 .dtk-tune-labhint{font-family:var(--mono);font-size:11px;color:var(--faint);}
 .dtk-tune-labchart{height:240px;}
 .dtk-th{display:flex;flex-direction:column;gap:8px;margin:2px 0 6px;}
+.dtk-th-toggles{display:flex;gap:8px;flex-wrap:wrap;}
 .dtk-th-toggle{align-self:flex-start;border:1px solid var(--border);background:var(--surface);
   color:var(--muted);border-radius:8px;padding:6px 12px;font-family:var(--sans);font-size:12.5px;cursor:pointer;}
 .dtk-th-toggle:hover{border-color:var(--c);color:var(--c7);}

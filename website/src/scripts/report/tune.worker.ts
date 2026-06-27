@@ -31,6 +31,15 @@ interface SeriesMsg {
   series: Series;
 }
 
+/** A firing alert: the fire index + the ms-span of the anomaly streak that fired. */
+interface FireRun {
+  /** index where the run reaches `consecutive` (the marker / fire point). */
+  fire: number;
+  /** streak start/end timestamps (ms) — the WHOLE grid-adjacent flagged run. */
+  startTs: number;
+  endTs: number;
+}
+
 let series: Series | null = null;
 
 /**
@@ -47,22 +56,38 @@ function applyDirection(scored: ScoredPoint[], direction: DetectorParams['direct
   }
 }
 
-/** One fire index per maximal run of grid-adjacent flagged points reaching `consecutive`. */
-function alertFireIndexes(scored: ScoredPoint[], intervalMs: number, consecutive: number): number[] {
-  const fires: number[] = [];
-  let runLen = 0;
-  for (let i = 0; i < scored.length; i++) {
-    const flagged = scored[i].scored && scored[i].isAnomaly;
-    if (!flagged) {
-      runLen = 0;
+/**
+ * One FireRun per maximal run of grid-adjacent flagged points that reaches
+ * `consecutive`. We return the WHOLE run's span (not just the fire point) so the
+ * cockpit can score recall/FDR by overlap with the marked incident spans — an
+ * alert fires `consecutive-1` intervals into the streak, so matching the fire
+ * point alone against a narrow incident misses (the recall-undercount bug).
+ */
+function alertFireRuns(scored: ScoredPoint[], intervalMs: number, consecutive: number): FireRun[] {
+  const runs: FireRun[] = [];
+  const n = scored.length;
+  let i = 0;
+  while (i < n) {
+    if (!(scored[i].scored && scored[i].isAnomaly)) {
+      i++;
       continue;
     }
-    const prevFlagged = i > 0 && scored[i - 1].scored && scored[i - 1].isAnomaly;
-    const adjacent = i > 0 && scored[i].timestamp - scored[i - 1].timestamp === intervalMs;
-    runLen = prevFlagged && adjacent ? runLen + 1 : 1;
-    if (runLen === consecutive) fires.push(i);
+    // Extend the run while the next point is flagged AND exactly one interval on.
+    let j = i;
+    while (
+      j + 1 < n &&
+      scored[j + 1].scored &&
+      scored[j + 1].isAnomaly &&
+      scored[j + 1].timestamp - scored[j].timestamp === intervalMs
+    ) {
+      j++;
+    }
+    if (j - i + 1 >= consecutive) {
+      runs.push({ fire: i + consecutive - 1, startTs: scored[i].timestamp, endTs: scored[j].timestamp });
+    }
+    i = j + 1;
   }
-  return fires;
+  return runs;
 }
 
 self.onmessage = (e: { data: unknown }): void => {
@@ -76,10 +101,12 @@ self.onmessage = (e: { data: unknown }): void => {
     const scored = runDetector(series, params);
     applyDirection(scored, params.direction);
     const intervalMs = series.intervalSeconds * 1000;
-    const fires = alertFireIndexes(scored, intervalMs, params.consecutiveAnomalies);
+    const runs = alertFireRuns(scored, intervalMs, params.consecutiveAnomalies);
+    const fires = runs.map((r) => r.fire);
+    const fireSpans = runs.map((r) => [r.startTs, r.endTs] as [number, number]);
     const eff = effectiveStartIndex(series, params);
     let flagged = 0;
     for (const s of scored) if (s.scored && s.isAnomaly) flagged++;
-    self.postMessage({ type: 'result', id: msg.id, scored, fires, eff, flagged });
+    self.postMessage({ type: 'result', id: msg.id, scored, fires, fireSpans, eff, flagged });
   }
 };

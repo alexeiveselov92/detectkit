@@ -80,9 +80,10 @@ dtk autotune --select <sel> [--incidents FILE] [--label] [--scoring METRIC] \
   **continues into tuning on it**. It **seeds from the metric's newest saved set**
   (or from `--incidents FILE|DIR` when given), so re-running `--label` continues
   editing in place. Beyond click-drag marking it offers **Threshold capture**
-  (grab every span above/below a horizontal line in one gesture), **on-chart
-  delete** (each band's ✕, or select + Delete key), and **Import file…** (load a
-  labels file you pick). `--no-serve` writes a static
+  (grab every span above/below a horizontal line in one gesture), **Lasso capture**
+  (loop around a cloud of points; each grid-adjacent run, gaps bridged, becomes one
+  incident span), **on-chart delete** (each band's ✕, or select + Delete key), and
+  **Import file…** (load a labels file you pick). `--no-serve` writes a static
   `metrics/<name>__labeler.html` (Export downloads the file) and exits; `--no-open`
   prints the URL instead of launching a browser.
 - `--scoring` — `mcc` (default), `f1`, `f_beta`, `balanced_accuracy`, `roc_auc`,
@@ -129,7 +130,9 @@ user to recall timestamps** — it is the easiest, most reliable path:
    at once (above/below, with an optional gap-bridge); it captures within the
    current view by default, and dragging across the chart limits it to a time
    window (different boundary per period) — the painted window is **saved with the
-   set and restored on reopen** (a `capture_windows:` block; metadata only). Each
+   set and restored on reopen** (a `capture_windows:` block; metadata only). For an
+   irregular cloud, **Lasso capture** loops around the points freehand and turns
+   each grid-adjacent run (small gaps bridged) into one incident span. Each
    band's ✕ (or select + Delete)
    removes one, and **focus** on a list row jumps the chart to it.
 3. That writes `incidents/<metric>/<metric>[-<set>]-<UTC>.yml` automatically

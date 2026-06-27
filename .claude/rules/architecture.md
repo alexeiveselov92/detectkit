@@ -583,7 +583,11 @@ count.
 detector chart `tune.ts` mounts a **second, synced labeler chart** (the shared
 `demo/chart.ts` in a new opt-in `labeling` mode): drag the plot to mark a real
 incident span, drag its edges to resize / its middle to move, click its ✕ (or
-select + Delete) to remove. The two charts share one incident array (by
+select + Delete) to remove. In `labeling` mode the chart draws the **raw line +
+the detector's anomaly dots** (the band/center/warm-up are suppressed — they
+belong to the detector chart above), fed the live `scored` array so the dots
+mirror what the band flags; this gives the lasso a cloud to grab. The two charts
+share one incident array (by
 reference), so list-edited labels and drag-edited spans never diverge; they also
 share **x-zoom/pan** (each chart's `onViewChange` drives the other's
 `setViewWindow`, suppressing re-emit so it never loops), **y-scale** (both
@@ -591,20 +595,34 @@ share **x-zoom/pan** (each chart's `onViewChange` drives the other's
 navigator strip (`showNavigator:false`) and overlays the same spans **read-only**
 so alerts vs incidents read together; the labeler chart owns the strip. A
 prominent **metrics bar** recomputes as you tune from the worker's fired-alert
-timestamps vs the marked spans: **incident catch rate (recall)** = incidents
-containing ≥1 alert / total, and **false-alert rate (FDR)** = alerts outside every
-span / total (shown as `%` and "≈1 in N false"); only incidents overlapping the
+**streak spans** vs the marked spans: **incident catch rate (recall)** = incidents
+whose span **overlaps** an alert's anomaly streak / total, and **false-alert rate
+(FDR)** = alerts whose streak overlaps no incident / total (shown as `%` and "≈1
+in N false", kept to one decimal below 10 so a mostly-false rate doesn't round to a
+misleading "1 in 1"). Matching on the whole streak span (not just the fire instant,
+which lands `consecutive-1` intervals into the streak) is the recall-undercount
+fix: `tune.worker.ts` returns a `fireSpans` array (the maximal grid-adjacent
+flagged run per fire) alongside `fires`, and `computeQuality` overlaps those
+against incidents. Only incidents overlapping the
 **loaded (possibly trimmed) series** are scored, so an out-of-window label can't
 mechanically drag recall down. Labeling is anchored here (not the
 read-only report) because the labels are fixed ground truth while only the alerts
-move as you tune. A **Threshold capture** tool (ported from the autotune
-`html_labeler`, lives in `chart.ts`'s `labeling` mode behind `setThresholdMode` +
+move as you tune. Two capture tools live in `chart.ts`'s `labeling` mode (mutually
+exclusive, each toggled from a toolbar above the labeler chart): **Threshold
+capture** (ported from the autotune `html_labeler`, behind `setThresholdMode` +
 an `onThresholdChange` callback) grabs every contiguous run of points on the chosen
 side of a horizontal line in one click — click/value sets the line, a horizontal
 plot drag paints a capture window (else the current view), `applyThreshold` merges
-the runs into incidents; the painted window persists as `capture_windows` in the
+the runs into incidents (each **padded half an interval each side** so a single
+matching point becomes a full-interval incident the fired alert lands inside); the
+painted window persists as `capture_windows` in the
 saved labels and re-seeds via `setCaptureWindow` on reopen (pure metadata —
-autotune ignores it). **Save incidents** POSTs to the server's `/labels` endpoint,
+autotune ignores it). **Lasso anomalies** (behind `setLassoMode` + an
+`onLassoChange` callback) draws a freeform loop and turns the enclosed **anomaly
+dots** into incidents — each grid-adjacent run, bridging gaps up to
+`consecutive_anomalies`, becomes one span padded half an interval each side (a lone
+anomaly ⇒ one full-interval incident; a separate burst in the loop ⇒ its own
+incident). **Save incidents** POSTs to the server's `/labels` endpoint,
 which writes a versioned `incidents/<metric>/<…>.yml` — the **same store
 `dtk autotune` reads**, so a labeling round here also feeds the next supervised
 autotune; the command seeds the labeler (incidents **and** capture windows) from

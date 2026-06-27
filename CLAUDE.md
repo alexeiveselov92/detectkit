@@ -45,9 +45,12 @@ rendered on the docs site under **For developers**). Read the relevant one:
   port as the landing playground) and, on **Apply**, writes the chosen config
   back into the metric YAML — validating first, archiving the previous version to
   `metrics/.history/<metric>/`, then re-emitting in place. It also hosts a
-  **synced incident-labeler chart**: mark real incidents (drag, or **Threshold
-  capture** every span past a horizontal line at once) and watch live
-  **catch-rate (recall)** / **false-alert rate (FDR)** metrics as you tune;
+  **synced incident-labeler chart** that mirrors the detector's anomaly dots: mark
+  real incidents (drag, **Lasso anomalies** to loop a cloud of anomaly dots into
+  per-streak incident spans, or **Threshold capture** every span past a horizontal
+  line at once) and watch live **catch-rate (recall)** / **false-alert rate (FDR)**
+  metrics — matched on each alert's anomaly **streak span**, not just the fire
+  instant — as you tune;
   **Save incidents** writes versioned `incidents/<metric>/*.yml` (the same store
   `dtk autotune` reads, including the painted `capture_windows`) via a
   `POST /labels` endpoint, reusing `autotune/labels.py`. Seeded incidents from that

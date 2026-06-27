@@ -246,6 +246,22 @@ export interface ThresholdInfo {
   windowMs: number;
 }
 
+/**
+ * Live state of the lasso-capture tool (labeling charts only): draw a freeform
+ * loop around a cloud of detector anomalies (or raw points where no detector
+ * runs) and turn each grid-adjacent run — bridging small gaps — into one proper
+ * incident SPAN. Pushed to the UI via `ChartOptions.onLassoChange` so a toolbar
+ * can show the live capture count. See `ChartHandle.setLassoMode`.
+ */
+export interface LassoInfo {
+  /** true while a loop is being drawn. */
+  active: boolean;
+  /** anomalies currently enclosed by the in-progress loop. */
+  anomalies: number;
+  /** incidents the current loop would create (grid-adjacent runs, gaps bridged). */
+  incidents: number;
+}
+
 export interface ChartData {
   series: Series;
   scored: ScoredPoint[];
@@ -301,6 +317,12 @@ export interface ChartOptions {
    */
   onThresholdChange?: (info: ThresholdInfo) => void;
   /**
+   * Called as a lasso loop is drawn / committed in `labeling` mode (see
+   * `ChartHandle.setLassoMode`). Drives the toolbar's live "N anomalies → M
+   * incidents" readout.
+   */
+  onLassoChange?: (info: LassoInfo) => void;
+  /**
    * Called whenever the visible window changes (zoom / pan / reset). Used to keep
    * two charts in sync — the listener typically calls the other chart's
    * `setViewWindow`. Only fires for user-driven view changes, not programmatic
@@ -342,6 +364,14 @@ export interface ChartHandle {
   setThresholdValue(value: number | null): void;
   /** Commit the previewed spans into incidents; returns how many were added. */
   applyThreshold(): number;
+  /**
+   * Lasso-capture (labeling charts only): draw a freeform loop around a cloud of
+   * detector anomalies (the dots, when `ChartData.scored` carries them) — or raw
+   * points where no detector runs — and turn each grid-adjacent run (bridging
+   * gaps up to `consecutiveAnomalies`) into one proper incident span. Toggles the
+   * tool; while on, a plot drag draws the loop and mouseup commits.
+   */
+  setLassoMode(on: boolean): void;
   /** Clear the painted capture window (back to capturing the current view). */
   clearCaptureWindow(): void;
   /** The painted capture window for persistence, or null. */

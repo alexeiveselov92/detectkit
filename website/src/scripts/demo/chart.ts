@@ -31,6 +31,7 @@ import type {
   ChartOptions,
   HoverInfo,
   Incident,
+  LassoInfo,
   ScoredPoint,
   Series,
 } from './types';
@@ -175,6 +176,13 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   let capWin: { a: number; b: number } | null = null;
   let thDown: { x: number; ts: number } | null = null;
   let thDragWin: { a: number; b: number } | null = null;
+
+  // Lasso-capture state (labeling mode only): draw a freeform loop around a cloud
+  // of anomalies (or raw points where no detector runs) and turn each grid-adjacent
+  // run — bridging gaps up to `consecutiveAnomalies` — into one proper incident
+  // span. `lassoPath` holds the in-progress loop in device px. Off until toggled.
+  let lassoMode = false;
+  let lassoPath: Array<{ x: number; y: number }> | null = null;
 
   // Domain, recomputed per render.
   let tmin = 0;
@@ -501,7 +509,11 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     const n = scored.length;
     const eff = Math.min(effectiveStartIndex(series, params), n);
     const effTs = eff < n ? series.timestamps[eff] : undefined;
-    const runs = scoredRuns(scored, eff);
+    // A labeling chart is a labeler, not a detector view: it shows the raw line +
+    // anomaly dots (so you can lasso the cloud) but NOT the band/center/warm-up,
+    // which belong to the synced detector chart above it. Zeroing the runs makes
+    // the corridor/center loops no-ops.
+    const runs = labeling ? [] : scoredRuns(scored, eff);
 
     // 2. confidence corridor — one filled polygon per contiguous scored run
     g.fillStyle = rgba(clay, 0.13);
@@ -553,11 +565,12 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     // behind it (so a viewer sees both what the metric did and what the band
     // sees). With no smoothing the processed value equals the raw value, so a
     // single clay line is all that's needed.
-    if (params.smoothing !== 'none') {
+    if (params.smoothing !== 'none' && !labeling) {
       drawSeries(series.values, rgba(clay, 0.28), 1.25);
       const processed = scored.map((p) => p.processedValue);
       drawSeries(processed, clay, 1.6);
     } else {
+      // Labeler always shows the raw series (the dots sit on the real values).
       drawSeries(series.values, clay, 1.5);
     }
 
@@ -588,7 +601,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
 
     // 6. warm-up overlay: dim the lead-in + label where detection reaches full
     // power. Drawn before the hover overlay so the window box stays crisp on top.
-    if (effTs !== undefined) {
+    if (effTs !== undefined && !labeling) {
       drawWarmupOverlay(g, canvas, MARGINS, dpr, px, effTs, 'detection at full power →');
     }
 
@@ -610,6 +623,8 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
 
     // 9. threshold-capture line + capture-window dimming, on top of the series.
     drawThresholdOverlay();
+    // 9b. lasso loop + the anomalies it currently encloses.
+    drawLasso(scored, eff, n);
 
     g.restore();
 
@@ -978,6 +993,113 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     }
   }
 
+  // ---- lasso capture --------------------------------------------------------
+  // Grid step in ms (1s fallback before any data).
+  const intervalMs = (): number => (data ? data.series.intervalSeconds * 1000 : 1000);
+
+  // Ray-casting point-in-polygon over a device-px loop.
+  function inPolygon(x: number, y: number, poly: Array<{ x: number; y: number }>): boolean {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i].x;
+      const yi = poly[i].y;
+      const xj = poly[j].x;
+      const yj = poly[j].y;
+      const hit = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi || 1e-9) + xi;
+      if (hit) inside = !inside;
+    }
+    return inside;
+  }
+
+  // The anomaly indices currently enclosed by the lasso loop (effective zone only).
+  function lassoCaptured(scored: ScoredPoint[], eff: number, n: number): number[] {
+    const out: number[] = [];
+    if (!lassoPath || lassoPath.length < 3) return out;
+    for (let i = Math.max(0, eff); i < n; i++) {
+      const p = scored[i];
+      if (!p.scored || !p.isAnomaly || !isFinite(p.value)) continue;
+      if (inPolygon(px(p.timestamp), py(p.value), lassoPath)) out.push(i);
+    }
+    return out;
+  }
+
+  // Collapse captured anomaly indices into incident spans: a new span starts only
+  // when the gap to the previous capture exceeds `consecutiveAnomalies` intervals
+  // (so the calm middle of a real incident doesn't fragment it). Each span is
+  // padded half an interval each side, so a lone anomaly becomes one full-interval
+  // incident (never a zero-width point the alert can land just outside of).
+  function lassoSpans(scored: ScoredPoint[], captured: number[]): Array<[number, number]> {
+    if (!captured.length) return [];
+    const step = intervalMs();
+    const bridge = Math.max(1, data?.params.consecutiveAnomalies ?? 1);
+    const maxGap = (bridge + 1) * step; // bridge up to `bridge` missing points
+    const half = step / 2;
+    const spans: Array<[number, number]> = [];
+    let runStart = captured[0];
+    let prev = captured[0];
+    for (let k = 1; k < captured.length; k++) {
+      const idx = captured[k];
+      if (scored[idx].timestamp - scored[prev].timestamp > maxGap) {
+        spans.push([scored[runStart].timestamp - half, scored[prev].timestamp + half]);
+        runStart = idx;
+      }
+      prev = idx;
+    }
+    spans.push([scored[runStart].timestamp - half, scored[prev].timestamp + half]);
+    return spans;
+  }
+
+  // Push the live lasso state (capture counts) to the UI.
+  function emitLasso(scored: ScoredPoint[], eff: number, n: number): void {
+    if (!opts.onLassoChange) return;
+    const captured = lassoMode && lassoPath ? lassoCaptured(scored, eff, n) : [];
+    opts.onLassoChange({
+      active: !!lassoPath,
+      anomalies: captured.length,
+      incidents: lassoSpans(scored, captured).length,
+    });
+  }
+
+  // Commit the loop: build incident spans from the enclosed anomalies, merge them
+  // into the incident set (addCaptured bridges overlaps) and emit.
+  function commitLasso(): void {
+    if (!data || !lassoPath) return;
+    const { scored } = data;
+    const n = scored.length;
+    const eff = Math.min(effectiveStartIndex(data.series, data.params), n);
+    const spans = lassoSpans(scored, lassoCaptured(scored, eff, n));
+    for (const [a, b] of spans) addCaptured(a, b);
+    if (spans.length) emitIncidents();
+  }
+
+  // The lasso loop (dashed accent outline + faint fill) and a brightened ring on
+  // every anomaly it currently encloses. No-op unless a loop is being drawn.
+  function drawLasso(scored: ScoredPoint[], eff: number, n: number): void {
+    if (!lassoMode || !lassoPath || lassoPath.length < 2) return;
+    const clay = token('--clay');
+    const anomaly = token('--st-anomaly');
+    g.beginPath();
+    g.moveTo(lassoPath[0].x, lassoPath[0].y);
+    for (let i = 1; i < lassoPath.length; i++) g.lineTo(lassoPath[i].x, lassoPath[i].y);
+    g.closePath();
+    g.fillStyle = rgba(clay, 0.08);
+    g.fill();
+    g.strokeStyle = rgba(clay, 0.9);
+    g.lineWidth = 1.5 * dpr;
+    g.setLineDash([5 * dpr, 4 * dpr]);
+    g.stroke();
+    g.setLineDash([]);
+    for (const i of lassoCaptured(scored, eff, n)) {
+      const X = px(scored[i].timestamp);
+      const Y = py(scored[i].value);
+      g.strokeStyle = anomaly;
+      g.lineWidth = 2 * dpr;
+      g.beginPath();
+      g.arc(X, Y, 7 * dpr, 0, Math.PI * 2);
+      g.stroke();
+    }
+  }
+
   // Shaded incident bands. Read-only on a detector chart (just fill + faint
   // edges); on a labeling chart they gain edge handles, a selection highlight, a
   // ✕ delete handle and a live drag preview.
@@ -1069,6 +1191,14 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     if (raf === 0) raf = requestAnimationFrame(paint);
   }
 
+  // Compute the effective zone + emit live lasso capture counts from current data.
+  function emitLassoNow(): void {
+    if (!data) return;
+    const n = data.scored.length;
+    const eff = Math.min(effectiveStartIndex(data.series, data.params), n);
+    emitLasso(data.scored, eff, n);
+  }
+
   // ---- interaction ----------------------------------------------------------
   function emitHover(): void {
     if (!opts.onHover || !data) return;
@@ -1118,6 +1248,16 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       }
       const hit = navHit(devX);
       canvas.style.cursor = hit === 'l' || hit === 'r' ? 'ew-resize' : hit === 'move' ? 'grab' : 'pointer';
+      return;
+    }
+    if (labeling && lassoMode) {
+      // lasso capture: the freeform loop is drawn on the window-level drag handler;
+      // here just keep the crosshair and suppress point hover.
+      if (hoverIndex !== -1) {
+        hoverIndex = -1;
+        emitHover();
+      }
+      canvas.style.cursor = 'crosshair';
       return;
     }
     if (labeling && thMode) {
@@ -1195,6 +1335,15 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     }
     // plot area (everything above the navigator strip / bottom margin)
     if (devY > MARGINS.t * dpr && devY < canvas.height - MARGINS.b * dpr - navTotal()) {
+      if (labeling && lassoMode) {
+        // start a freeform loop; points accumulate on the window-level drag.
+        lassoPath = [{ x: devX, y: devY }];
+        emitLassoNow();
+        canvas.style.cursor = 'crosshair';
+        schedule();
+        ev.preventDefault();
+        return;
+      }
       if (labeling && thMode) {
         // a press either sets the line (a click) or paints a capture window (a
         // horizontal drag) — resolved on mouseup by how far it moved.
@@ -1239,6 +1388,12 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   function onWinMove(ev: MouseEvent): void {
     if (!data) return;
     const { x: devX, y: devY } = devOf(ev);
+    if (lassoMode && lassoPath) {
+      lassoPath.push({ x: devX, y: devY });
+      emitLassoNow();
+      schedule();
+      return;
+    }
     if (thMode && thDown) {
       // a far-enough horizontal move paints a capture window; otherwise keep
       // tracking the cursor's Y as the candidate line value.
@@ -1294,6 +1449,13 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   }
 
   function onUp(ev: MouseEvent): void {
+    if (lassoMode && lassoPath) {
+      commitLasso();
+      lassoPath = null;
+      emitLassoNow();
+      schedule();
+      return;
+    }
     if (thMode && thDown) {
       const { x: devX, y: devY } = devOf(ev);
       if (Math.abs(devX - thDown.x) > 6 * dpr) {
@@ -1344,6 +1506,15 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   function onKey(ev: KeyboardEvent): void {
     const t = ev.target as HTMLElement | null;
     const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+    // In lasso mode the selection is inert; Escape abandons an in-progress loop.
+    if (lassoMode) {
+      if (ev.key === 'Escape' && lassoPath) {
+        lassoPath = null;
+        emitLassoNow();
+        schedule();
+      }
+      return;
+    }
     // In threshold mode the selection is inert — don't let Delete remove a band.
     if (thMode || typing || !selIncident) return;
     if (ev.key === 'Delete' || ev.key === 'Backspace') {
@@ -1357,6 +1528,11 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
 
   function onWheel(ev: WheelEvent): void {
     if (!navigable || !data) return;
+    // Don't let a zoom distort the device-px loop mid-draw.
+    if (lassoMode && lassoPath) {
+      ev.preventDefault();
+      return;
+    }
     ev.preventDefault();
     const { x: devX, y: devY } = devOf(ev);
     const s = clampNum(tspan() * Math.pow(1.0015, ev.deltaY), minSpan(), fullSpan());
@@ -1427,9 +1603,31 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       thDragWin = null;
     } else {
       selIncident = null;
+      // mutually exclusive with the lasso tool.
+      lassoMode = false;
+      lassoPath = null;
+      emitLassoNow();
     }
     canvas.style.cursor = 'crosshair';
     emitThreshold();
+    schedule();
+  }
+  // Toggle the freeform lasso tool (mutually exclusive with threshold capture).
+  function setLassoMode(on: boolean): void {
+    if (!labeling) return;
+    lassoMode = on;
+    if (on) {
+      thMode = false;
+      thDown = null;
+      thDragWin = null;
+      thHoverVal = null;
+      selIncident = null;
+      emitThreshold();
+    } else {
+      lassoPath = null;
+    }
+    canvas.style.cursor = 'crosshair';
+    emitLassoNow();
     schedule();
   }
   function setThresholdDirection(dir: 'above' | 'below'): void {
@@ -1449,7 +1647,11 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   }
   function applyThreshold(): number {
     const runs = thRuns();
-    for (const [a, b] of runs) addCaptured(a, b);
+    // Pad each captured run half an interval each side so a single matching point
+    // becomes a full-interval-wide incident (not a zero-width point the fired
+    // alert lands just outside of) — the recall-undercount fix on the capture side.
+    const half = intervalMs() / 2;
+    for (const [a, b] of runs) addCaptured(a - half, b + half);
     if (runs.length) emitIncidents();
     emitThreshold();
     schedule();
@@ -1507,6 +1709,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     setThresholdGap,
     setThresholdValue,
     applyThreshold,
+    setLassoMode,
     clearCaptureWindow,
     getCaptureWindow,
     setCaptureWindow,

@@ -81,8 +81,11 @@ knobs (type — including **Manual bounds** with lower/upper sliders — thresho
 window, recency weighting + half-life, detrend, smoothing, **seasonality groups**,
 **direction** (both/up/down), alert `consecutive_anomalies`) while the confidence
 band and flagged anomalies **recompute live**. The whole screen is a **chart-first
-cockpit**: ONE chart (the windshield) fills the view, every knob lives in a
-**collapsible dock under it**, the metrics ride beneath the chart, and the chart is
+cockpit**: ONE chart (the windshield) fills the view, the live metrics ride
+**pinned in a HUD over the chart** (the speedometer), and every control lives in an
+**always-visible, mode-aware side rail** beside the chart (Tune shows the detector
+knobs + effective config + Apply, Review the verdict actions, Label the capture
+tools + incident list + Save). The chart is
 **zoomable** (scroll/drag + navigator strip) with a **"Points shown"** trim slider.
 Clicking **Apply** writes the chosen
 config back into the metric YAML **in place** (autotune, by contrast, writes a new

@@ -802,8 +802,11 @@ what will be written. A **y = 0 line** toggle shows the metric relative to zero.
 
 #### Chart-first cockpit: modes, alert review & metrics
 
-The whole screen is **one chart** (the windshield) with the knobs in a
-**collapsible dock under it** and the metrics beneath the chart. A **mode switch**
+The whole screen is **one chart** (the windshield) with the live metrics pinned in
+a HUD over it (the speedometer) and every control in an **always-visible side rail**
+that is **mode-aware** — it shows only the current mode's panel (detector knobs +
+effective-config readout + Apply in Tune, verdict actions in Review, capture tools +
+Save in Label) and collapses to give the chart the whole width. A **mode switch**
 picks the job and dims the layers that don't matter to it:
 
 - **Tune** — steer the band (corridor leads; incidents are read-only context; hover

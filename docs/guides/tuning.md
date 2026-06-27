@@ -108,10 +108,14 @@ on the [HTML report](visualizing-results.md). Off by default.
 ## One chart, three modes
 
 `dtk tune` is a **chart-first cockpit**: a single chart fills the screen (the
-windshield), every knob lives in a **collapsible dock under it**, and the live
-metrics sit right beneath the chart — so the first thing you do is turn a knob and
-watch the band, with no scrolling. A **mode switch** above the chart picks the job;
-the layers that don't matter to it dim to context instead of competing for pixels:
+windshield), the live **metrics ride pinned over the chart** (your speedometer —
+always in view), and every control lives in an **always-visible side rail** beside
+the chart — so the first thing you do is turn a knob and watch the band, with no
+scrolling. The rail is **mode-aware**: it shows only the controls the current mode
+needs (the detector knobs + Apply in Tune, the verdict actions in Review, the
+capture tools + Save in Label), and collapses to give the chart the whole width. A
+**mode switch** above the chart picks the job; the layers that don't matter to it
+dim to context instead of competing for pixels:
 
 - **Tune** — steer the band. The confidence corridor leads, marked incidents recede
   to read-only context, and hovering a point shows the trailing window that scored

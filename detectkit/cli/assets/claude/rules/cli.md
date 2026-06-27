@@ -89,16 +89,22 @@ datapoints (run `dtk run --steps load` first if empty); the selector must resolv
 to a single metric.
 
 **Mark incidents + see alert quality live.** A second, **synced** chart beneath
-the detector view lets you **mark the real incidents** (drag to create a span,
-drag its edges/middle to adjust, ✕ or Delete to remove), or **Threshold capture**
+the detector view **mirrors the detector's anomaly dots** and lets you **mark the
+real incidents** (drag to create a span, drag its edges/middle to adjust, ✕ or
+Delete to remove), **Lasso anomalies** (loop around a cloud of anomaly dots — each
+run of consecutive anomalies, small gaps bridged up to `consecutive_anomalies`,
+becomes one incident span), or **Threshold capture**
 every contiguous span past a horizontal line in one shot (set the line by click or
 value, above/below, optional gap-bridging, optionally limited to a painted time
 window — the same tool as the autotune labeler; the window is saved as
-`capture_windows` and restored on reopen). As you tune, a metrics
+`capture_windows` and restored on reopen; each captured span is widened to a full
+interval so the alert lands inside). As you tune, a metrics
 bar shows two operator numbers: **incident catch rate (recall)** — how many marked
-incidents your config catches — and **false-alert rate** — what share of alerts
-fall outside any real incident ("≈1 in N false"); only incidents within the loaded
-window are scored. **Save incidents** writes a
+incidents your config catches (an incident is caught when an alert's anomaly
+**streak overlaps** it, not just the fire instant) — and **false-alert rate** —
+what share of alerts fall outside any real incident ("≈1 in N false", keeping a
+decimal so a mostly-false rate doesn't round to a misleading "1 in 1"); only
+incidents within the loaded window are scored. **Save incidents** writes a
 versioned `incidents/<metric>/*.yml` — the same store `dtk autotune` reads, so the
 same labels feed the next supervised tune (it seeds from the newest file on open,
 **anchoring the budget-sized loaded window on the seeded incidents** — ending just

@@ -213,7 +213,12 @@ Then, in the browser:
    **↺ whole view** clears the window. The painted window is **saved with the set**
    (a `capture_windows:` block in the file) and **restored when you reopen it**, so
    the regime scope you reasoned about is recorded and survives between sessions.
-4. Click **Save & tune**. The server writes a **versioned** file
+4. **Lasso capture** (for an irregular cloud of outliers): toggle it and **draw a
+   freeform loop** around the points you want — every point inside is grabbed, and
+   each **grid-adjacent run** (small gaps bridged) becomes one **incident span**
+   (a lone point becomes a full-interval incident), so you can pick out a messy
+   cluster without touching the points beside it. **Esc** abandons a loop.
+5. Click **Save & tune**. The server writes a **versioned** file
    `incidents/<metric>/<metric>[-<set>]-<UTC>.yml` (named after the metric, with the
    optional set name folded in as a suffix; re-labeling adds a new file — nothing is
    overwritten, so the full history is kept) and the command **continues straight

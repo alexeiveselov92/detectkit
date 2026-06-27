@@ -7,6 +7,7 @@ import pytest
 
 from detectkit.autotune._types import TuneMode
 from detectkit.autotune.labels import (
+    alert_reviews_to_display,
     capture_windows_to_display,
     newest_labels_file,
     parse_incident_labels,
@@ -209,6 +210,43 @@ def test_capture_windows_round_trip_to_display():
 def test_capture_windows_must_be_a_list():
     with pytest.raises(ValueError, match="capture_windows"):
         parse_incident_labels({"incidents": [], "capture_windows": "nope"}, interval_seconds=3600)
+
+
+def test_alert_reviews_parsed_round_trip_and_metadata_only():
+    labels = parse_incident_labels(
+        {
+            "incidents": [{"at": "2026-01-01 05:00:00"}],
+            "alert_reviews": [
+                {"start": "2026-01-01 02:00:00", "end": "2026-01-01 03:00:00", "verdict": "valid"},
+                {"start": "2026-01-01 06:00:00", "end": "2026-01-01 06:00:00", "verdict": "false"},
+            ],
+        },
+        interval_seconds=3600,
+    )
+    assert [v for _, _, v in labels.alert_reviews] == ["valid", "false"]
+    assert alert_reviews_to_display(labels) == [
+        {"start": "2026-01-01 02:00:00", "end": "2026-01-01 03:00:00", "verdict": "valid"},
+        {"start": "2026-01-01 06:00:00", "end": "2026-01-01 06:00:00", "verdict": "false"},
+    ]
+    # alert_reviews are metadata only — they never change ground truth (the incident does).
+    assert labels.to_ground_truth(_grid(), 3600).n_positive == 1
+
+
+def test_alert_reviews_default_empty_and_unknown_verdict_is_valid():
+    labels = parse_incident_labels(
+        {
+            "incidents": [],
+            "alert_reviews": [{"start": "2026-01-01 00:00:00", "end": "2026-01-01 01:00:00"}],
+        },
+        interval_seconds=3600,
+    )
+    assert labels.alert_reviews[0][2] == "valid"  # missing verdict defaults to valid
+    assert parse_incident_labels({"incidents": []}, interval_seconds=3600).alert_reviews == []
+
+
+def test_alert_reviews_must_be_a_list():
+    with pytest.raises(ValueError, match="alert_reviews"):
+        parse_incident_labels({"incidents": [], "alert_reviews": "nope"}, interval_seconds=3600)
 
 
 def test_sanitize_label_set_name():

@@ -208,9 +208,30 @@ export interface HoverInfo {
 export interface ChartAlert {
   /** ms-epoch timestamp where the alert fired. */
   t: number;
-  /** 'anomaly' | 'recovery' | 'nodata' — picks the marker color. */
+  /**
+   * Picks the marker color:
+   * - 'anomaly'           — fired, not yet reviewed (red)
+   * - 'anomaly-validated' — the user confirmed it's a real alert (green)
+   * - 'anomaly-false'     — the user marked it a false alarm (slate, recedes)
+   * - 'recovery' | 'nodata' — pipeline event markers
+   */
   kind: string;
 }
+
+/**
+ * Which working mode the chart is in (labeling charts only — see ChartOptions.mode).
+ * The mode drives which visual LAYERS are full / dimmed / hidden and which
+ * interactions are armed, so one chart serves tuning, alert-review and labeling
+ * without two stacked canvases:
+ * - 'tune'   — steer the band: band full, incidents dim/read-only, hover window on.
+ * - 'review' — confirm the fired alerts: band ghosted, alert markers are the subject
+ *              (click one to cycle its verdict), incidents dim/read-only.
+ * - 'label'  — mark incidents: band hidden, incidents full + editable, capture tools armed.
+ */
+export type ChartMode = 'tune' | 'review' | 'label';
+
+/** Per-alert review verdict (keyed on the fire timestamp in the cockpit). */
+export type AlertVerdict = 'unreviewed' | 'valid' | 'false';
 
 /**
  * A labeled real-world incident span (ms-epoch). Drawn as a shaded band on the
@@ -305,9 +326,24 @@ export interface ChartOptions {
    * Incident-labeling mode: drag on the plot to mark an incident span, drag its
    * edges to resize / its middle to move, click its ✕ (or select + Delete) to
    * remove it. Pan/zoom stays available via the navigator strip + wheel. Used by
-   * the `dtk tune` cockpit's labeler chart; off by default.
+   * the `dtk tune` cockpit's single chart; off by default.
    */
   labeling?: boolean;
+  /**
+   * Working mode for a labeling chart (see ChartMode). Default 'tune'. Drives the
+   * per-layer full/dim/hidden states + which interactions are armed, so the cockpit
+   * runs tuning / alert-review / labeling on ONE chart. Ignored on non-labeling
+   * charts (the landing demo), which always render in the 'tune' layer set — i.e.
+   * exactly as before. Switch live via `setMode`.
+   */
+  mode?: ChartMode;
+  /**
+   * Called when the user cycles a fired alert's review verdict (clicking its marker
+   * in 'review'/'label' mode). `fireTs` is the alert's fire timestamp; `verdict` is
+   * the NEXT state. The cockpit stores it and re-renders with the alert's `kind`
+   * updated. Labeling charts only.
+   */
+  onAlertReviewChange?: (fireTs: number, verdict: AlertVerdict) => void;
   /** Called (with a snapshot) whenever the user edits incidents in `labeling` mode. */
   onIncidentsChange?: (incidents: Incident[]) => void;
   /**
@@ -343,6 +379,8 @@ export interface ChartHandle {
   render(data: ChartData): void;
   /** re-fit the backing store to the element size (call on resize). */
   resize(): void;
+  /** Switch the working mode (labeling charts only): 'tune' | 'review' | 'label'. */
+  setMode(mode: ChartMode): void;
   /** Toggle the y = 0 reference line + 0-relative scaling (see ChartOptions.showZeroLine). */
   setZeroLine(on: boolean): void;
   /** Set the visible window programmatically WITHOUT re-emitting onViewChange (for sync). */

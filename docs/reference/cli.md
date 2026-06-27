@@ -800,32 +800,42 @@ into one group), **direction** (both/up/down) and the alert
 **`consecutive_anomalies`** window. The "effective config" readout shows exactly
 what will be written. A **y = 0 line** toggle shows the metric relative to zero.
 
-#### Mark incidents & alert-quality metrics
+#### Chart-first cockpit: modes, alert review & metrics
 
-A second, **synced** chart beneath the detector view **mirrors the detector's
-anomaly dots** and lets you **mark real
-incidents** (drag to create a span; drag its edges/middle to adjust; ✕ or Delete to
-remove), **Lasso anomalies** (draw a freeform loop around a cloud of anomaly dots —
-each run of consecutive anomalies, small gaps bridged, becomes one incident span
-sized to the run), or use **Threshold capture** to grab every contiguous span past a
-horizontal line at once (set the line by click or value, pick **above**/**below**,
-optionally bridge a few intervals of gap, and drag across the chart to limit the
-capture to a time window — the painted window is saved as `capture_windows` and
-restored on reopen; each captured span is widened to a full interval so the alert
-lands inside). As you tune, a metrics bar shows **incident catch rate
-(recall)** — the share of marked incidents caught by an alert (an incident is
-caught when an alert's anomaly **streak overlaps** it, not just the fire instant) —
-and **false-alert
-rate** — the share of fired alerts outside every incident ("≈1 in N false"); only
-incidents within the loaded window are scored. **Save incidents** writes
+The whole screen is **one chart** (the windshield) with the knobs in a
+**collapsible dock under it** and the metrics beneath the chart. A **mode switch**
+picks the job and dims the layers that don't matter to it:
+
+- **Tune** — steer the band (corridor leads; incidents are read-only context; hover
+  a point for its window).
+- **Review** — confirm the fired alerts: **click an alert marker** to cycle its
+  verdict un-reviewed (red) → **valid** (green) → **false alarm** (slate); **Confirm
+  all unreviewed valid** does the lot. A confirmed alert asserts a real incident
+  happened there — it counts toward recall + correct (so a clean metric is validated
+  in a few clicks **without drawing spans**) and is written as an incident on Save.
+- **Label** — mark real incidents: **drag** a span (edges/middle to adjust, ✕/Delete
+  to remove), **Lasso anomalies** (loop a cloud of anomaly dots — each consecutive
+  run, gaps bridged up to `consecutive_anomalies`, becomes one span sized to the
+  run), or **Threshold capture** (grab every span past a horizontal line; set it by
+  click or value, **above**/**below**, optional gap-bridge, optional painted time
+  window saved as `capture_windows`; each span widened to a full interval so the
+  alert lands inside).
+
+As you tune, a metrics bar shows **incident catch rate (recall)** — the share of
+ground-truth incidents (marked + confirmed-valid alerts) caught by an alert (caught
+when an alert's anomaly **streak overlaps** it, not just the fire instant) —
+**false-alert rate** — the share of fired alerts outside every incident and not
+confirmed valid ("≈1 in N false") — and **reviewed N/M**; only incidents within the
+loaded window are scored. **Save incidents** writes
 a versioned `incidents/<metric>/<…>.yml`, the **same store
 [`dtk autotune`](#dtk-autotune) reads** (it seeds incidents *and* capture windows
 from the newest such file on open, **anchoring the budget-sized loaded window on
 the seeded incidents** — ending just past the latest one rather than at the last
 datapoint — so they render and count without loading the whole history; older
-incidents stay list-only, use `--from`/`--to` to tune against them), so a labeling
-round here also feeds the next supervised tune. Saving incidents does not end the
-session; only **Apply** does.
+incidents stay list-only, use `--from`/`--to` to tune against them; per-alert
+verdicts persist as an `alert_reviews` metadata block and re-seed on reopen), so a
+labeling round here also feeds the next supervised tune. Saving incidents does not
+end the session; only **Apply** does.
 
 #### How Apply writes back
 

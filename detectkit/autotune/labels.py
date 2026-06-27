@@ -67,6 +67,11 @@ class IncidentLabels:
     # metadata: it records the regime scope the user reasoned about (auditable in
     # the saved file, restored on reopen); it does NOT affect ground truth.
     capture_windows: list[tuple[datetime, datetime]] = field(default_factory=list)
+    # Optional per-alert review verdicts from `dtk tune` (streak span + 'valid' /
+    # 'false'). Pure metadata: it re-seeds the green/slate markers on reopen (a
+    # confirmed alert is also written as a normal incident, which IS ground truth).
+    # autotune ignores this block entirely.
+    alert_reviews: list[tuple[datetime, datetime, str]] = field(default_factory=list)
 
     def is_empty(self) -> bool:
         return not self.intervals and not self.points
@@ -158,6 +163,7 @@ def parse_incident_labels(
         return IncidentLabels([], [])
 
     raw_windows: list = []
+    raw_reviews: list = []
     if isinstance(raw, list):
         entries = raw
         tz: ZoneInfo | None = None
@@ -173,6 +179,9 @@ def parse_incident_labels(
         raw_windows = raw.get("capture_windows") or []
         if not isinstance(raw_windows, list):
             raise ValueError("'capture_windows' must be a list")
+        raw_reviews = raw.get("alert_reviews") or []
+        if not isinstance(raw_reviews, list):
+            raise ValueError("'alert_reviews' must be a list")
     else:
         raise ValueError("Labels must be a mapping with 'incidents' or a list of incidents")
 
@@ -205,7 +214,22 @@ def parse_incident_labels(
             raise ValueError(f"Capture window start {ws} is after end {we}")
         capture_windows.append((ws, we))
 
-    return IncidentLabels(intervals=intervals, points=points, capture_windows=capture_windows)
+    alert_reviews: list[tuple[datetime, datetime, str]] = []
+    for rv in raw_reviews:
+        if not isinstance(rv, dict) or "start" not in rv or "end" not in rv:
+            raise ValueError("Each alert_reviews entry needs 'start' and 'end'")
+        rs, re_ = _parse_dt(rv["start"], tz), _parse_dt(rv["end"], tz)
+        if rs > re_:
+            raise ValueError(f"Alert review start {rs} is after end {re_}")
+        verdict = "false" if str(rv.get("verdict", "valid")) == "false" else "valid"
+        alert_reviews.append((rs, re_, verdict))
+
+    return IncidentLabels(
+        intervals=intervals,
+        points=points,
+        capture_windows=capture_windows,
+        alert_reviews=alert_reviews,
+    )
 
 
 def parse_labels_file(
@@ -280,6 +304,29 @@ def load_capture_windows(
     """Load a labels file and render its capture windows as labeler display dicts."""
     labels = parse_labels_file(path, interval_seconds=interval_seconds, metric_name=metric_name)
     return capture_windows_to_display(labels)
+
+
+def alert_reviews_to_display(labels: IncidentLabels) -> list[dict[str, str]]:
+    """Render parsed per-alert review verdicts as display dicts (naive-UTC strings)."""
+    return [
+        {
+            "start": start.strftime(_DISPLAY_FMT),
+            "end": end.strftime(_DISPLAY_FMT),
+            "verdict": verdict,
+        }
+        for start, end, verdict in labels.alert_reviews
+    ]
+
+
+def load_alert_reviews(
+    path: str | Path,
+    *,
+    interval_seconds: int,
+    metric_name: str | None = None,
+) -> list[dict[str, str]]:
+    """Load a labels file and render its per-alert review verdicts as display dicts."""
+    labels = parse_labels_file(path, interval_seconds=interval_seconds, metric_name=metric_name)
+    return alert_reviews_to_display(labels)
 
 
 # Versioned labels store helpers (shared by the autotune labeler server and the

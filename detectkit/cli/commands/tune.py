@@ -16,6 +16,7 @@ from __future__ import annotations
 import click
 
 from detectkit.autotune.labels import (
+    load_alert_reviews,
     load_capture_windows,
     load_incidents_for_display,
     newest_labels_file,
@@ -70,6 +71,7 @@ def run_tune(
     incidents_dir = project_root / "incidents" / name
     preload_incidents: list[dict[str, str]] = []
     preload_capture: list[dict[str, str]] = []
+    preload_reviews: list[dict[str, str]] = []
     newest = newest_labels_file(incidents_dir)
     if newest is not None:
         try:
@@ -77,6 +79,9 @@ def run_tune(
                 newest, interval_seconds=interval_seconds, metric_name=name
             )
             preload_capture = load_capture_windows(
+                newest, interval_seconds=interval_seconds, metric_name=name
+            )
+            preload_reviews = load_alert_reviews(
                 newest, interval_seconds=interval_seconds, metric_name=name
             )
             click.echo(
@@ -99,6 +104,7 @@ def run_tune(
         project_name=project_name,
         incidents=preload_incidents,
         capture_windows=preload_capture,
+        alert_reviews=preload_reviews,
     )
     n_points = len(payload["points"])
     if n_points == 0:

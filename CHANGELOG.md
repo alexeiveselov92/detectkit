@@ -5,6 +5,36 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.38.0] - 2026-06-27
+
+### Added
+- **`dtk tune` is now a chart-first cockpit on ONE chart with three modes.** The
+  detector and labeler charts are merged into a single windshield that fills the
+  screen; every control lives in a collapsible **dock under the chart**, and the
+  live metrics sit right beneath it (no more scrolling past the chart to reach the
+  knobs). A **mode switch** drives which layers lead and which interactions are
+  armed: **Tune** (the band leads; incidents recede to read-only context; hover a
+  point for its window), **Review** (the fired alerts lead; the band ghosts), and
+  **Label** (the band hides; incidents are editable; threshold/lasso capture
+  armed). The non-active layers dim to context instead of competing for pixels, so
+  one canvas does the job two stacked half-charts used to.
+- **Validate fired alerts right on the chart.** Click an alert marker to cycle its
+  verdict **un-reviewed (red) → valid (green) → false alarm (slate)** — on the one
+  chart, in Tune or Review mode; **Confirm all unreviewed valid** does the lot. A
+  confirmed alert is the user asserting a real incident happened there: it counts
+  as caught (recall) and correct (FDR) — so a clean metric whose alerts are all
+  good can be validated in a few clicks **without hand-drawing incident spans** —
+  and it is **written as a normal incident on Save**, so confirming alerts also
+  feeds the next supervised `dtk autotune`. The metrics bar gains a **reviewed
+  N/M** chip. Verdicts persist as an `alert_reviews:` metadata block (re-bound to
+  the moved alerts by streak-span overlap on reopen; autotune ignores the block).
+
+### Changed
+- The two synced `dtk tune` charts are replaced by the single mode-driven chart
+  (less vertical budget, no cross-chart sync machinery). The shared chart engine
+  gains a `mode` (`tune`/`review`/`label`) with a per-layer full/dim/hidden model;
+  the landing playground (no `mode`/`labeling`) renders exactly as before.
+
 ## [0.37.0] - 2026-06-27
 
 ### Added

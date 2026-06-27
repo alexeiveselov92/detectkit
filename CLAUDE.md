@@ -44,15 +44,22 @@ rendered on the docs site under **For developers**). Read the relevant one:
   metric's real series (recomputing the band live via the **same** TS detector
   port as the landing playground) and, on **Apply**, writes the chosen config
   back into the metric YAML — validating first, archiving the previous version to
-  `metrics/.history/<metric>/`, then re-emitting in place. It also hosts a
-  **synced incident-labeler chart** that mirrors the detector's anomaly dots: mark
-  real incidents (drag, **Lasso anomalies** to loop a cloud of anomaly dots into
-  per-streak incident spans, or **Threshold capture** every span past a horizontal
-  line at once) and watch live **catch-rate (recall)** / **false-alert rate (FDR)**
+  `metrics/.history/<metric>/`, then re-emitting in place. The whole screen is a
+  **chart-first cockpit**: ONE mode-driven chart (the windshield) fills the view,
+  the controls live in a **collapsible dock under it**, and the metrics ride
+  beneath the chart. A **mode switch** picks which layers lead / dim / hide and
+  which interactions are armed — **Tune** (band leads), **Review** (confirm the
+  fired alerts: click a marker to cycle un-reviewed → valid (green) → false alarm
+  (slate); a confirmed alert folds in as a virtual incident, so a clean metric is
+  validated in a few clicks without hand-drawing spans), **Label** (band hides,
+  incidents editable; **Lasso anomalies** loops a cloud of anomaly dots into
+  per-streak incident spans, **Threshold capture** grabs every span past a line).
+  Watch live **catch-rate (recall)** / **false-alert rate (FDR)** / **reviewed**
   metrics — matched on each alert's anomaly **streak span**, not just the fire
   instant — as you tune;
   **Save incidents** writes versioned `incidents/<metric>/*.yml` (the same store
-  `dtk autotune` reads, including the painted `capture_windows`) via a
+  `dtk autotune` reads, including the painted `capture_windows` and per-alert
+  `alert_reviews` metadata; confirmed alerts are written as incidents too) via a
   `POST /labels` endpoint, reusing `autotune/labels.py`. Seeded incidents from that
   store **anchor the (budget-sized) loaded window** — it ends just past the latest
   incident rather than at the last datapoint, so they render/score without an old

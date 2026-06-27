@@ -25,9 +25,11 @@ import {
 } from '../core/canvas';
 import { effectiveStartIndex } from './detector';
 import type {
+  AlertVerdict,
   ChartAlert,
   ChartData,
   ChartHandle,
+  ChartMode,
   ChartOptions,
   HoverInfo,
   Incident,
@@ -143,6 +145,23 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   // Incident-labeling mode: plot-drag marks/edits incident spans (pan via the
   // strip). Off → incidents (if any) are read-only shaded context.
   const labeling = !!opts.labeling;
+  // Working mode (labeling charts only): 'tune' steers the band, 'review' confirms
+  // the alerts, 'label' marks incidents. It drives which LAYERS are full/dim/hidden
+  // and which interactions are armed, so one chart serves all three. A non-labeling
+  // chart (the landing demo) is always 'tune' → identical to before.
+  let mode: ChartMode = opts.mode ?? 'tune';
+  const m = (): ChartMode => (labeling ? mode : 'tune');
+  // Per-layer visibility/alpha by mode. Tuned so the active job's layer dominates and
+  // the rest recede to locatable context instead of competing for pixels.
+  const bandShown = (): boolean => m() !== 'label'; // hidden while labeling
+  const bandMul = (): number => (m() === 'review' ? 0.3 : 1); // ghosted in review
+  const dotsMul = (): number => (m() === 'tune' ? 1 : m() === 'review' ? 0.3 : 0.85);
+  const incEditable = (): boolean => labeling && m() === 'label';
+  const incFillMul = (): number => (m() === 'label' ? 1 : 0.55); // dim read-only elsewhere
+  const hoverOn = (): boolean => m() === 'tune';
+  // A single click on a fired-alert marker cycles its verdict — armed while tuning
+  // or reviewing (not in 'label', where a top click belongs to incident handles).
+  const alertReviewArmed = (): boolean => labeling && (m() === 'tune' || m() === 'review');
 
   let dpr = 1;
   let data: ChartData | null = null;
@@ -509,14 +528,14 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     const n = scored.length;
     const eff = Math.min(effectiveStartIndex(series, params), n);
     const effTs = eff < n ? series.timestamps[eff] : undefined;
-    // A labeling chart is a labeler, not a detector view: it shows the raw line +
-    // anomaly dots (so you can lasso the cloud) but NOT the band/center/warm-up,
-    // which belong to the synced detector chart above it. Zeroing the runs makes
-    // the corridor/center loops no-ops.
-    const runs = labeling ? [] : scoredRuns(scored, eff);
+    // The band layer follows the MODE: full in 'tune', a faint ghost in 'review'
+    // (the alerts are the subject there) and hidden in 'label' (incidents own the
+    // chart). Zeroing the runs makes the corridor/center loops no-ops.
+    const bMul = bandMul();
+    const runs = bandShown() ? scoredRuns(scored, eff) : [];
 
     // 2. confidence corridor — one filled polygon per contiguous scored run
-    g.fillStyle = rgba(clay, 0.13);
+    g.fillStyle = rgba(clay, 0.13 * bMul);
     for (const [a, b] of runs) {
       g.beginPath();
       g.moveTo(px(scored[a].timestamp), py(scored[a].upper));
@@ -526,7 +545,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       g.fill();
     }
     // faint top/bottom edges
-    g.strokeStyle = rgba(clay, 0.4);
+    g.strokeStyle = rgba(clay, 0.4 * bMul);
     g.lineWidth = 1 * dpr;
     for (const [a, b] of runs) {
       for (const bound of ['upper', 'lower'] as const) {
@@ -542,7 +561,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     }
 
     // 3. center line — thin dashed faint
-    g.strokeStyle = rgba(faint, 0.55);
+    g.strokeStyle = rgba(faint, 0.55 * bMul);
     g.lineWidth = 1 * dpr;
     g.setLineDash([3 * dpr, 3 * dpr]);
     for (const [a, b] of runs) {
@@ -565,27 +584,32 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     // behind it (so a viewer sees both what the metric did and what the band
     // sees). With no smoothing the processed value equals the raw value, so a
     // single clay line is all that's needed.
-    if (params.smoothing !== 'none' && !labeling) {
+    // Show the processed (smoothed) line as the active clay line only where the
+    // band is the subject (tune mode / the landing demo); 'review'/'label' show the
+    // raw series so the anomaly dots sit on the real values.
+    if (params.smoothing !== 'none' && (!labeling || m() === 'tune')) {
       drawSeries(series.values, rgba(clay, 0.28), 1.25);
       const processed = scored.map((p) => p.processedValue);
       drawSeries(processed, clay, 1.6);
     } else {
-      // Labeler always shows the raw series (the dots sit on the real values).
       drawSeries(series.values, clay, 1.5);
     }
 
-    // 5. anomaly markers (flagged dots) + missed-truth rings — effective zone only
+    // 5. anomaly markers (flagged dots) + missed-truth rings — effective zone only.
+    // Dots follow the mode: full in 'tune', dimmed in 'review' (alerts lead) and a
+    // touch dimmed in 'label' (still the lasso target).
+    const dMul = dotsMul();
     for (let i = eff; i < n; i++) {
       const p = scored[i];
       if (!p.scored || !isFinite(p.value)) continue;
       const X = px(p.timestamp);
       const Y = py(p.value);
       if (p.isAnomaly) {
-        g.fillStyle = rgba(anomaly, 0.18);
+        g.fillStyle = rgba(anomaly, 0.18 * dMul);
         g.beginPath();
         g.arc(X, Y, 6 * dpr, 0, Math.PI * 2);
         g.fill();
-        g.fillStyle = anomaly;
+        g.fillStyle = rgba(anomaly, dMul);
         g.beginPath();
         g.arc(X, Y, 3 * dpr, 0, Math.PI * 2);
         g.fill();
@@ -601,23 +625,29 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
 
     // 6. warm-up overlay: dim the lead-in + label where detection reaches full
     // power. Drawn before the hover overlay so the window box stays crisp on top.
-    if (effTs !== undefined && !labeling) {
+    if (effTs !== undefined && (!labeling || m() === 'tune')) {
       drawWarmupOverlay(g, canvas, MARGINS, dpr, px, effTs, 'detection at full power →');
     }
 
-    // 7. window overlay (hover) — works across the whole series for context
-    if (hoverIndex >= 0 && hoverIndex < scored.length) {
+    // 7. window overlay (hover) — band-steering context, so only in 'tune'.
+    if (hoverIndex >= 0 && hoverIndex < scored.length && hoverOn()) {
       drawWindowOverlay(hoverIndex, params.windowSize, scored, series, faint);
     }
 
-    // 8. alert markers — one per fired incident, along the top axis
+    // 8. alert markers — one per fired alert, along the top axis. Color carries the
+    // review verdict: red = fired/un-reviewed, green = confirmed valid, slate =
+    // marked a false alarm (recedes). 'recovery'/'nodata' keep their event colors.
     if (alerts && alerts.length) {
       drawAlertMarkers(g, canvas, MARGINS, dpr, px, alerts, (k) =>
         k === 'anomaly'
           ? token('--st-anomaly')
-          : k === 'recovery'
+          : k === 'anomaly-validated'
             ? token('--st-recovery')
-            : token('--st-nodata'),
+            : k === 'anomaly-false'
+              ? token('--st-error')
+              : k === 'recovery'
+                ? token('--st-recovery')
+                : token('--st-nodata'),
       );
     }
 
@@ -1109,31 +1139,62 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     const anomaly = token('--st-anomaly');
     const left = MARGINS.l * dpr;
     const right = canvas.width - MARGINS.r * dpr;
+    // Editable (handles, ✕, selection) only in 'label' mode; elsewhere they are
+    // dimmed read-only context so alerts/band lead.
+    const editable = incEditable();
+    const fMul = incFillMul();
     for (let idx = 0; idx < incidents.length; idx++) {
       const iv = incidents[idx];
       const x0 = px(iv.start);
       const x1 = px(iv.end);
       if (x1 < left - 1 || x0 > right + 1) continue;
       const w = Math.max(x1 - x0, 2 * dpr);
-      const isSel = labeling && iv === selIncident;
-      g.fillStyle = rgba(anomaly, isSel ? 0.3 : 0.16);
+      const isSel = editable && iv === selIncident;
+      g.fillStyle = rgba(anomaly, (isSel ? 0.3 : 0.16) * fMul);
       g.fillRect(x0, top, w, h);
-      g.strokeStyle = rgba(anomaly, isSel ? 0.95 : 0.5);
+      g.strokeStyle = rgba(anomaly, (isSel ? 0.95 : 0.5) * fMul);
       g.lineWidth = (isSel ? 2 : 1) * dpr;
       g.strokeRect(x0, top, w, h);
-      if (labeling) {
+      if (editable) {
         g.fillStyle = rgba(anomaly, 0.95);
         g.fillRect(x0 - 1.5 * dpr, top, 3 * dpr, h);
         g.fillRect(x1 - 1.5 * dpr, top, 3 * dpr, h);
         if (x1 - x0 >= 22 * dpr || isSel) drawDelHandle(x1, isSel || idx === hoverDelIdx);
       }
     }
-    if (labeling && incidentDrag && incidentDrag.mode === 'new') {
+    if (editable && incidentDrag && incidentDrag.mode === 'new') {
       const x0 = px(incidentDrag.a);
       const x1 = px(incidentDrag.b);
       g.fillStyle = rgba(token('--st-nodata'), 0.28);
       g.fillRect(Math.min(x0, x1), top, Math.abs(x1 - x0), h);
     }
+  }
+
+  // ---- alert review ---------------------------------------------------------
+  // Hit-test a fired-alert marker (it lives at the top axis); returns its index or -1.
+  function hitAlert(devX: number, devY: number): number {
+    if (!data || !data.alerts || !data.alerts.length) return -1;
+    if (devY > (MARGINS.t + 22) * dpr) return -1; // only the marker lane up top
+    let best = -1;
+    let bestD = 9 * dpr;
+    for (let i = 0; i < data.alerts.length; i++) {
+      const d = Math.abs(devX - px(data.alerts[i].t));
+      if (d <= bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    return best;
+  }
+  // Click cycles the verdict: un-reviewed → valid → false → un-reviewed. The chart
+  // is stateless about reviews — it reads the verdict from the marker's `kind` and
+  // emits the next one; the cockpit stores it and re-renders with the kind updated.
+  function cycleAlert(i: number): void {
+    if (!data || !data.alerts) return;
+    const k = data.alerts[i].kind;
+    const next: AlertVerdict =
+      k === 'anomaly' ? 'valid' : k === 'anomaly-validated' ? 'false' : 'unreviewed';
+    opts.onAlertReviewChange?.(data.alerts[i].t, next);
   }
 
   // Emit the LIVE array (not a copy) so the caller and chart share one source of
@@ -1250,7 +1311,8 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       canvas.style.cursor = hit === 'l' || hit === 'r' ? 'ew-resize' : hit === 'move' ? 'grab' : 'pointer';
       return;
     }
-    if (labeling && lassoMode) {
+    const mm = m();
+    if (labeling && mm === 'label' && lassoMode) {
       // lasso capture: the freeform loop is drawn on the window-level drag handler;
       // here just keep the crosshair and suppress point hover.
       if (hoverIndex !== -1) {
@@ -1260,7 +1322,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       canvas.style.cursor = 'crosshair';
       return;
     }
-    if (labeling && thMode) {
+    if (labeling && mm === 'label' && thMode) {
       // threshold capture: the cursor's Y sets the candidate line (unless pinned).
       // While a press is active (thDown), the drag is a window paint handled in
       // onWinMove — don't also move the line here.
@@ -1276,8 +1338,8 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       canvas.style.cursor = 'crosshair';
       return;
     }
-    if (labeling) {
-      // over the plot in labeling mode: hint create/move/resize/delete; no point hover.
+    if (labeling && mm === 'label') {
+      // label mode: hint create/move/resize/delete; no point hover.
       if (hoverIndex !== -1) {
         hoverIndex = -1;
         emitHover();
@@ -1297,7 +1359,18 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
         : 'crosshair';
       return;
     }
-    if (navigable) canvas.style.cursor = 'grab';
+    if (labeling && mm === 'review') {
+      // review mode: the alerts are the subject — point at a marker to confirm it.
+      if (hoverIndex !== -1) {
+        hoverIndex = -1;
+        emitHover();
+      }
+      canvas.style.cursor = hitAlert(devX, devY) >= 0 ? 'pointer' : 'grab';
+      return;
+    }
+    // tune mode (or a non-labeling navigable chart): a marker click still cycles its
+    // verdict, but the rest of the plot hovers the trailing window.
+    if (navigable) canvas.style.cursor = labeling && hitAlert(devX, devY) >= 0 ? 'pointer' : 'grab';
     const idx = nearestIndex(devX);
     if (idx !== hoverIndex) {
       hoverIndex = idx;
@@ -1335,7 +1408,18 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     }
     // plot area (everything above the navigator strip / bottom margin)
     if (devY > MARGINS.t * dpr && devY < canvas.height - MARGINS.b * dpr - navTotal()) {
-      if (labeling && lassoMode) {
+      const mm = m();
+      // Alert-marker click cycles its verdict (tune/review) — handled before pan so
+      // the click isn't swallowed as the start of a drag.
+      if (alertReviewArmed()) {
+        const ai = hitAlert(devX, devY);
+        if (ai >= 0) {
+          cycleAlert(ai);
+          ev.preventDefault();
+          return;
+        }
+      }
+      if (labeling && mm === 'label' && lassoMode) {
         // start a freeform loop; points accumulate on the window-level drag.
         lassoPath = [{ x: devX, y: devY }];
         emitLassoNow();
@@ -1344,7 +1428,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
         ev.preventDefault();
         return;
       }
-      if (labeling && thMode) {
+      if (labeling && mm === 'label' && thMode) {
         // a press either sets the line (a click) or paints a capture window (a
         // horizontal drag) — resolved on mouseup by how far it moved.
         thDown = { x: devX, ts: tsAtDevX(devX) };
@@ -1354,7 +1438,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
         ev.preventDefault();
         return;
       }
-      if (labeling) {
+      if (labeling && mm === 'label') {
         const t = tsAtDevX(devX);
         const hit = hitIncident(devX, devY);
         if (hit && hit.edge === 'del') {
@@ -1563,7 +1647,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   }
   if (labeling) {
     window.addEventListener('keydown', onKey);
-    canvas.style.cursor = 'crosshair';
+    canvas.style.cursor = mode === 'tune' ? 'grab' : 'crosshair';
   }
 
   // ---- public handle --------------------------------------------------------
@@ -1628,6 +1712,28 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     }
     canvas.style.cursor = 'crosshair';
     emitLassoNow();
+    schedule();
+  }
+  // Switch the working mode. Leaving 'label' disarms the capture tools + clears any
+  // selection so their state can't leak into tune/review.
+  function setMode(next: ChartMode): void {
+    if (!labeling || mode === next) return;
+    mode = next;
+    if (next !== 'label') {
+      thMode = false;
+      thDown = null;
+      thDragWin = null;
+      thHoverVal = null;
+      lassoMode = false;
+      lassoPath = null;
+      selIncident = null;
+      hoverDelIdx = -1;
+      emitThreshold();
+      emitLassoNow();
+    }
+    hoverIndex = -1;
+    canvas.style.cursor = next === 'tune' ? 'grab' : 'crosshair';
+    if (data) computeDomain(data.series, data.scored);
     schedule();
   }
   function setThresholdDirection(dir: 'above' | 'below'): void {
@@ -1701,6 +1807,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   return {
     render,
     resize,
+    setMode,
     setZeroLine,
     setViewWindow,
     setIncidents,

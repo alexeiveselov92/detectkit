@@ -280,8 +280,7 @@ adjusting and save again, or save labels and then tune the detector against them
 
 Click **Apply to metric**. detectkit then, in order:
 
-1. **Validates** the chosen detector through the same `DetectorFactory` and
-   `MetricConfig` the pipeline uses — a broken or untunable config is rejected and
+1. **Validates** the chosen detector and the whole metric config with the same validation the pipeline uses — a broken or untunable config is rejected and
    **nothing is written** (fix the knobs and click Apply again).
 2. **Archives** the current metric YAML verbatim (comments and all) to
    `metrics/.history/<metric>/<metric>-<timestamp>.yml`, so you keep a trackable

@@ -114,6 +114,5 @@ series, watch the band recompute live, then write the config back into the metri
 
 ## Authoritative sources
 
-The shipped detectkit docs (`docs/` in the repo, or
-<https://dtk.pipelab.dev>) and the `CHANGELOG.md` are authoritative for
+The detectkit docs at <https://dtk.pipelab.dev> and the project changelog are authoritative for
 behavior. These rule files summarize them for the installed version.

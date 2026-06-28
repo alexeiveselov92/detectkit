@@ -277,7 +277,7 @@ alerting:
     - mattermost_ops
     - slack_critical
 
-  # Dashboard / runbook links (v0.13.0)
+  # Dashboard / runbook links
   dashboard_url: null            # Optional dashboard/runbook URL (default: null)
   links: {}                      # Extra "label: url" links (default: {})
 
@@ -295,10 +295,10 @@ alerting:
   notify_on_recovery: false      # Send notification when metric stabilizes (default: false)
   template_recovery: null        # Custom recovery message template (default: null)
 
-  # Mentions (v0.3.8) — tag users/groups in alerts
+  # Mentions — tag users/groups in alerts
   mentions: []                   # Plain usernames without @, e.g., ["oncall", "here"]
 
-  # Missing data alert (v0.5.0)
+  # Missing data alert
   no_data_alert: false           # Fire alert when last interval has no row (default: false)
   template_no_data: null         # Custom no-data message template
 
@@ -380,7 +380,7 @@ list of one block. See the [Alerting Guide](alerting.md) for full details.
   - Each channel formats mentions in its native syntax
   - Available as `{mentions}` and `{mentions_line}` template variables
 
-- **`dashboard_url`** (v0.13.0): Optional dashboard/runbook URL
+- **`dashboard_url`**: Optional dashboard/runbook URL
   - `null` (default) — no dashboard link
   - Surfaced as a first-class action on every channel: a clickable
     attachment title on Slack/Mattermost, an inline "Open dashboard" link
@@ -388,15 +388,15 @@ list of one block. See the [Alerting Guide](alerting.md) for full details.
   - Also available to custom templates as `{dashboard_url}` and
     `{dashboard_line}`
 
-- **`links`** (v0.13.0): Extra `label: url` links shown alongside
+- **`links`**: Extra `label: url` links shown alongside
   `dashboard_url`
   - `{}` (default) — no extra links
   - Each entry is appended as a labelled link, e.g.
     `{Runbook: 'https://...', Grafana: 'https://...'}`
   - On webhook channels (Slack/Mattermost/generic) these render as compact
-    clickable labels in one `Links` field — never raw URLs (since v0.16.1)
+    clickable labels in one `Links` field — never raw URLs
 
-- **`{help_url}` / `{help_line}`** (template variables, since v0.16.0): the
+- **`{help_url}` / `{help_line}`** (template variables): the
   "How to read this alert" stakeholder link carried on every alert. This is
   **not** a per-metric field — it is set project-wide via `alert_help_url` in
   `detectkit_project.yml` (tri-state: unset → official guide, URL → your
@@ -413,7 +413,7 @@ alerting:
     Runbook: https://runbooks.ops/api-errors
 ```
 
-- **`no_data_alert`** (v0.5.0): Alert when the latest expected interval
+- **`no_data_alert`**: Alert when the latest expected interval
   has no datapoint
   - `false` (default) — disabled
   - `true` — at the alert step, checks `_dtk_datapoints` for the last
@@ -426,7 +426,7 @@ alerting:
   - Webhook channels render no-data alerts in amber (`#F0AD4E`) instead
     of red.
 
-- **`template_no_data`** (v0.5.0): Custom message body for no-data alerts
+- **`template_no_data`**: Custom message body for no-data alerts
   - Default: `"No data for metric: {metric_name}\n...Time: {timestamp}\nStatus: query returned no datapoint for the latest interval"`
   - Variables: `{metric_name}`, `{timestamp}`, `{timezone}`,
     `{description}`, `{description_line}`, `{mentions}`,

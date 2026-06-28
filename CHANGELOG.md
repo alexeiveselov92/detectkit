@@ -5,6 +5,31 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.44.1] - 2026-06-28
+
+### Documentation
+- **`dtk init-claude` assistant context is now strictly user-perspective.** The
+  AI-assistant docs shipped into a user's own project
+  (`detectkit/cli/assets/claude/`) described some behaviors by naming the
+  internal Python symbols that implement them — `BaseAlertChannel.build_context`,
+  `ProjectConfig.resolve_alert_help_url`, `WebhookChannel` — which belong to the
+  **library-development** role, not someone *using* detectkit. Those references
+  are rephrased to the observable behavior + the YAML/CLI knobs a user actually
+  controls. The overview also pointed at "the `docs/` directory in the repo" —
+  which a pip-installed user does not have — and now points at the docs site and
+  the changelog. The contributor-facing rules (`.claude/rules/architecture.md`,
+  `contributing.md`) and the website's `development/` pages keep those internal
+  symbols on purpose: that is where the central-development perspective belongs.
+- **Removed hardcoded version markers from the user guides.** The guides and
+  reference pages (in `docs/` and the website mirror) sprinkled `(v0.5.0)`,
+  `Since v0.15.0`, `New in v0.5.0`, `since v0.16.1`, `pre-0.7.0` and a stale
+  "prior to v0.5.0 this was broken" migration note through descriptions of
+  **current** behavior. Those documents describe the installed version, so the
+  inline version stamps were noise; the version history lives in this changelog.
+  The behavior wording is unchanged — only the version markers were dropped.
+  (Dependency constraints, the MySQL 8.0+ runtime requirement, and the
+  `127.0.0.1` localhost references are not detectkit versions and were kept.)
+
 ## [0.44.0] - 2026-06-28
 
 ### Changed

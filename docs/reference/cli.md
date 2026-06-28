@@ -852,8 +852,7 @@ end the session; only **Apply** does.
 
 #### How Apply writes back
 
-On **Apply to metric** the server validates the chosen detector (through the same
-`DetectorFactory` + `MetricConfig` the pipeline uses) — a broken or untunable
+On **Apply to metric** detectkit validates the chosen detector and the whole metric config (with the same validation the pipeline uses) — a broken or untunable
 config is rejected and nothing is written — then archives the current YAML
 verbatim to `metrics/.history/<metric>/<metric>-<timestamp>.yml` and re-emits the
 metric in place with the tuned detector (the `detectors` list becomes the single

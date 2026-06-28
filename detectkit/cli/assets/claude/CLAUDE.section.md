@@ -54,7 +54,9 @@ version — **read the relevant one on demand** instead of guessing:
   `dtk autotune`, and explains the chosen, annotated config (an automatic,
   cross-validated search). For **hands-on** tuning instead, `dtk tune` opens a
   browser view where you drag the detector's knobs against the real series and
-  write the result back in place (see `cli.md`).
+  write the result back in place — and its **Autotune** mode can run that same
+  search server-side and re-seed the knobs without leaving the cockpit (see
+  `cli.md`).
 - **Hit a detectkit bug, or have feedback** — once you've ruled out a local
   config fix (see the gotchas below), use the **`dtk-feedback`** skill to file a
   redacted bug report, feature request, or comment as a GitHub issue on the

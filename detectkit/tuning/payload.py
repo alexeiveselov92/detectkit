@@ -112,23 +112,17 @@ def _incident_span(incidents: list[dict[str, str]]) -> tuple[datetime, datetime]
     return earliest, latest
 
 
-def _seed_detector(metric_config: MetricConfig) -> dict[str, Any]:
-    """Map the metric's current detector config to the TS ``DetectorParams`` shape.
+def seed_detector_params(dtype: str, params: dict[str, Any]) -> dict[str, Any]:
+    """Map a (detector type, snake_case params) pair to the TS ``DetectorParams`` shape.
 
-    Picks the first tunable (mad/zscore/iqr/manual_bounds) detector to seed the
-    sliders; falls back to MAD defaults when the metric has none. Param names are
-    camelCased to match the client port. The windowed knobs always carry sane
-    defaults (even for a manual_bounds seed) so switching detector type in the UI
-    never hits an empty slider; ``lowerBound``/``upperBound`` carry the manual
-    thresholds (``None`` for a windowed metric — the client picks a data default).
+    The single snake→camel mapping used both to seed the controls from the
+    metric's current config and to re-seed them from a server-side **Autotune**
+    result, so the two paths produce an identical control state. The windowed
+    knobs always carry sane defaults (even for a ``manual_bounds`` seed) so
+    switching detector type in the UI never hits an empty slider;
+    ``lowerBound``/``upperBound`` carry the manual thresholds (``None`` for a
+    windowed config — the client picks a data default).
     """
-    chosen = next(
-        (d for d in metric_config.detectors if d.type in _TUNABLE_TYPES),
-        None,
-    )
-    dtype = chosen.type if chosen is not None else "mad"
-    params = dict(chosen.params) if chosen is not None else {}
-
     half_life = params.get("half_life")
     seed: dict[str, Any] = {
         "type": dtype,
@@ -157,6 +151,22 @@ def _seed_detector(metric_config: MetricConfig) -> dict[str, Any]:
         "upperBound": params.get("upper_bound"),
     }
     return seed
+
+
+def _seed_detector(metric_config: MetricConfig) -> dict[str, Any]:
+    """Seed the controls from the metric's current detector config.
+
+    Picks the first tunable (mad/zscore/iqr/manual_bounds) detector; falls back
+    to MAD defaults when the metric has none, then maps it via
+    :func:`seed_detector_params`.
+    """
+    chosen = next(
+        (d for d in metric_config.detectors if d.type in _TUNABLE_TYPES),
+        None,
+    )
+    dtype = chosen.type if chosen is not None else "mad"
+    params = dict(chosen.params) if chosen is not None else {}
+    return seed_detector_params(dtype, params)
 
 
 def _seed_direction(metric_config: MetricConfig) -> str:
@@ -201,7 +211,9 @@ def build_tune_payload(
     history in). An explicit ``start``/``--from`` is still honored verbatim.
     ``capture_windows`` seeds the threshold-capture regime scope (display dicts
     ``{start, end}``). ``labels_save_url`` (the POST endpoint for **Save
-    incidents**) is injected by the server, like ``save_url`` — it is ``None`` here.
+    incidents**) and ``autotune_url`` (the POST endpoint for the server-side
+    **Autotune** mode) are injected by the server, like ``save_url`` — both are
+    ``None`` here.
     """
     seed_incidents = incidents or []
     seed_capture = capture_windows or []
@@ -272,6 +284,7 @@ def build_tune_payload(
         "alert_reviews": seed_reviews,
         "false_alert_budget": fa_budget,
         "labels_save_url": None,
+        "autotune_url": None,
     }
     if start is None or end is None:
         return empty
@@ -315,4 +328,5 @@ def build_tune_payload(
         "alert_reviews": seed_reviews,
         "false_alert_budget": fa_budget,
         "labels_save_url": None,
+        "autotune_url": None,
     }

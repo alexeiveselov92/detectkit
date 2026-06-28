@@ -50,7 +50,8 @@ rendered on the docs site under **For developers**). Read the relevant one:
   always in view), and every control lives in an **always-visible side rail**
   beside the chart with its own scroll. The rail is **mode-aware** — it shows only
   the current mode's panel (detector knobs + effective config + Apply in **Tune**,
-  verdict actions in **Review**, capture tools + incident list + Save in **Label**)
+  verdict actions in **Review**, capture tools + incident list + Save in **Label**,
+  the search button + winner/decision-log in **Autotune**)
   and collapses to give the chart the whole width — but the controls that aren't
   detector-specific stay visible in **every** mode (the **Points shown** data
   window, the alert rule — **direction** + **consecutive anomalies** — and the
@@ -63,7 +64,17 @@ rendered on the docs site under **For developers**). Read the relevant one:
   is written on Save, so a clean metric is validated in a few clicks without
   hand-drawing spans), **Label** (band hides,
   incidents editable; **Lasso anomalies** loops a cloud of anomaly dots into
-  per-streak incident spans, **Threshold capture** grabs every span past a line).
+  per-streak incident spans, **Threshold capture** grabs every span past a line),
+  and **Autotune** (runs the **real** `dtk autotune` engine **server-side** over the
+  metric's full history via a repeatable `POST /autotune`, using the marked incidents
+  as ground truth, then **re-seeds every knob** with the winner + renders the
+  decision log; the band leads like Tune). Autotune-in-tune is **advisory** — it
+  computes + re-seeds only, persisting **no** run/`__tuned_<id>.yml`/detections (so
+  `dtk tune` stays lock-free); the user reviews and **Apply**s, and the next
+  `dtk run` is source of truth. The CLI command and the server share one
+  `autotune/runner.py` (`autotune_from_data` — cap history → resolve scoring →
+  ground truth → settings → `run_autotune_engine`), and the result re-seeds via the
+  same `payload.seed_detector_params` the controls were first seeded from.
   The incident list, the live metrics and Save share **one** ground-truth set —
   hand-marked spans **plus** confirmed-valid alerts (derived from the stored
   verdict, not the current fire, so a confirmed incident stays scored — as a recall

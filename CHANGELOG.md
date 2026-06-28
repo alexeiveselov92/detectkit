@@ -5,6 +5,49 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.43.0] - 2026-06-28
+
+### Added
+- **`dtk tune` gains an Autotune mode — run the autotune engine in the cockpit.**
+  A fourth mode joins Tune / Review / Label: switch to **Autotune** and click
+  **Run autotune**, and the **same** `dtk autotune` engine (seasonality → detector
+  → grid → window search, cross-validated) runs **server-side** over the metric's
+  full history — not a browser re-implementation — using the incidents you've marked
+  (and confirmed-valid alerts) as ground truth. When it finishes it **re-seeds every
+  knob** with the winning detector, recomputes the live band, and shows the winner,
+  the score and the **decision log** in the rail. Review the band, then **Apply** in
+  place (in Autotune or Tune mode). This completes folding autotune into the
+  `dtk tune` cockpit (Phase 2 of the merge begun in 0.42.0): the loop is now
+  **Label → Autotune → Tune → Apply**, all on one screen.
+  - It honours the metric's `autotune:` config block (`scoring_metric`, `folds`,
+    `detector_types`, `force_seasonality`, …), runs **supervised** when incidents are
+    marked (also choosing `consecutive_anomalies`) else **unsupervised**, exactly
+    like the CLI.
+  - It is **advisory**: nothing is written until you **Apply**. Unlike
+    `dtk autotune`, it does **not** persist a run record, emit a `__tuned_<id>.yml`,
+    or write detections — so `dtk tune` keeps taking **no pipeline lock**. The
+    re-seeded band is the TS approximation; the next `dtk run` recomputes detections
+    under the applied config and is the source of truth. Reach for `dtk autotune`
+    when you want the audited run + tuned file + persisted winner detections.
+  - Served over a new repeatable `POST /autotune` localhost endpoint (token-guarded,
+    keeps serving like `/labels`); unavailable under `--no-serve` (no live server)
+    and refused for a metric with `autotune: { enabled: false }`.
+
+### Changed
+- **The autotune `AutoTuneConfig` → engine plumbing is factored into
+  `detectkit/autotune/runner.py`** (`autotune_from_data`: cap history → resolve
+  scoring → project ground truth → build settings → run engine), shared verbatim by
+  the `dtk autotune` command and the new `dtk tune` Autotune mode. No behavior change
+  to `dtk autotune`.
+
+### Fixed
+- **`dtk tune` server error responses no longer crash on a unicode message.** The
+  localhost tuning server now returns the error detail in the (UTF-8) response body
+  instead of the HTTP status line — a validation/engine message carrying a unicode
+  dash or `≈` (e.g. the "no datapoints" hint, a pydantic error) previously raised a
+  `UnicodeEncodeError` instead of a clean 400. Applies to the **Apply**, **Save
+  incidents** and new **Autotune** endpoints.
+
 ## [0.42.0] - 2026-06-28
 
 ### Removed

@@ -20,7 +20,6 @@ import numpy as np
 from detectkit.autotune import (
     AutoTuneError,
     ScoringMetric,
-    TuneSettings,
     compute_run_id,
     emit_tuned_config,
     parse_labels_file,
@@ -31,6 +30,7 @@ from detectkit.autotune.labels import (
     IncidentLabels,
     parse_incident_labels,
 )
+from detectkit.autotune.runner import build_settings, cap_history, resolve_scoring
 from detectkit.cli._output import echo_done, echo_error, echo_noop
 from detectkit.cli.commands.run import find_project_root, parse_date, select_metrics
 from detectkit.config.metric_config import AutoTuneConfig, MetricConfig
@@ -40,10 +40,6 @@ from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.detectors.base import DetectionResult
 from detectkit.detectors.factory import DetectorFactory
 from detectkit.utils.json_utils import json_dumps_sorted
-
-# Cap the scored training span when the user doesn't pin max_history, so tuning
-# stays responsive on very long histories (recent data is the most relevant).
-_DEFAULT_TRAIN_CAP = 50_000
 
 _STAGE_TITLES = {
     "labels": "LABELS",
@@ -88,12 +84,11 @@ def _results_to_batch(results: list[DetectionResult]) -> dict[str, np.ndarray]:
 
 
 def _resolve_scoring(scoring_override: str | None, autotune_cfg: AutoTuneConfig) -> ScoringMetric:
-    value = scoring_override or autotune_cfg.scoring_metric or ScoringMetric.MCC.value
+    """CLI wrapper over the shared resolver: bad name → a click usage error."""
     try:
-        return ScoringMetric(value)
+        return resolve_scoring(scoring_override, autotune_cfg)
     except ValueError as exc:
-        allowed = ", ".join(m.value for m in ScoringMetric)
-        raise click.BadParameter(f"Invalid scoring metric '{value}'. Allowed: {allowed}") from exc
+        raise click.BadParameter(str(exc)) from exc
 
 
 _LABELS_GLOBS = ("*.yml", "*.yaml", "*.json")
@@ -214,34 +209,6 @@ def _prompt_labels(*, interval_seconds: int) -> IncidentLabels:
         )
         incidents.append({"start": start, "end": end} if end.strip() else {"at": start})
     return parse_incident_labels({"incidents": incidents}, interval_seconds=interval_seconds)
-
-
-def _build_settings(*, scoring: ScoringMetric, autotune_cfg: AutoTuneConfig) -> TuneSettings:
-    return TuneSettings(
-        metric=scoring,
-        beta=autotune_cfg.beta,
-        fold_count=autotune_cfg.folds,
-        stability_lambda=autotune_cfg.stability_lambda,
-        allowed_detector_types=autotune_cfg.detector_types,
-        allowed_seasonality=autotune_cfg.seasonality_candidates,
-        force_seasonality=autotune_cfg.force_seasonality,
-        fixed_params=dict(autotune_cfg.fixed_params),
-        max_history=autotune_cfg.max_history,
-    )
-
-
-def _cap_history(data: dict[str, np.ndarray], max_history: int | None) -> dict[str, np.ndarray]:
-    """Keep the most recent ``max_history`` (or default-cap) points."""
-    n = len(data["timestamp"])
-    cap = max_history if max_history is not None else _DEFAULT_TRAIN_CAP
-    if n <= cap:
-        return data
-    return {
-        "timestamp": data["timestamp"][-cap:],
-        "value": data["value"][-cap:],
-        "seasonality_data": data["seasonality_data"][-cap:],
-        "seasonality_columns": data["seasonality_columns"],
-    }
 
 
 def _load_project(
@@ -368,7 +335,7 @@ def _tune_one(
         return False
 
     try:
-        data = _cap_history(data, autotune_cfg.max_history)
+        data = cap_history(data, autotune_cfg.max_history)
         click.echo(
             f"  Training span: {len(data['timestamp']):,} points " f"(interval {interval_seconds}s)"
         )
@@ -384,7 +351,7 @@ def _tune_one(
         ground_truth = labels.to_ground_truth(data["timestamp"], interval_seconds)
         click.echo(f"  Labels: {label_source}")
 
-        settings = _build_settings(scoring=scoring, autotune_cfg=autotune_cfg)
+        settings = build_settings(scoring=scoring, autotune_cfg=autotune_cfg)
         result = run_autotune_engine(
             metric_name=name,
             data=data,

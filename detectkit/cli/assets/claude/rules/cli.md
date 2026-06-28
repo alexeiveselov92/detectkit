@@ -88,7 +88,8 @@ cockpit**: ONE chart (the windshield) fills the view, the live metrics ride
 **pinned in a HUD over the chart** (the speedometer), and every control lives in an
 **always-visible, mode-aware side rail** beside the chart (Tune shows the detector
 knobs + effective config + Apply, Review the verdict actions, Label the capture
-tools + incident list + Save), while the controls that aren't detector-specific —
+tools + incident list + Save, Autotune the search button + winning config), while
+the controls that aren't detector-specific —
 the **Points shown** data window, the alert rule (**direction** + **consecutive
 anomalies**) and the **y = 0** toggle — stay visible in every mode. The chart is
 **zoomable** (scroll/drag + navigator strip) with a **"Points shown"** trim slider.
@@ -103,11 +104,20 @@ and which interactions are armed on the one chart: **Tune** (band leads; inciden
 recede to read-only context; hover a point for its window), **Review** (the fired
 alerts lead, band ghosts — click an alert marker to cycle its verdict un-reviewed →
 **valid** (green) → **false alarm** (slate); **Confirm all unreviewed valid** does
-the lot), and **Label** (band hides; **mark the real incidents** by drag, **Lasso
+the lot), **Label** (band hides; **mark the real incidents** by drag, **Lasso
 anomalies** — loop a cloud of anomaly dots, each consecutive run, gaps bridged up to
 `consecutive_anomalies`, becomes one span — or **Threshold capture** every span past
 a horizontal line, each widened to a full interval so the alert lands inside; the
-painted window saves as `capture_windows`). **Confirming an alert valid IS marking an
+painted window saves as `capture_windows`), and **Autotune** (**Run autotune**
+launches the **real** `dtk autotune` engine **server-side** over the metric's full
+history, using your marked incidents as ground truth, then **re-seeds every knob**
+with the winner and shows the score + decision log; the band leads like Tune). The
+Autotune mode is **advisory** — it computes + re-seeds only and persists nothing (no
+run record / `__tuned_<id>.yml` / detections, so `dtk tune` stays lock-free); review
+the band and **Apply** to write it back. It honours the metric's `autotune:` block,
+is supervised when incidents are marked (also picks `consecutive_anomalies`) else
+unsupervised, and needs the live server (unavailable under `--no-serve`).
+**Confirming an alert valid IS marking an
 incident**: the confirmed streak becomes a first-class **ground-truth incident** that
 shows in the Marked-incidents list (a read-only "✓ confirmed alert" row; its ✕
 un-confirms the alert), counts toward recall + correct, and is written on Save — so a

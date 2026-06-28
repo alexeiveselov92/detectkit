@@ -22,8 +22,10 @@ Two complementary ways to optimize a metric:
 | Output | a **new** `metrics/<name>__tuned_<id>.yml` (original untouched) | the metric YAML, edited **in place** (previous version archived) |
 | Best when | you have labels or want a strong starting point | you know the metric and want to dial it in by feel |
 
-A natural workflow is to use both: let `dtk autotune` propose a config, then
-`dtk tune` to refine it by eye and commit.
+A natural workflow is to use both — and you can do it **without leaving the
+cockpit**: `dtk tune` has an **Autotune** mode that runs the autotune engine
+server-side and re-seeds the knobs with the winner, which you then refine by eye and
+**Apply**. See [Auto-tune in place](#auto-tune-in-place-autotune-mode) below.
 
 ## Prerequisites
 
@@ -105,7 +107,7 @@ into the vertical scale, so a real-valued metric (one best read *relative to zer
 shows where it sits against zero. It is also available
 on the [HTML report](visualizing-results.md). Off by default.
 
-## One chart, three modes
+## One chart, four modes
 
 `dtk tune` is a **chart-first cockpit**: a single chart fills the screen (the
 windshield), the live **metrics ride pinned over the chart** (your speedometer —
@@ -113,7 +115,8 @@ always in view), and every control lives in an **always-visible side rail** besi
 the chart — so the first thing you do is turn a knob and watch the band, with no
 scrolling. The rail is **mode-aware**: it shows only the controls the current mode
 needs (the detector knobs + Apply in Tune, the verdict actions in Review, the
-capture tools + Save in Label), and collapses to give the chart the whole width.
+capture tools + Save in Label, the search button + result in Autotune), and
+collapses to give the chart the whole width.
 The controls that aren't detector-specific — the **Points shown** data window, the
 alert rule (**direction** + **consecutive anomalies**) and the **y = 0** toggle —
 stay visible in every mode, since they shape the band, the alerts you review, and
@@ -128,6 +131,10 @@ dim to context instead of competing for pixels:
   markers lead.
 - **Label** — mark the real incidents. The band hides so incidents lead, and the
   capture tools (Lasso / Threshold) are armed.
+- **Autotune** — let the [`dtk autotune`](autotuning.md) engine search for the best
+  detector **server-side** and re-seed the knobs with the winner (see below). The
+  chart leads with the band, like Tune, so you immediately see the recomputed
+  corridor.
 
 ## Confirm the alerts (Review mode)
 
@@ -179,6 +186,34 @@ incidents** — it ends just past the latest one rather than at the last datapoi
 so they render and count without loading the whole history. Incidents older than the
 loaded window stay in the list but aren't scored; pass `--from`/`--to` to tune
 against a specific older window.
+
+## Auto-tune in place (Autotune mode)
+
+You don't have to leave the cockpit to run [`dtk autotune`](autotuning.md). Switch
+to **Autotune** and click **Run autotune**: the **same engine** (seasonality →
+detector → grid → window search, cross-validated) runs **server-side** over the
+metric's full history — not a browser re-implementation — using the incidents you've
+marked (and confirmed-valid alerts) as **ground truth**. When it finishes it
+**re-seeds every knob** with the winning detector, recomputes the live band, and
+shows the winner, the score, and the **decision log** in the rail. Review the band,
+then **Apply** (in Autotune or Tune mode) to write it back.
+
+- With incidents marked, the search is **supervised** (it also picks
+  `consecutive_anomalies`); with none, it falls back to the **unsupervised**
+  objective. Mark a few incidents first for a sharper result — the Autotune panel
+  tells you which mode it ran.
+- It honours the metric's `autotune:` config block (`scoring_metric`, `folds`,
+  `detector_types`, `force_seasonality`, …), exactly like the CLI.
+- It is **advisory**: nothing is written until you **Apply**. Unlike `dtk autotune`,
+  it does **not** persist a run record, emit a `__tuned_<id>.yml`, or write
+  detections — so `dtk tune` stays lock-free. The re-seeded band is the TS
+  approximation; the next `dtk run` recomputes detections under the applied config
+  and is the source of truth.
+- Autotune needs the live server, so it is unavailable under `--no-serve`. If the
+  metric has `autotune: { enabled: false }`, the button reports that and does nothing.
+
+This closes the loop in one place: **Label** the incidents, **Autotune** to a strong
+config, then **Tune** by eye and **Apply**.
 
 ## Read the alert quality
 

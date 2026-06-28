@@ -87,6 +87,7 @@ detectkit/
 │   └── error_dispatch.py        # project-level error alert (shared by CLI + TaskManager)
 ├── autotune/                    # `dtk autotune` engine (separate from load/detect/alert)
 │   ├── autotuner.py             # AutoTuner facade + run_autotune_engine + alert-window sweep
+│   ├── runner.py                # autotune_from_data: cap→scoring→ground-truth→settings→engine (CLI + dtk tune)
 │   ├── labels.py / scoring.py / distribution.py / crossval.py   # ground truth, metrics, CV
 │   ├── seasonality_search.py / detector_select.py / grid_search.py / window_select.py  # stages
 │   └── result.py / config_emitter.py / settings.py / _types.py / _base.py
@@ -98,7 +99,7 @@ detectkit/
 │   ├── payload.py               # build_tune_payload: bakes raw series + seeded detector config → JSON
 │   ├── html.py                  # render_tune_html: inlines assets/tune.js + payload
 │   ├── config_writer.py         # apply_tuned_config: validate → archive to metrics/.history → re-emit in place
-│   ├── server.py                # serve_tuner/build_tune_server: localhost one-shot write-back (POST /apply)
+│   ├── server.py                # serve_tuner/build_tune_server: localhost write-back (POST /apply, /labels, /autotune)
 │   └── assets/tune.js           # committed renderer bundle (shared detector port; ships in the wheel)
 └── utils/                       # datetime, json (sorted/orjson), env interpolation, stats
 ```
@@ -479,7 +480,12 @@ The engine is **pure and DB-free** — it operates on the in-memory `data` dict 
 reuses `WindowedStatDetector`/`DetectorFactory`/`detector_id` unchanged. The
 command loads data, threads it into `run_autotune_engine(...)`, then persists the
 run, emits the config, persists the winner's detections, and prunes superseded
-prior winners. Stages (`AutoTuner.tune()`), each appending to a decision log:
+prior winners. The plumbing from a metric's `AutoTuneConfig` + labels to the engine
+(cap history → resolve scoring → project ground truth → build `TuneSettings` → run)
+is factored into `autotune/runner.py` (`autotune_from_data`), shared verbatim by the
+CLI command and the `dtk tune` server's **Autotune** mode (so autotuning in the
+cockpit and on the command line are the same computation). Stages
+(`AutoTuner.tune()`), each appending to a decision log:
 
 1. **Seasonality search** (`seasonality_search.py`) — greedy over the metric's
    seasonality columns (single-add or merge-into-last to form conjunctive
@@ -603,21 +609,27 @@ speedometer — always in view across every mode), and every control lives in an
 turn a knob and watch the band change with no scrolling and no gaze-drop to a dock
 below; a `ResizeObserver` on the chart box re-fits the canvas when the rail
 collapses (the slim `.dtk-rail-open` tab brings it back). The rail is
-**mode-partitioned** — `setUiMode` shows only the current mode's group
+**mode-partitioned** — `setUiMode(md: UiMode)` shows only the current mode's group
 (`.dtk-rail-group`) and renames the rail header: the detector knobs + the
-effective-config echo + **Apply** (the last two in the Tune-only
-`.dtk-tune-railfoot`; the echo is collapsed by default) in **Tune**, the verdict
-actions in **Review**, the capture tools + incident list + **Save incidents** in
-**Label** — never every control at once. Two **always-visible common groups**
+effective-config echo + **Apply** (the last two in the `.dtk-tune-railfoot`; the
+echo is collapsed by default) in **Tune**, the verdict actions in **Review**, the
+capture tools + incident list + **Save incidents** in **Label**, the **Run
+autotune** button + winner/decision-log in **Autotune** (the `.dtk-tune-railfoot`
+also rides in Autotune, so the searched config can be Applied in place) — never
+every control at once. Two **always-visible common groups**
 sandwich the per-mode group (never toggled by `setUiMode`): `topCommon` (the
 **Points shown** data-window trim) above it and `alertCommon` (the alert rule —
 **direction** + **consecutive anomalies** — plus the **y = 0** view toggle) below
 it, since those shape the band / the reviewed alerts / the recall+FDR in every
-mode. A **mode switch** (`chart.setMode`, in the HUD) decides which visual LAYERS
-are full/dimmed/hidden and which interactions are armed, generalizing the old ad-hoc
-`runs = labeling ? [] : …` band-suppression into a per-layer table:
+mode. The **mode switch** lives in the HUD. `UiMode = ChartMode | 'autotune'`: the
+chart itself only knows the three **layer**-modes (`ChartMode = tune | review |
+label`), so `setUiMode` maps `'autotune' → chart.setMode('tune')` (the Autotune
+panel leads with the band, like Tune — it adds a rail panel, not a new chart layer
+set). `chart.setMode` decides which visual LAYERS are full/dimmed/hidden and which
+interactions are armed, generalizing the old ad-hoc `runs = labeling ? [] : …`
+band-suppression into a per-layer table:
 
-| layer | `tune` | `review` | `label` |
+| layer | `tune` (+ `autotune`) | `review` | `label` |
 |---|---|---|---|
 | band fill + center | full | ghost (~0.3) | hidden |
 | anomaly dots | full | dim | dim (lasso target) |
@@ -718,8 +730,11 @@ Three pure-ish pieces + a server:
   incidents it **anchors the budget-sized window on the incident region** (ending
   just past the latest incident via `_incident_span`, clamped to the first
   datapoint) so they render and score while the load stays bounded. It bakes **no** precomputed
-  detection (the browser runs the detector itself). `labels_save_url` (like
-  `save_url`) is injected by the server.
+  detection (the browser runs the detector itself). The detector seed is built by
+  `seed_detector_params(type, params)` — the **same** snake→camel mapping the
+  server uses to re-seed the controls from an autotune result, so the two paths
+  produce an identical control state. `labels_save_url` and `autotune_url` (like
+  `save_url`) are injected by the server.
 - `html.render_tune_html(payload)` inlines `assets/tune.js` + the payload into one
   self-contained HTML page (mirrors `reporting/html_report.py`; assigns
   `window.__DTK_TUNE__`).
@@ -735,19 +750,32 @@ Three pure-ish pieces + a server:
   first alerting block's `consecutive_anomalies` (it never invents alerting).
 - `server.serve_tuner(...)` / `build_tune_server(...)` is the localhost write-back
   server: bound to `127.0.0.1:0`
-  with a one-shot `secrets` token, serves the page, and handles **two** token-guarded
+  with a one-shot `secrets` token, serves the page, and handles **three** token-guarded
   POSTs. `POST /apply` (the **Apply** click) → `apply_tuned_config` → responds +
   **self-shuts-down** so the command reports what changed; an invalid config returns
   **400 and keeps serving**. `POST /labels` (the **Save incidents** click) validates
   via `parse_incident_labels` and writes a versioned file through
   `versioned_labels_path` into `incidents/<metric>/`, then **keeps serving** (labels
   save repeatedly while you tune; only Apply ends the session); invalid labels return
-  **400 and keep serving**. `dtk tune --no-serve` writes a static read-only preview
+  **400 and keep serving**. `POST /autotune` (the **Run autotune** click, the
+  **Autotune** mode) reloads the metric's full history from the `internal_manager`
+  handle, projects the POSTed labels YAML (the page's current ground truth) onto the
+  grid, runs the shared `autotune/runner.autotune_from_data(...)` over the metric's
+  `autotune:` config, and replies with the winning detector (shaped via
+  `seed_detector_params`) + `consecutive_anomalies` + score + decision log for the
+  page to **re-seed** every knob; it **keeps serving** (repeatable, advisory) and
+  persists nothing — any error returns **400 and keeps serving**. `/autotune` needs
+  the `metric_config` + `internal_manager` handles `build_tune_server` now carries
+  (the tune command passes them); omit them (static preview) and it returns 400.
+  `dtk tune --no-serve` writes a static read-only preview
   file (sliders recompute, no write-back; **Save incidents** downloads the labels
-  file instead).
+  file instead; **Autotune** is unavailable — no live server).
 
 Unlike `run`/`autotune`, `dtk tune` takes **no pipeline lock** — it neither runs
-the pipeline nor persists detections, it only edits a config file. Changing the
+the pipeline nor persists detections, it only edits a config file (the **Autotune**
+mode computes a config server-side but persists nothing — no run record,
+`__tuned_<id>.yml` or detections — so the lock-free property holds; the user
+**Apply**s the searched config like any other). Changing the
 detector params changes the `detector_id`, so detections recompute under the new
 id on the next `dtk run` (the live preview is the TS approximation; the next real
 run is the source of truth).

@@ -87,7 +87,28 @@ interface TunePayload {
   false_alert_budget?: number | null;
   /** localhost POST endpoint for Save labels; null = download instead (no server). */
   labels_save_url?: string | null;
+  /** localhost POST endpoint for server-side Autotune; null = unavailable (static preview). */
+  autotune_url?: string | null;
 }
+
+/** The server-side autotune result (mirrors detectkit/tuning/server.py `_run_autotune`). */
+interface AutotuneResult {
+  detector: DetectorSeed;
+  consecutive_anomalies: number | null;
+  seasonality: string[][] | null;
+  score: number;
+  scoring_metric: string;
+  mode: string;
+  n_points: number;
+  n_candidates: number;
+  labels_summary: Record<string, number>;
+  cv_per_fold: number[];
+  decision_log: Array<{ stage: string; message: string; fields?: Record<string, unknown> }>;
+  winner: string;
+}
+
+/** UI mode: the chart's three layer-modes plus an Autotune panel (chart stays in 'tune'). */
+type UiMode = ChartMode | 'autotune';
 
 // Per-type interval-width default (mirrors the detector classes / the demo).
 // Partial: manual_bounds has no threshold / per-group default.
@@ -185,7 +206,7 @@ function rangeControl(
     hint?: string;
   },
   onChange: (v: number) => void,
-): { row: HTMLElement; get: () => number; setMax: (m: number) => void } {
+): { row: HTMLElement; get: () => number; set: (v: number) => void; setMax: (m: number) => void } {
   const row = el('div', 'dtk-ctl');
   const head = el('div', 'dtk-ctl-head');
   const lab = ctlLabel(label, opts.hint);
@@ -210,6 +231,13 @@ function rangeControl(
   return {
     row,
     get: () => Number(input.value),
+    // Programmatic set (e.g. re-seeding from an autotune result). Updates the echo
+    // but, like a chart-driven change, does NOT fire onChange — the caller drives
+    // the recompute once after re-seeding every control.
+    set: (v: number) => {
+      input.value = String(v);
+      out.textContent = fmt(Number(input.value));
+    },
     setMax: (m: number) => {
       input.max = String(m);
       if (Number(input.value) > m) {
@@ -545,10 +573,12 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   const tuneGroup = el('div', 'dtk-rail-group');
   const reviewGroup = el('div', 'dtk-rail-group');
   const labelGroup = el('div', 'dtk-rail-group');
+  const autotuneGroup = el('div', 'dtk-rail-group');
   const alertCommon = el('div', 'dtk-rail-group');
   reviewGroup.style.display = 'none';
   labelGroup.style.display = 'none';
-  controls.append(topCommon, tuneGroup, reviewGroup, labelGroup, alertCommon);
+  autotuneGroup.style.display = 'none';
+  controls.append(topCommon, tuneGroup, reviewGroup, labelGroup, autotuneGroup, alertCommon);
   // Tune-only footer (effective config + Apply); hidden in Review / Label.
   const railFoot = el('div', 'dtk-tune-railfoot');
   rail.appendChild(railFoot);
@@ -605,17 +635,19 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   stage.appendChild(chartWrap);
   stage.appendChild(stageFoot);
 
-  // ---- mode switch (Tune / Review / Label) ----------------------------------
-  // One chart, three jobs: the mode picks which layers lead and which interactions
+  // ---- mode switch (Tune / Review / Label / Autotune) -----------------------
+  // One chart, four jobs: the mode picks which layers lead and which interactions
   // are armed. 'tune' steers the band, 'review' confirms the fired alerts, 'label'
-  // marks incidents. setUiMode (defined once the tool bars exist) drives the chart
-  // + reveals the matching tools.
+  // marks incidents, and 'autotune' runs the server-side search and re-seeds the
+  // knobs with the winner (the chart leads with the band, like 'tune'). setUiMode
+  // (defined once the tool bars exist) drives the chart + reveals the matching tools.
   const modeRow = el('div', 'dtk-tune-modes');
-  const modeBtns: Partial<Record<ChartMode, HTMLButtonElement>> = {};
-  const MODES: Array<{ v: ChartMode; label: string; hint: string }> = [
+  const modeBtns: Partial<Record<UiMode, HTMLButtonElement>> = {};
+  const MODES: Array<{ v: UiMode; label: string; hint: string }> = [
     { v: 'tune', label: 'Tune', hint: 'Steer the band — the confidence corridor leads; incidents recede to read-only context. Hover a point for its window.' },
     { v: 'review', label: 'Review alerts', hint: 'Confirm the fired alerts — click a marker to cycle un-reviewed → valid (green) → false (slate). The band ghosts so the alerts lead.' },
     { v: 'label', label: 'Label incidents', hint: 'Mark real incidents — drag a span, lasso the anomaly cloud, or threshold-capture. The band hides so incidents lead.' },
+    { v: 'autotune', label: 'Autotune', hint: 'Let the autotune engine search for the best detector server-side, using your marked incidents as ground truth, then re-seed the knobs with the winner. Review the band, then Apply.' },
   ];
   MODES.forEach((md) => {
     const b = el('button', 'dtk-mode-btn', md.label);
@@ -978,14 +1010,18 @@ function render(payload: TunePayload, mount: HTMLElement): void {
 
   // Drive the chart mode + reveal the matching tools. Defined here (after the tool
   // bars exist) and called by the mode buttons + on first paint.
-  const RAIL_TITLES: Record<ChartMode, string> = {
+  const RAIL_TITLES: Record<UiMode, string> = {
     tune: 'Tune · controls',
     review: 'Review · verdicts',
     label: 'Label · incidents',
+    autotune: 'Autotune · search',
   };
-  function setUiMode(md: ChartMode): void {
-    chart.setMode(md);
-    (Object.keys(modeBtns) as ChartMode[]).forEach((v) =>
+  function setUiMode(md: UiMode): void {
+    // The Autotune panel renders the chart exactly like Tune (band leads): it shows
+    // the recomputed band after the engine re-seeds the knobs. So the chart only
+    // knows the three layer-modes; 'autotune' maps to 'tune' for the chart.
+    chart.setMode(md === 'autotune' ? 'tune' : md);
+    (Object.keys(modeBtns) as UiMode[]).forEach((v) =>
       modeBtns[v]?.classList.toggle('on', v === md),
     );
     if (md !== 'label') {
@@ -994,11 +1030,14 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     }
     // Swap the rail to the current mode's panel (and rename its header): detector
     // knobs + effective config + Apply in Tune, the verdict actions in Review, the
-    // capture tools + incident list + Save in Label — never all the controls at once.
+    // capture tools + incident list + Save in Label, the autotune search in Autotune
+    // — never all the controls at once. The Tune-only action footer (effective config
+    // + Apply) also rides in Autotune so the searched config can be applied in place.
     tuneGroup.style.display = md === 'tune' ? '' : 'none';
     reviewGroup.style.display = md === 'review' ? '' : 'none';
     labelGroup.style.display = md === 'label' ? '' : 'none';
-    railFoot.style.display = md === 'tune' ? '' : 'none';
+    autotuneGroup.style.display = md === 'autotune' ? '' : 'none';
+    railFoot.style.display = md === 'tune' || md === 'autotune' ? '' : 'none';
     railTitle.textContent = RAIL_TITLES[md];
   }
 
@@ -1303,6 +1342,9 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   // are conjoined into ONE seasonal key (e.g. dow×hour); separate groups apply
   // independent corrections — the full string[][] grouping the detector supports.
   let seasonalityRow: HTMLElement | null = null;
+  // Re-seed the per-column group assignment (e.g. from an autotune result). No-op
+  // when the metric has no seasonality columns; overridden below when it does.
+  let setSeasonalityGroups: (groups: string[][]) => void = () => {};
   if (payload.seasonality_columns.length) {
     const cols = payload.seasonality_columns;
     const row = el('div', 'dtk-ctl');
@@ -1316,9 +1358,13 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       ),
     );
     // Offer Off + as many groups as there are columns (each could stand alone).
-    const groupCount = Math.min(cols.length, 6);
+    // Sized to the column count — never fewer — so any grouping a re-seed
+    // (e.g. an autotune winner) hands back always has a matching button to show on.
+    const groupCount = cols.length;
     const opts: SegSpec[] = [{ label: '—', value: '0' }];
     for (let gi = 1; gi <= groupCount; gi++) opts.push({ label: `G${gi}`, value: String(gi) });
+    // One repaint per column row, collected so a re-seed can refresh them all.
+    const seasonPaints: Array<() => void> = [];
     cols.forEach((col) => {
       const crow = el('div', 'dtk-season-row');
       crow.appendChild(el('span', 'dtk-season-col', col));
@@ -1327,6 +1373,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       const cur = (): number => colGroup.get(col) ?? 0;
       const paint = (): void =>
         buttons.forEach((b) => b.classList.toggle('on', Number(b.dataset.v) === cur()));
+      seasonPaints.push(paint);
       opts.forEach((opt) => {
         const b = el('button', 'dtk-seg-btn', opt.label);
         b.type = 'button';
@@ -1345,6 +1392,11 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       row.appendChild(crow);
     });
     tuneGroup.appendChild(row);
+    setSeasonalityGroups = (groups: string[][]): void => {
+      colGroup.clear();
+      groups.forEach((grp, gi) => grp.forEach((c) => colGroup.set(c, gi + 1)));
+      seasonPaints.forEach((p) => p());
+    };
   }
 
   // Direction filter (alert-layer / view): which anomalies show + count as alerts.
@@ -1683,6 +1735,154 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   labelsWrap.appendChild(labelsMsg);
   labelGroup.appendChild(labelsWrap);
 
+  // ---- autotune panel (Autotune mode) ---------------------------------------
+  // Server-side autotune: POST the current ground truth (the same labels YAML as
+  // Save incidents) to the engine, which searches over the metric's full history
+  // and returns the winning detector. We re-seed every knob from it, recompute the
+  // live band, and render the decision log — then the user reviews and Applies (in
+  // Tune/Autotune mode). Re-seeding mirrors the initial render() seeding exactly,
+  // via the same camelCase shape the server builds with seed_detector_params.
+  function applyAutotuneResult(res: AutotuneResult): void {
+    const d = res.detector;
+    detectorCtl.set(d.type);
+    thresholdCtl.set(d.threshold);
+    // Autotune may pick a window/half-life beyond the slider's explore reach; raise
+    // the max first so set() can't silently clamp (which would shrink what Apply
+    // writes — the same guard the initial seed uses via windowMax).
+    const wMax = Math.max(windowMax, d.windowSize);
+    windowCtl.setMax(wMax);
+    halfLifeCtl.setMax(wMax);
+    windowCtl.set(d.windowSize);
+    weightsCtl.set(d.windowWeights);
+    if (d.windowWeights === 'exponential' && d.halfLife != null) halfLifeCtl.set(d.halfLife);
+    detrendCtl.set(d.detrend);
+    smoothingCtl.set(d.smoothing);
+    setSeasonalityGroups(d.seasonalityComponents || []);
+    if (res.consecutive_anomalies != null) {
+      consecutive = res.consecutive_anomalies;
+      consecutiveCtl.set(consecutive);
+    }
+    refreshVisibility();
+    recompute();
+  }
+
+  autotuneGroup.appendChild(
+    el(
+      'div',
+      'dtk-tune-note',
+      'Run the full autotune engine server-side over the metric’s history, using the ' +
+        'incidents you’ve marked (and confirmed alerts) as ground truth. It re-seeds the ' +
+        'knobs with the winning detector — review the band, then Apply (here or in Tune). ' +
+        'Nothing is written until you Apply; the next `dtk run` is the source of truth.',
+    ),
+  );
+  if (payload.autotune_url) {
+    const atWrap = el('div', 'dtk-tune-apply');
+    const atBtn = el('button', 'dtk-apply-btn', 'Run autotune');
+    atBtn.type = 'button';
+    atBtn.title =
+      'Search for the best detector over the metric’s full (capped) history. Uses your ' +
+      'marked incidents as ground truth when present (supervised), else an unsupervised ' +
+      'objective. Can take a few seconds on a long history.';
+    const atMsg = el('span', 'dtk-apply-msg');
+    atWrap.appendChild(atBtn);
+    atWrap.appendChild(atMsg);
+    autotuneGroup.appendChild(atWrap);
+
+    const atResult = el('div', 'dtk-at-result');
+    atResult.style.display = 'none';
+    autotuneGroup.appendChild(atResult);
+
+    const renderAutotuneResult = (res: AutotuneResult): void => {
+      atResult.innerHTML = '';
+      atResult.style.display = '';
+      const head = el('div', 'dtk-at-head');
+      head.appendChild(el('span', 'dtk-at-winner', res.winner));
+      head.appendChild(
+        el(
+          'span',
+          'dtk-at-score',
+          `${res.scoring_metric} ${Number.isFinite(res.score) ? res.score.toFixed(3) : '—'} · ${res.mode}`,
+        ),
+      );
+      atResult.appendChild(head);
+      atResult.appendChild(
+        el(
+          'div',
+          'dtk-at-meta',
+          `${res.n_candidates} candidate${res.n_candidates === 1 ? '' : 's'} · ${res.n_points} pts` +
+            (res.consecutive_anomalies != null ? ` · consecutive ${res.consecutive_anomalies}` : '') +
+            (res.seasonality && res.seasonality.length
+              ? ` · seasonality ${JSON.stringify(res.seasonality)}`
+              : ' · no seasonality'),
+        ),
+      );
+      // Decision log — collapsed by default (it can be long), one line per stage.
+      const logToggle = el('button', 'dtk-tune-cfg-k');
+      logToggle.type = 'button';
+      const logBody = el('div', 'dtk-at-log');
+      let logOpen = false;
+      const setLogOpen = (o: boolean): void => {
+        logOpen = o;
+        logBody.style.display = o ? '' : 'none';
+        logToggle.textContent = `${o ? '▾' : '▸'} decision log (${res.decision_log.length})`;
+      };
+      logToggle.onclick = (): void => setLogOpen(!logOpen);
+      for (const e of res.decision_log) {
+        const line = el('div', 'dtk-at-logline');
+        line.appendChild(el('span', 'dtk-at-stage', e.stage));
+        line.appendChild(el('span', 'dtk-at-msg', e.message));
+        logBody.appendChild(line);
+      }
+      setLogOpen(false);
+      atResult.appendChild(logToggle);
+      atResult.appendChild(logBody);
+    };
+
+    atBtn.onclick = (): void => {
+      atBtn.disabled = true;
+      atMsg.className = 'dtk-apply-msg info';
+      atMsg.textContent = 'Autotuning over the history… this can take a moment.';
+      fetch(payload.autotune_url as string, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Send the current ground truth so the search is supervised by what's marked.
+        body: JSON.stringify({ yaml: buildLabelsYaml() }),
+      })
+        .then((r) =>
+          r.ok
+            ? r.json()
+            : r.text().then((t) => {
+                throw new Error(t || `HTTP ${r.status}`);
+              }),
+        )
+        .then((res: AutotuneResult) => {
+          atBtn.disabled = false;
+          applyAutotuneResult(res);
+          renderAutotuneResult(res);
+          const sup =
+            res.mode === 'supervised'
+              ? ' — supervised by your incidents'
+              : ' — unsupervised (mark incidents for a supervised tune)';
+          atMsg.className = 'dtk-apply-msg ok';
+          atMsg.textContent = `Tuned${sup}. Knobs updated; review the band, then Apply.`;
+        })
+        .catch((e: Error) => {
+          atBtn.disabled = false;
+          atMsg.className = 'dtk-apply-msg err';
+          atMsg.textContent = `Autotune failed: ${e.message}`;
+        });
+    };
+  } else {
+    autotuneGroup.appendChild(
+      el(
+        'div',
+        'dtk-tune-note',
+        'Autotune needs the live server — run `dtk tune` without --no-serve.',
+      ),
+    );
+  }
+
   // ---- first paint + resize -------------------------------------------------
   setUiMode('tune');
   refreshIncidentList();
@@ -1866,6 +2066,17 @@ function injectStyle(): void {
 .dtk-tune-reviewbar{align-items:center;}
 .dtk-tune-reviewbar .dtk-apply-btn{background:var(--green);}
 .dtk-tune-reviewbar .dtk-apply-btn:hover{background:#27815d;}
+.dtk-at-result{display:flex;flex-direction:column;gap:7px;background:var(--surface);
+  border:1px solid var(--border);border-radius:10px;padding:11px 13px;}
+.dtk-at-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px;}
+.dtk-at-winner{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);}
+.dtk-at-score{font-family:var(--mono);font-size:11.5px;color:var(--c7);}
+.dtk-at-meta{font-family:var(--mono);font-size:11px;color:var(--muted);word-break:break-word;}
+.dtk-at-log{display:flex;flex-direction:column;gap:5px;max-height:240px;overflow:auto;margin-top:4px;}
+.dtk-at-logline{display:flex;gap:8px;align-items:baseline;}
+.dtk-at-stage{flex:0 0 auto;font-family:var(--mono);font-size:9.5px;text-transform:uppercase;
+  letter-spacing:.05em;color:#fff;background:var(--c);border-radius:4px;padding:1px 6px;}
+.dtk-at-msg{font-family:var(--mono);font-size:11px;color:var(--ink);}
 .dtk-th{display:flex;flex-direction:column;gap:8px;margin:2px 0 6px;}
 .dtk-th-toggles{display:flex;gap:8px;flex-wrap:wrap;}
 .dtk-th-toggle{align-self:flex-start;border:1px solid var(--border);background:var(--surface);

@@ -238,3 +238,231 @@ def test_labels_rejects_bad_token(tmp_path):
     finally:
         server.shutdown()
         server.server_close()
+
+
+# ── server-side autotune (the Autotune mode) ──────────────────────────────────
+
+_AUTOTUNE_METRIC_YAML = """name: orders
+interval: 1h
+query: "SELECT timestamp, value FROM t"
+detectors:
+  - type: mad
+    params: {threshold: 3.0, window_size: 50}
+alerting:
+  - enabled: true
+    channels: [slack_alerts]
+    consecutive_anomalies: 3
+autotune:
+  folds: 3
+"""
+
+
+class _StubManager:
+    """Minimal stand-in for InternalTablesManager — only load_datapoints is used."""
+
+    def __init__(self, data: dict) -> None:
+        self._data = data
+
+    def load_datapoints(self, metric_name, from_timestamp=None, to_timestamp=None):  # noqa: ARG002
+        return self._data
+
+
+def _series(n: int = 600) -> dict:
+    import numpy as np
+
+    rng = np.random.RandomState(3)
+    ts = np.array(
+        [np.datetime64("2026-01-01T00:00:00", "ms") + np.timedelta64(i, "h") for i in range(n)],
+        dtype="datetime64[ms]",
+    )
+    vals = (100 + rng.normal(0, 3, n)).astype(np.float64)
+    for i in (200, 201, 400):
+        if i < n:
+            vals[i] += 60.0
+    return {
+        "timestamp": ts,
+        "value": vals,
+        "seasonality_data": np.array(["{}"] * n, dtype=object),
+        "seasonality_columns": [],
+    }
+
+
+def _autotune_server(tmp_path: Path):
+    (tmp_path / "metrics").mkdir(parents=True, exist_ok=True)
+    path = tmp_path / "metrics" / "orders.yml"
+    path.write_text(_AUTOTUNE_METRIC_YAML, encoding="utf-8")
+    config = MetricConfig.from_yaml_file(path)
+    server, url = build_tune_server(
+        payload=_payload(),
+        original_path=path,
+        project_root=tmp_path,
+        metric_name="orders",
+        incidents_dir=tmp_path / "incidents" / "orders",
+        interval_seconds=3600,
+        metric_config=config,
+        internal_manager=_StubManager(_series()),
+    )
+    return server, url, path
+
+
+def test_autotune_url_injected_into_page(tmp_path):
+    server, _url, _path = _autotune_server(tmp_path)
+    try:
+        assert "/autotune?token=" in server.html  # Autotune endpoint baked in
+    finally:
+        server.server_close()
+
+
+def test_autotune_returns_winner_and_keeps_serving(tmp_path):
+    server, url, _path = _autotune_server(tmp_path)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        # Unsupervised (no incidents) — still returns a winning windowed detector.
+        r = _post_path(base, "/autotune", token, {"yaml": "metric: orders\nincidents: []\n"})
+        assert r.status == 200
+        res = json.loads(r.read())
+        assert res["detector"]["type"] in {"mad", "zscore", "iqr"}
+        assert isinstance(res["detector"]["threshold"], (int, float))
+        assert isinstance(res["detector"]["windowSize"], int)
+        assert res["mode"] == "unsupervised"
+        assert res["n_candidates"] >= 1
+        assert isinstance(res["decision_log"], list) and res["decision_log"]
+        # Repeatable + advisory: never triggers apply, nothing written.
+        assert server.applied is None
+        r2 = _post_path(base, "/autotune", token, {"yaml": "metric: orders\nincidents: []\n"})
+        assert r2.status == 200
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_autotune_supervised_picks_consecutive(tmp_path):
+    server, url, _path = _autotune_server(tmp_path)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        # index 200/201 → 2026-01-09 08:00/09:00 (i hours after 2026-01-01T00:00).
+        labels = (
+            "metric: orders\ntimezone: UTC\n"
+            'incidents:\n  - {start: "2026-01-09 08:00:00", end: "2026-01-09 09:00:00"}\n'
+        )
+        r = _post_path(base, "/autotune", token, {"yaml": labels})
+        assert r.status == 200
+        res = json.loads(r.read())
+        assert res["mode"] == "supervised"
+        assert isinstance(res["consecutive_anomalies"], int)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_autotune_rejects_bad_scoring_and_keeps_serving(tmp_path):
+    # A bad `scoring` override in the POST body must surface as 400 (it threads into
+    # resolve_scoring) and leave the server serving for a valid retry.
+    server, url, _path = _autotune_server(tmp_path)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post_path(
+                base,
+                "/autotune",
+                token,
+                {"yaml": "metric: orders\nincidents: []\n", "scoring": "nonsense"},
+            )
+        assert ei.value.code == 400
+        r = _post_path(base, "/autotune", token, {"yaml": "metric: orders\nincidents: []\n"})
+        assert r.status == 200
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_autotune_rejects_when_no_datapoints(tmp_path):
+    # Manager returns an empty series (e.g. datapoints were cleaned) → friendly 400.
+    import numpy as np
+
+    (tmp_path / "metrics").mkdir(parents=True, exist_ok=True)
+    path = tmp_path / "metrics" / "orders.yml"
+    path.write_text(_AUTOTUNE_METRIC_YAML, encoding="utf-8")
+    empty = {
+        "timestamp": np.array([], dtype="datetime64[ms]"),
+        "value": np.array([], dtype="float64"),
+        "seasonality_data": np.array([], dtype=object),
+        "seasonality_columns": [],
+    }
+    server, url = build_tune_server(
+        payload=_payload(),
+        original_path=path,
+        project_root=tmp_path,
+        metric_name="orders",
+        interval_seconds=3600,
+        metric_config=MetricConfig.from_yaml_file(path),
+        internal_manager=_StubManager(empty),
+    )
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post_path(base, "/autotune", token, {"yaml": "metric: orders\nincidents: []\n"})
+        assert ei.value.code == 400
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_json_default_serializes_numpy_and_rejects_unknown():
+    # The /autotune reply serializes the decision log / CV folds, which can carry
+    # numpy scalars — lock all three branches of the JSON fallback directly.
+    import numpy as np
+
+    from detectkit.tuning.server import _json_default
+
+    assert _json_default(np.int64(3)) == 3
+    assert isinstance(_json_default(np.int64(3)), int)
+    assert _json_default(np.float64(1.5)) == 1.5
+    assert _json_default(np.array([1, 2])) == [1, 2]
+    with pytest.raises(TypeError):
+        _json_default(object())
+
+
+def test_autotune_unavailable_without_config(tmp_path):
+    # The plain labels server carries no metric_config/internal_manager → 400.
+    server, url, _inc = _labels_server(tmp_path)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post_path(base, "/autotune", token, {"yaml": "metric: orders\nincidents: []\n"})
+        assert ei.value.code == 400
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_autotune_rejects_when_disabled(tmp_path):
+    (tmp_path / "metrics").mkdir(parents=True, exist_ok=True)
+    path = tmp_path / "metrics" / "orders.yml"
+    path.write_text(
+        _AUTOTUNE_METRIC_YAML.replace("autotune:\n  folds: 3\n", "autotune:\n  enabled: false\n"),
+        encoding="utf-8",
+    )
+    server, url = build_tune_server(
+        payload=_payload(),
+        original_path=path,
+        project_root=tmp_path,
+        metric_name="orders",
+        interval_seconds=3600,
+        metric_config=MetricConfig.from_yaml_file(path),
+        internal_manager=_StubManager(_series(200)),
+    )
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post_path(base, "/autotune", token, {"yaml": "metric: orders\nincidents: []\n"})
+        assert ei.value.code == 400
+    finally:
+        server.shutdown()
+        server.server_close()

@@ -5,6 +5,26 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.45.1] - 2026-06-28
+
+### Fixed
+- **`dtk tune`: deleting an incident on the chart no longer "turns it into" a
+  confirmed alert.** In **Label** mode, deleting a marked incident via the chart's
+  ✕ handle (or the **Delete** key) removed the hand-marked span but left behind any
+  confirmed-valid alert verdict it overlapped — so that verdict, which the
+  Marked-incidents list had been hiding *behind* the incident (overlap-dedup),
+  **resurfaced as its own "✓ confirmed alert" row**. The incident appeared to become
+  a confirmed alert instead of being deleted, and the catch-rate/false-alert metrics
+  stayed wrong. This bit hardest on **seeded** sessions: **Save** writes each
+  confirmed alert as *both* an incident *and* an `alert_reviews:` entry, so on reopen
+  every incident is backed by a verdict and *every* chart-✕ delete resurfaced one.
+  Deleting an incident now also **retracts** any confirmed-valid verdict overlapping
+  it (clearing it to un-reviewed, the same effect as the list's "un-confirm" ✕), so
+  the incident is fully removed and the chart ✕ and list ✕ behave identically.
+  Explicit *false-alarm* verdicts and confirmed alerts that don't overlap the deleted
+  span are untouched; confirming alerts (Review mode, **Confirm all**) is unchanged.
+  The committed `assets/tune.js` bundle is regenerated.
+
 ## [0.45.0] - 2026-06-28
 
 ### Added

@@ -820,7 +820,9 @@ to it:
   **without drawing spans**), and is written as an incident on Save. The list, the
   metrics and Save share one ground-truth set (marked spans + confirmed alerts).
 - **Label** — mark real incidents: **drag** a span (edges/middle to adjust, ✕/Delete
-  to remove), **Lasso anomalies** (loop a cloud of anomaly dots — each consecutive
+  to remove — removing also un-confirms any overlapping confirmed-valid alert, so the
+  incident is fully gone rather than reappearing as a "✓ confirmed alert" row, with
+  the chart ✕ and list ✕ behaving identically), **Lasso anomalies** (loop a cloud of anomaly dots — each consecutive
   run, gaps bridged up to `consecutive_anomalies`, becomes one span sized to the
   run), or **Threshold capture** (grab every span past a horizontal line; set it by
   click or value, **above**/**below**, optional gap-bridge, optional painted time

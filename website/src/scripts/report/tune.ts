@@ -414,6 +414,24 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     validatedSpans().filter((v) => !incidents.some((iv) => overlapIv(v, iv)));
   // The full ground-truth incident set the live metrics, the list and Save all share.
   const groundTruth = (): Incident[] => [...incidents, ...validatedExtra()];
+  // Deleting a hand-marked incident asserts "no real incident in this span", so any
+  // confirmed-VALID alert overlapping it is retracted too (cleared to un-reviewed, like
+  // unconfirmAlert). Otherwise that verdict — which validatedExtra() was hiding behind
+  // the incident — RESURFACES as its own "confirmed alert" row, so the deleted incident
+  // appears to turn INTO a confirmed alert instead of vanishing. (Seeded case: Save
+  // writes each confirmed alert as both an incident AND a review, so on reopen every
+  // incident is backed by one.) Leaves explicit 'false' verdicts alone. Returns whether
+  // anything was cleared (→ the alert markers need repainting).
+  const retractConfirmationFor = (iv: Incident): boolean => {
+    let changed = false;
+    for (let i = reviews.length - 1; i >= 0; i--) {
+      if (reviews[i].verdict === 'valid' && overlapIv(reviews[i], iv)) {
+        reviews.splice(i, 1);
+        changed = true;
+      }
+    }
+    return changed;
+  };
   // Build the alert markers with their review-verdict color (red / green / slate).
   const buildAlerts = (): ChartAlert[] =>
     lastFireTs.map((t, i) => {
@@ -873,10 +891,17 @@ function render(payload: TunePayload, mount: HTMLElement): void {
         `band=[${fmtNum(p.lower)}, ${fmtNum(p.upper)}]` +
         (p.isAnomaly ? `  ⚠ ${p.direction} (sev ${p.severity.toFixed(2)})` : '');
     },
-    onIncidentsChange: (): void => {
-      // The chart mutates `incidents` in place (shared ref); reflect it.
-      refreshIncidentList();
-      renderMetrics();
+    onIncidentsChange: (_incidents, removed): void => {
+      // The chart mutates `incidents` in place (shared ref); reflect it. If a span was
+      // DELETED on the chart (✕ handle / Delete key), retract any confirmed-valid verdict
+      // it overlapped (see retractConfirmationFor) so the incident is fully removed
+      // instead of resurfacing as a "confirmed alert" — same as deleting it from the list.
+      const retracted = removed ? retractConfirmationFor(removed) : false;
+      if (retracted) repaintAlerts();
+      else {
+        refreshIncidentList();
+        renderMetrics();
+      }
     },
     onThresholdChange: (info): void => updateThresholdUI(info),
     onLassoChange: (info): void => updateLassoUI(info),
@@ -1470,9 +1495,15 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   function deleteIncident(iv: Incident): void {
     const k = incidents.indexOf(iv);
     if (k >= 0) incidents.splice(k, 1);
+    // Retract a confirmed-valid verdict this incident overlapped, so it doesn't
+    // resurface as a "confirmed alert" row — the chart ✕ and this list ✕ stay in sync.
+    const retracted = retractConfirmationFor(iv);
     chart.setIncidents(incidents);
-    refreshIncidentList();
-    renderMetrics();
+    if (retracted) repaintAlerts(); // recolours markers + recomputes metrics + refreshes list
+    else {
+      refreshIncidentList();
+      renderMetrics();
+    }
   }
   // Un-confirm a validated-alert incident: clear its verdict (the green marker
   // reverts to an un-reviewed alert), then repaint everything — this is the inverse

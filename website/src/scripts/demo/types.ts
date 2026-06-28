@@ -344,8 +344,13 @@ export interface ChartOptions {
    * updated. Labeling charts only.
    */
   onAlertReviewChange?: (fireTs: number, verdict: AlertVerdict) => void;
-  /** Called (with a snapshot) whenever the user edits incidents in `labeling` mode. */
-  onIncidentsChange?: (incidents: Incident[]) => void;
+  /**
+   * Called whenever the user edits incidents in `labeling` mode. `incidents` is the
+   * live array (shared ref). `removed` is the incident that was just DELETED (✕ handle
+   * or Delete key) — present only for deletions, so the cockpit can retract a
+   * confirmed-alert verdict that span overlapped rather than let it resurface.
+   */
+  onIncidentsChange?: (incidents: Incident[], removed?: Incident) => void;
   /**
    * Called whenever the threshold-capture preview changes (line value, run count
    * or painted window) in `labeling` mode. Used by the `dtk tune` cockpit to drive

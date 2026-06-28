@@ -661,7 +661,15 @@ already covered by a hand-marked incident (overlap dedup); `groundTruth()` =
 `incidents` ∪ `validatedExtra()` is what the **Marked-incidents list** and **Save**
 read, so confirmed alerts appear in the list (a read-only "✓ confirmed alert" row
 whose ✕ clears the verdict via `unconfirmAlert`) and are written as incidents on Save
-(feeding the next supervised autotune) with no double-count after a Save→reopen. The
+(feeding the next supervised autotune) with no double-count after a Save→reopen.
+**Deleting** a hand-marked incident (the chart's ✕ handle / **Delete** key, or the
+list's ✕) **retracts any confirmed-valid verdict it overlapped** (`retractConfirmationFor`,
+mirroring `unconfirmAlert`), so the incident is fully removed instead of the hidden
+verdict **resurfacing** as its own "✓ confirmed alert" row — i.e. the chart-✕ and
+list-✕ delete paths stay in lockstep and a deleted incident never appears to *turn
+into* a confirmed alert (the chart threads the removed span to the cockpit via
+`onIncidentsChange(incidents, removed)`). Explicit `false` verdicts and confirmed
+alerts that don't overlap the deleted span are left alone. The
 live metrics build the **same** union but **window-filter first** and dedup the
 confirmed spans against only the in-window incidents (not the full set), so trimming a
 hand-marked incident out of the active window can't silently drop an overlapping

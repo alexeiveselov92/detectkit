@@ -192,12 +192,18 @@ against a specific older window.
 You don't have to leave the cockpit to run [`dtk autotune`](autotuning.md). Switch
 to **Autotune** and click **Run autotune**: the **same engine** (seasonality →
 detector → grid → window search, cross-validated) runs **server-side** over the
-metric's full history — not a browser re-implementation — using the incidents you've
-marked (and confirmed-valid alerts) as **ground truth**. When it finishes it
-**re-seeds every knob** with the winning detector, recomputes the live band, and
-shows the winner, the score, and the **decision log** in the rail. Review the band,
-then **Apply** (in Autotune or Tune mode) to write it back.
+**window you're looking at** — the **Points shown** trim, the same series the cockpit
+displays and scores, not the full history — not a browser re-implementation — using
+the incidents you've marked (and confirmed-valid alerts) as **ground truth**. When it
+finishes it **re-seeds every knob** with the winning detector, recomputes the live
+band, and shows the winner, the score, and the **decision log** in the rail. Review
+the band, then **Apply** (in Autotune or Tune mode) to write it back.
 
+- Trim **Points shown** to focus the search on a recent period — the engine tunes on
+  exactly that window, so what you see is what's optimized.
+- Watch the **terminal** you launched `dtk tune` from: each run streams a structured,
+  blocked log (`LABELS → SEASONALITY → … → RESULT`, the same look as `dtk run` and
+  `dtk autotune`) so you can follow what it's computing.
 - With incidents marked, the search is **supervised** (it also picks
   `consecutive_anomalies`); with none, it falls back to the **unsupervised**
   objective. Mark a few incidents first for a sharper result — the Autotune panel

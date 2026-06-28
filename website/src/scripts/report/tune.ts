@@ -1737,8 +1737,10 @@ function render(payload: TunePayload, mount: HTMLElement): void {
 
   // ---- autotune panel (Autotune mode) ---------------------------------------
   // Server-side autotune: POST the current ground truth (the same labels YAML as
-  // Save incidents) to the engine, which searches over the metric's full history
-  // and returns the winning detector. We re-seed every knob from it, recompute the
+  // Save incidents) plus the window currently shown (the 'Points shown' trim) to
+  // the engine, which searches over exactly that window — the same series the
+  // cockpit displays and scores — and returns the winning detector. We re-seed
+  // every knob from it, recompute the
   // live band, and render the decision log — then the user reviews and Applies (in
   // Tune/Autotune mode). Re-seeding mirrors the initial render() seeding exactly,
   // via the same camelCase shape the server builds with seed_detector_params.
@@ -1770,10 +1772,11 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     el(
       'div',
       'dtk-tune-note',
-      'Run the full autotune engine server-side over the metric’s history, using the ' +
-        'incidents you’ve marked (and confirmed alerts) as ground truth. It re-seeds the ' +
-        'knobs with the winning detector — review the band, then Apply (here or in Tune). ' +
-        'Nothing is written until you Apply; the next `dtk run` is the source of truth.',
+      'Run the full autotune engine server-side over the window shown (the ‘Points shown’ ' +
+        'trim — the same series you see and score here), using the incidents you’ve marked ' +
+        '(and confirmed alerts) as ground truth. It re-seeds the knobs with the winning ' +
+        'detector — review the band, then Apply (here or in Tune). Nothing is written until ' +
+        'you Apply; the next `dtk run` is the source of truth.',
     ),
   );
   if (payload.autotune_url) {
@@ -1781,9 +1784,9 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     const atBtn = el('button', 'dtk-apply-btn', 'Run autotune');
     atBtn.type = 'button';
     atBtn.title =
-      'Search for the best detector over the metric’s full (capped) history. Uses your ' +
-      'marked incidents as ground truth when present (supervised), else an unsupervised ' +
-      'objective. Can take a few seconds on a long history.';
+      'Search for the best detector over the window shown (the ‘Points shown’ trim). Uses ' +
+      'your marked incidents as ground truth when present (supervised), else an unsupervised ' +
+      'objective. Can take a few seconds on a long window.';
     const atMsg = el('span', 'dtk-apply-msg');
     atWrap.appendChild(atBtn);
     atWrap.appendChild(atMsg);
@@ -1842,12 +1845,23 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     atBtn.onclick = (): void => {
       atBtn.disabled = true;
       atMsg.className = 'dtk-apply-msg info';
-      atMsg.textContent = 'Autotuning over the history… this can take a moment.';
+      atMsg.textContent = 'Autotuning over the shown window… this can take a moment.';
       fetch(payload.autotune_url as string, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Send the current ground truth so the search is supervised by what's marked.
-        body: JSON.stringify({ yaml: buildLabelsYaml() }),
+        body: JSON.stringify({
+          // The current ground truth, so the search is supervised by what's marked.
+          yaml: buildLabelsYaml(),
+          // Tune on exactly the window shown (the 'Points shown' trim re-slices
+          // `series`), so the engine optimizes the same series the cockpit displays
+          // and scores — not the full history. Omitted → server uses full history.
+          window: series.timestamps.length
+            ? {
+                start: series.timestamps[0],
+                end: series.timestamps[series.timestamps.length - 1],
+              }
+            : null,
+        }),
       })
         .then((r) =>
           r.ok

@@ -258,13 +258,33 @@ autotune:
 
 
 class _StubManager:
-    """Minimal stand-in for InternalTablesManager — only load_datapoints is used."""
+    """Minimal stand-in for InternalTablesManager — only load_datapoints is used.
+
+    Honors ``from_timestamp`` / ``to_timestamp`` with the real half-open ``[from,
+    to)`` semantics so a test can assert the server constrains the load to the
+    shown window.
+    """
 
     def __init__(self, data: dict) -> None:
         self._data = data
 
     def load_datapoints(self, metric_name, from_timestamp=None, to_timestamp=None):  # noqa: ARG002
-        return self._data
+        if from_timestamp is None and to_timestamp is None:
+            return self._data
+        import numpy as np
+
+        ts = self._data["timestamp"]
+        mask = np.ones(len(ts), dtype=bool)
+        if from_timestamp is not None:
+            mask &= ts >= np.datetime64(from_timestamp, "ms")
+        if to_timestamp is not None:
+            mask &= ts < np.datetime64(to_timestamp, "ms")
+        return {
+            "timestamp": ts[mask],
+            "value": self._data["value"][mask],
+            "seasonality_data": self._data["seasonality_data"][mask],
+            "seasonality_columns": self._data["seasonality_columns"],
+        }
 
 
 def _series(n: int = 600) -> dict:
@@ -323,7 +343,7 @@ def test_autotune_returns_winner_and_keeps_serving(tmp_path):
         assert r.status == 200
         res = json.loads(r.read())
         assert res["detector"]["type"] in {"mad", "zscore", "iqr"}
-        assert isinstance(res["detector"]["threshold"], (int, float))
+        assert isinstance(res["detector"]["threshold"], int | float)
         assert isinstance(res["detector"]["windowSize"], int)
         assert res["mode"] == "unsupervised"
         assert res["n_candidates"] >= 1
@@ -335,6 +355,82 @@ def test_autotune_returns_winner_and_keeps_serving(tmp_path):
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_autotune_streams_structured_run_log(tmp_path):
+    """The Autotune mode streams a blocked run-log through ``server.echo`` — a
+    cyan banner, the engine's LABELS/SEASONALITY/.../RESULT blocks (the same
+    house style as ``dtk run`` / ``dtk autotune``) — so a user watching the
+    terminal beside the cockpit sees what each Run-autotune click computes. The
+    per-candidate under-fill warning flood never reaches that log."""
+    server, url, _path = _autotune_server(tmp_path)
+    lines: list[str] = []
+    server.echo = lines.append  # capture the streamed run-log
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        # echo happens synchronously before the JSON reply, so the lines are all
+        # captured by the time the POST returns.
+        r = _post_path(base, "/autotune", token, {"yaml": "metric: orders\nincidents: []\n"})
+        assert r.status == 200
+        blob = "\n".join(lines)
+        assert "Autotune (cockpit): orders" in blob  # the banner
+        assert "┌─ LABELS" in blob  # first engine stage block
+        assert "┌─ RESULT" in blob  # closing block
+        assert "Winner:" in blob
+        assert "falls back to global" not in blob  # no warning flood in the log
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_autotune_honors_shown_window(tmp_path):
+    """The page posts the shown 'Points shown' window; the server must tune on
+    exactly that slice, not the full history — otherwise the search optimizes a
+    different series than the cockpit shows and scores recall/FDR on."""
+    import numpy as np
+
+    server, url, _path = _autotune_server(tmp_path)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        # No window → full history (all 600 points).
+        r_full = _post_path(base, "/autotune", token, {"yaml": "metric: orders\nincidents: []\n"})
+        assert json.loads(r_full.read())["n_points"] == 600
+        # Shown window = the most-recent 400 points (indices 200..599). `_series` is
+        # deterministic, so these timestamps match the server's stub series exactly.
+        ts = _series()["timestamp"]
+        win = {
+            "start": int(ts[200].astype("datetime64[ms]").astype(np.int64)),
+            "end": int(ts[599].astype("datetime64[ms]").astype(np.int64)),
+        }
+        r_win = _post_path(
+            base,
+            "/autotune",
+            token,
+            {"yaml": "metric: orders\nincidents: []\n", "window": win},
+        )
+        assert json.loads(r_win.read())["n_points"] == 400  # exactly the shown window
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_autotune_window_maps_ms_to_load_bounds():
+    from datetime import datetime
+
+    from detectkit.tuning.server import _autotune_window
+
+    f, t, desc = _autotune_window({"start": 0, "end": 3_600_000}, 3600)
+    assert desc == "the selected window"
+    assert f == datetime(1970, 1, 1)
+    # half-open [from, to): the upper bound is pushed one interval past the last
+    # shown point (end 01:00 + 1h interval) so that point stays included.
+    assert t == datetime(1970, 1, 1, 2)
+    # Absent / malformed / reversed windows fall back to the full history.
+    assert _autotune_window(None, 3600) == (None, None, "the full history")
+    assert _autotune_window({"start": 5, "end": 1}, 3600)[2] == "the full history"
+    assert _autotune_window({"start": "x", "end": 1}, 3600)[2] == "the full history"
 
 
 def test_autotune_supervised_picks_consecutive(tmp_path):

@@ -66,9 +66,15 @@ rendered on the docs site under **For developers**). Read the relevant one:
   incidents editable; **Lasso anomalies** loops a cloud of anomaly dots into
   per-streak incident spans, **Threshold capture** grabs every span past a line),
   and **Autotune** (runs the **real** `dtk autotune` engine **server-side** over the
-  metric's full history via a repeatable `POST /autotune`, using the marked incidents
+  **window the cockpit is showing** — the page posts its current **Points shown**
+  trim window so the engine tunes on exactly the series the user sees and scores, not
+  the full history — via a repeatable `POST /autotune`, using the marked incidents
   as ground truth, then **re-seeds every knob** with the winner + renders the
-  decision log; the band leads like Tune). Autotune-in-tune is **advisory** — it
+  decision log; the band leads like Tune). The run also **streams a structured
+  run-log to the terminal** (cyan banner → `LABELS → SEASONALITY → … → RESULT`
+  blocks via the same `StageLogRenderer` `dtk autotune` uses, matching `dtk run`'s
+  format; the per-candidate "falls back to global" warning flood is quieted during
+  the search). Autotune-in-tune is **advisory** — it
   computes + re-seeds only, persisting **no** run/`__tuned_<id>.yml`/detections (so
   `dtk tune` stays lock-free); the user reviews and **Apply**s, and the next
   `dtk run` is source of truth. The CLI command and the server share one

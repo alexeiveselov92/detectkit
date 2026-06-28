@@ -31,7 +31,14 @@ from detectkit.autotune.labels import (
     parse_incident_labels,
 )
 from detectkit.autotune.runner import build_settings, cap_history, resolve_scoring
-from detectkit.cli._output import echo_done, echo_error, echo_noop
+from detectkit.cli._output import (
+    AUTOTUNE_STAGE_TITLES,
+    StageLogRenderer,
+    echo_block,
+    echo_done,
+    echo_error,
+    echo_noop,
+)
 from detectkit.cli.commands.run import find_project_root, parse_date, select_metrics
 from detectkit.config.metric_config import AutoTuneConfig, MetricConfig
 from detectkit.config.profile import ProfilesConfig
@@ -40,28 +47,6 @@ from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.detectors.base import DetectionResult
 from detectkit.detectors.factory import DetectorFactory
 from detectkit.utils.json_utils import json_dumps_sorted
-
-_STAGE_TITLES = {
-    "labels": "LABELS",
-    "seasonality": "SEASONALITY",
-    "detector_select": "DETECTOR SELECT",
-    "grid_search": "GRID SEARCH",
-    "window": "WINDOW",
-}
-
-
-class _StageRenderer:
-    """Streams engine progress as the run-log tree (header per stage + │ lines)."""
-
-    def __init__(self) -> None:
-        self._open: str | None = None
-
-    def __call__(self, stage: str, line: str) -> None:
-        if self._open != stage:
-            title = _STAGE_TITLES.get(stage, stage.upper())
-            click.echo(click.style(f"  ┌─ {title}", fg="cyan", bold=True))
-            self._open = stage
-        click.echo(f"  │   {line}")
 
 
 def _results_to_batch(results: list[DetectionResult]) -> dict[str, np.ndarray]:
@@ -358,7 +343,7 @@ def _tune_one(
             ground_truth=ground_truth,
             interval_seconds=interval_seconds,
             settings=settings,
-            on_stage=_StageRenderer(),
+            on_stage=StageLogRenderer(titles=AUTOTUNE_STAGE_TITLES),
         )
 
         run_id = compute_run_id(result)
@@ -434,9 +419,7 @@ def _finalize(
 
     if dry_run:
         children.append("dry-run: no config written, no detections persisted")
-        click.echo(click.style("  ┌─ RESULT", fg="cyan", bold=True))
-        for i, child in enumerate(children):
-            click.echo(f"  {'└─' if i == len(children) - 1 else '│  '} {child}")
+        echo_block("RESULT", children)
         return
 
     # Persist the run record (the audit trail).
@@ -518,9 +501,7 @@ def _finalize(
         f"persisted winner, pruned {pruned} superseded run(s)"
     )
     children.append(f"Re-run with: dtk run --select {name}__tuned_{run_id}")
-    click.echo(click.style("  ┌─ RESULT", fg="cyan", bold=True))
-    for i, child in enumerate(children):
-        click.echo(f"  {'└─' if i == len(children) - 1 else '│  '} {child}")
+    echo_block("RESULT", children)
 
 
 def _prune_prior_winners(

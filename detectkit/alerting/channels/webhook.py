@@ -25,22 +25,23 @@ class WebhookChannel(BaseAlertChannel):
     - Slack incoming webhooks
     - Custom webhook endpoints
 
-    Rendering: the default (no custom ``template``) anomaly/recovery payload is
-    **two stacked Slack/Mattermost attachments** — a colored **base card** that
-    is always visible (the title, a short markdown lead with the **Rule** chip,
-    the Value / Expected fields and an always-visible compact **Links** field)
-    and a neutral **detail card** carrying the verbose tail (Quorum / Severity /
-    the anomalous span / Detectors / Parameters) as one markdown ``text`` block.
-    Slack and Mattermost natively collapse only an attachment's ``text`` (Slack
-    above 700 characters / 5 line breaks, Mattermost above ~200px of rendered
-    height) and **never** collapse the ``fields`` grid — so routing the bulk
-    into the detail card's ``text`` lets the platform fold it behind a
-    "Show more" toggle while the base (value, expected and links) stays in view.
-    Short kinds (no-data / error) render as a single base card. A custom
-    ``template`` degrades to a plain text-only attachment (one opaque string
-    that can't be sliced into fields), keeping the color, title and branding.
-    Branding (``footer`` + ``footer_icon``) rides on the **last** attachment so
-    it sits at the bottom of the whole message, below the folded detail card.
+    Rendering: the default (no custom ``template``) payload is a **single
+    status-colored Slack/Mattermost attachment** whose whole body rides in one
+    markdown ``text`` block, ordered most-important-first — the lead + **Rule**
+    chip, then Value / Expected, the action **Links**, and finally the verbose
+    evidence tail (Quorum / Severity / the anomalous span / Detectors /
+    Parameters). Both platforms natively collapse a long attachment ``text``
+    behind a **"Show more"** toggle (Slack above 700 characters / 5 line breaks;
+    Mattermost wraps only the ``text`` in its ``maxHeight`` 200px fold — the
+    ``title``, the color bar and the ``footer`` render *outside* that fold), so a
+    long anomaly folds its tail exactly like a reference AlertManager alert while
+    the one colored bar, the clickable title and the **branded footer (with the
+    logo)** stay in view even when the body is collapsed. No-data / error alerts
+    stay short, single un-folded cards; a long anomaly — or a full recovery
+    timeline (onset → fired → recovered) — folds its tail. A custom ``template``
+    renders the same shape — one colored, branded, text-only attachment.
+    Branding (``footer`` + ``footer_icon``, the brand logo) rides on that single
+    attachment and, being outside the text fold, is always visible.
 
     Mentions ride in the **top-level** ``text`` (mentions inside attachments do
     not reliably notify on Slack). A ``dashboard_url`` makes the attachment
@@ -55,10 +56,16 @@ class WebhookChannel(BaseAlertChannel):
             "text": "<!here> ...",                      # mentions (top level)
             "channel": "#channel",                      # optional (Slack)
             "attachments": [
-                # base card — always visible (never folds; fields don't collapse)
-                {"color": ..., "title": ..., "fields": [Value, Expected, Links], ...},
-                # detail card — neutral, foldable text (anomaly/recovery only)
-                {"text": "<verbose tail>", "mrkdwn_in": ["text"]},
+                # one colored card; the long body folds behind "Show more",
+                # the footer (brand + logo) stays visible below the fold.
+                {
+                    "color": ...,
+                    "title": ...,
+                    "text": "<lead + Rule + value/expected + links + tail>",
+                    "footer": "detectkit · <project>",
+                    "footer_icon": "https://.../bot-icon.png",
+                    "mrkdwn_in": ["text"],
+                },
             ]
         }
 
@@ -134,8 +141,9 @@ class WebhookChannel(BaseAlertChannel):
         Args:
             alert_data: Alert data to send
             template: Optional custom message template. When given, the
-                attachment carries the formatted template as a single text
-                blob (no fields grid); otherwise the rich default is built.
+                attachment carries the formatted template verbatim as the body
+                text (in place of the structured lead/Value/tail sections);
+                otherwise the rich default is built.
 
         Returns:
             True if sent successfully, False otherwise
@@ -199,16 +207,18 @@ class WebhookChannel(BaseAlertChannel):
         else:
             attachments = self._build_rich_attachments(alert_data, ctx, color, title)
 
-        # Dashboard link → clickable title on the base (first) attachment.
+        # Dashboard link → clickable title on the attachment.
         if alert_data.dashboard_url:
             attachments[0]["title_link"] = alert_data.dashboard_url
 
-        # Brand the LAST attachment's footer (reliable on Slack even when
-        # top-level username/icon are locked to the app install) so the brand
-        # line sits at the bottom of the whole message — below the folded detail
-        # card when one is present. Pair the brand name with the project name
-        # when set ("detectkit · my_project") so two projects posting to the same
-        # channel stay distinguishable even past the title.
+        # Brand the (single) attachment's footer (reliable on Slack even when
+        # top-level username/icon are locked to the app install). Mattermost and
+        # Slack render an attachment's footer *outside* the "Show more" text
+        # fold, so the brand line — and its logo (``footer_icon``) — stays
+        # visible at the bottom of the message even when the body is collapsed.
+        # Pair the brand name with the project name when set
+        # ("detectkit · my_project") so two projects posting to the same channel
+        # stay distinguishable even past the title.
         footer = self.username or BRAND_USERNAME
         if alert_data.project_name:
             footer = f"{footer} · {alert_data.project_name}"
@@ -252,114 +262,131 @@ class WebhookChannel(BaseAlertChannel):
         color: str,
         title: str,
     ) -> list[dict[str, Any]]:
-        """Build the default attachment(s) for *alert_data*.
+        """Build the default **single** attachment for *alert_data*.
 
-        Returns a **base card** (always visible) and, for anomaly/recovery, a
-        neutral **detail card** whose long ``text`` block the chat client folds
-        behind "Show more". Slack and Mattermost collapse only an attachment's
-        ``text`` (never the ``fields`` grid), so the base keeps the value, the
-        expected band and the links permanently in view while the verbose tail
-        (quorum, severity, the anomalous span, detectors, parameters) rides in
-        the foldable detail card. No-data / error are short, so they render as a
-        single base card. Both cards render from one payload on Slack and
-        Mattermost.
+        Everything rides in one status-colored attachment whose body is a single
+        markdown ``text`` block, ordered most-important-first: the lead + Rule
+        chip, then value / expected, the action links, and finally the verbose
+        evidence tail (quorum, severity, the anomalous span, detectors,
+        parameters). Mattermost wraps only an attachment's ``text`` in its
+        "Show more" fold (``maxHeight`` 200px) and renders the ``title``, color
+        bar and ``footer`` outside it; Slack folds a long ``text`` too. So a long
+        anomaly collapses its tail behind "Show more" — exactly the one-block,
+        one-color, foldable layout of a reference AlertManager alert — while the
+        colored bar, the clickable title and the branded footer/logo (attached in
+        :meth:`build_payload`) stay in view even when collapsed. No-data / error
+        stay short, single un-folded cards; a long anomaly (or a full recovery
+        timeline) folds its tail.
         """
         kind = self.status_kind(alert_data)
-        base_fields: list[dict[str, Any]] = []
-        detail_lines: list[str] = []
-
-        def short(name: str, value: str) -> None:
-            """Add a 2-col field to the always-visible base card."""
-            if value:
-                base_fields.append({"title": name, "value": value, "short": True})
-
-        def full(name: str, value: str) -> None:
-            """Add a full-width field to the always-visible base card."""
-            if value:
-                base_fields.append({"title": name, "value": value, "short": False})
-
-        def detail(name: str, value: str) -> None:
-            """Add one line to the foldable detail card: bold label + value."""
-            if value:
-                detail_lines.append(f"{self._bold(name)} {value}")
 
         def code(s: str) -> str:
             return f"`{s}`" if s else ""
 
+        def line(name: str, value: str) -> str:
+            """One ``bold label + value`` body line (empty value → dropped)."""
+            return f"{self._bold(name)} {value}" if value else ""
+
         # The configured firing rule, set apart as a bold "Rule" label + an
         # inline-code chip so it reads as "this is the config that fired" at a
         # glance. Backticks render identically on Slack and Mattermost; the bold
-        # label is platform-aware (see ``_bold``). Stays in the always-visible
-        # base lead.
+        # label is platform-aware (see ``_bold``). Leads the body, above the fold.
         rule_chip = f"{self._bold('Rule')} " + code(
             f"min_detectors={ctx['min_detectors']} · "
             f"direction={ctx['direction_policy']} · "
             f"consecutive={ctx['consecutive_required']}"
         )
 
-        if kind == "anomaly":
-            # Base (always visible): the lead (how long it's been going on), the
-            # Rule chip, and the value vs the expected band.
-            lead = f"{ctx['anomaly_lead']}\n{rule_chip}"
-            short("Value", code(ctx["value_display"]))
-            short("Expected", code(ctx["expected_range"]))
-            # Detail (folds): quorum, severity, the span, detectors + params.
-            detail(
-                "Quorum",
-                f"{ctx['detector_count']}/{ctx['min_detectors']} · {ctx['direction']}",
-            )
-            detail("Severity", f"{alert_data.severity:.2f}")
-            if ctx["started_display"]:
-                detail("Anomaly began", ctx["started_display"])
-                detail("Latest reading", ctx["timestamp"])
-            else:
-                detail("Detected at", ctx["timestamp"])
-            detail("Detectors", code(ctx["detector_name"]))
-            if ctx["detector_params"]:
-                # Fenced block on its own lines so it renders as a code block (and
-                # adds line breaks that help trip the platform's fold).
-                detail_lines.append(
-                    f"{self._bold('Parameters')}\n```\n{ctx['detector_params']}\n```"
-                )
-        elif kind == "recovery":
-            lead = f"{ctx['recovery_lead']}\n{rule_chip}"
-            short("Value", code(ctx["value_display"]))
-            short("Expected", code(ctx["expected_range"]))
-            # Detail (folds): the incident timeline (onset → fired → recovered)
-            # and the detectors. ``detail`` skips the fired line when unknown.
-            if ctx["started_display"]:
-                detail("Anomaly began", ctx["started_display"])
-                detail("Alert fired", ctx["fired_display"])
-                detail("Recovered", ctx["timestamp"])
-            else:
-                detail("Cleared at", ctx["timestamp"])
-            detail("Detectors", code(ctx["detector_name"]))
-        elif kind == "no_data":
-            lead = "Query returned no datapoint for the latest expected interval."
-            full("Expected at", ctx["timestamp"])
-            short("Expected", code(ctx["expected_range"]))
-        else:  # error
-            lead = "The detectkit pipeline failed for this metric."
-            full("Detected at", ctx["timestamp"])
-            err = f"{ctx['error_type']}: {ctx['error_message']}".strip(": ")
-            full("Error", code(err))
-
-        # Links — always visible in the base card. The dashboard / "how to read
-        # this alert" links are actionable, so they never fold. Every entry is a
-        # compact clickable label, never a raw URL string (a Grafana URL can be a
-        # paragraph long once it carries variables; nobody should read that in an
-        # alert), rendered in the platform's link syntax and joined by " · " on a
-        # single line to stay compact. (The title is also a clickable dashboard
-        # link.)
-        link_parts = []
+        # Links — compact clickable labels (never raw URL strings: a Grafana URL
+        # can be a paragraph long once it carries variables), rendered in the
+        # platform's link syntax and joined by " · ". Kept high in the body so
+        # they stay above the fold and actionable at a glance. (The title is also
+        # a clickable dashboard link.)
+        link_parts: list[str] = []
         if alert_data.dashboard_url:
             link_parts.append(self._link_markup(alert_data.dashboard_url, "Dashboard"))
         for label, url in alert_data.links.items():
             link_parts.append(self._link_markup(url, label))
         if ctx["help_url"]:
             link_parts.append(self._link_markup(ctx["help_url"], ctx["help_label"]))
-        if link_parts:
-            full("Links", " · ".join(link_parts))
+        links_line = line("Links", " · ".join(link_parts)) if link_parts else ""
+
+        # The body is built as sections joined by a blank line; the verbose tail
+        # is last so the platform fold hides it first.
+        sections: list[list[str]] = []
+        if kind == "anomaly":
+            sections.append([ctx["anomaly_lead"], rule_chip])
+            sections.append(
+                [
+                    line("Value", code(ctx["value_display"])),
+                    line("Expected", code(ctx["expected_range"])),
+                    links_line,
+                ]
+            )
+            tail = [
+                line(
+                    "Quorum",
+                    f"{ctx['detector_count']}/{ctx['min_detectors']} · {ctx['direction']}",
+                ),
+                line("Severity", f"{alert_data.severity:.2f}"),
+            ]
+            if ctx["started_display"]:
+                tail.append(line("Anomaly began", ctx["started_display"]))
+                tail.append(line("Latest reading", ctx["timestamp"]))
+            else:
+                tail.append(line("Detected at", ctx["timestamp"]))
+            tail.append(line("Detectors", code(ctx["detector_name"])))
+            if ctx["detector_params"]:
+                # Fenced block on its own lines so it renders as a code block (and
+                # adds line breaks that help trip the platform's fold).
+                tail.append(f"{self._bold('Parameters')}\n```\n{ctx['detector_params']}\n```")
+            sections.append(tail)
+        elif kind == "recovery":
+            sections.append([ctx["recovery_lead"], rule_chip])
+            sections.append(
+                [
+                    line("Value", code(ctx["value_display"])),
+                    line("Expected", code(ctx["expected_range"])),
+                    links_line,
+                ]
+            )
+            # The incident timeline (onset → fired → recovered) + detectors;
+            # ``line`` drops the fired entry when unknown.
+            if ctx["started_display"]:
+                tail = [
+                    line("Anomaly began", ctx["started_display"]),
+                    line("Alert fired", ctx["fired_display"]),
+                    line("Recovered", ctx["timestamp"]),
+                ]
+            else:
+                tail = [line("Cleared at", ctx["timestamp"])]
+            tail.append(line("Detectors", code(ctx["detector_name"])))
+            sections.append(tail)
+        elif kind == "no_data":
+            sections.append(["Query returned no datapoint for the latest expected interval."])
+            sections.append(
+                [
+                    line("Expected at", ctx["timestamp"]),
+                    line("Expected", code(ctx["expected_range"])),
+                    links_line,
+                ]
+            )
+        else:  # error
+            err = f"{ctx['error_type']}: {ctx['error_message']}".strip(": ")
+            sections.append(["The detectkit pipeline failed for this metric."])
+            sections.append(
+                [
+                    line("Detected at", ctx["timestamp"]),
+                    line("Error", code(err)),
+                    links_line,
+                ]
+            )
+
+        text = "\n\n".join(
+            "\n".join(entry for entry in section if entry)
+            for section in sections
+            if any(entry for entry in section)
+        )
 
         # A plain-text one-liner for notification previews / unsupported clients.
         if kind == "no_data":
@@ -372,26 +399,15 @@ class WebhookChannel(BaseAlertChannel):
                 f"(expected {ctx['expected_range']}) at {ctx['timestamp']}"
             )
 
-        base: dict[str, Any] = {
-            "fallback": fallback,
-            "color": color,
-            "title": title,
-            "text": lead,
-            "fields": base_fields,
-            "mrkdwn_in": ["text", "fields"],
-        }
-        attachments: list[dict[str, Any]] = [base]
-        # Detail card: neutral (no color bar) so it reads as a continuation of
-        # the base rather than a second alert, with the verbose tail in one
-        # foldable ``text`` block.
-        if detail_lines:
-            attachments.append(
-                {
-                    "text": "\n".join(detail_lines),
-                    "mrkdwn_in": ["text"],
-                }
-            )
-        return attachments
+        return [
+            {
+                "fallback": fallback,
+                "color": color,
+                "title": title,
+                "text": text,
+                "mrkdwn_in": ["text"],
+            }
+        ]
 
     def _bold(self, text: str) -> str:
         """Render *text* bold in the target platform's markdown.

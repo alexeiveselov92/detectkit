@@ -1631,7 +1631,8 @@
   color: #7c766a;
 }
 
-/* Slack / Mattermost — shared fields-based webhook attachment. */
+/* Slack / Mattermost — shared single-card webhook attachment (stacked text body
+   with a foldable "Show more" tail). */
 .chat-msg {
   display: flex;
   gap: 12px;
@@ -1730,26 +1731,24 @@
   padding: 1px 5px;
   border-radius: 4px;
 }
-.att-fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 9px 16px;
+/* One stacked text body (no fields grid): essentials above the fold, the verbose
+   tail folded behind a native <details> "Show more" toggle. */
+.att-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
-.att-field.full {
-  grid-column: 1 / -1;
-}
-.att-field .fk {
-  font-size: 11px;
-  font-weight: 700;
-  color: #616061;
-  margin-bottom: 1px;
-}
-.att-field .fv {
+.att-line {
   font-size: 13px;
+  line-height: 1.5;
   color: #1d1c1d;
   word-break: break-word;
 }
-.att-field .fv code {
+.att-line .lk {
+  font-weight: 700;
+  color: #616061;
+}
+.att-line code {
   font-family: var(--mono);
   font-size: 12px;
   background: #f3f1ec;
@@ -1757,9 +1756,35 @@
   padding: 1px 5px;
   border-radius: 4px;
 }
-.att-field .fv a {
+.att-line a {
   color: #1264a3;
   text-decoration: none;
+}
+.att-more {
+  margin-top: 7px;
+}
+.att-more > summary {
+  cursor: pointer;
+  list-style: none;
+  color: #1264a3;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 0;
+  user-select: none;
+}
+.att-more > summary::-webkit-details-marker {
+  display: none;
+}
+.att-more > summary::before {
+  content: '⌄  Show more';
+}
+.att-more[open] > summary::before {
+  content: '⌃  Show less';
+}
+.att-tail {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid #ececec;
 }
 .att-footer {
   display: flex;

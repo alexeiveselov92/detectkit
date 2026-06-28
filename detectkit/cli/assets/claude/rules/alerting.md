@@ -167,7 +167,7 @@ config needed. Control it project-wide with `alert_help_url` in
 Per-channel rendering (defaults only; the resolved help URL is rendered per channel as follows):
 
 - **Slack / Mattermost / generic webhook** — a clickable `How to read this alert`
-  label in the compact `Links` field (alongside `Dashboard` + any extra links),
+  label in the compact `Links` line (alongside `Dashboard` + any extra links),
   never a raw URL. Rendered in the platform's link syntax (Slack `<url|label>`,
   Mattermost/generic markdown links) so a long dashboard URL stays hidden behind
   its label.
@@ -191,25 +191,25 @@ leads with a colored **status circle** — 🔴 anomaly, 🟢 recovery, 🟡 no-
 **project name** as a `[name] ` prefix (from `detectkit_project.yml`) — see
 [Project label](#project-label-multi-project-channels) below.
 
-- **Slack / Mattermost / generic webhook** — an anomaly/recovery renders as
-  **two stacked attachments** so long alerts fold in the channel. Both platforms
-  collapse only an attachment's `text` block behind a "Show more" toggle (Slack
-  above 700 chars / 5 line breaks; Mattermost above ~200px) and never collapse
-  the `fields` grid, so the message splits into:
-  - an always-visible **base card** — status-colored accent bar, a clickable
-    title (the metric; links to `dashboard_url` when set), a short markdown lead
-    (the duration sentence — see "Incident timing" below) with the **Rule** chip
-    beneath it, and a compact fields grid kept to **Value / Expected** plus an
-    always-visible compact **Links** field (dashboard + extra links + the "how to
-    read this alert" guide as clickable labels);
-  - a neutral, foldable **detail card** — the verbose tail as one markdown
-    `text` block: Quorum / Severity / the anomalous span (Anomaly began → Latest
-    reading; began → fired → recovered on recovery) / Detectors / Parameters.
-
-  No-data / error stay a single base card. The branded footer + footer icon ride
-  on the **last** attachment. @mentions ride in the **top-level** message text so
-  they notify. A custom `template` instead renders as a single plain text-only
-  attachment (color/title/branding kept, no fields grid, no fold split).
+- **Slack / Mattermost / generic webhook** — an alert renders as **one
+  status-colored attachment** whose whole body is a single markdown `text` block,
+  ordered **most-important-first** so a long alert folds its tail behind a
+  **"Show more"** toggle — one block, one color, just like a reference
+  AlertManager alert. The body order: the clickable title (the metric; links to
+  `dashboard_url` when set), then the markdown lead (the duration sentence — see
+  "Incident timing" below) with the **Rule** chip beneath it, **Value /
+  Expected**, the compact **Links** line (dashboard + extra links + the "how to
+  read this alert" guide as clickable labels, never raw URLs), and finally the
+  verbose tail (Quorum / Severity / the anomalous span — Anomaly began → Latest
+  reading; began → fired → recovered on recovery — / Detectors / Parameters).
+  Both clients fold **only** the `text` (Slack above 700 chars / 5 line breaks;
+  Mattermost above ~200px) and render the title, the color bar and the **footer**
+  *outside* the fold — so the branded **footer + footer icon (the logo)** stays
+  visible even when the body is collapsed. No-data / error stay short, single
+  un-folded cards; a long anomaly (or a full recovery timeline) folds its tail.
+  @mentions ride in the **top-level** message text so they notify. A custom
+  `template` renders as a single plain text-only attachment (the raw template
+  replaces the structured lead/Value/tail sections; color/title/branding kept).
 - **Telegram** — default `parse_mode` is now **HTML**. The default message is
   structured and HTML-escaped: a colored status dot (red anomaly / green
   recovery / yellow no-data / blue error), a bold headline, the lead + rule, then

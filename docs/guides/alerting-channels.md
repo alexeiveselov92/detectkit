@@ -13,29 +13,31 @@ also leads with the **project name** (`[name] `) — see
 [Project label](#project-label-multi-project-channels).
 
 - **Slack / Mattermost / generic webhook** (all webhook-based channels): an
-  anomaly/recovery renders as **two stacked attachments** so a long alert folds
-  in the channel. Slack and Mattermost natively collapse only an attachment's
-  text block behind a "Show more" toggle (Slack above 700 characters / 5 line
-  breaks, Mattermost above ~200px of height) and never collapse the fields grid,
-  so the message is split into:
-  - an always-visible **base card** — a status-colored accent bar, a clickable
-    title (the project + metric; links to `dashboard_url` when set), a short
-    markdown lead — *how long it has been going on* ("Anomalous for 2h 30m — 15
-    consecutive 10min intervals.") with the **Rule** chip right beneath it — and
-    a compact fields grid kept to the essentials: **Value / Expected**, plus a
-    compact always-visible **Links** field of clickable labels (Dashboard / any
-    extra links / "How to read this alert" — never raw URLs);
-  - a neutral, foldable **detail card** — the verbose tail as one markdown text
-    block (Quorum / Severity / Anomaly began / Latest reading — began / alert
-    fired / recovered on recovery — / Detectors / Parameters), which the chat
-    client collapses behind "Show more" once it's long.
+  alert renders as **one status-colored attachment** — a single block with a
+  single color (the left accent bar), whose long tail collapses behind a
+  **"Show more"** toggle, exactly like an AlertManager alert. The whole body is
+  one markdown text block, ordered **most-important-first** so the fold hides only
+  the verbose tail:
+  - a clickable **title** (the project + metric; links to `dashboard_url` when
+    set), then a short markdown **lead** — *how long it has been going on*
+    ("Anomalous for 2h 30m — 15 consecutive 10min intervals.") with the **Rule**
+    chip right beneath it;
+  - **Value / Expected**, then a compact **Links** line of clickable labels
+    (Dashboard / any extra links / "How to read this alert" — never raw URLs);
+  - the verbose tail — Quorum / Severity / Anomaly began / Latest reading (began
+    / alert fired / recovered on recovery) / Detectors / Parameters — which the
+    chat client folds behind "Show more" once the message is long.
 
-  No-data / error alerts are short, so they render as a single base card. The
-  branded footer (`detectkit · <project>`) and footer icon ride on the **last**
-  attachment (the bottom of the message). `@mentions` ride in the **top-level
-  message text** (not the attachment) so Slack actually notifies. A custom
-  `template` renders instead as a single plain text-only attachment (status
-  color, title and branding kept, no fields grid, no fold split).
+  Slack and Mattermost natively collapse only an attachment's text block (Slack
+  above 700 characters / 5 line breaks, Mattermost above ~200px of height) and
+  render the title, the color bar and the footer **outside** that fold — so the
+  branded footer (`detectkit · <project>`) and its **logo (footer icon)** stay
+  visible even when the body is collapsed. No-data / error alerts stay short,
+  single un-folded cards; a long anomaly (or a full recovery timeline) folds its
+  tail. `@mentions` ride in the **top-level message text** (not the attachment)
+  so Slack actually notifies. A custom `template` renders as a single plain
+  text-only attachment (the raw template replaces the structured lead/Value/tail
+  sections; status color, title and branding kept).
 - **Telegram**: a structured, HTML-escaped message (default `parse_mode` is now
   `HTML`) — a colored status dot (red anomaly / green recovery / yellow no-data /
   blue error), a bold headline (`[project] Status · metric`), the lead (how long
@@ -68,7 +70,7 @@ Two metric-level `alerting:` fields surface as first-class links on every
 channel:
 
 - `dashboard_url` — optional dashboard/runbook URL. Rendered as the clickable
-  attachment title **and** a `Dashboard` label in the webhook `Links` field, an
+  attachment title **and** a `Dashboard` label in the webhook `Links` line, an
   inline "Open dashboard" link on Telegram, and an "Open dashboard" button in
   email. On webhooks the URL is always hidden behind a clickable label (a real
   Grafana URL can be paragraph-long with all its variables), using each
@@ -77,7 +79,7 @@ channel:
   empty string when unset) and `{dashboard_line}` (`Dashboard: <url>\n` when set,
   else empty — appended to the default plain-text templates).
 - `links` — a `label: url` map of extra links shown as more clickable labels in
-  the same webhook `Links` field (and alongside the other links on Telegram/email).
+  the same webhook `Links` line (and alongside the other links on Telegram/email).
 
 ```yaml
 # In metric config
@@ -98,7 +100,7 @@ plain-language pointer for non-operators who see the alert but don't run the
 pipeline. By default it links to the official detectkit guide,
 [Reading alerts](reading-alerts.md)
 (`https://dtk.pipelab.dev/guides/reading-alerts/`). It renders per channel as a
-clickable label in the webhook `Links` field, on the Telegram links line (after
+clickable label in the webhook `Links` line, on the Telegram links line (after
 "Open dashboard"), and in the email footer.
 
 The link is controlled project-wide by the `alert_help_url` field in

@@ -357,8 +357,8 @@ class TestMattermostChannel:
         call_args = mock_post.call_args
         payload = call_args[1]["json"]
         assert "attachments" in payload
-        # Anomaly → base card + foldable detail card.
-        assert len(payload["attachments"]) == 2
+        # One colored card whose long body folds behind "Show more".
+        assert len(payload["attachments"]) == 1
         attachment = payload["attachments"][0]
         assert attachment["color"] == "#D63232"  # red for anomaly
         assert "cpu_usage" in attachment["title"]
@@ -627,40 +627,43 @@ class TestEmailBranding:
 
 
 class TestWebhookRichAttachment:
-    """The default webhook payload is a base card + a foldable detail card."""
+    """The default webhook payload is a single colored, foldable attachment."""
 
     def _payload(self, alert, template=None):
         return WebhookChannel(webhook_url="https://example.com/hooks/xxx").build_payload(
             alert, template
         )
 
-    def test_base_card_keeps_value_expected_and_links_visible(self):
+    def test_single_attachment_holds_the_whole_body(self):
         alert = _anomaly_alert()
         alert.help_url = "https://docs.example/reading-alerts"
-        base = self._payload(alert)["attachments"][0]
-        assert base["color"] == "#D63232"
-        assert "cpu_usage" in base["title"]
-        # The always-visible base keeps only the value, the band and the links;
-        # the verbose tail (quorum, severity, …) is folded into the detail card.
-        field_titles = [f["title"] for f in base["fields"]]
-        assert "Value" in field_titles
-        assert "Expected" in field_titles
-        assert "Links" in field_titles
-        assert "Quorum" not in field_titles
-        assert base["mrkdwn_in"] == ["text", "fields"]
+        attachments = self._payload(alert)["attachments"]
+        # One block, one color — no second neutral-bar card.
+        assert len(attachments) == 1
+        card = attachments[0]
+        assert card["color"] == "#D63232"
+        assert "cpu_usage" in card["title"]
+        # The whole body rides in one foldable ``text`` block (no fields grid):
+        # essentials lead, the verbose tail follows and folds behind "Show more".
+        assert "fields" not in card
+        assert card["mrkdwn_in"] == ["text"]
+        text = card["text"]
+        assert "Value" in text
+        assert "Expected" in text
+        assert "Links" in text
+        assert "Quorum" in text
+        assert "Parameters" in text
+        # Most-important-first: Rule + value/expected sit above the verbose tail.
+        assert text.index("Rule") < text.index("Value")
+        assert text.index("Value") < text.index("Quorum")
+        assert text.index("Quorum") < text.index("Parameters")
 
-    def test_detail_card_folds_the_verbose_tail(self):
-        attachments = self._payload(_anomaly_alert())["attachments"]
-        assert len(attachments) == 2
-        detail = attachments[1]
-        # Neutral continuation (no second accent bar) carrying foldable text.
-        assert "color" not in detail
-        assert detail["mrkdwn_in"] == ["text"]
-        assert "Quorum" in detail["text"]
-        assert "Parameters" in detail["text"]
-        # Branding rides on the LAST attachment so it sits at the bottom.
-        assert detail["footer"] == "detectkit"
-        assert detail["footer_icon"] == BRAND_ICON_URL
+    def test_branding_rides_the_single_attachment(self):
+        # The footer + logo ride the one attachment and, being outside the text
+        # fold, stay visible even when the body collapses.
+        card = self._payload(_anomaly_alert())["attachments"][0]
+        assert card["footer"] == "detectkit"
+        assert card["footer_icon"] == BRAND_ICON_URL
 
     def test_mentions_ride_in_top_level_text(self):
         alert = _anomaly_alert()
@@ -692,14 +695,30 @@ class TestWebhookRichAttachment:
     def test_recovery_uses_green_color(self):
         alert = _anomaly_alert()
         alert.is_recovery = True
-        assert self._payload(alert)["attachments"][0]["color"] == "#36A64F"
+        payload = self._payload(alert)
+        assert len(payload["attachments"]) == 1  # one card, like every kind
+        assert payload["attachments"][0]["color"] == "#36A64F"
 
     def test_error_uses_error_color(self):
         alert = _anomaly_alert()
         alert.is_error = True
         alert.error_type = "DBError"
         alert.error_message = "connection refused"
-        assert self._payload(alert)["attachments"][0]["color"] == "#5A7A8C"
+        payload = self._payload(alert)
+        assert len(payload["attachments"]) == 1  # one card, like every kind
+        assert payload["attachments"][0]["color"] == "#5A7A8C"
+
+    def test_no_data_renders_single_attachment(self):
+        # The short kinds collapse to one card too — guard against a per-kind
+        # regression that re-splits or duplicates the attachment.
+        alert = _anomaly_alert()
+        alert.is_no_data = True
+        alert.value = None
+        attachments = self._payload(alert)["attachments"]
+        assert len(attachments) == 1
+        assert attachments[0]["color"] == "#F0AD4E"  # amber for no-data
+        assert "no datapoint" in attachments[0]["text"]
+        assert attachments[0]["footer"] == "detectkit"  # logo/footer still rides it
 
 
 class TestTelegramHtmlRendering:
@@ -834,7 +853,7 @@ class TestProjectNameRendering:
     # ---- webhook (Slack/Mattermost) ----
     def test_webhook_title_prefixed_and_footer_paired(self):
         payload = WebhookChannel(webhook_url="https://x/hooks/y").build_payload(_proj_alert())
-        # Title leads the base card; the brand footer rides the last (detail) card.
+        # Single attachment: the title and the brand footer both ride the one card.
         assert payload["attachments"][0]["title"] == "🔴 [my_monitoring] Alert: cpu_usage"
         assert payload["attachments"][-1]["footer"] == "detectkit · my_monitoring"
 

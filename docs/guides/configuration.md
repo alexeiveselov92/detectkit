@@ -181,7 +181,7 @@ alert_help_url: https://wiki.example.com/runbooks/reading-detectkit-alerts
 **Per-channel rendering**:
 
 - **Slack / Mattermost / generic webhook** — a clickable
-  "How to read this alert" label in the compact `Links` field (alongside
+  "How to read this alert" label in the compact `Links` line (alongside
   the `Dashboard` label and any extra `links`), never a raw URL — using
   each platform's link syntax (Slack `<url|label>`, Mattermost/generic
   markdown links).

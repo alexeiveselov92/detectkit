@@ -147,11 +147,14 @@ const claudeLines = [
 const claudeHtml = claudeLines.map((l) => `<div class="ln">${l}</div>`).join('');
 
 // ---- alert preview: each channel rendered the way detectkit actually emits
-// it, for both Anomaly and Recovery. Slack/Mattermost = a fields-based webhook
-// attachment; Telegram = an escaped-HTML Bot API message; Email = a branded
-// HTML card. A dashboard_url is surfaced as a first-class action on every
-// channel (clickable title/link, inline link, button) — see the alerting
-// config snippet above the demo. The chrome mirrors each platform's own UI.
+// it, for both Anomaly and Recovery. Slack/Mattermost = one status-colored
+// webhook attachment whose whole body is a single text block ordered
+// essentials-first, so the verbose tail folds behind a "Show more" toggle (one
+// block, one color, like an AlertManager alert); Telegram = an escaped-HTML Bot
+// API message; Email = a branded HTML card. A dashboard_url is surfaced as a
+// first-class action on every channel (clickable title/link, inline link,
+// button) — see the alerting config snippet above the demo. The chrome mirrors
+// each platform's own UI.
 const dashUrl = 'https://grafana.ops/d/api-errors';
 const helpUrl = 'https://dtk.pipelab.dev/guides/reading-alerts/';
 
@@ -163,15 +166,13 @@ const logoSvg = (size: number, rx: string) =>
   `<polyline points="14,62 36,62 50,22 64,62 86,62" fill="none" stroke="#FBF9F3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>` +
   `<circle cx="50" cy="22" r="6.5" fill="#FBF9F3"/></svg>`;
 
-// Per-state content. Fields are [label, value, short, mono].
-// Links is one compact block of clickable labels — never raw URLs (a real
-// dashboard URL can be paragraph-long), matching the webhook channel rendering.
-const linkField: [string, string, boolean, boolean] = [
-  'Links',
-  `<a href="${dashUrl}">Dashboard</a> · <a href="${helpUrl}">How to read this alert</a>`,
-  false,
-  false,
-];
+// Per-state content for the webhook body. `top` (the essentials kept above the
+// fold) and `tail` (the verbose evidence that folds behind "Show more") are each
+// [label, value, mono] lines; `links` is one compact line of clickable labels —
+// never raw URLs (a real dashboard URL can be paragraph-long) — kept above the
+// fold. This mirrors the real single-attachment text body order: lead + Rule →
+// Value / Expected → Links → folded tail.
+const linksLine = `<a href="${dashUrl}">Dashboard</a> · <a href="${helpUrl}">How to read this alert</a>`;
 const ALERT = {
   anomaly: {
     title: '🔴 [payments] Alert: api_error_rate',
@@ -181,17 +182,19 @@ const ALERT = {
     // interval, the streak length and the wall-clock duration — so a reader
     // knows immediately whether the corridor was breached just now or hours ago.
     lead: 'Anomalous for 1h — 6 consecutive 10min intervals.',
-    fields: [
-      ['Value', '4.2', true, true],
-      ['Expected', '&lt;= 1.1', true, true],
-      ['Quorum', '1/1 · above', true, false],
-      ['Severity', '3.40', true, false],
-      ['Started', '2026-06-19 11:14:00 (Europe/Moscow)', true, false],
-      ['Latest', '2026-06-19 12:04:00 (Europe/Moscow)', true, false],
-      ['Detectors', 'mad', false, true],
-      ['Parameters', '{"threshold": 3.0, "window_size": 2016, "half_life": "1d"}', false, true],
-      linkField,
-    ] as [string, string, boolean, boolean][],
+    top: [
+      ['Value', '4.2', true],
+      ['Expected', '&lt;= 1.1', true],
+    ] as [string, string, boolean][],
+    links: linksLine,
+    tail: [
+      ['Quorum', '1/1 · above', false],
+      ['Severity', '3.40', false],
+      ['Anomaly began', '2026-06-19 11:14:00 (Europe/Moscow)', false],
+      ['Latest reading', '2026-06-19 12:04:00 (Europe/Moscow)', false],
+      ['Detectors', 'mad', true],
+      ['Parameters', '{"threshold": 3.0, "window_size": 2016, "half_life": "1d"}', true],
+    ] as [string, string, boolean][],
     emailStats: [
       ['Value', '4.2'],
       ['Expected', '&lt;= 1.1'],
@@ -207,14 +210,17 @@ const ALERT = {
     pill: 'RECOVERED',
     rule: 'min_detectors=1 · direction=same · consecutive=3',
     lead: 'The alert condition no longer holds — the metric is back within expected bounds. Incident lasted 1h (6 consecutive 10min intervals).',
-    fields: [
-      ['Value', '1.0', true, true],
-      ['Expected', '&lt;= 1.1', true, true],
-      ['Started', '2026-06-19 11:36:00 (Europe/Moscow)', true, false],
-      ['Cleared', '2026-06-19 12:36:00 (Europe/Moscow)', true, false],
-      ['Detectors', 'mad', false, true],
-      linkField,
-    ] as [string, string, boolean, boolean][],
+    top: [
+      ['Value', '1.0', true],
+      ['Expected', '&lt;= 1.1', true],
+    ] as [string, string, boolean][],
+    links: linksLine,
+    tail: [
+      ['Anomaly began', '2026-06-19 11:36:00 (Europe/Moscow)', false],
+      ['Alert fired', '2026-06-19 11:56:00 (Europe/Moscow)', false],
+      ['Recovered', '2026-06-19 12:36:00 (Europe/Moscow)', false],
+      ['Detectors', 'mad', true],
+    ] as [string, string, boolean][],
     emailStats: [
       ['Value', '1.0'],
       ['Expected', '&lt;= 1.1'],
@@ -236,18 +242,14 @@ const ruleLead = (sev: 'anomaly' | 'recovery') => {
   return `${d.lead}<br>${chip}`;
 };
 
-// Slack / Mattermost — one fields-based attachment (the metric name is the
-// clickable attachment title; long values span full width; mentions ride in
-// the top-level message text).
-const fieldsHtml = (fields: [string, string, boolean, boolean][]) =>
-  '<div class="att-fields">' +
-  fields
-    .map(([k, v, short, mono]) => {
-      const val = k === 'Links' ? v : mono ? `<code>${v}</code>` : v;
-      return `<div class="att-field ${short ? 'short' : 'full'}"><div class="fk">${k}</div><div class="fv">${val}</div></div>`;
-    })
-    .join('') +
-  '</div>';
+// Slack / Mattermost — one status-colored attachment (the metric name is the
+// clickable attachment title; mentions ride in the top-level message text). The
+// whole body is a single stacked text block: the essentials (Value / Expected /
+// Links) stay above the fold, and the verbose tail collapses behind a native
+// "Show more" toggle — mirroring how both clients fold only the attachment text
+// while the title, color bar and footer/logo stay in view.
+const bodyLine = ([k, v, mono]: [string, string, boolean]) =>
+  `<div class="att-line"><span class="lk">${k}</span> ${mono ? `<code>${v}</code>` : v}</div>`;
 
 const attachmentHtml = (sev: 'anomaly' | 'recovery') => {
   const d = ALERT[sev];
@@ -258,7 +260,13 @@ const attachmentHtml = (sev: 'anomaly' | 'recovery') => {
     '<div class="content">' +
     `<a class="att-title" href="${dashUrl}">${d.title}<span class="ext"> ↗</span></a>` +
     `<div class="att-lead">${ruleLead(sev)}</div>` +
-    fieldsHtml(d.fields) +
+    '<div class="att-body">' +
+    d.top.map(bodyLine).join('') +
+    `<div class="att-line"><span class="lk">Links</span> ${d.links}</div>` +
+    '</div>' +
+    '<details class="att-more"><summary aria-label="Show more"></summary>' +
+    `<div class="att-body att-tail">${d.tail.map(bodyLine).join('')}</div>` +
+    '</details>' +
     `<div class="att-footer">${logoSvg(13, '3px')}<span>detectkit · payments</span></div>` +
     '</div></div>'
   );
@@ -1031,15 +1039,16 @@ const dxExplainer = (() => {
           </div>
         </div>
         <p class="pf-note">
-          The same alert, posted by detectkit to each channel — rendered as that channel formats it: a
-          fields attachment on Slack/Mattermost, escaped HTML on Telegram, a branded card in email.
+          The same alert, posted by detectkit to each channel — rendered as that channel formats it: one
+          folding attachment on Slack/Mattermost (its verbose tail collapses behind “Show more”), escaped
+          HTML on Telegram, a branded card in email.
           Each leads with the project name (<code>[payments]</code>) so several projects can share one
           channel while keeping the brand bot identity. The <code>dashboard_url</code> below becomes a
           first-class link on every channel.
         </p>
         <div class="pf-surface">
           <div class="pf-panels">
-            <!-- Slack — fields-based webhook attachment, clickable title -->
+            <!-- Slack — single-card webhook attachment, clickable title, foldable tail -->
             <div class="pf-panel pf-slack-panel">
               <div class="sev-anomaly-only" set:html={slackPanelHtml('anomaly')}></div>
               <div class="sev-recovery-only" set:html={slackPanelHtml('recovery')}></div>

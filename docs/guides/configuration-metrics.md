@@ -394,7 +394,7 @@ list of one block. See the [Alerting Guide](alerting.md) for full details.
   - Each entry is appended as a labelled link, e.g.
     `{Runbook: 'https://...', Grafana: 'https://...'}`
   - On webhook channels (Slack/Mattermost/generic) these render as compact
-    clickable labels in one `Links` field — never raw URLs
+    clickable labels in one `Links` line — never raw URLs
 
 - **`{help_url}` / `{help_line}`** (template variables): the
   "How to read this alert" stakeholder link carried on every alert. This is

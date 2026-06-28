@@ -184,12 +184,6 @@ pick accents with `status_color(alert_data)` so status reads from color.
 2. **Update `CHANGELOG.md`** — Keep a Changelog format; it is the authoritative
    record of behavior changes.
 3. **Update `docs/`** — keep user-facing guides/reference in sync with behavior.
-   If you changed the autotune HTML labeler
-   (`detectkit/autotune/html_labeler.py`), regenerate the doc's live demo with
-   `python website/scripts/gen-labeler-example.py` (it rewrites
-   `docs/examples/autotune-labeler.html` from the real template, which the
-   autotune reference page embeds — same generated-asset pattern as
-   `website/scripts/make-bot-icon.mjs`).
 4. **Regenerate the report + tune bundles** — if you changed the HTML report's
    renderer TS (`website/src/scripts/core/canvas.ts`, `report/report.ts`, or
    anything they pull in), rebuild the committed bundle with
@@ -199,7 +193,7 @@ pick accents with `status_color(alert_data)` so status reads from color.
    `demo/` detector/chart it reuses), also rebuild
    `node website/scripts/gen-tune-bundle.mjs` so
    `detectkit/tuning/assets/tune.js` matches — same generated-asset pattern as
-   `make-bot-icon.mjs` / `gen-labeler-example.py`. The renderers share the detector
+   `make-bot-icon.mjs`. The renderers share the detector
    port with the landing playground, so run the demo parity check
    (`npm run check:demo-parity`) to confirm the TS detector port still matches the
    Python detectors.

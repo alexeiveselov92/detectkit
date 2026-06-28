@@ -108,7 +108,9 @@ The advisory names a **concrete date** (the shift's grid timestamp, recorded as
 [`max_history`](#autotune-config-block)), so the search and the runtime baseline
 see the current regime only. The probe detects **level** shifts, not pure
 variance/shape changes (a metric whose *spread* changed without moving its
-median); for those, [label the incidents](#--label-flag) so scoring is supervised.
+median); for those, label the incidents in
+[`dtk tune`](../guides/tuning.md) (Label mode) and re-run
+`dtk autotune` — it auto-discovers `incidents/<metric>/` — so scoring is supervised.
 
 Two related knobs help on a regime-shift metric even without re-scoping: the grid
 search now sweeps the recency **half-life** (a fast-forgetting baseline tracks the
@@ -157,8 +159,14 @@ dtk run --select my_metric --steps load   # optionally --from <date> for more hi
 ### `--incidents` (optional)
 
 Path to a [labels file](#labels-file-format) of known incidents → **supervised**
-tuning. Without it (and without an `autotune.labels_file` in the config), an
-**interactive** terminal first prompts whether to enter incidents inline
+tuning. It is usually unnecessary: when you've marked incidents in
+[`dtk tune`](../guides/tuning.md) (Label or Review mode, then **Save incidents**),
+they land in `incidents/<metric>/` and `dtk autotune` **auto-discovers** the newest
+set there — so a plain `dtk autotune --select <metric>` runs supervised on them with
+no flag. Pass `--incidents` only to override that (or when the labels live
+elsewhere). Without any labels — no `--incidents`, no `autotune.labels_file`, no
+inline `incidents`, and nothing in `incidents/<metric>/` — an **interactive**
+terminal first prompts whether to enter incidents inline
 (`No incident labels provided. Enter them now?`); decline — or run
 non-interactively (cron/CI/piped input, no prompt) — and tuning falls back to the
 **unsupervised** objective (a tight, well-calibrated band — see
@@ -168,89 +176,16 @@ grid points; labels entirely outside the loaded series mark nothing and the run
 proceeds unsupervised.
 
 `--incidents` (and `autotune.labels_file`) may also point at a **directory** of
-versioned labels files (e.g. `incidents/<metric>/`, what `--label` writes). When
-the terminal is interactive and the folder holds more than one set you're
-prompted to pick one (default: the newest); non-interactive runs use the newest:
+versioned labels files (e.g. `incidents/<metric>/`, what
+[`dtk tune`](../guides/tuning.md) writes on **Save incidents**) — the same store
+auto-discovery reads. When the terminal is interactive and the folder holds more
+than one set you're prompted to pick one (default: the newest); non-interactive
+runs use the newest:
 
 ```bash
 dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml
 # …or point at the folder of versions (pick interactively / newest):
 dtk autotune --select api_error_rate --incidents incidents/api_error_rate/
-```
-
-### `--label` (flag)
-
-Mark incidents **visually on the chart** instead of dictating timestamps, then
-tune on them — in one command. By default `--label` starts a small **local
-labeler server** (bound to `127.0.0.1` with a one-shot token) and opens your
-browser:
-
-```bash
-dtk autotune --select api_error_rate --label
-```
-
-Then, in the browser:
-
-1. **Navigate** a long/dense series: scroll to zoom where you point, double-click
-   to reset, and drag the **navigator strip** below the chart to move the view
-   (window = pan, edges = stretch/squeeze) — so narrow incidents are markable even
-   on a long span with a small step. Adaptive **time gridlines** label both the
-   chart and the strip, and your marked incidents show as **red ticks on the
-   navigator** too, so you can spot and jump to them at a glance.
-2. **Mark**: click-drag across the chart to mark each incident (red band + a row
-   below with an optional **description**, exported as `label:`). **Adjust** an
-   existing incident by dragging its **edges**, or its **middle** to move it.
-   **Remove** one by clicking its **✕** on the chart, or selecting it and pressing
-   **Delete** — no need to hunt for its row; **focus** on a row jumps the chart to
-   that incident; *Clear all* resets. Optionally **name the set**.
-3. **Threshold capture** (for many obvious outliers): toggle it, set a horizontal
-   line (hover the chart, or type an exact **line value**), choose **above / below**,
-   optionally **bridge gaps ≤ N intervals**, and **Add N spans** marks every
-   qualifying span at once — then tidy any stragglers with the ✕. It captures
-   within the **current view** by default; **drag across the chart** to limit it to
-   a narrower **time window** (the rest dims out) — handy when the metric's normal
-   level differs across periods, so you can use a different boundary per period.
-   **↺ whole view** clears the window. The painted window is **saved with the set**
-   (a `capture_windows:` block in the file) and **restored when you reopen it**, so
-   the regime scope you reasoned about is recorded and survives between sessions.
-4. **Lasso capture** (for an irregular cloud of outliers): toggle it and **draw a
-   freeform loop** around the points you want — every point inside is grabbed, and
-   each **grid-adjacent run** (small gaps bridged) becomes one **incident span**
-   (a lone point becomes a full-interval incident), so you can pick out a messy
-   cluster without touching the points beside it. **Esc** abandons a loop.
-5. Click **Save & tune**. The server writes a **versioned** file
-   `incidents/<metric>/<metric>[-<set>]-<UTC>.yml` (named after the metric, with the
-   optional set name folded in as a suffix; re-labeling adds a new file — nothing is
-   overwritten, so the full history is kept) and the command **continues straight
-   into the tuning run** on it. Nothing is exposed off your machine, and nothing
-   is written until you save.
-
-**Editing an existing set.** `--label` **seeds the page from the metric's newest
-saved set** (or from `--incidents <file-or-dir>`, the config `autotune.labels_file`,
-or inline `autotune.incidents` — the same precedence as a normal run), so you can
-keep filling incidents in over time — open, mark a few more, **Save & tune** writes
-the next version. The static page also has an **Import file…** button to load any
-labels file you pick back in.
-
-Variants: `--no-serve` writes a static `metrics/<metric>__labeler.html` you open
-and whose **Export** downloads the file (then move it into `incidents/<metric>/`
-and re-run `--incidents`); `--no-open` prints the local URL instead of launching a
-browser.
-
-The labeler looks like this (a live copy of the real output — scroll, drag the
-navigator, mark a span, drag an incident's edges):
-
-<iframe src="/examples/autotune-labeler.html" title="Interactive incident labeler — live example" style="width:100%;height:560px;border:1px solid var(--sl-color-gray-5);border-radius:8px;background:#211e1a"></iframe>
-
-> Open it directly: [examples/autotune-labeler.html](../examples/autotune-labeler.html).
-
-Each exported incident uses the canonical schema (with the optional description), e.g.:
-
-```yaml
-metric: api_error_rate
-timezone: UTC
-incidents:
-  - {start: "2026-05-07 06:00:00", end: "2026-05-07 13:00:00", label: "checkout 5xx spike"}
 ```
 
 ### `--scoring` (optional, default: `mcc`)
@@ -406,8 +341,9 @@ autotune:
 | `max_history` | int | Cap on the number of training points used |
 
 **Label resolution precedence** (highest first): the `--incidents` flag → the
-config's `labels_file` → the config's inline `incidents` → an interactive prompt
-(only on a TTY) → none (unsupervised).
+config's `labels_file` → the config's inline `incidents` → **auto-discovered**
+`incidents/<metric>/` (the newest set [`dtk tune`](../guides/tuning.md) saved
+there) → an interactive prompt (only on a TTY) → none (unsupervised).
 
 A worked block is in
 [autotuned-metric-example.yml](../examples/autotuned-metric-example.yml).

@@ -64,28 +64,24 @@ ratios to choose.
 ## Command
 
 ```bash
-dtk autotune --select <sel> [--incidents FILE] [--label] [--scoring METRIC] \
+dtk autotune --select <sel> [--incidents FILE] [--scoring METRIC] \
              [--from DATE] [--to DATE] [--profile NAME] [--force] [--dry-run] [--report]
 ```
 
 - `--incidents FILE|DIR` — a labels file (below) → **supervised** tuning. May be a
   **directory** (e.g. `incidents/<name>/`): interactive runs prompt to pick a
-  version (default newest), non-interactive use the newest. With nothing given, an
+  version (default newest), non-interactive use the newest. **Omit it and `dtk
+  autotune` auto-discovers the newest labels in `incidents/<metric>/`** (the store
+  `dtk tune`'s **Save incidents** writes) — so after labeling in `dtk tune` you run
+  `dtk autotune --select <metric>` with no flag. With no labels anywhere, an
   interactive terminal prompts to enter incidents inline; declining (or running
   non-interactively) tunes **unsupervised**.
-- `--label` — open the interactive labeler (zoom/pan, edit incident edges,
-  per-incident descriptions, named sets). **Default:** a local 127.0.0.1 server +
-  browser; **Save & tune** writes `incidents/<metric>/<metric>[-<set>]-<UTC>.yml`
-  (named after the metric, optional set name as a suffix) and the run
-  **continues into tuning on it**. It **seeds from the metric's newest saved set**
-  (or from `--incidents FILE|DIR` when given), so re-running `--label` continues
-  editing in place. Beyond click-drag marking it offers **Threshold capture**
-  (grab every span above/below a horizontal line in one gesture), **Lasso capture**
-  (loop around a cloud of points; each grid-adjacent run, gaps bridged, becomes one
-  incident span), **on-chart delete** (each band's ✕, or select + Delete key), and
-  **Import file…** (load a labels file you pick). `--no-serve` writes a static
-  `metrics/<name>__labeler.html` (Export downloads the file) and exits; `--no-open`
-  prints the URL instead of launching a browser.
+- **To label incidents**, use `dtk tune --select <metric>`: switch to **Label**
+  mode (drag spans, **Threshold capture** every span past a horizontal line,
+  **Lasso** the anomaly cloud) or **Review** mode (confirm fired alerts as
+  incidents), then **Save incidents**. That writes versioned files into
+  `incidents/<metric>/` — the **same store this command reads** — so the labels feed
+  the next supervised tune with no `--incidents` flag (see `cli.md`).
 - `--scoring` — `mcc` (default), `f1`, `f_beta`, `balanced_accuracy`, `roc_auc`,
   `pr_auc`. MCC uses the whole confusion matrix and suits rare anomalies.
 - `--dry-run` — run the search but persist nothing and write no config.
@@ -115,45 +111,35 @@ incidents:
   - {at: "2026-05-11 09:05:00"}                                  # point
 ```
 
-### Getting labels — offer the interactive labeler first
+### Getting labels — label in `dtk tune` first
 
-When labels would help, **offer the interactive HTML labeler before asking the
+When labels would help, **offer to mark incidents in `dtk tune` before asking the
 user to recall timestamps** — it is the easiest, most reliable path:
 
-1. Run `dtk autotune --select <name> --label`. It starts a local labeler server
-   and opens the browser (use `--no-open` on a remote box and share the printed
-   127.0.0.1 URL; the user port-forwards or runs it locally).
-2. The user marks incidents on the chart (scroll to zoom, drag the navigator to
-   move, click-drag to mark, drag an incident's edges to adjust, add a
-   description, optionally name the set), then clicks **Save & tune**. For many
-   clear outliers, **Threshold capture** grabs every span past a horizontal line
-   at once (above/below, with an optional gap-bridge); it captures within the
-   current view by default, and dragging across the chart limits it to a time
-   window (different boundary per period) — the painted window is **saved with the
-   set and restored on reopen** (a `capture_windows:` block; metadata only). For an
-   irregular cloud, **Lasso capture** loops around the points freehand and turns
-   each grid-adjacent run (small gaps bridged) into one incident span. Each
-   band's ✕ (or select + Delete)
-   removes one, and **focus** on a list row jumps the chart to it.
-3. That writes `incidents/<metric>/<metric>[-<set>]-<UTC>.yml` automatically
-   (named after the metric, optional set name as a suffix; versioned —
-   re-labeling never overwrites) and the **same command continues into the tuning
-   run** on it. No manual file moving.
-4. **Editing over time:** re-running `--label` seeds the page from the metric's
-   newest saved set, so labeling can grow across sessions. To re-tune later on
-   saved sets, point `--incidents` at the folder (`incidents/<name>/`) —
-   interactive runs let the user pick a version, and `--label --incidents <file>`
-   opens that exact set for editing. The static `--no-serve` path still exists
-   (Export downloads a file you move into `incidents/<name>/`; its **Import
-   file…** button loads one back in).
+1. Run `dtk tune --select <name>`. It opens a localhost browser view of the real
+   series (use `--no-open` on a remote box and share the printed 127.0.0.1 URL).
+2. Mark the real incidents one of two ways:
+   - **Label** mode — drag a span over each incident, or **Threshold capture**
+     every span past a horizontal line in one gesture, or **Lasso anomalies** to
+     loop a cloud of anomaly dots into per-streak incident spans.
+   - **Review** mode — the fired alerts lead; click each alert marker to confirm it
+     **valid** (which marks it as a ground-truth incident) or **false alarm**.
+     **Confirm all unreviewed valid** does the lot — a clean metric whose alerts
+     are all good is validated in a few clicks without hand-drawing spans.
+3. Click **Save incidents**. It writes a versioned
+   `incidents/<metric>/<…>.yml` automatically.
+4. Run `dtk autotune --select <name>` with **no `--incidents` flag** — it
+   auto-discovers the newest file in `incidents/<metric>/` and tunes supervised on
+   it. (You can still pass `--incidents <file-or-dir>` to pick a specific set.)
 
 Prefer this whenever the user can *recognise* incidents on a chart but doesn't
 have exact times. If they already know the times (or you found them via a DB
 MCP), write the labels file / inline `incidents:` directly instead. If there are
 no known incidents, run unsupervised — the baseline below is good on its own.
 
-With no labels (no `--incidents`, no config `labels_file`, no interactive
-entry), tuning falls back to an **unsupervised** objective that blends three
+With no labels (no `--incidents`, no config `labels_file`, none auto-discovered
+in `incidents/<metric>/`, no interactive entry), tuning falls back to an
+**unsupervised** objective that blends three
 band-fit / flag-budget terms — `0.4·budget + 0.3·sharpness + 0.3·separation`: a
 smooth one-sided flag-rate budget (no hard cliff), sharpness (a tight,
 well-calibrated confidence interval), and separation (flagged points sitting
@@ -192,8 +178,10 @@ differs from `seasonality_candidates`, which only narrows the *set of columns*
 the search may consider but still runs the search and may choose none.
 
 Label precedence (highest first): `--incidents` flag → `labels_file` → inline
-`incidents` → interactive prompt → none. `labels_file` and `incidents` are
-mutually exclusive. `--scoring` likewise overrides `scoring_metric`.
+`incidents` → auto-discovered `incidents/<metric>/` (the newest file, e.g. from
+`dtk tune`'s **Save incidents**) → interactive prompt → none (unsupervised).
+`labels_file` and `incidents` are mutually exclusive. `--scoring` likewise
+overrides `scoring_metric`.
 
 ## The annotated config
 

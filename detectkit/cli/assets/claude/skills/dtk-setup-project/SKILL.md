@@ -45,7 +45,8 @@ side by side, ask which one to set up.
 > a database MCP): you can inspect metric series, find incidents to label for
 > `dtk autotune`, sanity-check queries, and confirm detections yourself. Suggest
 > the user connect one if they haven't; if they can't, you can still do
-> everything by asking them to run queries and by using `dtk autotune --label`.
+> everything by asking them to run queries and by marking incidents visually in
+> `dtk tune` (Label/Review modes), which `dtk autotune` auto-discovers.
 
 ## Step 1 — Pick the database backend
 

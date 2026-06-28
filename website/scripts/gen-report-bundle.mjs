@@ -11,7 +11,7 @@
  *   node scripts/gen-report-bundle.mjs        (or: npm run build:report-bundle)
  *
  * No new dependencies: esbuild ships transitively with astro/vite. Same
- * generated-asset pattern as make-bot-icon.mjs / gen-labeler-example.py.
+ * generated-asset pattern as make-bot-icon.mjs / gen-tune-bundle.mjs.
  */
 import { promises as fs } from 'node:fs';
 import path from 'node:path';

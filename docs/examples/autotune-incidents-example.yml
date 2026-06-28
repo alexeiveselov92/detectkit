@@ -19,10 +19,10 @@
 # - `label` is optional free text and is only documentation.
 #
 # Tip: can't enumerate incidents from memory? Run
-#   dtk autotune --select api_error_rate --label
-# It writes a clickable HTML chart to metrics/api_error_rate__labeler.html; open
-# it in a browser, mark incidents visually, and its Export button downloads a
-# labels file in exactly this shape.
+#   dtk tune --select api_error_rate
+# and use Label mode to mark incidents visually in a browser; Save incidents writes
+# a versioned file (in exactly this shape) into incidents/api_error_rate/, which
+# `dtk autotune` auto-discovers — no --incidents flag needed.
 
 # Optional: the metric these labels belong to. If present, it MUST match the
 # `name:` of the metric you tune — autotune refuses a mismatch.

@@ -615,9 +615,15 @@ dtk run --select api_error_rate --steps load --from "2026-01-01"
 
 ##### `--incidents` (optional)
 
-Path to a labels file of known incidents → **supervised** tuning. Without it
-(and without an `autotune.labels_file` in the metric config), an interactive
-terminal first prompts to enter incidents inline; declining — or running
+Path to a labels file **or** the `incidents/<metric>/` directory of known
+incidents → **supervised** tuning. You don't usually need it: `dtk autotune`
+**auto-discovers** the newest labels in `incidents/<metric>/`, so after marking
+incidents in [`dtk tune`](#dtk-tune) (Label / Review mode → **Save incidents**)
+you just run `dtk autotune --select <metric>`. Resolution precedence is:
+`--incidents` flag > config `labels_file` > inline config `incidents` >
+auto-discovered `incidents/<metric>/` > interactive prompt > none
+(unsupervised). When none of those resolve and the terminal is interactive, a
+prompt first offers to enter incidents inline; declining — or running
 non-interactively (cron/CI/piped input) — falls back to an **unsupervised**
 objective (low false-positive rate + stable cross-fold separation). Supervised
 mode engages only if labeled timestamps land on **loaded** grid points. The file
@@ -634,25 +640,6 @@ incidents:
 
 ```bash
 dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml
-```
-
-##### `--label` (flag)
-
-Open the interactive labeler to mark incidents visually, then tune on them in the
-same command. By default it starts a local `127.0.0.1` browser labeler; **Save &
-tune** writes a versioned file into `incidents/<metric>/` and the run continues
-into tuning. Mark incidents by click-drag, use **Threshold capture** to grab
-every span above/below a horizontal line at once, or **Lasso capture** to loop
-around a cloud of outliers (each grid-adjacent run, gaps bridged, becomes one
-incident span); remove one with its chart-side **✕** or the Delete key. It **seeds from the metric's newest saved set** (or
-`--incidents <file-or-dir>`), so re-running `--label` keeps editing in place.
-`--no-serve` instead writes a static `metrics/<metric>__labeler.html` (Export
-downloads a labels file; **Import file…** loads one back); `--no-open` prints the
-URL instead of launching a browser. See the
-[`--label` reference](autotune.md#--label-flag) for the full walkthrough.
-
-```bash
-dtk autotune --select api_error_rate --label
 ```
 
 ##### `--scoring` (default: `mcc`)

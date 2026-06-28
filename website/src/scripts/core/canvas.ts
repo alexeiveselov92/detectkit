@@ -2,12 +2,11 @@
 // (src/scripts/demo/chart.ts) and the library report renderer
 // (src/scripts/report/report.ts).
 //
-// These are extracted verbatim (behaviour-identical) from the demo chart logic,
-// which was itself ported from detectkit/autotune/html_labeler.py: a brand-token
-// reader, hex → rgb(a) parsing, DPR-aware canvas fitting, a scales factory
-// (px/py over a domain + margins), a min/max-decimated series line (NaN breaks
-// the pen), a translucent confidence band over contiguous scored runs, anomaly
-// dots, gridlines + axis ticks, and value/timestamp formatters.
+// These are extracted verbatim (behaviour-identical) from the demo chart logic:
+// a brand-token reader, hex → rgb(a) parsing, DPR-aware canvas fitting, a scales
+// factory (px/py over a domain + margins), a min/max-decimated series line (NaN
+// breaks the pen), a translucent confidence band over contiguous scored runs,
+// anomaly dots, gridlines + axis ticks, and value/timestamp formatters.
 //
 // Nothing here is detectkit-specific or report-specific; both renderers compose
 // these into their own frames.
@@ -64,9 +63,9 @@ export function rgba(hex: string, a: number): string {
 // ----------------------------------------------------------------------------
 
 /**
- * DPR-aware backing-store fit (ported from html_labeler.fit). Sizes the canvas'
- * pixel buffer to its CSS box × devicePixelRatio. Returns the dpr used so the
- * caller can scale line widths / fonts.
+ * DPR-aware backing-store fit. Sizes the canvas' pixel buffer to its CSS box ×
+ * devicePixelRatio. Returns the dpr used so the caller can scale line widths /
+ * fonts.
  */
 export function fit(canvas: HTMLCanvasElement): number {
   const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -107,8 +106,8 @@ export interface Scales {
 
 /**
  * Build the px/py mapping for a domain + margins on a canvas at a given dpr.
- * Identical math to the demo chart and html_labeler: device-px space, origin
- * top-left, y inverted.
+ * Identical math to the demo chart: device-px space, origin top-left, y
+ * inverted.
  */
 export function makeScales(
   canvas: HTMLCanvasElement,
@@ -138,8 +137,8 @@ const isFiniteNum = Number.isFinite;
  * Draw a value series as a min/max-decimated envelope (one column per device
  * pixel) so a 100k-point series stays fast and spikes stay visible. When few
  * points are visible (zoomed in) it falls back to a direct polyline. A
- * non-finite value (NaN gap) breaks the pen, exactly like the demo chart and
- * html_labeler.drawSeries.
+ * non-finite value (NaN gap) breaks the pen, exactly like the demo chart's
+ * series renderer.
  *
  * `lo`/`hi` bound the time range that should be drawn (the current view); points
  * outside it are skipped. `left`/`width` are device-px geometry of the plot rect.

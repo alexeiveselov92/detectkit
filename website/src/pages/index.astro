@@ -972,15 +972,16 @@ const dxExplainer = (() => {
 
     <!-- ===== visual labeling teaser ===== -->
     <section class="wrap section">
-      <div class="eyebrow">autotune · labeling</div>
+      <div class="eyebrow">dtk tune · labeling</div>
       <h2>Teach it your incidents — point, drag, done.</h2>
       <p class="sub">
         Autotune already tunes well with <strong>zero labels</strong>. To optimise against your
-        <em>real</em> incidents, run <code>dtk autotune --select &lt;metric&gt; --label</code> — it opens
-        a chart where you drag across each incident, add a note, and <strong>Export</strong> one
-        self-contained file: offline, nothing leaves your browser, every round versioned.
+        <em>real</em> incidents, run <code>dtk tune --select &lt;metric&gt;</code> and switch to
+        <strong>Label</strong> mode — drag across each incident (or lasso the anomaly cloud), then
+        <strong>Save incidents</strong>: offline, nothing leaves your browser, every round versioned
+        into <code>incidents/&lt;metric&gt;/</code>, which <code>dtk autotune</code> picks up automatically.
       </p>
-      <a class="pg-teaser pg-teaser-labeler" href="/reference/autotune/">
+      <a class="pg-teaser pg-teaser-labeler" href="/guides/tuning/">
         <div class="pg-teaser-chart">
           <svg class="pg-teaser-svg" viewBox="0 0 520 200" aria-hidden="true">
             <line class="hc-grid" x1="20" y1="60" x2="500" y2="60" />
@@ -994,8 +995,8 @@ const dxExplainer = (() => {
           </svg>
         </div>
         <div class="pg-teaser-cta">
-          <span class="pg-teaser-go">Open the labeler demo →</span>
-          <span class="pg-teaser-sub">drag to label · scroll to zoom · export &amp; re-tune</span>
+          <span class="pg-teaser-go">See dtk tune →</span>
+          <span class="pg-teaser-sub">drag to label · scroll to zoom · save &amp; auto-tune</span>
         </div>
       </a>
     </section>

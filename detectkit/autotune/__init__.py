@@ -15,7 +15,6 @@ from detectkit.autotune._base import AutoTuneError, _AutoTuneBase
 from detectkit.autotune._types import ScoringMetric, TuneMode
 from detectkit.autotune.autotuner import AutoTuner, run_autotune_engine
 from detectkit.autotune.config_emitter import compute_run_id, emit_tuned_config
-from detectkit.autotune.html_labeler import render_labeler_html
 from detectkit.autotune.labels import (
     GroundTruth,
     IncidentLabels,
@@ -39,6 +38,5 @@ __all__ = [
     "emit_tuned_config",
     "parse_incident_labels",
     "parse_labels_file",
-    "render_labeler_html",
     "run_autotune_engine",
 ]

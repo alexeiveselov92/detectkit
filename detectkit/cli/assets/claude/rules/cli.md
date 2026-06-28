@@ -67,8 +67,11 @@ Automatically chooses a metric's seasonality, detector type, hyperparameters and
 history window, then writes an annotated `metrics/<name>__tuned_<id>.yml`. Reads
 the metric's loaded datapoints (run `dtk run --steps load` first if empty), never
 edits the original, never alerts. `--incidents FILE` enables supervised tuning
-against labeled incidents; without it, an unsupervised objective is used.
-`--dry-run` searches without writing. `--report [PATH]` writes the same
+against labeled incidents; omit it and autotune **auto-discovers** the newest
+labels in `incidents/<metric>/` (the store `dtk tune`'s **Save incidents** writes
+— label there in Label/Review mode, then just run `dtk autotune`); with no labels
+anywhere, an unsupervised objective is used. `--dry-run` searches without writing.
+`--report [PATH]` writes the same
 self-contained HTML report as `dtk run` for the tuned winner (default
 `reports/<metric>__tuned_<id>.html`; `<dir>` or a `.html` file also accepted).
 Full reference: `autotune.md`.

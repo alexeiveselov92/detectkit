@@ -6,7 +6,9 @@ command handles loading, persistence, config emission and candidate cleanup.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import contextlib
+import logging
+from collections.abc import Callable, Iterator
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -26,6 +28,31 @@ from detectkit.autotune.window_select import window_grid
 from detectkit.detectors.factory import DetectorFactory
 
 _ALERT_WINDOW_GRID = (1, 2, 3, 4, 5)
+
+# The windowed detectors emit a one-time "seasonality group can't fill this
+# window → falls back to global" warning per *instance*. A tune builds dozens of
+# throwaway candidate detectors, so that warning would flood the terminal and
+# bury the structured decision log. The engine already surfaces an under-fill of
+# the *chosen* seasonality as a `window` advisory in its own log, so the raw
+# per-candidate warnings are pure noise here.
+_WINDOWED_LOGGER = "detectkit.detectors.statistical._windowed"
+
+
+@contextlib.contextmanager
+def _quiet_per_candidate_warnings() -> Iterator[None]:
+    """Silence the windowed detectors' per-instance under-fill warning for a tune.
+
+    Scoped + restored, so a real ``dtk run`` (which builds one detector and *does*
+    want the warning) is unaffected — only the candidate sweep inside the engine
+    is quieted.
+    """
+    logger = logging.getLogger(_WINDOWED_LOGGER)
+    prev_level = logger.level
+    logger.setLevel(logging.ERROR)
+    try:
+        yield
+    finally:
+        logger.setLevel(prev_level)
 
 
 def _ts_to_dt(ts64: np.datetime64) -> datetime:
@@ -196,4 +223,5 @@ def run_autotune_engine(
         settings=settings,
         on_stage=on_stage,
     )
-    return tuner.tune()
+    with _quiet_per_candidate_warnings():
+        return tuner.tune()

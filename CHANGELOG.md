@@ -5,6 +5,38 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.44.0] - 2026-06-28
+
+### Changed
+- **`dtk tune` Autotune mode tunes on the window you're looking at, not the full
+  history.** When you click **Run autotune** in the cockpit, the page now posts the
+  window currently shown — the **Points shown** trim — and the server runs the engine
+  over **exactly that slice**. Previously it reloaded the metric's full history, so
+  the search optimized a different series than the one the cockpit displays and scores
+  recall/FDR on — illogical when you've deliberately trimmed to a recent period. Trim
+  **Points shown** to focus the search; what you see is now what's optimized. (An
+  older page that posts no window still falls back to full history.)
+
+### Added
+- **The cockpit's Autotune mode streams a structured run-log to the terminal.** A
+  user watching the terminal beside `dtk tune` now sees each **Run autotune** click as
+  a clean, blocked log — a cyan banner (metric · window · ground truth · scoring) then
+  the engine's `LABELS → SEASONALITY → DETECTOR SELECT → GRID SEARCH → WINDOW →
+  RESULT` blocks — using the **same** renderer (`StageLogRenderer`, now shared in
+  `cli/_output.py`) the `dtk autotune` command uses, so it matches `dtk run`'s
+  load/detect/alert format. Previously the server-side run streamed nothing
+  structured; the terminal showed only a wall of repeated detector warnings.
+
+### Fixed
+- **No more per-candidate warning flood during tuning.** The grid search builds dozens
+  of throwaway candidate detectors, each of which emitted the windowed detectors'
+  one-time "seasonality group can't fill this window → falls back to global" warning —
+  flooding the terminal (in both `dtk autotune` and the cockpit's Autotune mode) and
+  burying the decision log. The engine now quiets that per-candidate warning for the
+  duration of a tune; the under-fill of the **chosen** seasonality is still surfaced
+  as a structured `window` advisory in the decision log, and a real `dtk run` (which
+  builds one detector and wants the warning) is unaffected.
+
 ## [0.43.0] - 2026-06-28
 
 ### Added

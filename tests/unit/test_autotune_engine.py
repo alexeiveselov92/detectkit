@@ -246,3 +246,34 @@ def test_run_id_is_deterministic():
         settings=TuneSettings(),
     )
     assert compute_run_id(r1) == compute_run_id(r2)
+
+
+def test_engine_suppresses_per_candidate_underfill_warnings(caplog):
+    """The grid sweep builds many small-window seasonal candidates; each would
+    emit the windowed detector's per-instance "seasonality falls back to global"
+    warning, flooding the terminal and burying the structured decision log. The
+    engine quiets that flood (the under-fill of the *chosen* seasonality is
+    surfaced as a structured `window` advisory instead). Forcing the grouping
+    guarantees seasonal candidates are built, so the test is non-vacuous."""
+    from detectkit.detectors.statistical.mad import MADDetector
+
+    data, ts = _seasonal_series()
+    gt = IncidentLabels([], []).to_ground_truth(ts, 3600)
+
+    with caplog.at_level("WARNING"):
+        run_autotune_engine(
+            metric_name="demo",
+            data=data,
+            ground_truth=gt,
+            interval_seconds=3600,
+            settings=TuneSettings(force_seasonality=[["hour"]]),
+        )
+    flood = [r for r in caplog.records if "falls back to global" in r.getMessage()]
+    assert flood == [], "the per-candidate under-fill warning flood must be suppressed"
+
+    # Scoped, not a permanent disable: a direct detect() with a too-small window
+    # for the grouping still warns — exactly what `dtk run` relies on.
+    caplog.clear()
+    with caplog.at_level("WARNING"):
+        MADDetector(window_size=100, seasonality_components=["hour"]).detect(data)
+    assert any("falls back to global" in r.getMessage() for r in caplog.records)

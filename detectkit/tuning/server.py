@@ -28,6 +28,7 @@ import secrets
 import threading
 import webbrowser
 from collections.abc import Callable, Iterator
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -81,6 +82,11 @@ class _TuneServer(ThreadingHTTPServer):
         self.original_path: Path = Path(".")
         self.project_root: Path = Path(".")
         self.applied: AppliedConfig | None = None
+        # Where the server-side Autotune mode streams its run-log (the LABELS →
+        # SEASONALITY → … → RESULT blocks). Defaults to plain ``print`` so a bare
+        # server still works; ``serve_tuner`` swaps in the command's ``click.echo``
+        # so the terminal log matches the rest of the CLI's house style.
+        self.echo: Callable[[str], None] = print
         # Labeler write-back state (the synced incident labeler in the page).
         self.metric: str = ""
         self.incidents_dir: Path = Path(".")
@@ -212,6 +218,9 @@ class _Handler(BaseHTTPRequestHandler):
             with srv.autotune_lock:
                 result = _run_autotune(srv, body)
         except Exception as exc:  # noqa: BLE001 — surface as a 400, keep serving
+            import click
+
+            srv.echo(click.style(f"  ✗ Autotune failed: {exc}", fg="red"))
             self._reply_error(400, f"autotune failed: {exc}")
             return
         self._reply_json(result)
@@ -242,13 +251,22 @@ def _run_autotune(srv: _TuneServer, body: bytes) -> dict[str, Any]:
     detector seed the controls were first seeded from (``seed_detector_params``),
     plus a decision log / score summary for the panel. Raises on any problem; the
     handler turns that into a 400 and keeps serving.
+
+    Side effect: streams a structured run-log to ``srv.echo`` — a cyan banner,
+    then the engine's ``LABELS → SEASONALITY → DETECTOR SELECT → GRID SEARCH →
+    WINDOW`` blocks (the **same** ``StageLogRenderer`` the ``dtk autotune`` command
+    uses), then a ``RESULT`` block — so a user watching the terminal beside the
+    cockpit sees what each Run-autotune click is computing, in the same blocked
+    format as ``dtk run``'s load/detect/alert log.
     """
     import yaml as _yaml
 
     from detectkit.autotune.runner import autotune_from_data
+    from detectkit.cli._output import AUTOTUNE_STAGE_TITLES, StageLogRenderer
     from detectkit.config.metric_config import AutoTuneConfig
     from detectkit.tuning.payload import seed_detector_params
 
+    echo = srv.echo
     config = srv.metric_config
     internal = srv.internal_manager
     if config is None or internal is None:
@@ -264,11 +282,29 @@ def _run_autotune(srv: _TuneServer, body: bytes) -> dict[str, Any]:
         raw, interval_seconds=srv.interval_seconds, metric_name=srv.metric
     )
 
-    data = internal.load_datapoints(srv.metric)
-    if len(data["timestamp"]) == 0:
+    # Tune on exactly the window the cockpit is showing (the 'Points shown' trim),
+    # not the full history — otherwise the search optimizes a different series than
+    # the one the user sees and scores recall/FDR on. The page posts its current
+    # window; an absent window (older page / static) falls back to full history.
+    from_dt, to_dt, window_desc = _autotune_window(request.get("window"), srv.interval_seconds)
+    data = internal.load_datapoints(srv.metric, from_timestamp=from_dt, to_timestamp=to_dt)
+    n_all = int(len(data["timestamp"]))
+    if n_all == 0:
         raise RuntimeError(
-            f"no datapoints for {srv.metric} — run `dtk run --select {srv.metric} --steps load` first"
+            f"no datapoints for {srv.metric} in {window_desc} — "
+            f"run `dtk run --select {srv.metric} --steps load` first, or widen the window"
         )
+
+    _echo_autotune_banner(
+        echo=echo,
+        metric=srv.metric,
+        n_points=n_all,
+        interval_seconds=srv.interval_seconds,
+        labels=labels,
+        scoring=scoring,
+        autotune_cfg=autotune_cfg,
+        window_desc=window_desc,
+    )
 
     result = autotune_from_data(
         metric_name=srv.metric,
@@ -277,9 +313,11 @@ def _run_autotune(srv: _TuneServer, body: bytes) -> dict[str, Any]:
         interval_seconds=srv.interval_seconds,
         autotune_cfg=autotune_cfg,
         scoring_override=scoring,
+        on_stage=StageLogRenderer(titles=AUTOTUNE_STAGE_TITLES, echo=echo),
     )
 
     params = result.chosen_detector_params
+    _echo_autotune_result(echo=echo, result=result)
     return {
         "detector": seed_detector_params(result.chosen_detector_type, params),
         "consecutive_anomalies": result.consecutive_anomalies,
@@ -297,6 +335,90 @@ def _run_autotune(srv: _TuneServer, body: bytes) -> dict[str, Any]:
             f"(threshold={params.get('threshold')}, window_size={params.get('window_size')})"
         ),
     }
+
+
+def _autotune_window(
+    window: Any, interval_seconds: int
+) -> tuple[datetime | None, datetime | None, str]:
+    """Map the cockpit's current ``{start, end}`` ms window to load bounds.
+
+    The page posts the **shown** window (after the 'Points shown' trim) so the
+    engine tunes on exactly what the user sees. Returns ``(from_dt, to_dt,
+    label)``; an absent or malformed window falls back to ``(None, None, "the
+    full history")``. ``load_datapoints`` is half-open ``[from, to)``, so the
+    upper bound is pushed one interval past the last shown point to keep it
+    inclusive (mirroring ``build_tune_payload``).
+    """
+    if not isinstance(window, dict):
+        return None, None, "the full history"
+    try:
+        start_ms = int(window["start"])
+        end_ms = int(window["end"])
+    except (KeyError, TypeError, ValueError):
+        return None, None, "the full history"
+    if end_ms < start_ms:
+        return None, None, "the full history"
+    epoch = datetime(1970, 1, 1)
+    from_dt = epoch + timedelta(milliseconds=start_ms)
+    to_dt = epoch + timedelta(milliseconds=end_ms) + timedelta(seconds=interval_seconds)
+    return from_dt, to_dt, "the selected window"
+
+
+def _echo_autotune_banner(
+    *,
+    echo: Callable[[str], None],
+    metric: str,
+    n_points: int,
+    interval_seconds: int,
+    labels: Any,
+    scoring: str | None,
+    autotune_cfg: Any,
+    window_desc: str = "the full history",
+) -> None:
+    """Announce a server-side autotune run with the same cyan header the CLI prints.
+
+    Mirrors the ``dtk autotune`` command's ``Tuning metric: …`` preamble so the
+    cockpit's terminal log opens the same way: which metric, how much of which
+    window, the ground truth (supervised vs unsupervised) and the scoring metric.
+    """
+    import click
+
+    n_gt = len(labels.intervals) + len(labels.points)
+    gt_desc = (
+        f"{n_gt} marked incident(s) as ground truth (supervised)"
+        if n_gt
+        else "no marked incidents → unsupervised"
+    )
+    echo("")
+    echo(click.style(f"Autotune (cockpit): {metric}", fg="cyan", bold=True))
+    echo(
+        f"  Series: {n_points:,} point(s) in {window_desc} "
+        f"(interval {interval_seconds}s) · {gt_desc}"
+    )
+    echo(f"  Scoring: {scoring or autotune_cfg.scoring_metric or 'mcc'}")
+
+
+def _echo_autotune_result(*, echo: Callable[[str], None], result: Any) -> None:
+    """Render the closing ``RESULT`` block (winner + CV folds + the re-seed note)."""
+    from detectkit.cli._output import echo_block
+
+    params = result.chosen_detector_params
+    folds = " ".join(f"{f:.2f}" for f in result.cv_per_fold) or "—"
+    season_line = f"Seasonality: {result.chosen_seasonality or 'none'}  |  CV folds: {folds}"
+    if result.consecutive_anomalies is not None:
+        season_line += f"  |  consecutive_anomalies={result.consecutive_anomalies}"
+    echo_block(
+        "RESULT",
+        [
+            f"Winner: {result.chosen_detector_type}"
+            f"(threshold={params.get('threshold')}, window_size={params.get('window_size')})  "
+            f"{result.scoring_metric}={result.score:.3f}",
+            season_line,
+            f"Evaluated {len(result.candidate_detector_ids)} candidate(s) — re-seeded the cockpit. "
+            "Review the band, then click Apply to write it into the metric YAML.",
+        ],
+        echo=echo,
+    )
 
 
 def build_tune_server(
@@ -366,6 +488,9 @@ def serve_tuner(
         metric_config=metric_config,
         internal_manager=internal_manager,
     )
+    # Stream the server-side Autotune mode's run-log through the command's echo
+    # (``click.echo``) so the terminal blocks match the rest of the CLI.
+    server.echo = echo
     if on_ready is not None:
         on_ready(url)
     echo(f"  Tuner: {url}")

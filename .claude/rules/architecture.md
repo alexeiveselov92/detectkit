@@ -758,13 +758,27 @@ Three pure-ish pieces + a server:
   `versioned_labels_path` into `incidents/<metric>/`, then **keeps serving** (labels
   save repeatedly while you tune; only Apply ends the session); invalid labels return
   **400 and keep serving**. `POST /autotune` (the **Run autotune** click, the
-  **Autotune** mode) reloads the metric's full history from the `internal_manager`
-  handle, projects the POSTed labels YAML (the page's current ground truth) onto the
-  grid, runs the shared `autotune/runner.autotune_from_data(...)` over the metric's
-  `autotune:` config, and replies with the winning detector (shaped via
+  **Autotune** mode) reloads the metric's datapoints from the `internal_manager`
+  handle **constrained to the window the cockpit is showing** — the page posts its
+  current `{start, end}` ms window (the **Points shown** trim), and `_autotune_window`
+  maps it to the half-open `load_datapoints` bounds (upper bound nudged one interval
+  past the last shown point) so the engine tunes on **exactly the series the user
+  sees and scores**, not the full history (an absent/malformed window falls back to
+  full history). It projects the POSTed labels YAML (the page's current ground truth)
+  onto the grid, runs the shared `autotune/runner.autotune_from_data(...)` over the
+  metric's `autotune:` config, and replies with the winning detector (shaped via
   `seed_detector_params`) + `consecutive_anomalies` + score + decision log for the
   page to **re-seed** every knob; it **keeps serving** (repeatable, advisory) and
-  persists nothing — any error returns **400 and keeps serving**. `/autotune` needs
+  persists nothing — any error returns **400 and keeps serving**. It also **streams a
+  structured run-log to the terminal** through `server.echo` (the command's
+  `click.echo`): a cyan banner then the engine's `LABELS → SEASONALITY → DETECTOR
+  SELECT → GRID SEARCH → WINDOW → RESULT` blocks — the **same** `StageLogRenderer`
+  (`cli/_output.py`) the `dtk autotune` command uses, so the cockpit's terminal log
+  matches `dtk run`'s load/detect/alert format. The engine (`run_autotune_engine`)
+  quiets the windowed detectors' per-candidate "seasonality falls back to global"
+  warning for the duration of a tune (the grid builds dozens of throwaway candidates;
+  the under-fill of the *chosen* seasonality is still surfaced as a structured
+  `window` advisory), so the log stays clean instead of flooding. `/autotune` needs
   the `metric_config` + `internal_manager` handles `build_tune_server` now carries
   (the tune command passes them); omit them (static preview) and it returns 400.
   `dtk tune --no-serve` writes a static read-only preview

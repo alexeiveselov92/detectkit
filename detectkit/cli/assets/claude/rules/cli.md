@@ -109,10 +109,12 @@ anomalies** — loop a cloud of anomaly dots, each consecutive run, gaps bridged
 `consecutive_anomalies`, becomes one span — or **Threshold capture** every span past
 a horizontal line, each widened to a full interval so the alert lands inside; the
 painted window saves as `capture_windows`), and **Autotune** (**Run autotune**
-launches the **real** `dtk autotune` engine **server-side** over the metric's full
-history, using your marked incidents as ground truth, then **re-seeds every knob**
-with the winner and shows the score + decision log; the band leads like Tune). The
-Autotune mode is **advisory** — it computes + re-seeds only and persists nothing (no
+launches the **real** `dtk autotune` engine **server-side** over the **window
+currently shown** (the **Points shown** trim — the same series you see and score, not
+the full history), using your marked incidents as ground truth, then **re-seeds every
+knob** with the winner and shows the score + decision log; the band leads like Tune;
+each run also streams a structured `LABELS → … → RESULT` log to the terminal, like
+`dtk run`). The Autotune mode is **advisory** — it computes + re-seeds only and persists nothing (no
 run record / `__tuned_<id>.yml` / detections, so `dtk tune` stays lock-free); review
 the band and **Apply** to write it back. It honours the metric's `autotune:` block,
 is supervised when incidents are marked (also picks `consecutive_anomalies`) else

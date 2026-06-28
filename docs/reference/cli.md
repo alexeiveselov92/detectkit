@@ -818,9 +818,13 @@ to it:
   window saved as `capture_windows`; each span widened to a full interval so the
   alert lands inside).
 - **Autotune** — **Run autotune** launches the [`dtk autotune`](autotune.md) engine
-  **server-side** over the metric's full history, using your marked incidents as
-  ground truth, then **re-seeds every knob** with the winning detector and shows the
-  score + decision log; the chart leads with the band, like Tune. It is **advisory**
+  **server-side** over the **window currently shown** (the **Points shown** trim — the
+  same series you see and score here, not the full history), using your marked
+  incidents as ground truth, then **re-seeds every knob** with the winning detector and
+  shows the score + decision log; the chart leads with the band, like Tune. The run
+  streams a structured, blocked log to the terminal you launched `dtk tune` from (the
+  same `LABELS → … → RESULT` format as `dtk run` / `dtk autotune`), so you can watch
+  what it computes. It is **advisory**
   — it computes + re-seeds only and writes nothing until you **Apply** (no run record
   / `__tuned_<id>.yml` / persisted detections, so `dtk tune` stays lock-free). It
   honours the metric's `autotune:` block, runs **supervised** when incidents are

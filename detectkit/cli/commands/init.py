@@ -152,8 +152,9 @@ _EXAMPLE_INCIDENTS = """# Example incidents (labels) file for supervised `dtk au
 # - `label` is optional free text (documentation only).
 #
 # Tip: can't list incidents from memory? Run
-#   dtk autotune --select example_cpu_usage --label
-# to get a clickable HTML chart; mark incidents in a browser and export this file.
+#   dtk tune --select example_cpu_usage
+# and use Label mode to mark incidents in a browser; Save incidents writes them
+# into incidents/example_cpu_usage/, which `dtk autotune` auto-discovers.
 
 # Optional — must match the metric `name:` it labels (autotune refuses a mismatch).
 metric: example_cpu_usage

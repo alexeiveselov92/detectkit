@@ -122,16 +122,15 @@ labels file, so the layout above is ready to fill in.
 > `incidents` and `labels_file` are mutually exclusive. The `--incidents` flag
 > still overrides either.
 
-> Can't enumerate the incidents from memory? Run
-> `dtk autotune --select api_error_rate --label`. It opens a local browser
-> labeler of the series; click-drag across the chart to mark each real incident
-> (or **Threshold capture** to grab every span past a line at once, **Lasso
-> capture** to loop around a cloud of outliers, and the chart-side **✕** / Delete
-> to remove one), then **Save & tune** writes the
-> labels into `incidents/api_error_rate/` and tunes on them in the same command.
-> Re-running `--label` re-opens the newest set so you can keep editing over time.
-> See the [`--label` reference](../reference/autotune.md#--label-flag) for the
-> static `--no-serve` variant.
+> Can't enumerate the incidents from memory? Mark them visually in
+> [`dtk tune`](tuning.md): run `dtk tune --select api_error_rate`, then switch to
+> **Label** mode (drag spans, **Threshold capture** to grab every span past a
+> line, **Lasso anomalies** to loop around a cloud of outliers) or **Review**
+> mode (confirm fired alerts as incidents), and click **Save incidents**. That
+> writes versioned files into `incidents/api_error_rate/` — the **same store
+> autotune reads**. Autotune **auto-discovers** the newest labels there, so once
+> you've labeled you just run `dtk autotune --select api_error_rate` with no
+> `--incidents` flag needed (the flag still wins if you pass it explicitly).
 
 ### 2. Run it
 

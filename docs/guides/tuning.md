@@ -166,7 +166,7 @@ To mark ground truth directly, switch to **Label**:
   span** sized to the run, not a single point; a separate burst inside the loop
   becomes its own incident.
 - **Threshold capture** — grab every contiguous span past a horizontal line in one
-  shot (the same tool as the [autotune labeler](autotuning.md)): click to set the
+  shot: click to set the
   line (or type a value), choose **above**/**below**, optionally **bridge gaps**, and
   drag across the chart to limit the capture to a time window. **Add N spans** marks
   them all. Each captured span is widened to a full interval, so a single matching

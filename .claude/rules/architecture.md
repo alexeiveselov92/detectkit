@@ -89,7 +89,6 @@ detectkit/
 │   ├── autotuner.py             # AutoTuner facade + run_autotune_engine + alert-window sweep
 │   ├── labels.py / scoring.py / distribution.py / crossval.py   # ground truth, metrics, CV
 │   ├── seasonality_search.py / detector_select.py / grid_search.py / window_select.py  # stages
-│   ├── html_labeler.py / label_server.py   # interactive incident labeler (static + local server)
 │   └── result.py / config_emitter.py / settings.py / _types.py / _base.py
 ├── reporting/                   # self-contained HTML reports (`dtk run/autotune --report`)
 │   ├── builder.py               # build_report_payload: reads _dtk_* + replays alerts → JSON
@@ -425,9 +424,9 @@ constant rather than per-`AlertConfig`.
 ## Reporting (`dtk run --report`)
 
 `detectkit/reporting/` turns the persisted internal tables into one
-**self-contained HTML report** per metric — the same offline delivery model as
-the autotune incident labeler (inline JS, baked payload, nothing leaves the
-browser). It lets a user *see how a metric actually performed* — values +
+**self-contained HTML report** per metric — the same self-contained offline
+delivery model (inline JS, baked payload, nothing leaves the browser). It lets a
+user *see how a metric actually performed* — values +
 per-detector confidence bands + flagged anomalies + the alerts that fired + a
 summary, with client-side period selection (24h / 7d / 30d / All + zoom/pan) and
 an alerts list — without standing up BI / SQL / a 3rd-party charting tool.
@@ -456,7 +455,7 @@ timeline over the period by re-walking the **real** decision logic, with no
 dispatch, no state writes and no wall-clock (see the Alerting section).
 
 **Shared rendering core.** `assets/report.js` is a committed generated asset (the
-`bot-icon.png` / labeler-example pattern) built by
+`bot-icon.png` generated-asset pattern) built by
 `website/scripts/gen-report-bundle.mjs` from the **same** framework-free
 TypeScript core (`website/src/scripts/core/canvas.ts`) that powers the website's
 interactive landing playground — so the report and the marketing demo render
@@ -470,7 +469,11 @@ MANIFEST.in) and must be regenerated when the renderer TS changes.
 invoked by `dtk autotune --select <metric>` (`cli/commands/autotune.py`). Given a
 metric's already-loaded `_dtk_datapoints` (and optional labeled incidents), it
 chooses the best detector configuration and emits an annotated tuned config; it
-never edits the original metric and never alerts.
+never edits the original metric and never alerts. Labeled incidents come from
+`dtk tune` (its **Label** mode writes versioned `incidents/<metric>/` files);
+`dtk autotune` **auto-discovers** the newest labels in that directory, so after
+labeling you just run `dtk autotune --select <metric>` (no `--incidents` flag
+needed).
 
 The engine is **pure and DB-free** — it operates on the in-memory `data` dict and
 reuses `WindowedStatDetector`/`DetectorFactory`/`detector_id` unchanged. The
@@ -673,7 +676,7 @@ array (the maximal grid-adjacent flagged run per fire) alongside `fires`, and
 trimmed) series** are scored, so an out-of-window label can't mechanically drag recall
 down. Two capture tools are armed only in **Label** mode (mutually exclusive, toggled
 from the Label panel of the rail): **Threshold
-capture** (ported from the autotune `html_labeler`, behind `setThresholdMode` +
+capture** (behind `setThresholdMode` +
 an `onThresholdChange` callback) grabs every contiguous run of points on the chosen
 side of a horizontal line in one click — click/value sets the line, a horizontal
 plot drag paints a capture window (else the current view), `applyThreshold` merges
@@ -696,8 +699,9 @@ the *latest* incident rather than at the last datapoint — so they render and c
 without a single old outlier incident dragging the whole history in (which would
 blow the recompute budget and hang the page); incidents older than the bounded
 window stay list-only and are excluded from the live metrics. The whole labels stack (schema, validation, versioned filenames) is shared
-with the autotune labeler via `autotune/labels.py` (`parse_incident_labels`,
-`incidents_to_display`, `newest_labels_file`, `versioned_labels_path`). A **y = 0
+with `dtk autotune` via `autotune/labels.py` (`parse_incident_labels`,
+`incidents_to_display`, `newest_labels_file`, `versioned_labels_path`), which is
+also the store `dtk autotune` auto-discovers. A **y = 0
 reference line** toggle (shared chart `showZeroLine` + `setZeroLine`, also on
 `dtk run --report`) draws a horizontal line at zero and folds 0 into the scale, for
 real-valued metrics best read relative to zero. All these chart additions default
@@ -730,7 +734,7 @@ Three pure-ish pieces + a server:
   the `detectors` list with the single tuned detector and optionally updates the
   first alerting block's `consecutive_anomalies` (it never invents alerting).
 - `server.serve_tuner(...)` / `build_tune_server(...)` is the localhost write-back
-  server, modeled on `autotune/label_server.py`: bound to `127.0.0.1:0`
+  server: bound to `127.0.0.1:0`
   with a one-shot `secrets` token, serves the page, and handles **two** token-guarded
   POSTs. `POST /apply` (the **Apply** click) → `apply_tuned_config` → responds +
   **self-shuts-down** so the command reports what changed; an invalid config returns

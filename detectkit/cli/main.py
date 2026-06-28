@@ -214,22 +214,7 @@ def run(
     "--incidents",
     "incidents_path",
     type=click.Path(),
-    help="Canonical labels file marking real incidents (enables supervised tuning)",
-)
-@click.option(
-    "--label",
-    is_flag=True,
-    help="Open the interactive labeler (local server) to mark incidents, then tune on them",
-)
-@click.option(
-    "--no-serve",
-    is_flag=True,
-    help="With --label, write a static HTML labeler file and exit instead of serving",
-)
-@click.option(
-    "--no-open",
-    is_flag=True,
-    help="With --label, don't auto-open the browser (just print the local URL)",
+    help="Canonical labels file (or incidents/<metric>/ dir) marking real incidents",
 )
 @click.option(
     "--scoring",
@@ -275,9 +260,6 @@ def run(
 def autotune(
     select: str,
     incidents_path: str,
-    label: bool,
-    no_serve: bool,
-    no_open: bool,
     scoring_override: str,
     from_date: str,
     to_date: str,
@@ -295,18 +277,17 @@ def autotune(
     tuned config named <metric>__tuned_<id>. Each run is recorded in
     _dtk_autotune_runs.
 
-    Mark real incidents for supervised tuning via --incidents (a labels file);
-    without it, tuning falls back to an unsupervised objective.
+    Mark real incidents for supervised tuning via --incidents (a labels file or
+    the incidents/<metric>/ dir); without it, tuning falls back to an unsupervised
+    objective. Incidents marked in `dtk tune` (Label mode) are auto-discovered from
+    incidents/<metric>/, so no flag is needed after labeling there.
 
     Examples:
         # Supervised tuning against labeled incidents
         dtk autotune --select checkout_errors --incidents incidents/checkout.yml
 
-        # Unsupervised (no labels)
+        # Unsupervised (no labels), or auto-pick incidents/checkout_errors/ if present
         dtk autotune --select checkout_errors
-
-        # Mark incidents in a browser, save into incidents/<m>/, and tune on them
-        dtk autotune --select checkout_errors --label
 
         # Search only, change nothing
         dtk autotune --select checkout_errors --dry-run
@@ -316,9 +297,6 @@ def autotune(
     run_autotune(
         select=select,
         incidents_path=incidents_path,
-        label=label,
-        no_serve=no_serve,
-        no_open=no_open,
         scoring_override=scoring_override,
         from_date=from_date,
         to_date=to_date,

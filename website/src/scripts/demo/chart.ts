@@ -8,9 +8,8 @@
 // it shades exactly the history [i-windowSize .. i-1] that predicts point i.
 //
 // The whole series is always fitted to the canvas width (no zoom/pan). Canvas
-// primitives (DPR-aware fit, px/py coordinate helpers, decimated drawSeries) are
-// ported from detectkit/autotune/html_labeler.py and now live in core/canvas.ts,
-// shared with the library report renderer.
+// primitives (DPR-aware fit, px/py coordinate helpers, decimated drawSeries)
+// live in core/canvas.ts, shared with the library report renderer.
 
 import {
   type Margins,
@@ -847,7 +846,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   }
 
   // ---- incident bands -------------------------------------------------------
-  // A rounded-rect path (for the ✕ delete handle), ported from html_labeler.
+  // A rounded-rect path (for the ✕ delete handle).
   function roundRect(x: number, y: number, w: number, h: number, r: number): void {
     g.beginPath();
     g.moveTo(x + r, y);
@@ -894,8 +893,8 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     return [xLo(), xHi()];
   };
   // Contiguous runs (in ms) of points on the chosen side of the line within the
-  // capture window, bridging up to `thGap` non-matching points. Ported from the
-  // autotune html_labeler threshold capture.
+  // capture window, bridging up to `thGap` non-matching points. Drives the
+  // dtk tune threshold-capture tool.
   function thRuns(): Array<[number, number]> {
     const runs: Array<[number, number]> = [];
     const val = thEff();

@@ -5,6 +5,28 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.42.0] - 2026-06-28
+
+### Removed
+- **The standalone `dtk autotune` incident labeler is retired — label in `dtk tune`
+  instead.** The `dtk autotune --label` / `--no-serve` / `--no-open` flags and the
+  local labeler server are gone, along with the `html_labeler.py` / `label_server.py`
+  modules and the static `autotune-labeler.html` demo. Their entire feature set
+  already lives in `dtk tune`: open `dtk tune --select <metric>`, use **Label** mode
+  (drag spans, Threshold capture, Lasso the anomaly cloud) or **Review** mode (confirm
+  fired alerts as incidents), then **Save incidents** — which writes versioned files
+  into `incidents/<metric>/`, the same store autotune reads. This is the first step of
+  folding autotune into the `dtk tune` cockpit.
+
+### Added
+- **`dtk autotune` auto-discovers labels in `incidents/<metric>/`.** After marking
+  incidents in `dtk tune`, just run `dtk autotune --select <metric>` — it now picks up
+  the newest labels file in `incidents/<metric>/` with no `--incidents` flag, so the
+  retired one-command `--label` flow becomes a seamless two-command flow. Full
+  precedence: `--incidents` flag > config `labels_file` > inline config `incidents` >
+  auto-discovered `incidents/<metric>/` > interactive prompt > none (unsupervised).
+  `--incidents` still accepts a file or a directory explicitly.
+
 ## [0.41.0] - 2026-06-28
 
 ### Changed

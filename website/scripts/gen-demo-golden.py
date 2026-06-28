@@ -9,7 +9,8 @@ series and freezes their per-point output to ``website/src/scripts/demo/
 golden.json``. ``check-demo-parity.mjs`` then bundles ``detector.ts`` and asserts
 the TS ``runDetector`` reproduces every band within 1e-6.
 
-Run it from the repo (same pattern as ``gen-labeler-example.py``):
+Run it from the repo (same generated-asset pattern as ``gen-report-bundle.mjs`` /
+``make-bot-icon.mjs``):
 
     python website/scripts/gen-demo-golden.py
 

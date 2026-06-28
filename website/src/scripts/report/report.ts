@@ -394,7 +394,7 @@ function createReportChart(
   const minSpan = Math.min(MIN_SPAN_MS, fullSpan);
 
   // Value domain over the whole series + all band bounds (fixed; zoom is x-only,
-  // matching the demo / html_labeler, which keep the y-domain stable).
+  // matching the demo chart, which keeps the y-domain stable).
   let vmin = 0;
   let vmax = 1;
   computeValueDomain();

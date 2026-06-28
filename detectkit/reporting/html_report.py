@@ -1,10 +1,11 @@
 """Render a report payload into a single self-contained HTML file.
 
-Same delivery model as ``autotune/html_labeler.py``: one HTML document with the
-renderer JS inlined (the pre-built ``assets/report.js`` bundle — one source
-shared with the website landing demo) and the data baked in as a JS literal. No
-CDN, no network, nothing leaves the browser. Placeholders are substituted with
-``str.replace`` (NOT ``.format``) so literal ``{}`` in the JS/CSS survive.
+The self-contained inline-bundle delivery model (shared with the ``dtk tune``
+page): one HTML document with the renderer JS inlined (the pre-built
+``assets/report.js`` bundle — one source shared with the website landing demo)
+and the data baked in as a JS literal. No CDN, no network, nothing leaves the
+browser. Placeholders are substituted with ``str.replace`` (NOT ``.format``) so
+literal ``{}`` in the JS/CSS survive.
 """
 
 from __future__ import annotations

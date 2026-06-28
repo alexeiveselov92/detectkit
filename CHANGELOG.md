@@ -5,7 +5,38 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.44.1] - 2026-06-28
+## [0.45.0] - 2026-06-28
+
+### Added
+- **`dtk init-claude` now ships a `dtk-tune` skill** so the user's AI assistant can
+  actively *guide* metric configuration instead of only scaffolding files. The
+  cockpit (`dtk tune`) is the hands-on **umbrella** for tuning — it contains the
+  autotune engine (its **Autotune** mode), manual knobs, and Label/Review — but the
+  assistant had no procedure for driving it: `dtk tune` was documented only in the
+  `cli.md` reference and framed mainly as a labeling sub-step of `dtk-autotune`. The
+  new skill walks the assistant through the full hands-on path: stand up a **sandbox**
+  (scaffold a robust starter + load history), open the cockpit (with `--no-open` +
+  shared URL on a remote machine), guide the user through the four modes —
+  emphasising that **autotune is built in** and runs over the window shown — then
+  safe **Apply** and the `dtk run` / `dtk clean` follow-up.
+
+### Changed
+- **The assistant now presents tuning as a hands-on-vs-automatic choice, with the
+  interactive cockpit preferred when the user wants to be in the loop.** The
+  shipped context (`CLAUDE.section.md`) and the `dtk-new-metric` / `dtk-autotune`
+  skills are reworded so a scaffolded metric is framed as a **sandbox** the user
+  refines, branching to **`dtk-tune`** (hands-on cockpit, autotune built in) or
+  **`dtk-autotune`** (fully-automatic CLI search) — the same engine, picked by
+  whether the user wants hands-on or hands-off. Previously `dtk-new-metric` handed
+  off only to `dtk-autotune` and never mentioned the interactive cockpit.
+
+### Documentation
+- **Corrected stale skill lists in the user guides.** The installation, quickstart
+  and `dtk init-claude` CLI reference pages (in `docs/` and the website mirror)
+  still said detectkit ships **three** skills and omitted `dtk-autotune` entirely;
+  they now list all **five** (`dtk-setup-project`, `dtk-new-metric`, `dtk-tune`,
+  `dtk-autotune`, `dtk-feedback`). The landing page's `dtk init-claude` terminal
+  block and "skills" prose are updated to match (now `13 created`).
 
 ### Documentation
 - **`dtk init-claude` assistant context is now strictly user-perspective.** The

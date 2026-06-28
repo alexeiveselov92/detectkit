@@ -122,19 +122,24 @@ Folder holding your detectkit project(s) to set up.
 │                                   #   injected/refreshed (your content is kept)
 └── .claude/
     ├── rules/detectkit/            # reference docs the assistant reads on demand
-    │   ├── overview.md
+    │   ├── alerting.md
+    │   ├── autotune.md
     │   ├── cli.md
-    │   ├── project.md
-    │   ├── metrics.md
     │   ├── detectors.md
-    │   └── alerting.md
+    │   ├── metrics.md
+    │   ├── overview.md
+    │   └── project.md
     └── skills/
-        ├── dtk-setup-project/      # skill: configure profiles.yml (DB + channels)
+        ├── dtk-autotune/           # skill: automatic detector/param search
         │   └── SKILL.md
+        ├── dtk-feedback/           # skill: file a redacted bug/feature/feedback
+        │   └── SKILL.md            #        issue upstream (with your confirmation)
         ├── dtk-new-metric/         # skill: scaffold a validated metric YAML
         │   └── SKILL.md
-        └── dtk-feedback/           # skill: file a redacted bug/feature/feedback
-            └── SKILL.md            #        issue upstream (with your confirmation)
+        ├── dtk-setup-project/      # skill: configure profiles.yml (DB + channels)
+        │   └── SKILL.md
+        └── dtk-tune/               # skill: hands-on interactive tuning cockpit
+            └── SKILL.md            #        (autotune built in) + write-back
 ```
 
 #### Behavior
@@ -160,12 +165,16 @@ dtk init-claude --target-dir /opt/monitoring
 ```
 
 After running, open the folder in Claude Code and ask it about your metrics,
-alerts or configs. Three skills come with it: **`dtk-setup-project`** (configure
+alerts or configs. Five skills come with it: **`dtk-setup-project`** (configure
 `profiles.yml` — the database connection and a first alert channel — so runs
-work end to end), **`dtk-new-metric`** (scaffold a validated metric YAML), and
-**`dtk-feedback`** (file a bug report, feature request, or feedback as a GitHub
-issue on the upstream repo — it collects the diagnostic context, redacts every
-secret, and asks you to confirm before submitting).
+work end to end), **`dtk-new-metric`** (scaffold a validated metric YAML),
+**`dtk-tune`** (dial in a detector by hand in the interactive
+[`dtk tune`](#dtk-tune) browser cockpit — with autotune built in — and write it
+back), **`dtk-autotune`** (search for the best detector, seasonality and
+parameters automatically), and **`dtk-feedback`** (file a bug report, feature
+request, or feedback as a GitHub issue on the upstream repo — it collects the
+diagnostic context, redacts every secret, and asks you to confirm before
+submitting).
 
 ---
 

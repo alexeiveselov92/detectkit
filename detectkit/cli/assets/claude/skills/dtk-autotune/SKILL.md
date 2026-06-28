@@ -20,6 +20,14 @@ have them, otherwise an unsupervised objective), and writes a ready-to-run
 config named `<metric>__tuned_<id>` whose comment header explains every
 decision. Each run is recorded in the `_dtk_autotune_runs` table.
 
+**This skill is the fully-automatic, command-line path** — best for CI or when the
+user just wants a strong config picked for them without watching. If the user wants
+to be **in the loop** — see the series, judge the alerts, turn the knobs, mark
+incidents by eye — prefer the **`dtk-tune`** skill: it opens an interactive browser
+cockpit that runs this **same engine** in its **Autotune** mode (server-side,
+re-seeding the knobs) *and* lets them hand-tune and **Apply** in one place. The two
+share the same search; pick by whether the user wants hands-on or hands-off.
+
 Work the steps in order. Do not invent SQL, incident times, or channel names —
 gather them. This skill is the procedure; for field detail read the matching
 file under `.claude/rules/detectkit/` (`autotune.md`, `detectors.md`,
@@ -79,8 +87,9 @@ generalize is rejected.
 Labels turn tuning from a good unsupervised default into a config optimised
 against *your* real incidents (it then optimises MCC and also tunes the alert
 window `consecutive_anomalies`). **The easiest, most reliable way to produce them
-is to mark incidents in `dtk tune` — offer this first**, before asking the user to
-recall timestamps:
+is to mark incidents in `dtk tune` — offer this first**: open the cockpit and
+**guide the user through marking incidents on the chart** (see the **`dtk-tune`**
+skill for driving it), rather than asking them to recall timestamps:
 
 ```bash
 dtk tune --select <name>

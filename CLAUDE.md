@@ -100,6 +100,8 @@ rendered on the docs site under **For developers**). Read the relevant one:
   outlier dragging the whole history in. A **y = 0 reference line** toggle is shared with
   `dtk run --report`. Committed bundle `assets/tune.js` (built by
   `website/scripts/gen-tune-bundle.mjs`) ships in the wheel — regenerate it when
-  the renderer TS changes. Takes no pipeline lock.
+  the renderer TS changes. Takes no pipeline lock. `dtk init-claude` ships a
+  `dtk-tune` skill (the hands-on entry point for the user's assistant — the
+  cockpit umbrella, with autotune built in) — keep it in sync on release.
 
 Repo: https://github.com/alexeiveselov92/detectkit

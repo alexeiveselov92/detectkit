@@ -22,7 +22,9 @@ Then, in Claude Code, ask it to **run the `dtk-setup-project` skill**. It walks
 you through `profiles.yml` based on your database (ClickHouse today): connection
 details, the internal `_dtk_*` vs data locations, an optional first alert
 channel — and verifies it with a non-destructive run. Next, ask it to run
-**`dtk-new-metric`** to scaffold your first metric. That's the whole setup.
+**`dtk-new-metric`** to scaffold your first metric, then **`dtk-tune`** to dial in
+the detector by hand in an interactive browser cockpit (with autotune built in).
+That's the whole setup.
 
 Prefer to do it by hand? The manual steps below do exactly the same thing.
 

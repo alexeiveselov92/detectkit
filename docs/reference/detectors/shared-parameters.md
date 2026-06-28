@@ -234,7 +234,7 @@ threshold 3; false "below" alerts out of 4320 points):
 
 | Configuration | False alerts |
 |---------------|--------------|
-| Uniform window (pre-0.7.0 unscaled MAD) | 1557 |
+| Uniform window (unscaled MAD) | 1557 |
 | Uniform window (scaled MAD) | 238 |
 | `window_weights: exponential` + `half_life: "3d"` | 26 (≈ noise floor) |
 | `detrend: linear` | 54 |

@@ -108,7 +108,7 @@ alerting:
     - slack_critical
     - email_team
 
-  # Dashboard / runbook links (v0.13.0)
+  # Dashboard / runbook links
   dashboard_url: https://grafana.ops/d/api-errors   # clickable title / link / button
   links:                                            # extra "label: url" links
     Runbook: https://runbooks.ops/api-errors
@@ -259,4 +259,3 @@ This creates a **very conservative** alert:
 - Both detectors must report an anomaly
 - Both must fire in the same direction (both "up" or both "down")
 - That must hold for 3 consecutive, gap-free points
-

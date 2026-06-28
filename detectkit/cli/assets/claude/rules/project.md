@@ -45,8 +45,7 @@ overrides it; unset → a built-in `0.5`. Tuning-only — it never touches the p
 ### `alert_help_url` — "How to read this alert" link
 
 Every default-rendered alert on every channel carries a `How to read this alert`
-link for non-operator stakeholders. Tri-state, resolved by
-`ProjectConfig.resolve_alert_help_url`:
+link for non-operator stakeholders. Tri-state:
 
 - **unset / null** (default) → the official detectkit guide
   (`https://dtk.pipelab.dev/guides/reading-alerts/`).

@@ -164,8 +164,7 @@ config needed. Control it project-wide with `alert_help_url` in
 - **a URL string** → your own runbook/wiki page instead
 - **`false`** → hide the link entirely
 
-Per-channel rendering (defaults only; resolved by
-`ProjectConfig.resolve_alert_help_url`):
+Per-channel rendering (defaults only; the resolved help URL is rendered per channel as follows):
 
 - **Slack / Mattermost / generic webhook** — a clickable `How to read this alert`
   label in the compact `Links` field (alongside `Dashboard` + any extra links),
@@ -185,7 +184,7 @@ mirrors `{dashboard_url}` / `{dashboard_line}`. See the template table below.
 
 With no custom `template`, each channel renders a structured, branded message
 (alert-centric: the rule that fired leads, the anomaly value is evidence). The
-shared value computation lives in one place (`BaseAlertChannel.build_context`),
+shared value computation lives in one place,
 so templates and native rendering stay consistent. Every alert title/headline
 leads with a colored **status circle** — 🔴 anomaly, 🟢 recovery, 🟡 no-data,
 🔵 pipeline error — so the status reads from color alone. It also leads with the
@@ -241,8 +240,7 @@ Latest reading** fields bound the span. Labels are self-describing so the onset
 isn't misread as the alert-fire moment: **Anomaly began** is the resolved onset,
 **not** when the alert fired. Recovery shows the fuller **began → fired →
 recovered** timeline (`Incident lasted …`), where **Alert fired** =
-`onset + (consecutive_required − 1) × interval` (computed in `build_context`,
-exposed as `{fired_display}`, omitted when the run is capped). The true
+`onset + (consecutive_required − 1) × interval` (exposed as `{fired_display}`, omitted when the run is capped). The true
 streak/onset is resolved only when an alert fires/clears (a bounded lookback over
 the detection history; a run older than the window shows `over …`), so the hot
 no-alert path stays cheap. Exposed to templates as `{anomaly_lead}` /

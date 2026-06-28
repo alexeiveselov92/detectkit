@@ -1,6 +1,6 @@
 # Templates, mentions & testing
 
-## Mentions (v0.3.8)
+## Mentions
 
 Tag specific users or groups in alert messages. Mentions are **channel-agnostic**: you write plain usernames in metric config, and each channel formats them in its native syntax.
 
@@ -178,12 +178,12 @@ alerting:
 | Variable | Description | Available in |
 |---|---|---|
 | `metric_name` | Metric name | all |
-| `project_name` | `detectkit_project.yml` `name`, empty if not set | all — populated for every alert by the pipeline (v0.15.0) |
-| `project_name_prefix` | `"[<project_name>] "` if set, else empty; **leads every default title/headline/subject** so multiple projects on one channel stay distinct | all (v0.15.0) |
+| `project_name` | `detectkit_project.yml` `name`, empty if not set | all — populated for every alert by the pipeline |
+| `project_name_prefix` | `"[<project_name>] "` if set, else empty; **leads every default title/headline/subject** so multiple projects on one channel stay distinct | all |
 | `timestamp` | Timestamp (formatted in `{timezone}`) | all |
 | `timezone` | Timezone display name | all |
 | `value` | Current metric value (numeric, or string `"no data"` for no-data) | all |
-| `value_display` | NaN-safe string version — always renders, falls back to `"no data"` | all (v0.5.0) |
+| `value_display` | NaN-safe string version — always renders, falls back to `"no data"` | all |
 | `confidence_lower` / `confidence_upper` | Bounds of confidence interval | anomaly, recovery |
 | `confidence_interval` | Formatted as `[lower, upper]` or `"N/A"` | all |
 | `expected_range` | One-sided aware expected band: `>= lo`, `<= hi`, `[lo, hi]`, or `"N/A"`. Renders one-sided detector bounds cleanly instead of `[7.00, nan]` | all |
@@ -196,20 +196,20 @@ alerting:
 | `direction_policy` | Configured direction rule: `"same"`, `"any"`, `"up"`, `"down"` | anomaly, recovery |
 | `consecutive_count` | **True** consecutive streak length — resolved at fire time by looking back over the detection history, not capped at the rule threshold (recovery: the just-ended incident length) | anomaly, recovery |
 | `consecutive_required` | Configured consecutive threshold the alert fired on (the rule) | anomaly, recovery |
-| `interval_display` | Metric interval as a string (e.g. `"10min"`) (v0.17.0) | all |
-| `duration_display` | How long the streak/incident has run (e.g. `"2h 30m"`; `"over …"` when older than the lookback window) (v0.17.0) | anomaly, recovery |
-| `onset_display` / `started_display` | First **anomalous** timestamp of the run — the onset, **not** the alert-fire time (formatted in `{timezone}`); `started_display` adds `"or earlier"` when the run is capped (v0.17.0) | anomaly, recovery |
-| `fired_display` | On-grid moment the alert first fired — `onset + (consecutive_required − 1) × interval` (formatted in `{timezone}`); empty when the run is capped or no interval is wired in (v0.35.0) | recovery |
-| `anomaly_lead` / `recovery_lead` | Ready-made plain-language lead — `"Anomalous for …"` / `"… Incident lasted …"` (falls back to `"Latest X/Y consecutive points met the quorum."` when no interval is wired in) (v0.17.0) | anomaly, recovery |
-| `window_line` | `"Anomaly began: … \| Latest reading: …\n"` (anomaly) / `"Anomaly began: … \| Alert fired: … \| Recovered: …\n"` (recovery), or a single `"Detected at: …"` line when the onset is unknown (v0.17.0; relabeled v0.35.0) | all |
-| `status` | `"ANOMALY"`, `"RECOVERED"`, `"NO_DATA"`, or `"ERROR"` | all (v0.5.0 added NO_DATA / ERROR) |
-| `error_type` / `error_message` | Exception details | error only (v0.5.0) |
+| `interval_display` | Metric interval as a string (e.g. `"10min"`) | all |
+| `duration_display` | How long the streak/incident has run (e.g. `"2h 30m"`; `"over …"` when older than the lookback window) | anomaly, recovery |
+| `onset_display` / `started_display` | First **anomalous** timestamp of the run — the onset, **not** the alert-fire time (formatted in `{timezone}`); `started_display` adds `"or earlier"` when the run is capped | anomaly, recovery |
+| `fired_display` | On-grid moment the alert first fired — `onset + (consecutive_required − 1) × interval` (formatted in `{timezone}`); empty when the run is capped or no interval is wired in | recovery |
+| `anomaly_lead` / `recovery_lead` | Ready-made plain-language lead — `"Anomalous for …"` / `"… Incident lasted …"` (falls back to `"Latest X/Y consecutive points met the quorum."` when no interval is wired in) | anomaly, recovery |
+| `window_line` | `"Anomaly began: … \| Latest reading: …\n"` (anomaly) / `"Anomaly began: … \| Alert fired: … \| Recovered: …\n"` (recovery), or a single `"Detected at: …"` line when the onset is unknown | all |
+| `status` | `"ANOMALY"`, `"RECOVERED"`, `"NO_DATA"`, or `"ERROR"` | all |
+| `error_type` / `error_message` | Exception details | error only |
 | `description` / `description_line` | Metric description | all |
 | `mentions` / `mentions_line` | Formatted mentions | all |
-| `dashboard_url` | Raw `alerting.dashboard_url` (empty string when unset); also surfaced natively as a clickable title on Slack/Mattermost, an inline link on Telegram, and an "Open dashboard" button in email (v0.13.0) | all |
-| `dashboard_line` | `"Dashboard: <url>\n"` when set, else empty; appended to the default plain-text templates (v0.13.0) | all |
-| `help_url` | Raw "How to read this alert" URL (empty when hidden via `alert_help_url: false`); also surfaced natively as a clickable label in the webhook `Links` field, a links-line entry on Telegram, and a footer link in email (v0.16.0) | all |
-| `help_line` | `"How to read this alert: <url>\n"` when set, else empty; appended to the default plain-text templates (v0.16.0) | all |
+| `dashboard_url` | Raw `alerting.dashboard_url` (empty string when unset); also surfaced natively as a clickable title on Slack/Mattermost, an inline link on Telegram, and an "Open dashboard" button in email | all |
+| `dashboard_line` | `"Dashboard: <url>\n"` when set, else empty; appended to the default plain-text templates | all |
+| `help_url` | Raw "How to read this alert" URL (empty when hidden via `alert_help_url: false`); also surfaced natively as a clickable label in the webhook `Links` field, a links-line entry on Telegram, and a footer link in email | all |
+| `help_line` | `"How to read this alert: <url>\n"` when set, else empty; appended to the default plain-text templates | all |
 
 All variables are always substitutable in every alert kind — the
 "Available in" column marks where a value is *meaningful*, not where the

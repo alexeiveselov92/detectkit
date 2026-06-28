@@ -1,14 +1,9 @@
 # No-data & error alerts
 
-## Missing Data Alerts (v0.5.0)
+## Missing Data Alerts
 
 Detect when a metric stops producing data — the source query returned
 no rows for the latest interval, or the row's value is `NULL` / `NaN`.
-
-> **Note**: prior to v0.5.0 the `no_data_alert` flag existed but was
-> never read by the orchestrator. If you set it to `true` on an older
-> version and saw nothing fire, that was the bug. Upgrading to v0.5.0
-> is enough — no schema change.
 
 ### How It Works
 
@@ -60,7 +55,7 @@ is no value):
 | Variable | Description |
 |---|---|
 | `{metric_name}` | Metric name |
-| `{project_name}` | `detectkit_project.yml` `name`, or empty string. Since v0.15.0 populated for every alert kind, not just errors |
+| `{project_name}` | `detectkit_project.yml` `name`, or empty string. Populated for every alert kind, not just errors |
 | `{project_name_prefix}` | `"[<project_name>] "` when set, empty string otherwise. Leads the default no-data title |
 | `{timestamp}` | Timestamp of the missing interval (formatted, in `{timezone}`) |
 | `{timezone}` | Configured timezone |
@@ -68,7 +63,7 @@ is no value):
 | `{description_line}` | Same with trailing newline, empty if none |
 | `{status}` | Always `"NO_DATA"` |
 | `{mentions}` / `{mentions_line}` | Formatted mentions |
-| `{help_url}` / `{help_line}` | "How to read this alert" link URL / line (since v0.16.0); empty when hidden project-wide via `alert_help_url: false` |
+| `{help_url}` / `{help_line}` | "How to read this alert" link URL / line; empty when hidden project-wide via `alert_help_url: false` |
 | `{value_display}` | Always the literal string `"no data"` |
 
 If a template uses `{value:.2f}` or another numeric format spec on a
@@ -91,7 +86,7 @@ recoveries (green).
 - **Don't** enable on metrics with naturally sparse intervals — you'll
   just spam channels every cron tick
 
-## Project-Level Error Alerts (v0.5.0)
+## Project-Level Error Alerts
 
 When a metric pipeline crashes (DB unreachable, query timeout, lock
 acquisition failure, channel HTTP error), the failure is logged and
@@ -153,7 +148,7 @@ Error: {error_type}: {error_message}
 
 Title (webhook channels): `🔵 [{project_name}] Pipeline error: {metric_name}`
 when `project_name` is set in `detectkit_project.yml`, otherwise just
-`🔵 Pipeline error: {metric_name}` (backwards-compat). Since v0.15.0 the
+`🔵 Pipeline error: {metric_name}` (backwards-compat). The
 `{project_name_prefix}` lead is not error-specific — **every** default alert
 title/headline/subject carries it (see the
 [Channels guide](alerting-channels.md)). The bracketed prefix makes it obvious
@@ -164,8 +159,8 @@ which project crashed when multiple detectkit instances share an alert channel.
 | Variable | Description |
 |---|---|
 | `{metric_name}` | Name of the metric whose pipeline failed (or `<startup>` for early failures) |
-| `{project_name}` | `detectkit_project.yml` `name` field, or empty string. Since v0.15.0 populated for every alert, not just errors |
-| `{project_name_prefix}` | `"[<project_name>] "` when set, empty string otherwise. Since v0.15.0 leads every default title/headline/subject |
+| `{project_name}` | `detectkit_project.yml` `name` field, or empty string. Populated for every alert, not just errors |
+| `{project_name_prefix}` | `"[<project_name>] "` when set, empty string otherwise. Leads every default title/headline/subject |
 | `{error_type}` | Exception class name (e.g., `ConnectionRefusedError`) |
 | `{error_message}` | Exception `str(exc)` |
 | `{timestamp}` | When the alert was built (formatted in `{timezone}`) |
@@ -202,4 +197,3 @@ error_alerting:
 - Pair with cron monitoring (`dtk run` exit code) for full coverage —
   `error_alerting` covers in-process failures, cron monitors `dtk run`
   not running at all
-

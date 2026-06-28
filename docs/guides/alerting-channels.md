@@ -7,12 +7,12 @@ Channels are configured in `profiles.yml` and referenced by name in metric confi
 With no custom `template`, each channel renders a native, alert-centric layout:
 the message leads with the rule that fired, and the anomaly value is supporting
 evidence. The shared value computation (value, expected, severity, quorum,
-detectors, parameters) lives in `BaseAlertChannel.build_context`, so templates
+detectors, parameters) is computed in one shared place, so templates
 and native rendering read the same numbers. Every default title/headline/subject
 also leads with the **project name** (`[name] `) — see
 [Project label](#project-label-multi-project-channels).
 
-- **Slack / Mattermost / generic webhook** (all via `WebhookChannel`): an
+- **Slack / Mattermost / generic webhook** (all webhook-based channels): an
   anomaly/recovery renders as **two stacked attachments** so a long alert folds
   in the channel. Slack and Mattermost natively collapse only an attachment's
   text block behind a "Show more" toggle (Slack above 700 characters / 5 line

@@ -93,7 +93,7 @@ Operation timeouts in seconds:
 
 #### `error_alerting` (object, optional)
 
-**New in v0.5.0** — project-scoped error alerting. Catches any exception
+Project-scoped error alerting. Catches any exception
 from `TaskManager.run_metric` (DB outage, query timeout, lock acquisition
 failure, channel HTTP error, etc.) and ships **one** alert through the
 named channels. After the alert fires the rest of the `dtk run`
@@ -137,7 +137,7 @@ error_alerting:
 - `{project_name}` - Project `name` from `detectkit_project.yml`.
   Empty string when not set.
 - `{project_name_prefix}` - `"[<project_name>] "` when set, empty
-  otherwise. Since v0.15.0 **every** default alert title/headline/subject
+  otherwise. **Every** default alert title/headline/subject
   (anomaly, recovery, no-data and error) leads with this prefix so
   multi-project channels stay distinguishable
   (`[my_monitoring] Pipeline error: <startup>`).
@@ -209,4 +209,3 @@ false_alert_budget: 0.3
 
 This is purely a tuning aid — it only annotates a number you can already see in the
 cockpit; it never affects the load/detect/alert pipeline.
-

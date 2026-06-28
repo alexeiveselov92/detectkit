@@ -357,7 +357,8 @@ class TestMattermostChannel:
         call_args = mock_post.call_args
         payload = call_args[1]["json"]
         assert "attachments" in payload
-        assert len(payload["attachments"]) == 1
+        # Anomaly → base card + foldable detail card.
+        assert len(payload["attachments"]) == 2
         attachment = payload["attachments"][0]
         assert attachment["color"] == "#D63232"  # red for anomaly
         assert "cpu_usage" in attachment["title"]
@@ -626,26 +627,40 @@ class TestEmailBranding:
 
 
 class TestWebhookRichAttachment:
-    """The default webhook payload is a rich fields-based attachment."""
+    """The default webhook payload is a base card + a foldable detail card."""
 
     def _payload(self, alert, template=None):
         return WebhookChannel(webhook_url="https://example.com/hooks/xxx").build_payload(
             alert, template
         )
 
-    def test_default_attachment_has_fields_and_branding(self):
-        attachment = self._payload(_anomaly_alert())["attachments"][0]
-        assert attachment["color"] == "#D63232"
-        assert "cpu_usage" in attachment["title"]
-        # Compact fields grid is built from the context.
-        field_titles = [f["title"] for f in attachment["fields"]]
+    def test_base_card_keeps_value_expected_and_links_visible(self):
+        alert = _anomaly_alert()
+        alert.help_url = "https://docs.example/reading-alerts"
+        base = self._payload(alert)["attachments"][0]
+        assert base["color"] == "#D63232"
+        assert "cpu_usage" in base["title"]
+        # The always-visible base keeps only the value, the band and the links;
+        # the verbose tail (quorum, severity, …) is folded into the detail card.
+        field_titles = [f["title"] for f in base["fields"]]
         assert "Value" in field_titles
         assert "Expected" in field_titles
-        assert "Quorum" in field_titles
-        # Branding + markdown opt-in.
-        assert attachment["footer"] == "detectkit"
-        assert attachment["footer_icon"] == BRAND_ICON_URL
-        assert attachment["mrkdwn_in"] == ["text", "fields"]
+        assert "Links" in field_titles
+        assert "Quorum" not in field_titles
+        assert base["mrkdwn_in"] == ["text", "fields"]
+
+    def test_detail_card_folds_the_verbose_tail(self):
+        attachments = self._payload(_anomaly_alert())["attachments"]
+        assert len(attachments) == 2
+        detail = attachments[1]
+        # Neutral continuation (no second accent bar) carrying foldable text.
+        assert "color" not in detail
+        assert detail["mrkdwn_in"] == ["text"]
+        assert "Quorum" in detail["text"]
+        assert "Parameters" in detail["text"]
+        # Branding rides on the LAST attachment so it sits at the bottom.
+        assert detail["footer"] == "detectkit"
+        assert detail["footer_icon"] == BRAND_ICON_URL
 
     def test_mentions_ride_in_top_level_text(self):
         alert = _anomaly_alert()
@@ -819,21 +834,21 @@ class TestProjectNameRendering:
     # ---- webhook (Slack/Mattermost) ----
     def test_webhook_title_prefixed_and_footer_paired(self):
         payload = WebhookChannel(webhook_url="https://x/hooks/y").build_payload(_proj_alert())
-        attachment = payload["attachments"][0]
-        assert attachment["title"] == "🔴 [my_monitoring] Alert: cpu_usage"
-        assert attachment["footer"] == "detectkit · my_monitoring"
+        # Title leads the base card; the brand footer rides the last (detail) card.
+        assert payload["attachments"][0]["title"] == "🔴 [my_monitoring] Alert: cpu_usage"
+        assert payload["attachments"][-1]["footer"] == "detectkit · my_monitoring"
 
     def test_webhook_footer_plain_without_project(self):
         payload = WebhookChannel(webhook_url="https://x/hooks/y").build_payload(
             _proj_alert(project_name=None)
         )
-        assert payload["attachments"][0]["footer"] == "detectkit"
+        assert payload["attachments"][-1]["footer"] == "detectkit"
 
     def test_webhook_custom_username_paired_with_project(self):
         payload = WebhookChannel(webhook_url="https://x/hooks/y", username="ops-bot").build_payload(
             _proj_alert()
         )
-        assert payload["attachments"][0]["footer"] == "ops-bot · my_monitoring"
+        assert payload["attachments"][-1]["footer"] == "ops-bot · my_monitoring"
 
     def test_webhook_custom_template_keeps_project_title_and_footer(self):
         """The opaque custom-template path still carries the project label."""

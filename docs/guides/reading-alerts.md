@@ -68,6 +68,12 @@ one means.
 | **Detectors / Parameters** | The technical checks that flagged it and their settings. Safe to ignore unless you're tuning the monitoring. |
 | **[name] prefix** | If the title starts with `[something]`, that's the **project** the alert came from — useful when several projects post to the same channel. |
 
+On **Slack and Mattermost** a long alert is kept tidy: the essentials — the lead
+line, **Value**, **Expected** and the action **links** — are always shown, and
+the secondary detail (Quorum / Severity / the exact began→latest timestamps /
+Detectors / Parameters) folds behind a **"Show more"** toggle you can expand when
+you need it.
+
 ### Value vs Expected — the one comparison that matters
 
 The fastest read is **Value against Expected**:

@@ -325,17 +325,29 @@ orchestrator stamps `AlertData.project_name` from `ProjectConfig.name`
 with the brand name (`detectkit · <project>`). Direct-API callers leave it
 `None` and render unchanged.
 
-- **Slack / Mattermost / generic webhook** (all via `WebhookChannel`) render one
-  message *attachment* — a status-colored accent bar, a clickable title (the
-  metric, linking to `dashboard_url` when set), a short markdown lead (the
-  duration sentence, see "Incident timing" below) with the **Rule** chip beneath
-  it, and a compact fields grid: short fields Value / Expected / Quorum /
-  Severity / Anomaly began / Latest reading (Anomaly began / Alert fired /
-  Recovered on recovery), then full-width
-  Detectors / Parameters, plus a branded footer + footer_icon. `@mentions` ride
-  in the **top-level** message text so they notify on Slack. A custom `template`
-  still renders as a plain text-only attachment (color/title/branding kept, no
-  fields grid).
+- **Slack / Mattermost / generic webhook** (all via `WebhookChannel`) render an
+  anomaly/recovery as **two stacked attachments** so a long alert folds in the
+  channel. Both platforms natively collapse only an attachment's `text` block
+  (Slack above 700 chars / 5 line breaks; Mattermost above ~200px of rendered
+  height) and **never** collapse the `fields` grid — so the rendering splits into
+  an always-visible **base card** and a foldable **detail card**:
+  - **base card** — a status-colored accent bar, a clickable title (the metric,
+    linking to `dashboard_url` when set), a short markdown lead (the duration
+    sentence, see "Incident timing" below) with the **Rule** chip beneath it, and
+    a compact fields grid kept to the essentials: **Value / Expected**, plus an
+    always-visible compact **Links** field (dashboard + extra links + the "how to
+    read this alert" guide as clickable labels). Never folds.
+  - **detail card** — a neutral (no accent bar) continuation carrying the verbose
+    tail as one markdown `text` block: Quorum / Severity / the anomalous span
+    (Anomaly began → Latest reading; began → fired → recovered on recovery) /
+    Detectors / Parameters (fenced code block). The chat client folds it behind a
+    "Show more" toggle once it's long.
+
+  No-data / error are short, so they render as a single base card. The branded
+  footer + footer_icon ride on the **last** attachment (the bottom of the whole
+  message). `@mentions` ride in the **top-level** message text so they notify on
+  Slack. A custom `template` still renders as a single plain text-only attachment
+  (color/title/branding kept, no fields grid, no fold split).
 - **Telegram** defaults to `parse_mode: HTML` (was Markdown). The default
   message is structured and HTML-escaped: a colored status dot (red anomaly /
   green recovery / yellow no-data / blue error), a bold headline, the lead +

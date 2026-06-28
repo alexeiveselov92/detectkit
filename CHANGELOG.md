@@ -5,7 +5,24 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.40.0] - 2026-06-27
+## [0.41.0] - 2026-06-28
+
+### Changed
+- **Slack / Mattermost alerts now fold their long tail behind "Show more".** Long
+  anomaly notifications no longer fill the channel: the webhook message is split
+  into an always-visible **base card** (the lead + Rule, **Value / Expected**, and
+  a compact always-visible **Links** field — dashboard / extra links / "how to read
+  this alert") and a neutral **detail card** carrying the verbose tail (Quorum /
+  Severity / the anomalous span / Detectors / Parameters) as one markdown text
+  block. Both Slack and Mattermost natively collapse only an attachment's *text*
+  block (Slack above 700 characters / 5 line breaks; Mattermost above ~200px of
+  height) and never the fields grid, so routing the bulk into the detail card lets
+  the platform fold it behind a **"Show more"** toggle while the value, the expected
+  band and the action links stay in view. No wording changed — same content, just a
+  layout that collapses. No-data / error alerts stay a single card; the branded
+  footer rides the last attachment; a custom `template` is unchanged (single
+  text-only attachment). Telegram and email are unaffected (no native fold). This is
+  webhook-only and needs no config.
 
 ### Added
 - **`dtk tune`: confirmed alerts now show up as incidents, and an optional

@@ -25,6 +25,7 @@ SKILL_FILE = ".claude/skills/dtk-new-metric/SKILL.md"
 SETUP_SKILL_FILE = ".claude/skills/dtk-setup-project/SKILL.md"
 FEEDBACK_SKILL_FILE = ".claude/skills/dtk-feedback/SKILL.md"
 AUTOTUNE_SKILL_FILE = ".claude/skills/dtk-autotune/SKILL.md"
+TUNE_SKILL_FILE = ".claude/skills/dtk-tune/SKILL.md"
 
 
 def _read(p: Path) -> str:
@@ -64,6 +65,10 @@ class TestFreshScaffold:
         assert autotune_skill.exists()
         assert "name: dtk-autotune" in _read(autotune_skill)
 
+        tune_skill = tmp_path / TUNE_SKILL_FILE
+        assert tune_skill.exists()
+        assert "name: dtk-tune" in _read(tune_skill)
+
     def test_block_points_to_rules_and_skill(self, tmp_path):
         run_init_claude(str(tmp_path))
         text = _read(tmp_path / "CLAUDE.md")
@@ -72,6 +77,7 @@ class TestFreshScaffold:
         assert "dtk-setup-project" in text
         assert "dtk-feedback" in text
         assert "dtk-autotune" in text
+        assert "dtk-tune" in text
         assert "autotune.md" in text
 
 

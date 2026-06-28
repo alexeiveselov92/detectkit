@@ -48,15 +48,25 @@ version — **read the relevant one on demand** instead of guessing:
   values that need your real connection details) and, optionally, a first alert
   channel.
 - **A new metric** — use the **`dtk-new-metric`** skill; it walks the config out
-  to a YAML file that validates and is ready to run.
-- **Tune / pick a detector, or build an alert from scratch and tune it** — use
-  the **`dtk-autotune`** skill; it gathers seasonality + incidents, runs
-  `dtk autotune`, and explains the chosen, annotated config (an automatic,
-  cross-validated search). For **hands-on** tuning instead, `dtk tune` opens a
-  browser view where you drag the detector's knobs against the real series and
-  write the result back in place — and its **Autotune** mode can run that same
-  search server-side and re-seed the knobs without leaving the cockpit (see
-  `cli.md`).
+  to a YAML file that validates and is ready to run. A robust starter is enough —
+  it's the **sandbox** the user then refines with one of the tuning skills below.
+- **Tune a detector (hands-on, recommended)** — use the **`dtk-tune`** skill: it
+  loads some history and opens an interactive browser **cockpit** where the user
+  turns the detector's knobs on their **real** series and watches the band,
+  anomalies and would-fire alerts recompute live, then **Apply**s the result back
+  into the metric YAML in place. It is the **umbrella** for tuning: its **Autotune**
+  mode runs the full `dtk autotune` engine **server-side** and re-seeds the knobs,
+  and its **Label / Review** modes mark or confirm incidents — so the user can
+  auto-search, hand-tune and label in one place. **Prefer this whenever the user
+  wants to be in the loop** (see, judge, adjust). This is also how you build an
+  alert from scratch and dial it in: scaffold the metric (`dtk-new-metric`), then
+  open the cockpit.
+- **Tune a detector (fully automatic)** — use the **`dtk-autotune`** skill: a
+  cross-validated **command-line** search (seasonality → detector → params →
+  window) that writes an annotated `__tuned_<id>.yml` without touching the
+  original. Best for CI or "just pick one for me, I won't look." It runs the same
+  engine `dtk-tune`'s Autotune mode does — pick the skill by whether the user wants
+  hands-on or hands-off.
 - **Hit a detectkit bug, or have feedback** — once you've ruled out a local
   config fix (see the gotchas below), use the **`dtk-feedback`** skill to file a
   redacted bug report, feature request, or comment as a GitHub issue on the

@@ -73,8 +73,12 @@ Pick with the user (see `detectors.md` for the decision table):
 - **Unsure** → `mad` (robust default), `threshold: 3.0`.
 
 If you don't yet know the right detector or parameters, scaffold a robust starter
-(`mad`, `threshold: 3.0`) and let the **`dtk-autotune`** skill pick the detector
-and tune it on real data / labeled incidents after this metric loads.
+(`mad`, `threshold: 3.0`) — treat it as a **sandbox** the user will refine on the
+real series after this metric loads. Two complementary ways to refine it (Step 7):
+the **`dtk-tune`** skill opens an interactive browser cockpit where they turn the
+knobs by hand and watch the band recompute live (with autotune built in), or the
+**`dtk-autotune`** skill searches for the best detector/params automatically. You
+don't need the perfect detector now — a sound starter is enough to open the cockpit.
 
 Set `window_size` to fit the data cadence (non-seasonal 100–500 points; seasonal
 several full cycles) and `min_samples` ≈ 10–30% of it. For a metric with a
@@ -163,6 +167,17 @@ dtk run --select <name> --steps detect    # confirm the detector runs
 dtk test-alert <name>                      # confirm channels work (if alerting)
 ```
 
-Report the created file path and the commands to run it for real. If the user
-wants the detector chosen or tuned automatically (rather than the starter
-config), hand off to the **`dtk-autotune`** skill now.
+Report the created file path and the commands to run it for real. Then offer to
+**refine the starter on the real series** — the metric so far is a sandbox, and
+this is where most of the value is. Pick the path with the user:
+
+- **Hands-on / "let me see and turn the knobs"** → the **`dtk-tune`** skill: it
+  loads some history and opens an interactive browser cockpit where they adjust
+  the detector live and **Apply** the result back. Its **Autotune** mode runs the
+  automatic search *in place* too, so this one path covers both styles — prefer it
+  whenever the user wants to be in the loop.
+- **Fully automatic / "just pick one for me"** → the **`dtk-autotune`** skill: a
+  cross-validated command-line search that writes an annotated tuned config
+  (optionally against incidents you label first).
+
+If they're happy with the robust starter for now, they can just run it and tune later.

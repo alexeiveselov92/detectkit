@@ -12,7 +12,7 @@ It writes three things into the target directory:
 - ``.claude/rules/detectkit/`` — the reference docs the assistant reads on
   demand (overview, cli, project, metrics, detectors, alerting, autotune).
 - ``.claude/skills/`` — user-facing skills (``dtk-setup-project``,
-  ``dtk-new-metric``, ``dtk-autotune``, ``dtk-feedback``).
+  ``dtk-new-metric``, ``dtk-tune``, ``dtk-autotune``, ``dtk-feedback``).
 
 The source of truth for all of the above lives in ``detectkit/cli/assets/claude``
 and ships with the package, so re-running this command after upgrading detectkit

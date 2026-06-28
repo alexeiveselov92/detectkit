@@ -5,6 +5,34 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.46.0] - 2026-06-29
+
+### Changed
+- **Slack / Mattermost alerts are now one collapsible card, not two.** The
+  v0.41.0 "fold the long tail" change split the webhook message into a **base
+  card** plus a neutral **detail card** — but in practice that read as *two*
+  blocks (the second with its own grey accent bar, looking like a separate,
+  differently-colored alert), and the detail card's short `text` usually never
+  reached the height that trips the platform fold, so nothing collapsed. The
+  webhook message is now a **single status-colored attachment** whose whole body
+  rides in one markdown `text` block, ordered **most-important-first** (lead +
+  Rule → Value / Expected → the action **Links** line → then the verbose tail:
+  Quorum / Severity / the anomalous span / Detectors / Parameters). Because Slack
+  and Mattermost fold **only** an attachment's `text` (Mattermost wraps it in a
+  200px `<ShowMore>`; the `title`, the color bar and the `footer` render
+  *outside* the fold), a long anomaly now collapses its tail behind **"Show
+  more"** as **one block with one color** — exactly like a reference AlertManager
+  alert — while the essentials stay in view. No wording changed; no-data / error
+  alerts stay short, single un-folded cards (a long anomaly, or a full recovery
+  timeline, folds its tail). Webhook-only; no config.
+
+### Fixed
+- **The brand logo now stays visible when an alert is collapsed.** The branded
+  footer + footer icon (the detectkit logo) ride on the single attachment, and
+  since a chat client renders an attachment's footer *outside* the "Show more"
+  text fold, the logo is now always visible at the bottom of the message — even
+  when the body is collapsed. Previously it sat on the foldable second card.
+
 ## [0.45.1] - 2026-06-28
 
 ### Fixed

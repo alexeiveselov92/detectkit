@@ -81,10 +81,17 @@ class TestBuildContext:
 # Per-channel native rendering
 # --------------------------------------------------------------------------
 def _links_value(payload):
-    """The compact 'Links' attachment field value, or None when absent."""
-    fields = payload["attachments"][0]["fields"]
-    matches = [f for f in fields if f["title"] == "Links"]
-    return matches[0]["value"] if matches else None
+    """The compact 'Links' body line from the single attachment, or None.
+
+    Links now ride as one ``**Links** …`` line inside the attachment's foldable
+    ``text`` block (the two-card split was collapsed into one colored card), so
+    pull that line out of ``text`` rather than a ``fields`` entry.
+    """
+    text = payload["attachments"][0].get("text", "")
+    for ln in text.splitlines():
+        if "Links" in ln:
+            return ln
+    return None
 
 
 class TestWebhookRendering:

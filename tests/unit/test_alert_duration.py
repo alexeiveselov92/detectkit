@@ -148,23 +148,27 @@ def test_build_context_fallback_without_interval():
 
 
 # --------------------------------------------------------------------------- #
-# Webhook layout — description → Rule → Value/Expected, Started/Latest fields
+# Webhook layout — base card (value/expected/links) + foldable detail card
 # --------------------------------------------------------------------------- #
 def test_webhook_anomaly_layout():
     ch = WebhookChannel(webhook_url="https://example.com/hook")
     payload = ch.build_payload(_anomaly_alert())
-    att = payload["attachments"][0]
+    base, detail = payload["attachments"][0], payload["attachments"][1]
 
-    # Lead leads with the description, the Rule chip sits right below it.
-    lead = att["text"]
+    # Base lead leads with the description, the Rule chip sits right below it.
+    lead = base["text"]
     assert lead.index("Anomalous for") < lead.index("Rule")
 
-    titles = [f["title"] for f in att["fields"]]
-    assert "Anomaly began" in titles
-    assert "Latest reading" in titles
-    assert "Quorum" in titles
-    # Value/Expected precede the began/latest span.
-    assert titles.index("Value") < titles.index("Anomaly began")
+    # The always-visible base keeps the value + the band; the span/quorum fold.
+    base_titles = [f["title"] for f in base["fields"]]
+    assert "Value" in base_titles
+    assert "Expected" in base_titles
+    assert "Quorum" not in base_titles
+
+    # The verbose tail folds into the neutral detail card's text block.
+    assert "Quorum" in detail["text"]
+    assert "Anomaly began" in detail["text"]
+    assert "Latest reading" in detail["text"]
 
 
 def test_webhook_recovery_layout():
@@ -176,13 +180,13 @@ def test_webhook_recovery_layout():
         severity=0.0,
         detector_name="mad",
     )
-    att = ch.build_payload(data)["attachments"][0]
+    payload = ch.build_payload(data)
 
-    assert "Incident lasted" in att["text"]
-    titles = [f["title"] for f in att["fields"]]
-    assert "Anomaly began" in titles
-    assert "Alert fired" in titles
-    assert "Recovered" in titles
+    assert "Incident lasted" in payload["attachments"][0]["text"]
+    detail = payload["attachments"][1]["text"]
+    assert "Anomaly began" in detail
+    assert "Alert fired" in detail
+    assert "Recovered" in detail
 
 
 # --------------------------------------------------------------------------- #

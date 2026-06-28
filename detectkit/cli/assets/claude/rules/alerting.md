@@ -192,15 +192,25 @@ leads with a colored **status circle** — 🔴 anomaly, 🟢 recovery, 🟡 no-
 **project name** as a `[name] ` prefix (from `detectkit_project.yml`) — see
 [Project label](#project-label-multi-project-channels) below.
 
-- **Slack / Mattermost / generic webhook** — one message *attachment* with a
-  status-colored accent bar, a clickable title (the metric; links to
-  `dashboard_url` when set), a short markdown lead (the duration sentence — see
-  "Incident timing" below) with the **Rule** chip beneath it, and a compact
-  fields grid: short fields Value / Expected / Quorum / Severity / Anomaly began /
-  Latest reading (Anomaly began / Alert fired / Recovered on recovery), then full-width Detectors / Parameters,
-  plus a branded footer + footer icon. @mentions ride in the **top-level**
-  message text so they notify. A custom `template` instead renders as a plain
-  text-only attachment (color/title/ branding kept, no fields grid).
+- **Slack / Mattermost / generic webhook** — an anomaly/recovery renders as
+  **two stacked attachments** so long alerts fold in the channel. Both platforms
+  collapse only an attachment's `text` block behind a "Show more" toggle (Slack
+  above 700 chars / 5 line breaks; Mattermost above ~200px) and never collapse
+  the `fields` grid, so the message splits into:
+  - an always-visible **base card** — status-colored accent bar, a clickable
+    title (the metric; links to `dashboard_url` when set), a short markdown lead
+    (the duration sentence — see "Incident timing" below) with the **Rule** chip
+    beneath it, and a compact fields grid kept to **Value / Expected** plus an
+    always-visible compact **Links** field (dashboard + extra links + the "how to
+    read this alert" guide as clickable labels);
+  - a neutral, foldable **detail card** — the verbose tail as one markdown
+    `text` block: Quorum / Severity / the anomalous span (Anomaly began → Latest
+    reading; began → fired → recovered on recovery) / Detectors / Parameters.
+
+  No-data / error stay a single base card. The branded footer + footer icon ride
+  on the **last** attachment. @mentions ride in the **top-level** message text so
+  they notify. A custom `template` instead renders as a single plain text-only
+  attachment (color/title/branding kept, no fields grid, no fold split).
 - **Telegram** — default `parse_mode` is now **HTML**. The default message is
   structured and HTML-escaped: a colored status dot (red anomaly / green
   recovery / yellow no-data / blue error), a bold headline, the lead + rule, then

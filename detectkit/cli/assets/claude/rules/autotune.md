@@ -17,6 +17,14 @@ same windowed detectors and `detector_id` identity). The fastest path is the
 > `metrics/.history/<metric>/` first). Use `autotune` to search automatically and
 > emit a new file; use `tune` to dial a detector in by eye and commit it. See
 > `cli.md`.
+>
+> **You can also run this engine *inside* `dtk tune`** — its **Autotune** mode runs
+> the same search **server-side** (using the incidents you've marked as ground
+> truth), re-seeds the knobs with the winner, and lets you **Apply** in place. That's
+> the same computation as this command; the difference is it edits the metric YAML in
+> place (advisory — no run record / `__tuned_<id>.yml` / persisted detections) rather
+> than emitting a new tuned file. Reach for `dtk autotune` when you want the audited
+> run + tuned file + persisted winner detections.
 
 ## What it searches
 

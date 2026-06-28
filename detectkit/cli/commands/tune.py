@@ -143,6 +143,10 @@ def run_tune(
         metric_name=name,
         incidents_dir=incidents_dir,
         interval_seconds=interval_seconds,
+        # Enable the server-side Autotune mode: the config (autotune block, interval)
+        # + a DB handle to reload the metric's history for the engine.
+        metric_config=config,
+        internal_manager=internal_manager,
     )
     if applied is None:
         echo_noop(name, "tuning cancelled — metric unchanged")

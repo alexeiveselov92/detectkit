@@ -13,7 +13,35 @@ from detectkit.tuning.payload import (
     _seed_direction,
     build_tune_payload,
     default_window_points,
+    seed_detector_params,
 )
+
+
+def test_seed_detector_params_maps_autotune_winner():
+    """The shared snake->camel seam used to re-seed the controls from an autotune result."""
+    seed = seed_detector_params(
+        "zscore",
+        {
+            "threshold": 4.0,
+            "window_size": 240,
+            "window_weights": "exponential",
+            "half_life": 30,
+            "detrend": "linear",
+            "seasonality_components": [["hour"]],
+            "min_samples_per_group": 6,
+        },
+    )
+    assert seed["type"] == "zscore"
+    assert seed["threshold"] == 4.0
+    assert seed["windowSize"] == 240
+    assert seed["windowWeights"] == "exponential"
+    assert seed["halfLife"] == 30
+    assert seed["detrend"] == "linear"
+    assert seed["seasonalityComponents"] == [["hour"]]
+    assert seed["minSamplesPerGroup"] == 6
+    # absent windowed knobs still carry sane defaults (no empty sliders)
+    assert seed["smoothing"] == "none"
+    assert seed["lowerBound"] is None
 
 
 class FakeInternal:
@@ -148,6 +176,9 @@ def test_build_payload_shape():
     assert payload["project"] == "demo"
     assert payload["interval_seconds"] == 3600
     assert payload["save_url"] is None
+    # endpoints are injected by the server, not the builder
+    assert payload["labels_save_url"] is None
+    assert payload["autotune_url"] is None
     assert payload["consecutive_anomalies"] == 4
     # points + seasonality are aligned 1:1
     assert len(payload["points"]) == len(payload["seasonality"]) == 48

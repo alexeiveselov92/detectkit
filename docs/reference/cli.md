@@ -793,7 +793,8 @@ The whole screen is **one chart** (the windshield) with the live metrics pinned 
 a HUD over it (the speedometer) and every control in an **always-visible side rail**
 that is **mode-aware** — it shows only the current mode's panel (detector knobs +
 effective-config readout + Apply in Tune, verdict actions in Review, capture tools +
-Save in Label) and collapses to give the chart the whole width. The controls that
+Save in Label, the search button + winner in Autotune) and collapses to give the
+chart the whole width. The controls that
 aren't detector-specific — the **Points shown** data window, the alert rule
 (**direction** + **consecutive anomalies**) and the **y = 0** toggle — stay visible
 in every mode. A **mode switch** picks the job and dims the layers that don't matter
@@ -816,6 +817,15 @@ to it:
   click or value, **above**/**below**, optional gap-bridge, optional painted time
   window saved as `capture_windows`; each span widened to a full interval so the
   alert lands inside).
+- **Autotune** — **Run autotune** launches the [`dtk autotune`](autotune.md) engine
+  **server-side** over the metric's full history, using your marked incidents as
+  ground truth, then **re-seeds every knob** with the winning detector and shows the
+  score + decision log; the chart leads with the band, like Tune. It is **advisory**
+  — it computes + re-seeds only and writes nothing until you **Apply** (no run record
+  / `__tuned_<id>.yml` / persisted detections, so `dtk tune` stays lock-free). It
+  honours the metric's `autotune:` block, runs **supervised** when incidents are
+  marked (also choosing `consecutive_anomalies`) else **unsupervised**, and needs the
+  live server (unavailable under `--no-serve`).
 
 As you tune, a metrics bar shows **incident catch rate (recall)** — the share of
 ground-truth incidents (marked + confirmed-valid alerts) caught by an alert (caught

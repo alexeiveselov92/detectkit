@@ -1197,9 +1197,11 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   }
 
   // Emit the LIVE array (not a copy) so the caller and chart share one source of
-  // truth — list-edited labels and drag-edited spans never diverge.
-  function emitIncidents(): void {
-    opts.onIncidentsChange?.(incidents);
+  // truth — list-edited labels and drag-edited spans never diverge. `removed` is set
+  // only when a span was DELETED (not on create/edit), so the cockpit can retract a
+  // confirmed-alert verdict the deleted incident overlapped instead of resurfacing it.
+  function emitIncidents(removed?: Incident): void {
+    opts.onIncidentsChange?.(incidents, removed);
   }
 
   function removeIncident(iv: Incident): void {
@@ -1208,7 +1210,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     incidents.splice(k, 1);
     if (selIncident === iv) selIncident = null;
     hoverDelIdx = -1;
-    emitIncidents();
+    emitIncidents(iv);
     schedule();
   }
 

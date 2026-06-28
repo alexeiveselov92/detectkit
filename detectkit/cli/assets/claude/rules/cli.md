@@ -126,6 +126,11 @@ un-confirms the alert), counts toward recall + correct, and is written on Save �
 clean metric whose alerts are all good is validated in a few clicks **without
 hand-drawing spans**. The list, the live metrics and Save share **one** ground-truth
 set (hand-marked spans **plus** confirmed-valid alerts, deduped by overlap).
+**Deleting** an incident (the chart's ✕ / Delete key **or** the list's ✕) also
+**retracts** any confirmed-valid alert verdict it overlapped, so it's fully removed
+instead of reappearing as a "✓ confirmed alert" row — the chart-✕ and list-✕ behave
+identically (a `false`-alarm verdict, and a confirmed alert that doesn't overlap the
+deleted span, are left alone).
 As you tune, a metrics bar shows **incident catch rate (recall)** — how many
 ground-truth incidents (marked + confirmed) your config catches (an incident is
 caught when an alert's anomaly **streak overlaps** it, not just the fire instant) —

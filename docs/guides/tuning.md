@@ -165,7 +165,9 @@ To mark ground truth directly, switch to **Label**:
 
 - **Drag** across the chart to mark an incident span; **drag its edges** to adjust,
   **drag its middle** to move, and click its **✕** (or select it and press
-  **Delete**) to remove it.
+  **Delete**) to remove it. Removing an incident this way also **un-confirms** any
+  overlapping confirmed-valid alert, so it's fully gone — it won't pop back as a
+  "✓ confirmed alert" row (the chart's ✕ and the list's ✕ behave the same).
 - **Lasso anomalies** — the fastest way to turn what the detector flags into ground
   truth: click **Lasso anomalies**, then **draw a freeform loop** around a cloud of
   anomaly dots. Each **run of consecutive anomalies** (small gaps — up to your

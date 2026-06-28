@@ -85,6 +85,13 @@ rendered on the docs site under **For developers**). Read the relevant one:
   hand-marked spans **plus** confirmed-valid alerts (derived from the stored
   verdict, not the current fire, so a confirmed incident stays scored — as a recall
   *miss* — even if the detector no longer fires there), deduped by overlap.
+  **Deleting** a hand-marked incident (chart ✕ / Delete key **or** the list ✕)
+  **retracts any confirmed-valid verdict it overlapped** (`retractConfirmationFor`,
+  mirroring `unconfirmAlert`), so the span is fully removed instead of the hidden
+  verdict **resurfacing** as a "✓ confirmed alert" row — the two delete paths stay in
+  lockstep (the chart threads the removed span via `onIncidentsChange(incidents,
+  removed)`); explicit `false` verdicts and non-overlapping confirmed alerts are left
+  alone.
   Watch live **catch-rate (recall)** / **false-alert rate (FDR)** / **reviewed**
   metrics — matched on each alert's anomaly **streak span**, not just the fire
   instant — as you tune; an optional **false-alert budget** (`false_alert_budget`,

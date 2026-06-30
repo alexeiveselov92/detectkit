@@ -297,6 +297,7 @@ referenced by path). Key variables:
 | Variable | Meaning |
 |---|---|
 | `{metric_name}`, `{description}` / `{description_line}` | identity |
+| `{synonyms}` / `{synonyms_line}` | alt names from `ai_context.synonyms` (opt-in; not in default templates — add `{synonyms_line}` for an "Also known as: …" line) |
 | `{project_name}` / `{project_name_prefix}` | project label (`"[name] "` prefix, or `""`) |
 | `{timestamp}`, `{timezone}` | when (display tz via `alerting.timezone`, default UTC) |
 | `{value}` / `{value_display}` | metric value (`value_display` is NaN-safe) |

@@ -1130,6 +1130,66 @@ Re-run with --execute to apply.
 
 ---
 
+## `dtk osi`
+
+Interop with [Open Semantic Interchange](https://github.com/open-semantic-interchange/OSI)
+(OSI) semantic models — define a metric once in a governed OSI model and consume
+it in detectkit. A **separate, additive** command group: it never runs the
+pipeline, takes no lock, and its converter package is not imported by
+load/detect/alert, so it cannot affect a running project. OSI is treated as an
+*interchange* format, not an execution engine (detectkit does not build a live
+OSI→SQL runtime — it converts at the edges).
+
+sqlglot is needed only for the ClickHouse target — install the optional extra:
+
+```bash
+pip install 'detectkit[osi]'
+```
+
+### `dtk osi import`
+
+Resolve one metric from an OSI model and **scaffold a normal native detectkit
+metric** (SQL query, interval, a starter detector, the metric's `ai_context`).
+Review the output and commit it like any hand-written metric — there is no
+runtime dependency on OSI.
+
+```bash
+# preview the SQL only
+dtk osi compile model.osi.yml --metric total_sales --interval 1h
+
+# ClickHouse target: direct query from the dataset's physical `source`
+dtk osi import model.osi.yml --metric total_sales --interval 1h --out metrics/
+
+# Cube target: a Cube SQL-API MEASURE() query (alerts match the dashboard number)
+dtk osi import model.osi.yml --metric total_sales --interval 1h \
+  --target cube --cube store_sales --time-field sold_at --out metrics/
+```
+
+Only provably per-bucket-additive measures compile — `SUM`, `COUNT`,
+`COUNT(DISTINCT)`, `AVG`, `MIN`, `MAX`, and ratios of them (e.g.
+`SUM(x) / NULLIF(COUNT(DISTINCT y), 0)`). Window functions, non-aggregate
+expressions and unsupported aggregates are **refused** with a message to use
+`query_file:` — detectkit never emits a plausible-but-wrong series.
+
+Key options: `--target {clickhouse,cube}`, `--dataset`, `--time-field`,
+`--where`, `--cube` / `--cube-measure` / `--time-dimension` (cube target),
+`--seasonality a,b`, `--detector <type>`, `--out <file|dir>`, `--force`.
+
+### `dtk osi export`
+
+Publish native detectkit metrics into an OSI fragment. Each metric becomes an OSI
+`metrics` entry carrying its `ai_context` plus the **exact** detect/alert config
+in a `custom_extensions[detectkit]` block (a JSON string, per the OSI spec), so a
+detectkit-aware reader round-trips it losslessly while other OSI tools still see
+the metric name + `ai_context`.
+
+```bash
+dtk osi export --out semantic/detectkit.osi.yml          # all metrics
+dtk osi export --select tag:critical                     # a subset, to stdout
+```
+
+---
+
 ## Exit Codes
 
 | Code | Meaning |

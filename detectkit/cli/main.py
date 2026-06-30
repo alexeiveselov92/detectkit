@@ -515,5 +515,13 @@ def clean(select: str, orphaned_metrics: bool, execute: bool, yes: bool, profile
     )
 
 
+# OSI (Open Semantic Interchange) interop — a self-contained command group
+# (`dtk osi import` / `export` / `compile`). Isolated from the load/detect/alert
+# pipeline; its module only imports click/yaml at load time (sqlglot stays lazy).
+from detectkit.cli.commands.osi import osi as _osi_group  # noqa: E402
+
+cli.add_command(_osi_group)
+
+
 if __name__ == "__main__":
     cli()

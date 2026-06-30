@@ -507,6 +507,59 @@ class AutoTuneConfig(BaseModel):
         return self
 
 
+class AiContextConfig(BaseModel):
+    """OSI-compatible AI grounding for a metric (purely descriptive).
+
+    Mirrors the OSI ``ai_context`` shape (``instructions`` / ``synonyms`` /
+    ``examples``) verbatim, so a metric's business meaning, alternative names and
+    example values are portable to and from an OSI semantic model (Open Semantic
+    Interchange). It is surfaced to humans and agents — synonyms ride into alerts
+    as an "Also known as" line, the whole block is baked into the ``dtk tune``
+    cockpit payload, and it is shipped to the assistant via ``dtk init-claude`` —
+    but it **never** affects the load/detect/alert pipeline or the detector id. A
+    metric with no ``ai_context`` behaves exactly as before.
+
+    Accepts either the full mapping or a bare string (lifted to ``instructions``):
+
+        ```yaml
+        ai_context: "Revenue recognized at order completion, net of refunds."
+        # or
+        ai_context:
+          instructions: "Revenue recognized at order completion, net of refunds."
+          synonyms: ["total revenue", "gross sales"]
+          examples: ["12030.50", "9821.00"]
+        ```
+    """
+
+    instructions: str | None = Field(
+        default=None,
+        description="Business meaning / how to interpret the metric (grounds humans + LLMs)",
+    )
+    synonyms: list[str] = Field(
+        default_factory=list,
+        description="Alternative names for the metric (grounding + the alert 'Also known as' line)",
+    )
+    examples: list[str] = Field(
+        default_factory=list,
+        description="Illustrative example values or phrasings (grounding only)",
+    )
+
+    @field_validator("synonyms", "examples")
+    @classmethod
+    def _clean_str_list(cls, v: list[str]) -> list[str]:
+        """Drop blank/whitespace-only entries (trimming each), preserving order and
+        de-duplicating, so a stray empty YAML entry can't leak a bare comma into the
+        rendered "Also known as" line."""
+        seen: set[str] = set()
+        cleaned: list[str] = []
+        for item in v:
+            s = str(item).strip()
+            if s and s not in seen:
+                seen.add(s)
+                cleaned.append(s)
+        return cleaned
+
+
 class MetricConfig(BaseModel):
     """
     Configuration for a single metric.
@@ -602,7 +655,7 @@ class MetricConfig(BaseModel):
         """Normalize alerting to list. Accepts single dict/AlertConfig (backward compat) or list."""
         if v is None:
             return None
-        if isinstance(v, (dict, AlertConfig)):
+        if isinstance(v, dict | AlertConfig):
             return [v]
         return v
 
@@ -611,6 +664,19 @@ class MetricConfig(BaseModel):
     )
     autotune: AutoTuneConfig | None = Field(
         default=None, description="Optional auto-tuning constraints (for `dtk autotune`)"
+    )
+    # OSI-compatible AI grounding (instructions/synonyms/examples). Descriptive
+    # only: surfaced in alerts (synonyms → "Also known as"), the `dtk tune`
+    # cockpit and assistant grounding, but never touches load/detect/alert or the
+    # detector id. Mirrors OSI's `ai_context` so a metric's meaning is portable to
+    # and from an OSI semantic model. Accepts a bare string (→ instructions).
+    ai_context: AiContextConfig | None = Field(
+        default=None,
+        description=(
+            "Optional OSI-compatible AI grounding (instructions/synonyms/examples). "
+            "Descriptive only — surfaced in alerts, the tune cockpit and assistant "
+            "grounding; never affects load/detect/alert or the detector id."
+        ),
     )
     # Per-metric false-alert-rate (FDR) budget for manual tuning, overriding the
     # project-wide `false_alert_budget`. The `dtk tune` cockpit flags — non
@@ -635,6 +701,15 @@ class MetricConfig(BaseModel):
             return v
         if not 0.0 < v <= 1.0:
             raise ValueError("false_alert_budget must be a fraction in (0, 1] (e.g. 0.3 = 30%)")
+        return v
+
+    @field_validator("ai_context", mode="before")
+    @classmethod
+    def _accept_ai_context_string(cls, v: Any) -> Any:
+        """Allow ``ai_context: "free text"`` as shorthand for ``{instructions: ...}``,
+        mirroring OSI's ``ai_context`` which is itself either a string or a struct."""
+        if isinstance(v, str):
+            return {"instructions": v}
         return v
 
     # Parsed interval (computed from string/int)

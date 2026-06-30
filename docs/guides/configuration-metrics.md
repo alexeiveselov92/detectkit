@@ -11,6 +11,8 @@ description: |                   # Optional: multi-line, surfaces as {descriptio
   CPU usage monitoring metric.
   Tracks system load over time.
 tags: [critical, infrastructure] # Optional: drives `dtk run --select tag:critical`
+ai_context:                      # Optional: OSI-compatible grounding (descriptive only)
+  synonyms: ["cpu load"]         #   alt names → opt-in {synonyms} alert var + tune cockpit
 profile: prod                   # Optional: override default_profile
 enabled: true                   # Optional: disable metric
 
@@ -86,6 +88,27 @@ Must be unique across all metrics in the project.
 Free-form description of the metric. Supports multi-line text (use a YAML
 block scalar `|`). Surfaced in alert templates as the `{description}` and
 `{description_line}` variables.
+
+#### `ai_context` (string or mapping, optional)
+OSI-compatible grounding for the metric — its business meaning, alternative
+names and example values — mirroring the
+[Open Semantic Interchange](https://github.com/open-semantic-interchange/OSI)
+`ai_context` shape so a metric's meaning is portable to and from an OSI semantic
+model. Accepts a bare string (lifted to `instructions`) or the full mapping:
+
+```yaml
+ai_context:
+  instructions: "Revenue recognized at order completion, net of refunds (UTC)."
+  synonyms: ["total revenue", "gross sales"]
+  examples: ["12030.50", "9821.00"]
+```
+
+It is **purely descriptive** — it never affects load/detect/alert or the
+detector id, and it does **not** change any default-rendered alert message. The
+`synonyms` are exposed to alert templates as the opt-in `{synonyms}` /
+`{synonyms_line}` variables (so a custom `template` can add an "Also known as: …"
+line), and the whole block is shown as read-only grounding in the `dtk tune`
+cockpit. A metric with no `ai_context` behaves exactly as before.
 
 #### `tags` (list of strings, optional)
 Labels for selecting metrics on the command line. Run all metrics carrying a

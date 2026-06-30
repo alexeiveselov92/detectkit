@@ -107,8 +107,8 @@ It is **purely descriptive** — it never affects load/detect/alert or the
 detector id, and it does **not** change any default-rendered alert message. The
 `synonyms` are exposed to alert templates as the opt-in `{synonyms}` /
 `{synonyms_line}` variables (so a custom `template` can add an "Also known as: …"
-line), and the whole block is shown as read-only grounding in the `dtk tune`
-cockpit. A metric with no `ai_context` behaves exactly as before.
+line), and the whole block is carried in the `dtk tune` cockpit payload as
+read-only grounding. A metric with no `ai_context` behaves exactly as before.
 
 #### `tags` (list of strings, optional)
 Labels for selecting metrics on the command line. Run all metrics carrying a

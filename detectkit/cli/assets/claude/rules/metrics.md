@@ -74,9 +74,9 @@ Accepts a bare string (→ `instructions`) or the full mapping. It is **purely
 descriptive**: it never affects load/detect/alert or the detector id, and it does
 **not** change any default-rendered alert. The `synonyms` are exposed to alert
 templates as the **opt-in** `{synonyms}` / `{synonyms_line}` variables (a custom
-`template` can add an "Also known as: …" line), and the whole block is shown as
-read-only grounding in the `dtk tune` cockpit. Omit it and everything renders as
-before.
+`template` can add an "Also known as: …" line), and the whole block is carried in
+the `dtk tune` cockpit payload as read-only grounding. Omit it and everything
+renders as before.
 
 ## `interval` (required)
 

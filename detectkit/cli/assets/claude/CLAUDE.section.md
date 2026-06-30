@@ -40,6 +40,7 @@ version — **read the relevant one on demand** instead of guessing:
 | Alert rules (quorum/direction/consecutive), cooldown, recovery, templates | `.claude/rules/detectkit/alerting.md` |
 | Auto-tuning a detector (`dtk autotune`), labels file, the `autotune:` block, `_dtk_autotune_runs` | `.claude/rules/detectkit/autotune.md` |
 | Manually/interactively tuning a detector in the browser and writing it back in place (`dtk tune`) | `.claude/rules/detectkit/cli.md` |
+| OSI (Open Semantic Interchange) interop: import an OSI metric into a native metric / export back (`dtk osi`) | `.claude/rules/detectkit/cli.md` |
 
 ### Skills
 

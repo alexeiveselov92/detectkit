@@ -101,6 +101,11 @@ detectkit/
 │   ├── config_writer.py         # apply_tuned_config: validate → archive to metrics/.history → re-emit in place
 │   ├── server.py                # serve_tuner/build_tune_server: localhost write-back (POST /apply, /labels, /autotune)
 │   └── assets/tune.js           # committed renderer bundle (shared detector port; ships in the wheel)
+├── semantic/                    # OSI (Open Semantic Interchange) interop — `dtk osi` (isolated; pipeline never imports it)
+│   ├── osi_model.py             # lenient pydantic OSI models + custom_extensions / ai_context helpers
+│   ├── query_gen.py             # OSI expr → ClickHouse/Cube series SQL (sqlglot; additive allowlist + hard-refuse)
+│   ├── importer.py              # OSI metric → native MetricConfig scaffold (`dtk osi import`)
+│   └── exporter.py              # MetricConfig → OSI fragment + custom_extensions[detectkit] (`dtk osi export`)
 └── utils/                       # datetime, json (sorted/orjson), env interpolation, stats
 ```
 

@@ -56,6 +56,19 @@ interface WorkerResult {
 /** The detector seed (camelCase DetectorParams minus the alert-only knobs). */
 type DetectorSeed = Omit<DetectorParams, 'consecutiveAnomalies' | 'direction'>;
 
+/** One of the metric's configured detectors (for the picker + preserve note). */
+interface DetectorEntry {
+  /** slot in the metric's YAML `detectors:` list (what Apply rewrites/preserves). */
+  index: number;
+  type: string;
+  /** true for mad/zscore/iqr/manual_bounds; false for prophet/timesfm (preserved, not tunable). */
+  tunable: boolean;
+  /** camelCase control seed for tunable detectors; null for non-tunable ones. */
+  seed: DetectorSeed | null;
+  /** compact one-line summary for display (e.g. `mad · threshold=3 · window=8640`). */
+  summary: string;
+}
+
 interface TunePoint {
   t: number;
   v: number | null;
@@ -72,6 +85,10 @@ interface TunePayload {
   seasonality: Array<Record<string, number>>;
   seasonality_columns: string[];
   detector: DetectorSeed;
+  /** every configured detector, for the picker + the "preserved on Apply" note. */
+  detectors?: DetectorEntry[];
+  /** slot the cockpit opens on (first windowed, then first tunable); null = none tunable. */
+  detector_index?: number | null;
   consecutive_anomalies: number;
   /** alert-layer direction the view filter seeds to ('any' = both). */
   direction?: AlertDirection;
@@ -222,7 +239,13 @@ function rangeControl(
   input.step = String(opts.step);
   input.value = String(opts.value);
   out.textContent = fmt(opts.value);
+  // Live value echo WHILE dragging (cheap), but fire the (expensive) onChange only
+  // on `change` — i.e. when the drag is released — so pausing mid-drag with the
+  // button still held doesn't kick off a recompute. Keyboard arrows fire both.
   input.oninput = (): void => {
+    out.textContent = fmt(Number(input.value));
+  };
+  input.onchange = (): void => {
     const v = Number(input.value);
     out.textContent = fmt(v);
     onChange(v);
@@ -441,8 +464,34 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     });
 
   // ---- mutable parameter state, seeded from the metric's current config -----
-  const seed = payload.detector;
+  // `seed` is the ACTIVE detector's seed — the picker (a multi-detector metric)
+  // re-seeds it when you switch which detector you're tuning. readParams() reads
+  // the passthrough knobs (minSamples/inputType/smoothing*/minSamplesPerGroup) off it.
+  let seed = payload.detector;
   let consecutive = payload.consecutive_anomalies;
+
+  // ---- multi-detector picker state ------------------------------------------
+  // The cockpit tunes ONE detector at a time but a metric can configure several
+  // (e.g. a mad pattern detector + a manual_bounds floor). We open on `activeIndex`
+  // (the slot the payload picked), remember each detector's live params across
+  // switches (`editedParams`), and track which slots the user actually edited
+  // (`dirty`). On Apply we write back ONLY the active + dirty slots — every other
+  // detector is preserved verbatim by the server, so a retune can't silently drop a
+  // floor and kill a min_detectors>=2 alert (the reported bug).
+  const detectorEntries: DetectorEntry[] = payload.detectors || [];
+  let activeIndex: number | null =
+    typeof payload.detector_index === 'number' ? payload.detector_index : null;
+  // The slot the cockpit opened on — "the detector you came to tune". It is written
+  // on Apply even if you didn't move a knob (matching single-detector behaviour). A
+  // detector you merely SWITCHED the picker to but never edited is NOT written, so a
+  // lower-bound-only manual_bounds floor can't gain a phantom upper_bound just from
+  // being looked at.
+  const initialIndex: number | null = activeIndex;
+  const dirty = new Set<number>();
+  const editedParams = new Map<number, DetectorParams>();
+  const markActiveDirty = (): void => {
+    if (activeIndex != null) dirty.add(activeIndex);
+  };
 
   // manual_bounds support: derive the value domain from the REAL series so the
   // lower/upper sliders have a sensible range, and seed default bounds. If the
@@ -1139,15 +1188,22 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   // (large) series once, then only params per recompute. Stale results (an older
   // id) are dropped so only the latest knob state paints. Debounce so a slider
   // DRAG fires one recompute when it settles, not one per frame.
-  const worker = new Worker(
-    URL.createObjectURL(new Blob([__DTK_WORKER_SRC__], { type: 'text/javascript' })),
+  // One blob URL, reused across (re)spawns — no per-spawn leak.
+  const workerUrl = URL.createObjectURL(
+    new Blob([__DTK_WORKER_SRC__], { type: 'text/javascript' }),
   );
-  worker.postMessage({ type: 'series', series });
+  let worker: Worker;
   let reqId = 0;
+  let inFlight = false;
   let lastParams: DetectorParams | null = null;
-  worker.onmessage = (e: MessageEvent): void => {
+  const onWorkerMessage = (e: MessageEvent): void => {
     const res = e.data as WorkerResult;
+    // Only the CURRENT request clears the in-flight flag. A stale message (an old
+    // worker's result that slipped through before terminate, or an out-of-order id)
+    // must NOT clear it — the live compute is still running, and clearing it here
+    // would let the next knob-change queue behind that compute instead of killing it.
     if (res.type !== 'result' || res.id !== reqId || !lastParams) return; // ignore stale
+    inFlight = false;
     spinner.classList.remove('on');
     const params = lastParams;
     lastScored = res.scored;
@@ -1164,13 +1220,33 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     updateSeasonWarn(params);
     configEcho.textContent = configText(params, consecutive);
   };
-  worker.onerror = (): void => {
+  const onWorkerError = (): void => {
+    inFlight = false;
     spinner.classList.remove('on');
     statBar.textContent = 'recompute failed — see the browser console';
   };
+  function spawnWorker(): void {
+    worker = new Worker(workerUrl);
+    worker.onmessage = onWorkerMessage;
+    worker.onerror = onWorkerError;
+    worker.postMessage({ type: 'series', series });
+  }
+  spawnWorker();
   const runRecompute = (): void => {
     lastParams = readParams();
+    // Remember the active detector's live params so switching detectors (and Apply)
+    // can write back every slot the user tuned, not just the one on screen.
+    if (activeIndex != null) editedParams.set(activeIndex, lastParams);
     reqId += 1;
+    // Kill an in-flight compute instead of queuing behind it: the worker is
+    // single-threaded and would otherwise run the now-stale config to completion
+    // (O(points × window) — seconds on a large window) before starting this one.
+    // Terminate + respawn re-posts the (bounded) series, which is cheap by comparison.
+    if (inFlight) {
+      worker.terminate();
+      spawnWorker();
+    }
+    inFlight = true;
     spinner.classList.add('on');
     worker.postMessage({ type: 'run', id: reqId, params: lastParams });
   };
@@ -1188,20 +1264,76 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     worker.postMessage({ type: 'series', series });
     recompute();
   }
-  let trimDebounce = 0;
+  // Live echo while dragging; the (expensive) re-slice + re-post + recompute fires
+  // only on release (`change`), not on every mid-drag pause.
   trimInput.oninput = (): void => {
-    const count = Number(trimInput.value);
-    setTrimEcho(count);
-    if (trimDebounce) window.clearTimeout(trimDebounce);
-    trimDebounce = window.setTimeout(() => setActivePoints(count), 200);
+    setTrimEcho(Number(trimInput.value));
+  };
+  trimInput.onchange = (): void => {
+    setActivePoints(Number(trimInput.value));
   };
   let debounce = 0;
   const recompute = (): void => {
     if (debounce) window.clearTimeout(debounce);
     debounce = window.setTimeout(runRecompute, 130);
   };
+  // A detector knob changed (as opposed to an alert-layer/view control): mark the
+  // active detector dirty so Apply writes it back, then recompute. Programmatic
+  // re-seeds (detector switch, autotune winner) call recompute() directly, so they
+  // never mark dirty — only genuine user edits do.
+  const detectorChanged = (): void => {
+    markActiveDirty();
+    recompute();
+  };
 
   // ---- controls -------------------------------------------------------------
+  // Multi-detector picker: when the metric configures more than one detector, let
+  // the user choose WHICH one to tune here (the cockpit shows one band at a time)
+  // and make it plain that the others are preserved on Apply. Hidden for the common
+  // single-detector metric, so that UX is unchanged.
+  const tunableEntries = detectorEntries.filter((d) => d.tunable);
+  const preservedEntries = detectorEntries.filter((d) => !d.tunable);
+  if (detectorEntries.length > 1) {
+    const pickWrap = el('div', 'dtk-ctl dtk-tune-detpick');
+    pickWrap.appendChild(
+      ctlLabel(
+        'Tuning detector',
+        'This metric has several detectors. Pick which one to tune here; every other ' +
+          'detector is preserved unchanged when you Apply — so a manual_bounds floor or a ' +
+          'min_detectors≥2 quorum keeps working.',
+      ),
+    );
+    if (tunableEntries.length > 1) {
+      const seg = el('div', 'dtk-seg dtk-detpick-seg');
+      const buttons: HTMLButtonElement[] = [];
+      const paint = (): void =>
+        buttons.forEach((b) => b.classList.toggle('on', Number(b.dataset.v) === activeIndex));
+      tunableEntries.forEach((d) => {
+        const b = el('button', 'dtk-seg-btn', `#${d.index + 1} ${d.type}`);
+        b.type = 'button';
+        b.dataset.v = String(d.index);
+        b.title = d.summary;
+        b.onclick = (): void => {
+          switchDetector(d.index);
+          paint();
+        };
+        buttons.push(b);
+        seg.appendChild(b);
+      });
+      paint();
+      pickWrap.appendChild(seg);
+    }
+    const noteParts: string[] = [];
+    if (preservedEntries.length) {
+      noteParts.push(
+        `Preserved (not tunable here): ${preservedEntries.map((d) => d.summary).join('; ')}.`,
+      );
+    }
+    noteParts.push('Apply rewrites only the detector(s) you tune and keeps the rest verbatim.');
+    pickWrap.appendChild(el('div', 'dtk-tune-note', noteParts.join(' ')));
+    tuneGroup.appendChild(pickWrap);
+  }
+
   const detectorCtl = segControl(
     'Detector',
     [
@@ -1214,6 +1346,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     (v) => {
       // reset threshold to the new type's default for a sane starting point
       thresholdCtl_setDefault(THRESHOLD_DEFAULT[v as DetectorType] ?? 3.0);
+      markActiveDirty();
       refreshVisibility();
       recompute();
     },
@@ -1236,7 +1369,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       hint: 'Manual bounds: values below this read as anomalous. Drag in from the data range to ' +
         'see how many points fall outside (and how many alerts that yields).',
     },
-    recompute,
+    detectorChanged,
   );
   tuneGroup.appendChild(lowerBoundCtl.row);
 
@@ -1250,7 +1383,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       fmt: (v) => fmtNum(v),
       hint: 'Manual bounds: values above this read as anomalous.',
     },
-    recompute,
+    detectorChanged,
   );
   tuneGroup.appendChild(upperBoundCtl.row);
 
@@ -1265,7 +1398,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       hint: 'Band half-width in σ-equivalents. Lower = tighter band = more flags; higher = ' +
         'wider band = fewer flags.',
     },
-    recompute,
+    detectorChanged,
   );
   tuneGroup.appendChild(thresholdCtl.row);
   const thresholdInput = thresholdCtl.row.querySelector<HTMLInputElement>('input');
@@ -1295,7 +1428,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       hint: 'How many trailing points form the baseline window for each scored point. ' +
         'Larger = steadier baseline (more history); smaller = adapts faster to shifts.',
     },
-    recompute,
+    detectorChanged,
   );
   tuneGroup.appendChild(windowCtl.row);
 
@@ -1308,6 +1441,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     ],
     seed.windowWeights,
     () => {
+      markActiveDirty();
       refreshVisibility();
       recompute();
     },
@@ -1329,7 +1463,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       hint: 'Exponential weighting only: the age (in points) at which a point counts half as ' +
         'much as the newest. Smaller = faster decay = fresher baseline.',
     },
-    recompute,
+    detectorChanged,
   );
   const halfLifeRow = halfLifeCtl.row;
   halfLifeRow.style.display = seed.windowWeights === 'exponential' ? '' : 'none';
@@ -1342,7 +1476,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       { label: 'linear', value: 'linear' },
     ],
     seed.detrend,
-    recompute,
+    detectorChanged,
     'Remove a robust linear trend from each window before computing the band, so a steadily ' +
       'rising/falling metric is not flagged for the trend itself.',
   );
@@ -1356,7 +1490,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       { label: 'SMA', value: 'sma' },
     ],
     seed.smoothing,
-    recompute,
+    detectorChanged,
     'Smooth the series before detection (EMA or SMA) so single-point jitter does not flag. ' +
       'The detector judges the smoothed line; the raw values show as a faint ghost.',
   );
@@ -1407,7 +1541,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
         b.onclick = (): void => {
           colGroup.set(col, Number(opt.value));
           paint();
-          recompute();
+          detectorChanged();
         };
         buttons.push(b);
         seg.appendChild(b);
@@ -1586,6 +1720,47 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   }
   refreshVisibility();
 
+  // Set every detector control from a camelCase seed (a metric detector, a
+  // previously-edited detector, or an autotune winner) WITHOUT marking anything
+  // dirty — .set() never fires onChange, and the caller drives one recompute after.
+  // Updates the closed-over `seed` so readParams()'s passthrough knobs
+  // (minSamples/inputType/smoothing*/minSamplesPerGroup) follow the active detector.
+  function reseedControls(s: DetectorSeed): void {
+    seed = s;
+    detectorCtl.set(s.type);
+    thresholdCtl.set(s.threshold);
+    // A re-seed may carry a window/half-life beyond the slider's explore reach; raise
+    // the max first so .set() can't silently clamp (which would shrink what Apply writes).
+    const wMax = Math.max(windowMax, s.windowSize);
+    windowCtl.setMax(wMax);
+    halfLifeCtl.setMax(wMax);
+    windowCtl.set(s.windowSize);
+    weightsCtl.set(s.windowWeights);
+    if (s.windowWeights === 'exponential' && s.halfLife != null) halfLifeCtl.set(s.halfLife);
+    detrendCtl.set(s.detrend);
+    smoothingCtl.set(s.smoothing);
+    setSeasonalityGroups(s.seasonalityComponents || []);
+    if (s.lowerBound != null) lowerBoundCtl.set(s.lowerBound);
+    if (s.upperBound != null) upperBoundCtl.set(s.upperBound);
+    refreshVisibility();
+  }
+
+  // Switch which of a multi-detector metric's detectors the cockpit is tuning.
+  // FLUSH the outgoing detector's live control state into editedParams FIRST — a
+  // just-released slider only *schedules* a debounced recompute, and reseeding the
+  // controls below (plus recompute()'s own clearTimeout) would cancel that pending
+  // capture, silently losing an edit made <130ms before the switch. Then load the
+  // target (its in-session edits if any, else its original seed) and recompute.
+  function switchDetector(idx: number): void {
+    if (idx === activeIndex) return;
+    const entry = detectorEntries.find((d) => d.index === idx);
+    if (!entry || !entry.tunable || !entry.seed) return;
+    if (activeIndex != null) editedParams.set(activeIndex, readParams());
+    activeIndex = idx;
+    reseedControls(editedParams.get(idx) ?? entry.seed);
+    recompute();
+  }
+
   // ---- stat bar + effective config + apply ----------------------------------
   const statBar = el('div', 'dtk-tune-stat');
   stageFoot.appendChild(statBar);
@@ -1620,17 +1795,34 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       'under metrics/.history/). Trimming the sample does not change what is written.';
     const msg = el('span', 'dtk-apply-msg');
     btn.onclick = (): void => {
-      const params = readParams();
+      const activeParams = readParams();
+      // Capture the on-screen detector's live params so it's written with its current
+      // state (also covers the initial detector when it IS the active one).
+      if (activeIndex != null) editedParams.set(activeIndex, activeParams);
+      // Write back the detector the cockpit opened on (always) PLUS any slot the user
+      // actually EDITED (dirty) — never a slot merely switched to and left untouched.
+      // The server preserves every other detector verbatim, so a manual_bounds floor /
+      // prophet alongside the tuned detector survives (the fix for the silent drop
+      // that killed min_detectors≥2), and a lower-only floor you only glanced at in
+      // the picker keeps its single bound.
+      const out: Array<{ index: number | null; type: string; params: Record<string, unknown> }> =
+        [];
+      if (initialIndex != null) {
+        for (const i of new Set<number>([initialIndex, ...dirty])) {
+          const p = editedParams.get(i);
+          if (p) out.push({ index: i, type: p.type, params: applyParams(p) });
+        }
+      } else {
+        // No existing tunable slot (e.g. a prophet-only metric): append the fresh one.
+        out.push({ index: null, type: activeParams.type, params: applyParams(activeParams) });
+      }
       btn.disabled = true;
       msg.className = 'dtk-apply-msg info';
       msg.textContent = 'Applying…';
       fetch(payload.save_url as string, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          detector: { type: params.type, params: applyParams(params) },
-          consecutive_anomalies: consecutive,
-        }),
+        body: JSON.stringify({ detectors: out, consecutive_anomalies: consecutive }),
       })
         .then((r) =>
           r.ok
@@ -1639,9 +1831,11 @@ function render(payload: TunePayload, mount: HTMLElement): void {
                 throw new Error(t || `HTTP ${r.status}`);
               }),
         )
-        .then((res: { saved?: string; archived?: string }) => {
+        .then((res: { saved?: string; updated?: string[]; preserved?: string[] }) => {
           msg.className = 'dtk-apply-msg ok';
-          msg.textContent = `Applied → ${res.saved ?? 'metric'} (previous archived). You can close this tab.`;
+          const kept =
+            res.preserved && res.preserved.length ? ` Kept: ${res.preserved.join(', ')}.` : '';
+          msg.textContent = `Applied → ${res.saved ?? 'metric'} (previous archived).${kept} You can close this tab.`;
         })
         .catch((e: Error) => {
           btn.disabled = false;
@@ -1776,26 +1970,16 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   // Tune/Autotune mode). Re-seeding mirrors the initial render() seeding exactly,
   // via the same camelCase shape the server builds with seed_detector_params.
   function applyAutotuneResult(res: AutotuneResult): void {
-    const d = res.detector;
-    detectorCtl.set(d.type);
-    thresholdCtl.set(d.threshold);
-    // Autotune may pick a window/half-life beyond the slider's explore reach; raise
-    // the max first so set() can't silently clamp (which would shrink what Apply
-    // writes — the same guard the initial seed uses via windowMax).
-    const wMax = Math.max(windowMax, d.windowSize);
-    windowCtl.setMax(wMax);
-    halfLifeCtl.setMax(wMax);
-    windowCtl.set(d.windowSize);
-    weightsCtl.set(d.windowWeights);
-    if (d.windowWeights === 'exponential' && d.halfLife != null) halfLifeCtl.set(d.halfLife);
-    detrendCtl.set(d.detrend);
-    smoothingCtl.set(d.smoothing);
-    setSeasonalityGroups(d.seasonalityComponents || []);
+    // Re-seed the ACTIVE detector's knobs from the winner (shared with the picker's
+    // detector-switch). Autotune tunes the detector currently on screen; the metric's
+    // other detectors are untouched and stay preserved on Apply. Marks the active
+    // detector dirty so the searched config is written back.
+    reseedControls(res.detector);
+    markActiveDirty();
     if (res.consecutive_anomalies != null) {
       consecutive = res.consecutive_anomalies;
       consecutiveCtl.set(consecutive);
     }
-    refreshVisibility();
     recompute();
   }
 

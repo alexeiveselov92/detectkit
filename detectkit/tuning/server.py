@@ -35,7 +35,7 @@ from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import parse_qs, urlparse
 
 from detectkit.autotune.labels import parse_incident_labels, versioned_labels_path
-from detectkit.tuning.config_writer import AppliedConfig, apply_tuned_config
+from detectkit.tuning.config_writer import AppliedConfig, TunedDetector, apply_tuned_config
 from detectkit.tuning.html import render_tune_html
 
 if TYPE_CHECKING:
@@ -164,13 +164,11 @@ class _Handler(BaseHTTPRequestHandler):
     def _handle_apply(self, srv: _TuneServer, body: bytes) -> None:
         try:
             payload = json.loads(body.decode("utf-8"))
-            detector = payload.get("detector") or {}
             consecutive = payload.get("consecutive_anomalies")
             applied = apply_tuned_config(
                 original_path=srv.original_path,
                 project_root=srv.project_root,
-                detector_type=str(detector.get("type", "")),
-                detector_params=dict(detector.get("params") or {}),
+                detectors=_parse_tuned_detectors(payload),
                 consecutive_anomalies=None if consecutive is None else int(consecutive),
             )
         except Exception as exc:
@@ -178,7 +176,14 @@ class _Handler(BaseHTTPRequestHandler):
             self._reply_error(400, f"invalid config: {exc}")
             return
         srv.applied = applied
-        self._reply_json({"saved": str(applied.saved), "archived": str(applied.archived)})
+        self._reply_json(
+            {
+                "saved": str(applied.saved),
+                "archived": str(applied.archived),
+                "updated": list(applied.updated),
+                "preserved": list(applied.preserved),
+            }
+        )
         # stop serving (from this worker thread) so the command can continue
         threading.Thread(target=srv.shutdown, daemon=True).start()
 
@@ -224,6 +229,43 @@ class _Handler(BaseHTTPRequestHandler):
             self._reply_error(400, f"autotune failed: {exc}")
             return
         self._reply_json(result)
+
+
+def _parse_tuned_detectors(payload: dict[str, Any]) -> list[TunedDetector]:
+    """Build the tuned-detector list from an Apply POST.
+
+    The cockpit posts ``detectors: [{index, type, params}, ...]`` — one entry per
+    detector the user actually tuned (the auto-seeded one plus any it edited via the
+    picker); every other detector in the metric is preserved verbatim by the writer.
+    Falls back to the legacy single ``detector`` object (index 0) so an older page
+    still applies. Raises ``ValueError`` on a payload with neither.
+    """
+    raw = payload.get("detectors")
+    if isinstance(raw, list) and raw:
+        out: list[TunedDetector] = []
+        for d in raw:
+            if not isinstance(d, dict):
+                continue
+            idx = d.get("index")
+            out.append(
+                TunedDetector(
+                    type=str(d.get("type", "")),
+                    params=dict(d.get("params") or {}),
+                    index=int(idx) if isinstance(idx, int) and not isinstance(idx, bool) else None,
+                )
+            )
+        if out:
+            return out
+    detector = payload.get("detector")
+    if isinstance(detector, dict):
+        return [
+            TunedDetector(
+                type=str(detector.get("type", "")),
+                params=dict(detector.get("params") or {}),
+                index=0,
+            )
+        ]
+    raise ValueError("no detector in the apply request")
 
 
 def _json_default(o: Any) -> Any:

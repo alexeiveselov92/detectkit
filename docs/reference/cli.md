@@ -866,10 +866,16 @@ end the session; only **Apply** does.
 On **Apply to metric** detectkit validates the chosen detector and the whole metric config (with the same validation the pipeline uses) — a broken or untunable
 config is rejected and nothing is written — then archives the current YAML
 verbatim to `metrics/.history/<metric>/<metric>-<timestamp>.yml` and re-emits the
-metric in place with the tuned detector (the `detectors` list becomes the single
-tuned detector; the first `alerting` block's `consecutive_anomalies` is updated if
-present). The archive keeps a trackable history of chosen parameters and the
-original is always recoverable.
+metric in place, **merging** the tuned detector(s) back in: only the detector(s)
+you tuned are rewritten and every **other** detector (a `manual_bounds` floor, a
+`prophet`/`timesfm` detector, another windowed one) is preserved **verbatim** — so
+a `min_detectors: 2` alert isn't silently broken by a retune. The first `alerting`
+block's `consecutive_anomalies` is updated if present, and the re-emitted header
+names what was updated vs preserved. For a metric with more than one detector, a
+**Tuning detector** picker chooses which one to tune. The archive keeps a trackable
+history of chosen parameters, is **excluded from metric discovery** (so a tuned
+metric never collides with its own snapshots as a duplicate name), and the original
+is always recoverable.
 
 #### Examples
 

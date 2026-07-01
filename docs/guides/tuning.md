@@ -83,10 +83,13 @@ In the browser you can adjust:
 - **Alert: consecutive anomalies** — the alert window (`consecutive_anomalies`).
 
 Every control carries an **ⓘ tooltip** explaining what it does. The confidence
-band, the flagged points and the would-fire alert markers update on every change
-(a small **computing…** spinner shows while a recompute is in flight), a **legend**
-labels the series / band / center / anomalies / alerts, and the "effective config"
-readout shows exactly what will be written.
+band, the flagged points and the would-fire alert markers update when you
+**release** a slider (the value echo tracks live while you drag, so mid-drag pauses
+don't kick off a recompute); a small **computing…** spinner shows while a recompute
+is in flight, and moving another knob **cancels** the in-flight one so the newest
+config isn't left waiting behind a stale computation. A **legend** labels the
+series / band / center / anomalies / alerts, and the "effective config" readout
+shows exactly what will be written.
 
 ### Navigate a dense series
 
@@ -287,9 +290,23 @@ Click **Apply to metric**. detectkit then, in order:
 2. **Archives** the current metric YAML verbatim (comments and all) to
    `metrics/.history/<metric>/<metric>-<timestamp>.yml`, so you keep a trackable
    history of chosen parameters and can always recover the previous version.
-3. **Re-emits** the metric file in place with the tuned detector — the `detectors`
-   list becomes the single tuned detector, and the first `alerting` block's
-   `consecutive_anomalies` is updated if the metric has one.
+   (These archives are **not** loaded as live metrics, so a tuned metric never
+   trips a "duplicate metric name" error against its own snapshots.)
+3. **Re-emits** the metric file in place, **merging** the tuned detector(s) back
+   in — only the detector(s) you tuned are rewritten; every **other** detector is
+   kept **verbatim**, and the first `alerting` block's `consecutive_anomalies` is
+   updated if the metric has one. The re-emitted header names what was updated vs
+   preserved.
+
+**Metrics with more than one detector.** If a metric configures several detectors
+— e.g. a `mad` pattern detector **plus** a
+[`manual_bounds`](../reference/detectors/manual_bounds.md) hard floor with a
+`min_detectors: 2` alert — the cockpit shows a **Tuning detector** picker in the
+Tune rail. Pick which detector to tune (the chart shows one band at a time);
+switching re-seeds every knob from that detector. On **Apply**, the detectors you
+tuned are rewritten and the rest are **preserved unchanged**, so the quorum keeps
+firing — a tune never silently drops your other detectors. Non-tunable detectors
+(`prophet`/`timesfm`) are listed as preserved.
 
 `dtk tune` takes **no pipeline lock** — it only edits a config file. The live
 preview is a faithful approximation; the **next `dtk run` is the source of truth**.

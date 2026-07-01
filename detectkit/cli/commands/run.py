@@ -12,7 +12,11 @@ import click
 from detectkit.config.metric_config import MetricConfig
 from detectkit.config.profile import ProfilesConfig
 from detectkit.config.project_config import ProjectConfig
-from detectkit.config.validator import validate_metric_uniqueness
+from detectkit.config.validator import (
+    discover_metric_files,
+    is_discoverable_metric_file,
+    validate_metric_uniqueness,
+)
 from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.orchestration.error_dispatch import dispatch_project_error_alert
 from detectkit.orchestration.task_manager import PipelineStep, TaskManager
@@ -433,17 +437,16 @@ def select_metrics(selector: str, project_root: Path) -> list[tuple[Path, Metric
         if selector == "*":
             # "all metrics" — search recursively so nested metrics are included
             # (mirrors validate_project_metrics); a plain glob of "metrics/*"
-            # would only see the top level.
-            metric_paths = [p for sub in ("**/*.yml", "**/*.yaml") for p in metrics_dir.glob(sub)]
+            # would only see the top level. Excludes the metrics/.history/ archive.
+            metric_paths = discover_metric_files(metrics_dir)
         else:
             pattern = selector if selector.startswith("metrics/") else f"metrics/{selector}"
             # Keep only metric files: a bare glob also matches the `.gitkeep`
-            # stub created by `dtk init`, any other non-YAML files, and
-            # directories — all of which would crash the YAML parser.
+            # stub created by `dtk init`, any other non-YAML files, directories, and
+            # the metrics/.history/ archive dtk tune writes (whose snapshots keep the
+            # original name:) — all of which would crash the parser or collide on name.
             metric_paths = [
-                p
-                for p in project_root.glob(pattern)
-                if p.is_file() and p.suffix in (".yml", ".yaml")
+                p for p in project_root.glob(pattern) if is_discoverable_metric_file(p, metrics_dir)
             ]
     # Metric name selector
     else:
@@ -485,26 +488,25 @@ def find_metrics_by_tag(metrics_dir: Path, tag: str) -> list[Path]:
 
     matching_metrics = []
 
-    # Search both .yml and .yaml extensions (consistent with find_metric_by_name)
-    for pattern in ["**/*.yml", "**/*.yaml"]:
-        for metric_file in metrics_dir.glob(pattern):
-            try:
-                with open(metric_file) as f:
-                    config = yaml.safe_load(f)
+    # Live metric files only (excludes the metrics/.history/ archive).
+    for metric_file in discover_metric_files(metrics_dir):
+        try:
+            with open(metric_file) as f:
+                config = yaml.safe_load(f)
 
-                if config and "tags" in config:
-                    if tag in config["tags"]:
-                        matching_metrics.append(metric_file)
-            except Exception as e:
-                # Warn about unparseable files but continue searching
-                click.echo(
-                    click.style(
-                        f"Warning: Skipping {metric_file.relative_to(metrics_dir.parent)}: {e}",
-                        fg="yellow",
-                    ),
-                    err=True,
-                )
-                continue
+            if config and "tags" in config:
+                if tag in config["tags"]:
+                    matching_metrics.append(metric_file)
+        except Exception as e:
+            # Warn about unparseable files but continue searching
+            click.echo(
+                click.style(
+                    f"Warning: Skipping {metric_file.relative_to(metrics_dir.parent)}: {e}",
+                    fg="yellow",
+                ),
+                err=True,
+            )
+            continue
 
     return matching_metrics
 
@@ -522,25 +524,24 @@ def find_metric_by_name(metrics_dir: Path, name: str) -> Path | None:
     """
     import yaml
 
-    # Search both .yml and .yaml extensions
-    for pattern in ["**/*.yml", "**/*.yaml"]:
-        for metric_file in metrics_dir.glob(pattern):
-            try:
-                with open(metric_file) as f:
-                    config = yaml.safe_load(f)
+    # Live metric files only (excludes the metrics/.history/ archive).
+    for metric_file in discover_metric_files(metrics_dir):
+        try:
+            with open(metric_file) as f:
+                config = yaml.safe_load(f)
 
-                if config and config.get("name") == name:
-                    return metric_file
-            except Exception as e:
-                # Warn about unparseable files but continue searching
-                click.echo(
-                    click.style(
-                        f"Warning: Skipping {metric_file.relative_to(metrics_dir.parent)}: {e}",
-                        fg="yellow",
-                    ),
-                    err=True,
-                )
-                continue
+            if config and config.get("name") == name:
+                return metric_file
+        except Exception as e:
+            # Warn about unparseable files but continue searching
+            click.echo(
+                click.style(
+                    f"Warning: Skipping {metric_file.relative_to(metrics_dir.parent)}: {e}",
+                    fg="yellow",
+                ),
+                err=True,
+            )
+            continue
 
     return None
 

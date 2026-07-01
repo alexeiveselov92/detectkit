@@ -1,4 +1,4 @@
-"""Tests for the dtk tune config writer (validate → archive → re-emit)."""
+"""Tests for the dtk tune config writer (validate → archive → merge → re-emit)."""
 
 from datetime import datetime, timezone
 from pathlib import Path
@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from detectkit.config.metric_config import MetricConfig
-from detectkit.tuning.config_writer import apply_tuned_config
+from detectkit.tuning.config_writer import TunedDetector, apply_tuned_config
 
 _FIXED = datetime(2026, 6, 24, 10, 15, 30, tzinfo=timezone.utc)
 
@@ -28,6 +28,27 @@ alerting:
     consecutive_anomalies: 3
 """
 
+# The documented robust combo: a windowed pattern detector PLUS a manual_bounds hard
+# floor, with a min_detectors: 2 quorum. Retuning the mad must not drop the floor
+# (which would make the quorum permanently unsatisfiable — the reported bug).
+_MULTI_YAML = """name: orders
+interval: 1h
+query: "SELECT timestamp, value FROM t"
+detectors:
+  - type: mad
+    params:
+      threshold: 3.0
+      window_size: 8640
+  - type: manual_bounds
+    params:
+      lower_bound: 1
+alerting:
+  - channels: [slack_alerts]
+    min_detectors: 2
+    direction: down
+    consecutive_anomalies: 2
+"""
+
 
 def _project(tmp_path: Path, text: str = _METRIC_YAML, name: str = "orders") -> Path:
     (tmp_path / "metrics").mkdir(parents=True, exist_ok=True)
@@ -36,22 +57,30 @@ def _project(tmp_path: Path, text: str = _METRIC_YAML, name: str = "orders") -> 
     return path
 
 
+def _one(dtype: str, params: dict, index: int | None = 0) -> list[TunedDetector]:
+    return [TunedDetector(type=dtype, params=params, index=index)]
+
+
 def test_apply_swaps_detector_and_archives(tmp_path):
     path = _project(tmp_path)
     res = apply_tuned_config(
         original_path=path,
         project_root=tmp_path,
-        detector_type="zscore",
-        detector_params={
-            "threshold": 2.5,
-            "window_size": 200,
-            "window_weights": "exponential",
-            "half_life": 50,
-        },
+        detectors=_one(
+            "zscore",
+            {
+                "threshold": 2.5,
+                "window_size": 200,
+                "window_weights": "exponential",
+                "half_life": 50,
+            },
+        ),
         consecutive_anomalies=5,
         now=_FIXED,
     )
     assert res.metric == "orders"
+    assert res.updated == ("zscore",)
+    assert res.preserved == ()
     # archive holds the ORIGINAL bytes verbatim (comments preserved)
     assert res.archived.exists()
     assert (
@@ -81,8 +110,7 @@ def test_invalid_params_write_nothing(tmp_path):
         apply_tuned_config(
             original_path=path,
             project_root=tmp_path,
-            detector_type="mad",
-            detector_params={"threshold": -1.0},
+            detectors=_one("mad", {"threshold": -1.0}),
             now=_FIXED,
         )
     # original untouched, no archive created
@@ -96,10 +124,16 @@ def test_untunable_type_rejected(tmp_path):
         apply_tuned_config(
             original_path=path,
             project_root=tmp_path,
-            detector_type="prophet",  # not a tunable type
-            detector_params={"foo": 1},
+            detectors=_one("prophet", {"foo": 1}),  # not a tunable type
             now=_FIXED,
         )
+    assert not (tmp_path / "metrics" / ".history").exists()
+
+
+def test_empty_detector_list_rejected(tmp_path):
+    path = _project(tmp_path)
+    with pytest.raises(ValueError, match="no detector"):
+        apply_tuned_config(original_path=path, project_root=tmp_path, detectors=[], now=_FIXED)
     assert not (tmp_path / "metrics" / ".history").exists()
 
 
@@ -110,8 +144,7 @@ def test_apply_manual_bounds_swaps_detector(tmp_path):
     res = apply_tuned_config(
         original_path=path,
         project_root=tmp_path,
-        detector_type="manual_bounds",
-        detector_params={"lower_bound": 5.0, "upper_bound": 95.0},
+        detectors=_one("manual_bounds", {"lower_bound": 5.0, "upper_bound": 95.0}),
         consecutive_anomalies=2,
         now=_FIXED,
     )
@@ -133,8 +166,7 @@ def test_apply_manual_bounds_invalid_bounds_rejected(tmp_path):
         apply_tuned_config(
             original_path=path,
             project_root=tmp_path,
-            detector_type="manual_bounds",
-            detector_params={"lower_bound": 90.0, "upper_bound": 10.0},
+            detectors=_one("manual_bounds", {"lower_bound": 90.0, "upper_bound": 10.0}),
             now=_FIXED,
         )
     assert not (tmp_path / "metrics" / ".history").exists()
@@ -153,8 +185,7 @@ def test_nested_metric_form_round_trips(tmp_path):
     apply_tuned_config(
         original_path=path,
         project_root=tmp_path,
-        detector_type="mad",
-        detector_params={"threshold": 4.0, "window_size": 300},
+        detectors=_one("mad", {"threshold": 4.0, "window_size": 300}),
         now=_FIXED,
     )
     cfg = MetricConfig.from_yaml_file(path)
@@ -175,8 +206,7 @@ detectors:
     apply_tuned_config(
         original_path=path,
         project_root=tmp_path,
-        detector_type="mad",
-        detector_params={"threshold": 2.0},
+        detectors=_one("mad", {"threshold": 2.0}),
         consecutive_anomalies=7,  # ignored: metric has no alerting block
         now=_FIXED,
     )
@@ -190,8 +220,7 @@ def test_consecutive_anomalies_must_be_positive(tmp_path):
         apply_tuned_config(
             original_path=path,
             project_root=tmp_path,
-            detector_type="mad",
-            detector_params={"threshold": 3.0},
+            detectors=_one("mad", {"threshold": 3.0}),
             consecutive_anomalies=0,
             now=_FIXED,
         )
@@ -203,10 +232,173 @@ def test_type_and_consecutive_keys_stripped_from_params(tmp_path):
     apply_tuned_config(
         original_path=path,
         project_root=tmp_path,
-        detector_type="mad",
-        detector_params={"threshold": 3.0, "type": "mad", "consecutive_anomalies": 9},
+        detectors=_one("mad", {"threshold": 3.0, "type": "mad", "consecutive_anomalies": 9}),
         now=_FIXED,
     )
     cfg = MetricConfig.from_yaml_file(path)
     assert "type" not in cfg.detectors[0].params
     assert "consecutive_anomalies" not in cfg.detectors[0].params
+
+
+# --- merge: the multi-detector fix (the reported bug) ----------------------------
+
+
+def test_merge_preserves_untouched_manual_bounds_floor(tmp_path):
+    """Retuning the mad in a [mad, manual_bounds] metric must keep the floor verbatim.
+
+    The reported bug: the whole detectors list was replaced with the single tuned
+    detector, dropping the manual_bounds floor and permanently killing a
+    min_detectors: 2 alert. The floor is preserved with its lower_bound only — NO
+    phantom upper_bound added (a single-bound floor must stay single-bound).
+    """
+    path = _project(tmp_path, text=_MULTI_YAML)
+    res = apply_tuned_config(
+        original_path=path,
+        project_root=tmp_path,
+        detectors=_one("mad", {"threshold": 3.2, "window_size": 8640}, index=0),
+        consecutive_anomalies=2,
+        now=_FIXED,
+    )
+    assert res.updated == ("mad",)
+    assert res.preserved == ("manual_bounds",)
+    cfg = MetricConfig.from_yaml_file(path)
+    assert [d.type for d in cfg.detectors] == ["mad", "manual_bounds"]
+    assert cfg.detectors[0].params["threshold"] == 3.2
+    floor = cfg.detectors[1]
+    assert floor.params == {"lower_bound": 1}  # verbatim — no phantom upper_bound
+    # the min_detectors: 2 quorum is still satisfiable (both detectors present)
+    assert cfg.alerting[0].min_detectors == 2
+    # the header names what was preserved instead of the old misleading "only the
+    # detector block was changed"
+    assert "preserved verbatim: manual_bounds" in path.read_text()
+
+
+def test_merge_preserves_non_tunable_detector(tmp_path):
+    """A prophet/timesfm detector the cockpit can't tune is still preserved verbatim."""
+    text = """name: orders
+interval: 1h
+query: "SELECT 1"
+detectors:
+  - type: prophet
+    params: {interval_width: 0.99}
+  - type: mad
+    params: {threshold: 3.0, window_size: 100}
+"""
+    path = _project(tmp_path, text=text)
+    res = apply_tuned_config(
+        original_path=path,
+        project_root=tmp_path,
+        detectors=_one("mad", {"threshold": 2.0, "window_size": 120}, index=1),
+        now=_FIXED,
+    )
+    assert res.updated == ("mad",)
+    assert res.preserved == ("prophet",)
+    cfg = MetricConfig.from_yaml_file(path)
+    assert [d.type for d in cfg.detectors] == ["prophet", "mad"]
+    assert cfg.detectors[0].params == {"interval_width": 0.99}  # untouched
+    assert cfg.detectors[1].params["window_size"] == 120
+
+
+def test_merge_floor_first_preserves_single_bound_floor(tmp_path):
+    """Floor-FIRST combo: tuning the windowed detector at a later slot must keep the
+    leading manual_bounds floor verbatim — its single lower_bound intact, NO phantom
+    upper_bound. (The cockpit opens on the windowed detector, so this is the slot the
+    picker writes; the floor at slot 0 is preserved.)"""
+    text = """name: orders
+interval: 1h
+query: "SELECT 1"
+detectors:
+  - type: manual_bounds
+    params: {lower_bound: 1}
+  - type: mad
+    params: {threshold: 3.0, window_size: 8640}
+alerting:
+  - channels: [slack_alerts]
+    min_detectors: 2
+    consecutive_anomalies: 2
+"""
+    path = _project(tmp_path, text=text)
+    res = apply_tuned_config(
+        original_path=path,
+        project_root=tmp_path,
+        detectors=_one("mad", {"threshold": 2.8, "window_size": 4000}, index=1),
+        now=_FIXED,
+    )
+    assert res.updated == ("mad",)
+    assert res.preserved == ("manual_bounds",)
+    cfg = MetricConfig.from_yaml_file(path)
+    assert [d.type for d in cfg.detectors] == ["manual_bounds", "mad"]
+    assert cfg.detectors[0].params == {"lower_bound": 1}  # verbatim — no phantom upper_bound
+    assert cfg.detectors[1].params["window_size"] == 4000
+    assert cfg.alerting[0].min_detectors == 2
+
+
+def test_merge_writes_multiple_tuned_detectors(tmp_path):
+    """The picker can tune more than one detector; Apply rewrites each in place."""
+    path = _project(tmp_path, text=_MULTI_YAML)
+    res = apply_tuned_config(
+        original_path=path,
+        project_root=tmp_path,
+        detectors=[
+            TunedDetector(type="zscore", params={"threshold": 4.0, "window_size": 500}, index=0),
+            TunedDetector(type="manual_bounds", params={"lower_bound": 2}, index=1),
+        ],
+        now=_FIXED,
+    )
+    assert res.updated == ("zscore", "manual_bounds")
+    assert res.preserved == ()
+    cfg = MetricConfig.from_yaml_file(path)
+    assert [d.type for d in cfg.detectors] == ["zscore", "manual_bounds"]
+    assert cfg.detectors[0].params["window_size"] == 500
+    assert cfg.detectors[1].params == {"lower_bound": 2}
+
+
+def test_out_of_range_index_appends_and_preserves(tmp_path):
+    """No tunable slot (index None / out of range) → append, keeping existing detectors."""
+    text = """name: orders
+interval: 1h
+query: "SELECT 1"
+detectors:
+  - type: prophet
+    params: {interval_width: 0.99}
+"""
+    path = _project(tmp_path, text=text)
+    res = apply_tuned_config(
+        original_path=path,
+        project_root=tmp_path,
+        detectors=_one("mad", {"threshold": 3.0, "window_size": 100}, index=None),
+        now=_FIXED,
+    )
+    assert res.updated == ("mad",)
+    assert res.preserved == ("prophet",)
+    cfg = MetricConfig.from_yaml_file(path)
+    assert [d.type for d in cfg.detectors] == ["prophet", "mad"]
+
+
+def test_merge_preserves_execution_params_of_edited_detector(tmp_path):
+    """start_time / batch_size the cockpit never exposes survive a retune of that slot."""
+    text = """name: orders
+interval: 1h
+query: "SELECT 1"
+detectors:
+  - type: mad
+    params:
+      threshold: 3.0
+      window_size: 100
+      start_time: "2024-02-01 00:00:00"
+      batch_size: 500
+"""
+    path = _project(tmp_path, text=text)
+    apply_tuned_config(
+        original_path=path,
+        project_root=tmp_path,
+        # client sends only the tunable knobs
+        detectors=_one("mad", {"threshold": 2.5, "window_size": 200}, index=0),
+        now=_FIXED,
+    )
+    cfg = MetricConfig.from_yaml_file(path)
+    det = cfg.detectors[0]
+    assert det.params["threshold"] == 2.5
+    assert det.params["window_size"] == 200
+    assert det.params["start_time"] == "2024-02-01 00:00:00"  # carried over
+    assert det.params["batch_size"] == 500  # carried over

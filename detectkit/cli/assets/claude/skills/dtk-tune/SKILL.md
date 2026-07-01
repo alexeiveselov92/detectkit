@@ -146,9 +146,17 @@ false-alert rate exceeds it (tuning-only; labeling stays optional).
 When the user is happy, they click **Apply to metric**. detectkit then, in order:
 **validates** the config (a bad/untunable config is rejected and **nothing is
 written**), **archives** the current YAML verbatim under
-`metrics/.history/<metric>/`, and **re-emits** the metric in place with the tuned
-detector (and updates the first alerting block's `consecutive_anomalies` if it has
-one). Applying ends the session; saving incidents does not.
+`metrics/.history/<metric>/`, and **re-emits** the metric in place, **merging** the
+tuned detector(s) back in (and updating the first alerting block's
+`consecutive_anomalies` if it has one). Applying ends the session; saving incidents
+does not. **Merge, not replace:** only the detector(s) the user tuned are
+rewritten; every other detector is kept **verbatim** — so a metric with a
+`manual_bounds` floor alongside a `mad` detector (and a `min_detectors: 2` alert)
+keeps both. When a metric has more than one detector, the Tune rail shows a
+**Tuning detector** picker to choose which one to tune. If the user asks to tune a
+metric that has several detectors, reassure them the others are preserved. (The
+`.history/` archive is not discovered as a live metric, so it never causes a
+"duplicate metric name" error.)
 
 ## Step 5 — Recompute under the new config
 

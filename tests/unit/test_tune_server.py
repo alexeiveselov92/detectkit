@@ -130,6 +130,55 @@ def test_server_applies_valid_config(tmp_path):
         server.server_close()
 
 
+_MULTI_METRIC_YAML = """name: orders
+interval: 1h
+query: "SELECT timestamp, value FROM t"
+detectors:
+  - type: mad
+    params: {threshold: 3.0, window_size: 100}
+  - type: manual_bounds
+    params: {lower_bound: 1}
+alerting:
+  - channels: [slack_alerts]
+    min_detectors: 2
+    consecutive_anomalies: 2
+"""
+
+
+def test_server_merges_and_preserves_other_detectors(tmp_path):
+    """The new detectors-list Apply payload rewrites only the tuned slot and keeps
+    the metric's other detector (the manual_bounds floor) verbatim — so a
+    min_detectors: 2 quorum isn't silently disabled (the reported bug)."""
+    (tmp_path / "metrics").mkdir(parents=True, exist_ok=True)
+    path = tmp_path / "metrics" / "orders.yml"
+    path.write_text(_MULTI_METRIC_YAML, encoding="utf-8")
+    server, url = build_tune_server(payload=_payload(), original_path=path, project_root=tmp_path)
+    th = _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        body = {
+            "detectors": [
+                {"index": 0, "type": "zscore", "params": {"threshold": 2.0, "window_size": 150}}
+            ],
+            "consecutive_anomalies": 2,
+        }
+        r = _post(base, token, body)
+        assert r.status == 200
+        resp = json.loads(r.read())
+        assert resp["updated"] == ["zscore"]
+        assert resp["preserved"] == ["manual_bounds"]
+        th.join(timeout=5)
+        cfg = MetricConfig.from_yaml_file(path)
+        assert [d.type for d in cfg.detectors] == ["zscore", "manual_bounds"]
+        assert cfg.detectors[1].params == {"lower_bound": 1}  # floor preserved verbatim
+    finally:
+        try:
+            server.shutdown()
+        except Exception:
+            pass
+        server.server_close()
+
+
 def test_server_rejects_bad_token(tmp_path):
     path = _project(tmp_path)
     before = path.read_text()

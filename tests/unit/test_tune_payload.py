@@ -141,6 +141,65 @@ def test_seed_detector_manual_bounds():
     assert seed["windowSize"] == 100  # windowed default present for the UI switch
 
 
+def test_detectors_payload_prefers_windowed_and_lists_all():
+    """The cockpit opens on the first WINDOWED detector even when a manual_bounds
+    floor comes first, and bakes ALL detectors for the picker with correct slots."""
+    m = _metric(
+        detectors=[
+            {"type": "manual_bounds", "params": {"lower_bound": 1}},
+            {"type": "mad", "params": {"threshold": 3.0, "window_size": 8640}},
+        ]
+    )
+    payload = build_tune_payload(metric_config=m, internal=FakeInternal())
+    assert payload["detector_index"] == 1  # the windowed mad, not the leading floor
+    dets = payload["detectors"]
+    assert [d["type"] for d in dets] == ["manual_bounds", "mad"]
+    assert [d["index"] for d in dets] == [0, 1]
+    assert all(d["tunable"] for d in dets)
+    assert dets[0]["seed"]["lowerBound"] == 1
+    assert dets[1]["seed"]["windowSize"] == 8640
+    assert "lower=1" in dets[0]["summary"]
+    # the top-level `detector` seed matches the active (windowed) entry
+    assert payload["detector"]["type"] == "mad"
+
+
+def test_detectors_payload_marks_non_tunable_and_preserves_index():
+    """A prophet detector is listed but flagged non-tunable (no seed); the cockpit
+    seeds the tunable mad and surfaces prophet as preserved-on-Apply."""
+    m = _metric(
+        detectors=[
+            {"type": "prophet", "params": {"interval_width": 0.99}},
+            {"type": "mad", "params": {"threshold": 3.0}},
+        ]
+    )
+    payload = build_tune_payload(metric_config=m, internal=FakeInternal())
+    assert payload["detector_index"] == 1
+    dets = payload["detectors"]
+    assert dets[0]["type"] == "prophet"
+    assert dets[0]["tunable"] is False
+    assert dets[0]["seed"] is None
+    assert dets[1]["tunable"] is True
+
+
+def test_detectors_payload_no_tunable_detector():
+    """A metric with only a non-tunable detector → active index None, MAD-default
+    seed, and the existing detector is still listed (preserved on Apply)."""
+    m = _metric(detectors=[{"type": "prophet", "params": {"interval_width": 0.99}}])
+    payload = build_tune_payload(metric_config=m, internal=FakeInternal())
+    assert payload["detector_index"] is None
+    assert payload["detector"]["type"] == "mad"  # fresh default seed
+    assert [d["type"] for d in payload["detectors"]] == ["prophet"]
+
+
+def test_detectors_payload_single_detector():
+    """A plain single-detector metric: one entry, active index 0 (no picker needed)."""
+    m = _metric(detectors=[{"type": "mad", "params": {"threshold": 3.0}}])
+    payload = build_tune_payload(metric_config=m, internal=FakeInternal())
+    assert payload["detector_index"] == 0
+    assert len(payload["detectors"]) == 1
+    assert payload["detectors"][0]["index"] == 0
+
+
 def test_seed_direction_from_alerting():
     assert _seed_direction(_metric()) == "any"  # no alerting → any
     up = _metric(alerting=[{"channels": ["x"], "direction": "up"}])

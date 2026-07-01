@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from detectkit.config.validator import validate_metric_uniqueness, validate_project_metrics
+from detectkit.config.validator import (
+    discover_metric_files,
+    is_discoverable_metric_file,
+    validate_metric_uniqueness,
+    validate_project_metrics,
+)
 
 
 class TestValidateMetricUniqueness:
@@ -274,3 +279,46 @@ query: "SELECT * FROM metrics2"
 
         error_msg = str(exc_info.value)
         assert "Duplicate metric name 'cpu_usage' found" in error_msg
+
+
+class TestHistoryArchiveExcludedFromDiscovery:
+    """The metrics/.history/ archive (dtk tune's previous-config snapshots) keeps the
+    original name: and must NOT be discovered — otherwise a tuned metric collides with
+    its own archived copies as a duplicate name (the reported production bug)."""
+
+    def _metric_yaml(self, name: str, q: str) -> str:
+        return f'name: {name}\ninterval: 1min\nquery: "SELECT * FROM {q}"\n'
+
+    def test_history_snapshots_not_discovered(self, tmp_path: Path):
+        metrics_dir = tmp_path / "metrics"
+        metrics_dir.mkdir()
+        (metrics_dir / "cpu.yml").write_text(self._metric_yaml("cpu_usage", "live"))
+        # two archived snapshots of the same metric (as dtk tune writes them)
+        hist = metrics_dir / ".history" / "cpu_usage"
+        hist.mkdir(parents=True)
+        (hist / "cpu_usage-20260627T143935Z.yml").write_text(self._metric_yaml("cpu_usage", "old1"))
+        (hist / "cpu_usage-20260628T142047Z.yml").write_text(self._metric_yaml("cpu_usage", "old2"))
+
+        # discovery skips the archive entirely
+        found = discover_metric_files(metrics_dir)
+        assert found == [metrics_dir / "cpu.yml"]
+
+        # ...so project validation does NOT raise a duplicate-name error
+        result = validate_project_metrics(tmp_path)
+        assert len(result) == 1
+        assert result[0][1].name == "cpu_usage"
+
+    def test_is_discoverable_predicate(self, tmp_path: Path):
+        metrics_dir = tmp_path / "metrics"
+        live = metrics_dir / "cpu.yml"
+        archived = metrics_dir / ".history" / "cpu_usage" / "cpu_usage-20260627T143935Z.yml"
+        archived.parent.mkdir(parents=True)
+        live.write_text(self._metric_yaml("cpu_usage", "live"))
+        archived.write_text(self._metric_yaml("cpu_usage", "old"))
+        assert is_discoverable_metric_file(live, metrics_dir) is True
+        assert is_discoverable_metric_file(archived, metrics_dir) is False
+        # a project rooted under a dot-directory is unaffected (only parts BELOW
+        # metrics/ are checked), and autotune's top-level __tuned_ files stay visible
+        tuned = metrics_dir / "cpu__tuned_abc123.yml"
+        tuned.write_text(self._metric_yaml("cpu_usage_tuned", "tuned"))
+        assert is_discoverable_metric_file(tuned, metrics_dir) is True

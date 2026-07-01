@@ -59,6 +59,11 @@ _MIN_SAMPLES_PER_GROUP_DEFAULT = {"mad": 10, "zscore": 3, "iqr": 4}
 # Detector types the interactive tuner can seed/emit: the windowed statistical
 # detectors plus the stateless manual_bounds (lower/upper threshold) detector.
 _TUNABLE_TYPES = ("mad", "zscore", "iqr", "manual_bounds")
+# The windowed statistical detectors — the ones you tune against a live band. When
+# a metric mixes a windowed detector with a manual_bounds hard floor (the documented
+# combo), the cockpit opens on the windowed one (the manual floor is a fixed business
+# threshold, not something you slide against a baseline); the picker can still switch.
+_WINDOWED_TYPES = ("mad", "zscore", "iqr")
 
 # Built-in false-alert-rate budget used by the cockpit's quality bar when neither
 # the metric nor the project sets one. Lax on purpose (warn only when more than
@@ -153,17 +158,81 @@ def seed_detector_params(dtype: str, params: dict[str, Any]) -> dict[str, Any]:
     return seed
 
 
-def _seed_detector(metric_config: MetricConfig) -> dict[str, Any]:
-    """Seed the controls from the metric's current detector config.
+def _choose_seed_index(metric_config: MetricConfig) -> int | None:
+    """Index (into ``metric_config.detectors``) of the detector to open the cockpit on.
 
-    Picks the first tunable (mad/zscore/iqr/manual_bounds) detector; falls back
-    to MAD defaults when the metric has none, then maps it via
+    Prefers the first **windowed** detector (mad/zscore/iqr) — the one you tune
+    against a live band — then the first tunable one (a manual_bounds floor), then
+    ``None`` when the metric has no tunable detector at all (e.g. only prophet).
+    The picker can switch to any other tunable detector afterwards.
+    """
+    detectors = metric_config.detectors
+    for i, d in enumerate(detectors):
+        if d.type in _WINDOWED_TYPES:
+            return i
+    for i, d in enumerate(detectors):
+        if d.type in _TUNABLE_TYPES:
+            return i
+    return None
+
+
+def _detector_summary(dtype: str, params: dict[str, Any]) -> str:
+    """A compact one-line summary of a detector for the cockpit's picker / preserve note.
+
+    e.g. ``mad · threshold=3.0 · window=8640`` or ``manual_bounds · lower=1``. Used
+    only for display; the emitted config comes from the (re)seeded controls.
+    """
+    if dtype == "manual_bounds":
+        bits = []
+        if params.get("lower_bound") is not None:
+            bits.append(f"lower={params['lower_bound']}")
+        if params.get("upper_bound") is not None:
+            bits.append(f"upper={params['upper_bound']}")
+        return " · ".join(["manual_bounds", *bits]) if bits else "manual_bounds"
+    if dtype in _WINDOWED_TYPES:
+        thr = params.get("threshold", _THRESHOLD_DEFAULT.get(dtype, 3.0))
+        win = params.get("window_size", 100)
+        return f"{dtype} · threshold={thr} · window={win}"
+    # prophet / timesfm and any future non-tunable type: name only.
+    return dtype
+
+
+def _detectors_payload(metric_config: MetricConfig) -> tuple[list[dict[str, Any]], int | None]:
+    """Bake **every** detector for the cockpit's picker, plus the active index.
+
+    Returns ``(entries, active_index)`` where each entry is
+    ``{index, type, tunable, seed, summary}`` — ``seed`` is the camelCase control
+    seed for tunable detectors and ``None`` for non-tunable ones (prophet/timesfm),
+    which the cockpit surfaces read-only as "preserved on Apply". ``active_index`` is
+    the slot the cockpit opens on (see :func:`_choose_seed_index`), or ``None`` when
+    the metric has no tunable detector (the cockpit then seeds fresh MAD defaults and
+    Apply adds them without touching the existing detectors).
+    """
+    entries: list[dict[str, Any]] = []
+    for i, d in enumerate(metric_config.detectors):
+        tunable = d.type in _TUNABLE_TYPES
+        params = dict(d.params)
+        entries.append(
+            {
+                "index": i,
+                "type": d.type,
+                "tunable": tunable,
+                "seed": seed_detector_params(d.type, params) if tunable else None,
+                "summary": _detector_summary(d.type, params),
+            }
+        )
+    return entries, _choose_seed_index(metric_config)
+
+
+def _seed_detector(metric_config: MetricConfig) -> dict[str, Any]:
+    """Seed the controls from the detector the cockpit opens on.
+
+    Uses :func:`_choose_seed_index` (first windowed, then first tunable); falls back
+    to MAD defaults when the metric has no tunable detector, then maps it via
     :func:`seed_detector_params`.
     """
-    chosen = next(
-        (d for d in metric_config.detectors if d.type in _TUNABLE_TYPES),
-        None,
-    )
+    idx = _choose_seed_index(metric_config)
+    chosen = metric_config.detectors[idx] if idx is not None else None
     dtype = chosen.type if chosen is not None else "mad"
     params = dict(chosen.params) if chosen is not None else {}
     return seed_detector_params(dtype, params)
@@ -241,6 +310,7 @@ def build_tune_payload(
     interval_seconds = interval.seconds
 
     seed = _seed_detector(metric_config)
+    detector_entries, active_index = _detectors_payload(metric_config)
     ai_ctx = _ai_context_payload(metric_config)
 
     # Resolve the window. ``end`` defaults to the last datapoint. ``start``
@@ -295,6 +365,8 @@ def build_tune_payload(
         "seasonality": [],
         "seasonality_columns": [],
         "detector": seed,
+        "detectors": detector_entries,
+        "detector_index": active_index,
         "consecutive_anomalies": consecutive,
         "direction": direction,
         "save_url": save_url,
@@ -340,6 +412,8 @@ def build_tune_payload(
         "seasonality": seasonality,
         "seasonality_columns": season_cols,
         "detector": seed,
+        "detectors": detector_entries,
+        "detector_index": active_index,
         "consecutive_anomalies": consecutive,
         "direction": direction,
         "save_url": save_url,

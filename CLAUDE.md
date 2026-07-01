@@ -44,7 +44,14 @@ rendered on the docs site under **For developers**). Read the relevant one:
   metric's real series (recomputing the band live via the **same** TS detector
   port as the landing playground) and, on **Apply**, writes the chosen config
   back into the metric YAML — validating first, archiving the previous version to
-  `metrics/.history/<metric>/`, then re-emitting in place. The whole screen is a
+  `metrics/.history/<metric>/`, then re-emitting in place. Write-back **merges**:
+  it rewrites only the detector(s) you tuned and preserves every other detector
+  (a `manual_bounds` floor, a `prophet`/`timesfm` detector, another windowed one)
+  **verbatim** — a metric with several detectors gets a **Tuning detector** picker
+  to choose which to tune, and a `min_detectors>=2` alert is never silently broken
+  by a retune (the earlier bug). The archived `.history/` copies are **excluded
+  from metric discovery** (`discover_metric_files`), so a tuned metric no longer
+  collides with its own snapshots as a "duplicate metric name". The whole screen is a
   **chart-first cockpit**: ONE mode-driven chart (the windshield) fills the view,
   the live **metrics ride pinned in a HUD over the chart** (the speedometer —
   always in view), and every control lives in an **always-visible side rail**

@@ -97,7 +97,14 @@ anomalies**) and the **y = 0** toggle — stay visible in every mode. The chart 
 **zoomable** (scroll/drag + navigator strip) with a **"Points shown"** trim slider.
 Clicking **Apply** writes the chosen
 config back into the metric YAML **in place** (autotune, by contrast, writes a new
-`__tuned_<id>.yml` and never edits the original). Reads the metric's loaded
+`__tuned_<id>.yml` and never edits the original). Apply **merges** — it rewrites
+only the detector(s) you tuned and keeps every **other** detector unchanged, so a
+`manual_bounds` floor alongside a `mad` detector (and a `min_detectors: 2` alert)
+survives a retune. If a metric configures **more than one detector**, a **Tuning
+detector** picker in the Tune rail lets you choose which one to tune (the cockpit
+shows one band at a time); switching re-seeds every knob from that detector, and
+non-tunable detectors (`prophet`/`timesfm`) plus the ones you didn't touch are
+listed as "preserved on Apply". Reads the metric's loaded
 datapoints (run `dtk run --steps load` first if empty); the selector must resolve
 to a single metric.
 
@@ -155,8 +162,11 @@ relative to zero.
 
 Safe write-back: the config is validated before anything is written, the previous
 YAML is archived under `metrics/.history/<metric>/`, and only then is the metric
-overwritten. Takes **no pipeline lock** (it only edits a config file); re-run
-`dtk run` afterward to recompute detections under the new config.
+overwritten (the merge keeps your other detectors verbatim; the re-emitted header
+names what was updated vs preserved). The `.history/` archive is **not** discovered
+as a live metric, so a tuned metric never collides with its own snapshots as a
+"duplicate metric name". Takes **no pipeline lock** (it only edits a config file);
+re-run `dtk run` afterward to recompute detections under the new config.
 `--no-serve` writes a static read-only preview HTML instead (no write-back —
 **Save incidents** downloads the labels file); `--from` / `--to` bound the window;
 `--no-open` prints the URL without opening a browser.

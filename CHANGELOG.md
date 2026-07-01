@@ -5,6 +5,49 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.48.0] - 2026-07-01
+
+### Fixed
+- **`dtk tune` no longer silently drops a metric's other detectors on Apply.**
+  Previously **Apply** overwrote a metric's entire `detectors:` list with the
+  single detector shown in the cockpit — so a metric configured with, say, a `mad`
+  pattern detector **plus** a `manual_bounds` hard floor (the documented robust
+  combo) lost all but one after a routine retune. When the alert used
+  `min_detectors >= 2`, the quorum became permanently unsatisfiable and the alert
+  silently stopped firing. Write-back now **merges**: each tuned detector rewrites
+  only its own slot and every detector the cockpit didn't touch — a `manual_bounds`
+  floor, a `prophet`/`timesfm` detector, another windowed detector — is preserved
+  **verbatim** (including execution params like `start_time` / `batch_size` on the
+  edited detector). The re-emitted YAML header names what was updated vs preserved
+  instead of the old, misleading "Only the detector block … was changed".
+- **`metrics/.history/` archives are no longer discovered as live metrics.**
+  `dtk tune` archives the previous metric config under `metrics/.history/<metric>/`
+  before writing the tuned version in place. Those snapshots keep the original
+  `name:`, and metric discovery globbed them (Python's `pathlib` glob traverses
+  hidden directories, unlike shell globbing) — so `dtk run` / `dtk autotune` /
+  `dtk clean` failed with `Duplicate metric name '<x>' found` after any metric had
+  been tuned. Discovery now skips any hidden path component under `metrics/` (the
+  `.history` archive and any editor/VCS scratch dir), across every selection path
+  (`select_metrics`, tag/name search, and project validation). Autotune's
+  top-level `<metric>__tuned_<id>.yml` files are unaffected.
+
+### Added
+- **Detector picker in the `dtk tune` cockpit (multi-detector metrics).** When a
+  metric configures more than one detector, the Tune rail shows a **Tuning
+  detector** picker to choose which one to tune (the cockpit shows one band at a
+  time); switching re-seeds every knob from that detector's config, and **Apply**
+  writes back every detector you tuned while preserving the rest. Non-tunable
+  detectors (`prophet`/`timesfm`) and the ones you didn't touch are listed as
+  "preserved on Apply". Single-detector metrics are unchanged (no picker).
+
+### Changed
+- **`dtk tune` recompute is snappier.** The live band now recomputes when a slider
+  is **released** (not on every mid-drag pause while the mouse button is still
+  held), and an in-flight recompute is **cancelled** when a new one is requested —
+  previously the worker ran the now-stale config to completion (O(points × window),
+  seconds on a large window) before starting the new one, so a fresh config waited
+  behind it. The value echo still updates live while dragging.
+
 ## [0.47.0] - 2026-07-01
 
 ### Added

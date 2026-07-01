@@ -10,6 +10,44 @@ from pathlib import Path
 from detectkit.config.metric_config import MetricConfig
 
 
+def is_discoverable_metric_file(path: Path, metrics_dir: Path) -> bool:
+    """True for a *live* metric YAML — excludes the ``metrics/.history/`` archive.
+
+    ``dtk tune`` archives the previous metric config under
+    ``metrics/.history/<metric>/`` before writing the tuned version in place. Those
+    snapshots keep the original ``name:``, so discovering them as live metrics would
+    (a) flag every tuned metric as a duplicate-name conflict and (b) run stale
+    configs. Python's ``pathlib`` glob traverses hidden directories (unlike shell
+    globbing), so they must be filtered out explicitly. Any hidden path component
+    (a leading dot) *under* ``metrics/`` is skipped — this covers ``.history`` and
+    any editor/VCS scratch dir a user drops there, while a project rooted under a
+    dot-directory (checked only below ``metrics/``) is unaffected.
+    """
+    if not path.is_file() or path.suffix not in (".yml", ".yaml"):
+        return False
+    try:
+        parts = path.relative_to(metrics_dir).parts
+    except ValueError:
+        parts = path.parts
+    return not any(part.startswith(".") for part in parts)
+
+
+def discover_metric_files(metrics_dir: Path) -> list[Path]:
+    """All live metric YAMLs under ``metrics/`` (recursive), excluding the ``.history`` archive.
+
+    The single discovery seam shared by project validation and CLI metric selection,
+    so the ``.history`` exclusion can't drift between them. Returns a sorted list for
+    deterministic ordering.
+    """
+    files = [
+        p
+        for pattern in ("**/*.yml", "**/*.yaml")
+        for p in metrics_dir.glob(pattern)
+        if is_discoverable_metric_file(p, metrics_dir)
+    ]
+    return sorted(set(files))
+
+
 def validate_metric_uniqueness(metric_paths: list[Path]) -> list[tuple[Path, MetricConfig]]:
     """
     Load all metrics and validate that metric names are unique.
@@ -106,10 +144,8 @@ def validate_project_metrics(project_root: Path) -> list[tuple[Path, MetricConfi
             f"      your_metric.yml\n"
         )
 
-    # Find all metric files recursively
-    metric_paths = []
-    for pattern in ["**/*.yml", "**/*.yaml"]:
-        metric_paths.extend(metrics_dir.glob(pattern))
+    # Find all metric files recursively (excluding the metrics/.history/ archive).
+    metric_paths = discover_metric_files(metrics_dir)
 
     if not metric_paths:
         raise ValueError(

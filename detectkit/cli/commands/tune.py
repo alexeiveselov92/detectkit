@@ -153,6 +153,11 @@ def run_tune(
         return False
 
     click.echo(f"  Archived previous config: {applied.archived.relative_to(project_root)}")
-    echo_done(f"{name}: applied tuned detector → {applied.saved.relative_to(project_root)}")
+    updated = ", ".join(applied.updated) or "detector"
+    echo_done(
+        f"{name}: applied tuned detector(s) [{updated}] → {applied.saved.relative_to(project_root)}"
+    )
+    if applied.preserved:
+        click.echo(f"  Preserved the metric's other detector(s): {', '.join(applied.preserved)}")
     click.echo(f"  Re-run `dtk run --select {name}` to recompute detections under the new config.")
     return True

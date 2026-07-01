@@ -753,7 +753,14 @@ Three pure-ish pieces + a server:
   config (camelCased to seed the controls, including any `manual_bounds` lower/upper)
   + the alert `consecutive_anomalies` and seeded `direction` + seeded `incidents`
   and `capture_windows`** (newest `incidents/<metric>/` file → display dicts) into a
-  JSON payload — everything the client port needs to *recompute*. With seeded
+  JSON payload — plus, for a **multi-detector** metric, the **full `detectors`
+  list** (`{index, type, tunable, seed, summary}` per configured detector) and the
+  **`detector_index`** the cockpit opens on. The cockpit opens on the first
+  **windowed** detector (mad/zscore/iqr) — the one you tune against a band —
+  falling back to the first tunable one, then MAD defaults when none is tunable
+  (`_choose_seed_index`); the picker can switch to any other tunable detector, and
+  the non-tunable ones (`prophet`/`timesfm`) ride along read-only so the write-back
+  can preserve them. Everything the client port needs to *recompute*. With seeded
   incidents it **anchors the budget-sized window on the incident region** (ending
   just past the latest incident via `_incident_span`, clamped to the first
   datapoint) so they render and score while the load stays bounded. It bakes **no** precomputed
@@ -766,21 +773,34 @@ Three pure-ish pieces + a server:
   self-contained HTML page (mirrors `reporting/html_report.py`; assigns
   `window.__DTK_TUNE__`).
 - `config_writer.apply_tuned_config(...)` is the **single mutation seam**: it
-  validates the chosen detector through `DetectorFactory.create` **and** the whole
+  validates each tuned detector through `DetectorFactory.create` **and** the whole
   body through `MetricConfig` *before touching the filesystem* (raising — writing
   nothing — on a bad/untunable config), then **archives the previous YAML verbatim**
   under `metrics/.history/<metric>/<stamp>.yml` (comments preserved; the history of
   chosen params is trackable), and only then re-emits the metric in place via
   `yaml.safe_dump` (PyYAML only — same no-round-trip-dep choice as
-  `config_emitter.py`; the prepended `#`-header points at the archive). It replaces
-  the `detectors` list with the single tuned detector and optionally updates the
+  `config_emitter.py`; the prepended `#`-header names what was updated vs preserved
+  and points at the archive). It takes a **list of `TunedDetector(type, params,
+  index)`** and **merges**: each rewrites only **its own slot** in the `detectors:`
+  list; every detector the cockpit didn't touch — a `manual_bounds` floor, a
+  `prophet`/`timesfm` detector (not even tunable), another windowed detector — is
+  preserved **verbatim** (out-of-range/None index → append, so a metric with no
+  tunable slot gains one without dropping the rest). Execution-only params
+  (`start_time` / `batch_size`) on an edited slot are carried over from the old
+  config (the constructor rejects them, so they're stripped for validation but
+  re-emitted). This is the fix for the earlier bug where the whole list was
+  overwritten with the single tuned detector — silently dropping the others and, on
+  a `min_detectors >= 2` alert, permanently killing it. It optionally updates the
   first alerting block's `consecutive_anomalies` (it never invents alerting).
 - `server.serve_tuner(...)` / `build_tune_server(...)` is the localhost write-back
   server: bound to `127.0.0.1:0`
   with a one-shot `secrets` token, serves the page, and handles **three** token-guarded
-  POSTs. `POST /apply` (the **Apply** click) → `apply_tuned_config` → responds +
-  **self-shuts-down** so the command reports what changed; an invalid config returns
-  **400 and keeps serving**. `POST /labels` (the **Save incidents** click) validates
+  POSTs. `POST /apply` (the **Apply** click) posts a `detectors: [{index, type,
+  params}, ...]` list — one entry per detector the user tuned (the auto-seeded one
+  plus any edited via the picker; `_parse_tuned_detectors`, with a fallback to the
+  legacy single `detector` object) — into `apply_tuned_config` → responds with the
+  updated/preserved detector types + **self-shuts-down** so the command reports what
+  changed; an invalid config returns **400 and keeps serving**. `POST /labels` (the **Save incidents** click) validates
   via `parse_incident_labels` and writes a versioned file through
   `versioned_labels_path` into `incidents/<metric>/`, then **keeps serving** (labels
   save repeatedly while you tune; only Apply ends the session); invalid labels return
@@ -880,6 +900,16 @@ stale and overridden, so a process killed mid-run (e.g. DB restart) never blocks
 future runs. `--force` skips the held-lock check but still takes and releases the
 lock (so it also clears a stuck row). `dtk unlock` clears a held lock on demand;
 `dtk clean` prunes internal rows orphaned by deleted/renamed metric YAML.
+
+**Metric discovery** (`config/validator.py:discover_metric_files`, the single seam
+shared by `validate_project_metrics` and `select_metrics` / tag+name search)
+recursively globs `metrics/**/*.{yml,yaml}` but **excludes any hidden path
+component** under `metrics/` — chiefly the `metrics/.history/<metric>/` archive
+`dtk tune` writes. Those snapshots keep the original `name:`, and since `pathlib`
+glob traverses dotdirs (unlike shell globbing) they would otherwise be discovered
+as live metrics and fail uniqueness validation with a spurious `Duplicate metric
+name` error. Autotune's top-level `<metric>__tuned_<id>.yml` files are not hidden,
+so they stay discoverable.
 
 ## Key design decisions
 

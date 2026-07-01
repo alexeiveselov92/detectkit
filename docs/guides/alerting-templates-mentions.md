@@ -205,6 +205,7 @@ alerting:
 | `status` | `"ANOMALY"`, `"RECOVERED"`, `"NO_DATA"`, or `"ERROR"` | all |
 | `error_type` / `error_message` | Exception details | error only |
 | `description` / `description_line` | Metric description | all |
+| `synonyms` / `synonyms_line` | Metric's alternative names from `ai_context.synonyms` — `"total revenue, gross sales"` / `"Also known as: …\n"` (empty when unset). **Opt-in**: not in the default templates, so add `{synonyms_line}` to a custom `template` to surface an "Also known as: …" line | all |
 | `mentions` / `mentions_line` | Formatted mentions | all |
 | `dashboard_url` | Raw `alerting.dashboard_url` (empty string when unset); also surfaced natively as a clickable title on Slack/Mattermost, an inline link on Telegram, and an "Open dashboard" button in email | all |
 | `dashboard_line` | `"Dashboard: <url>\n"` when set, else empty; appended to the default plain-text templates | all |

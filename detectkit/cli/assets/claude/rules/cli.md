@@ -15,6 +15,8 @@ Run all commands from a project directory (the one containing
 | `dtk test-alert <metric>` | Send a mock alert to the metric's channels |
 | `dtk unlock --select <sel>` | Clear a stuck pipeline lock |
 | `dtk clean --select <sel>` | Prune internal data that no longer matches the config |
+| `dtk osi import <model>` | Scaffold a native metric from an OSI semantic-model metric (see "OSI interop") |
+| `dtk osi export` | Publish metrics into an OSI fragment (config in `custom_extensions[detectkit]`) |
 | `dtk --version` | Show installed detectkit version |
 
 ## Selectors (`--select` / `-s`)
@@ -192,6 +194,44 @@ actually delete.
   deleted metrics). Ignores `--select`; asks for confirmation on `--execute`
   unless `-y/--yes`; refuses to run if the project defines no metrics or configs
   fail to parse (so a wrong directory can't wipe valid data).
+
+## OSI interop (`dtk osi`)
+
+`dtk osi` converts between [Open Semantic Interchange](https://github.com/open-semantic-interchange/OSI)
+(OSI) semantic models and native detectkit metrics. It's a **separate, additive**
+layer: it never runs the pipeline, takes no lock, and the converter package
+(`detectkit/semantic/`) is not imported by load/detect/alert — so it can't affect
+a running project. OSI is treated as an *interchange* format (define the KPI once,
+consume in BI + AI), not an execution engine. OSI adoption is still early, so the
+broadly-useful piece today is `ai_context` (see the metrics rule) — the converters
+are a forward bridge for teams that already run a governed semantic layer.
+
+- `dtk osi import <model.osi.yml> --metric <name> --interval <grain>` — the
+  "enhanced init": resolve one OSI metric and **scaffold a normal native metric**
+  (SQL `query`, interval, a starter detector, the metric's `ai_context`). Review
+  it, then commit like any hand-written metric. Targets:
+  - `--target clickhouse` (default) — a direct `toStartOfInterval(...) GROUP BY`
+    query from the dataset's physical `source` (ANSI→ClickHouse via **sqlglot**,
+    the optional `[osi]` extra: `pip install 'detectkit[osi]'`).
+  - `--target cube --cube <name> --time-field <dim>` — a Cube **SQL-API**
+    `MEASURE(...)` query, so the metric runs through Cube and the alert matches a
+    Cube dashboard's number by construction. Point its `profile` at a Postgres
+    connection on Cube's SQL port.
+- Only provably per-bucket-additive measures compile (`SUM`/`COUNT`/`COUNT(DISTINCT)`/
+  `AVG`/`MIN`/`MAX` + ratios like `SUM(x)/NULLIF(COUNT(DISTINCT y),0)`). Window
+  functions / non-aggregates / unknown aggregates are **refused** with a message
+  to use `query_file:` — never a plausible-but-wrong series.
+- `dtk osi compile <model> --metric <name> --interval <g>` prints just the SQL
+  (for review). `dtk osi export [--select <sel>]` writes an OSI fragment carrying
+  a lossless snapshot of the config in `custom_extensions[detectkit]` + the
+  `ai_context` — a **one-way carrier** (`import` does not reconstruct from it; the
+  metric YAML stays the source of truth).
+
+```bash
+dtk osi compile model.osi.yml -m total_sales -i 1h          # preview the SQL
+dtk osi import model.osi.yml -m total_sales -i 1h -o metrics/  # scaffold a metric
+dtk osi export -o semantic/detectkit.osi.yml                  # publish back to OSI
+```
 
 ## Common workflows
 

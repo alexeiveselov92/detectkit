@@ -182,6 +182,23 @@ def _seed_direction(metric_config: MetricConfig) -> str:
     return raw if raw in ("up", "down", "any") else "any"
 
 
+def _ai_context_payload(metric_config: MetricConfig) -> dict[str, Any] | None:
+    """Serialize the metric's OSI ``ai_context`` for the cockpit (``None`` when unset).
+
+    Read-only grounding the cockpit HUD can show so the human tuner sees the KPI's
+    business meaning + alternative names while labeling. Purely descriptive — it
+    never touches the band, the recompute or the quality metrics.
+    """
+    ac = metric_config.ai_context
+    if ac is None:
+        return None
+    return {
+        "instructions": ac.instructions,
+        "synonyms": list(ac.synonyms),
+        "examples": list(ac.examples),
+    }
+
+
 def build_tune_payload(
     *,
     metric_config: MetricConfig,
@@ -224,6 +241,7 @@ def build_tune_payload(
     interval_seconds = interval.seconds
 
     seed = _seed_detector(metric_config)
+    ai_ctx = _ai_context_payload(metric_config)
 
     # Resolve the window. ``end`` defaults to the last datapoint. ``start``
     # defaults to a budget-sized number of intervals before ``end`` (clamped to the
@@ -270,6 +288,7 @@ def build_tune_payload(
         "metric": name,
         "project": project_name,
         "description": metric_config.description,
+        "ai_context": ai_ctx,
         "interval_seconds": interval_seconds,
         "period": {"start": 0, "end": 0},
         "points": [],
@@ -314,6 +333,7 @@ def build_tune_payload(
         "metric": name,
         "project": project_name,
         "description": metric_config.description,
+        "ai_context": ai_ctx,
         "interval_seconds": interval_seconds,
         "period": {"start": _ms(start), "end": end_ms},
         "points": points,

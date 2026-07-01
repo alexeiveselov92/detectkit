@@ -36,6 +36,7 @@ class _OrchestratorBase:
         links: dict[str, str] | None = None,
         project_name: str | None = None,
         help_url: str | None = None,
+        ai_synonyms: list[str] | None = None,
     ):
         self.metric_name = metric_name
         self.interval = interval
@@ -57,6 +58,10 @@ class _OrchestratorBase:
         # defaulting to the official docs; None when opted out). Stamped onto every
         # AlertData so channels render a guide link for non-operator stakeholders.
         self.help_url = help_url
+        # OSI ai_context synonyms (the metric's alternative names). Stamped onto
+        # every AlertData so channels can render an "Also known as" identity line.
+        # Empty list when the metric has no ai_context — renders unchanged.
+        self.ai_synonyms = ai_synonyms or []
 
     @staticmethod
     def _group_by_timestamp(

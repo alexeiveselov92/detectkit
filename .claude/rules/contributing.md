@@ -22,6 +22,7 @@ detectkit/
 │   ├── autotune/         # `dtk autotune` engine (seasonality/detector/grid search)
 │   ├── reporting/        # Self-contained HTML reports (`dtk run/autotune --report`)
 │   ├── tuning/           # `dtk tune` interactive manual tuning (write-back in place)
+│   ├── semantic/         # OSI (Open Semantic Interchange) interop (`dtk osi` import/export)
 │   └── utils/            # Numpy/stats helpers, env interpolation
 ├── tests/                # Unit (numpy/mock) + integration (testcontainers)
 └── docs/                 # User-facing docs (guides, reference, examples)

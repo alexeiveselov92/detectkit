@@ -48,6 +48,11 @@ prophet = ["prophet>=1.1.0"]
 timesfm = ["timesfm>=0.1.0"]
 advanced-detectors = ["prophet>=1.1.0", "timesfm>=0.1.0"]
 
+# OSI (Open Semantic Interchange) interop — sqlglot for ANSI->ClickHouse
+# transpilation in `dtk osi import/compile` (clickhouse target). Optional: the
+# core library and the rest of the CLI never import sqlglot.
+osi = ["sqlglot>=20.0"]
+
 # All extras
 all = [
     "clickhouse-driver>=0.2.0",
@@ -55,6 +60,7 @@ all = [
     "pymysql>=1.0.0",
     "prophet>=1.1.0",
     "timesfm>=0.1.0",
+    "sqlglot>=20.0",
 ]
 
 # Development dependencies
@@ -66,6 +72,7 @@ dev = [
     "black>=23.0",
     "mypy>=1.0",
     "ruff>=0.1.0",
+    "sqlglot>=20.0",
 ]
 # Integration tests (require Docker)
 integration = [

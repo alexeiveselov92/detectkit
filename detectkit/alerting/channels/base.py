@@ -72,6 +72,13 @@ class AlertData:
     error_message: str | None = None
     description: str | None = None
     mentions: list[str] = field(default_factory=list)
+    # OSI-compatible AI grounding: the metric's alternative names. Exposed to
+    # message templates as the OPT-IN ``{synonyms}`` / ``{synonyms_line}``
+    # variables (via :meth:`build_context`) so a custom template can surface an
+    # "Also known as: …" line — but the DEFAULT rendering deliberately does NOT
+    # show it, so existing alerts are byte-identical. Stamped by the orchestrator
+    # from ``MetricConfig.ai_context.synonyms``; defaults to empty.
+    ai_synonyms: list[str] = field(default_factory=list)
     project_name: str | None = None
     # Optional actionable links surfaced in the message. ``dashboard_url`` is the
     # headline link (rendered natively as a clickable title/link on
@@ -416,6 +423,14 @@ class BaseAlertChannel(ABC):
         # Format description line (empty string if no description)
         description_line = f"{alert_data.description}\n" if alert_data.description else ""
 
+        # OSI ai_context synonyms — the metric's alternative names. Provided as
+        # OPT-IN template variables only (``{synonyms}`` / ``{synonyms_line}``);
+        # the default templates do NOT reference them, so a metric without
+        # ai_context — and every existing alert — renders unchanged. A custom
+        # template can drop ``{synonyms_line}`` in to show "Also known as: …".
+        synonyms = ", ".join(alert_data.ai_synonyms) if alert_data.ai_synonyms else ""
+        synonyms_line = f"Also known as: {synonyms}\n" if synonyms else ""
+
         # Format mentions
         mentions_str = self.format_mentions(alert_data.mentions)
         mentions_line = f"\n{mentions_str}" if mentions_str else ""
@@ -482,6 +497,8 @@ class BaseAlertChannel(ABC):
             "error_message": alert_data.error_message or "",
             "description": alert_data.description or "",
             "description_line": description_line,
+            "synonyms": synonyms,
+            "synonyms_line": synonyms_line,
             "dashboard_url": dashboard_url,
             "dashboard_line": dashboard_line,
             "help_url": help_url,

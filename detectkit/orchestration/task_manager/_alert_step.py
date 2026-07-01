@@ -68,6 +68,7 @@ class _AlertStepMixin(_TaskManagerBase):
                 alert_config=alerting_config,
                 description=config.description,
                 mentions=alerting_config.mentions,
+                ai_synonyms=(config.ai_context.synonyms if config.ai_context else None),
                 dashboard_url=alerting_config.dashboard_url,
                 links=alerting_config.links,
                 project_name=getattr(self.project_config, "name", None),

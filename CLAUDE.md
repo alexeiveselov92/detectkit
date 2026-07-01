@@ -110,5 +110,26 @@ rendered on the docs site under **For developers**). Read the relevant one:
   the renderer TS changes. Takes no pipeline lock. `dtk init-claude` ships a
   `dtk-tune` skill (the hands-on entry point for the user's assistant — the
   cockpit umbrella, with autotune built in) — keep it in sync on release.
+- **OSI interop** lives in `detectkit/semantic/` (the `dtk osi import` /
+  `export` / `compile` commands): an **isolated, additive** bridge to
+  [Open Semantic Interchange](https://github.com/open-semantic-interchange/OSI) —
+  the pipeline never imports it, so it can't affect a running project. OSI is an
+  *interchange* format (define a KPI once, consume in BI + AI), not an execution
+  engine, so detectkit converts at the edges rather than running OSI live:
+  `import` scaffolds a **normal native metric** from an OSI model metric
+  (`--target clickhouse` compiles from `dataset.source` via **sqlglot**;
+  `--target cube` emits a Cube SQL-API `MEASURE(...)` query for dashboard
+  number-parity), compiling only provably per-bucket-additive measures and
+  hard-refusing the rest; `export` publishes metrics back as an OSI fragment with
+  a lossless snapshot of the config in `custom_extensions[detectkit]` (a **one-way
+  carrier** — `import` doesn't reconstruct from it; the metric YAML stays source of
+  truth). OSI adoption is early, so the broadly-useful piece today is the
+  metric-level `ai_context` (`{instructions, synonyms, examples}`, mirroring OSI) —
+  descriptive grounding usable on any metric with no OSI model: opt-in
+  `{synonyms}`/`{synonyms_line}` alert vars (no
+  default-message change) + the tune cockpit payload. sqlglot is the optional
+  `[osi]` extra (lazy import). A live runtime `osi_source` binding is deliberately
+  deferred. Keep the `dtk osi` docs (cli reference + the OSI guide) in sync on
+  release.
 
 Repo: https://github.com/alexeiveselov92/detectkit

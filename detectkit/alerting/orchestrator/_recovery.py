@@ -188,6 +188,7 @@ class _RecoveryMixin(_OrchestratorBase):
             is_recovery=True,
             description=self.description,
             mentions=self.mentions,
+            ai_synonyms=self.ai_synonyms,
             dashboard_url=self.dashboard_url,
             links=self.links,
             project_name=self.project_name,

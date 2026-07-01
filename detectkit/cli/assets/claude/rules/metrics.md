@@ -13,6 +13,9 @@ description: API p95 latency   # optional, shown in alerts
 profile: prod                  # optional, overrides project default_profile
 enabled: true                  # optional, false → skipped by `dtk run`
 tags: [critical, api]          # optional, used by `--select tag:<t>`
+ai_context:                    # optional — OSI-compatible grounding (descriptive only)
+  instructions: "p95 API latency, ms; user-facing"
+  synonyms: ["api latency", "response time"]
 
 interval: 5min                 # required — point spacing on the time grid
 
@@ -62,6 +65,19 @@ false_alert_budget: 0.3        # optional — `dtk tune` target false-alert rate
 `(0, 1]`) the `dtk tune` cockpit gently flags when exceeded. It overrides the
 project-wide default; unset → project, then a built-in `0.5`. Tuning-only — it never
 affects the load/detect/alert pipeline.
+
+`ai_context` is **OSI-compatible grounding** you can add to any metric with **no
+OSI model needed** — the metric's business meaning (`instructions`), alternative
+names (`synonyms`) and example values (`examples`), mirroring the
+[Open Semantic Interchange](https://github.com/open-semantic-interchange/OSI)
+`ai_context` shape so a metric's meaning is portable to/from an OSI semantic model.
+Accepts a bare string (→ `instructions`) or the full mapping. It is **purely
+descriptive**: it never affects load/detect/alert or the detector id, and it does
+**not** change any default-rendered alert. The `synonyms` are exposed to alert
+templates as the **opt-in** `{synonyms}` / `{synonyms_line}` variables (a custom
+`template` can add an "Also known as: …" line), and the whole block is carried in
+the `dtk tune` cockpit payload as read-only grounding. Omit it and everything
+renders as before.
 
 ## `interval` (required)
 

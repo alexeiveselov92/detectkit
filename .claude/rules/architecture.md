@@ -855,9 +855,10 @@ so detectkit does *not* build a live OSI→SQL runtime — it converts at the ed
   definition is a visible diff (detectkit resumes from the last datapoint).
 - `exporter.py` (`dtk osi export`) — emits an OSI fragment with the metric's
   `ai_context` + the **exact** detect/alert config in
-  `custom_extensions[vendor_name=detectkit].data` (lossless carrier). The portable
-  `expression` is a placeholder (a detectkit series query doesn't decompose into a
-  clean OSI measure).
+  `custom_extensions[vendor_name=detectkit].data` (a lossless snapshot — a
+  **one-way carrier**: `dtk osi import` does not reconstruct from it, so the metric
+  YAML stays source of truth). The portable `expression` is a placeholder (a
+  detectkit series query doesn't decompose into a clean OSI measure).
 
 sqlglot is the optional `[osi]` extra, imported lazily in `query_gen`; the core
 library and the rest of the CLI never import it. Deferred (needs the user's Cube

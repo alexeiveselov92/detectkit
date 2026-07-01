@@ -202,7 +202,9 @@ actually delete.
 layer: it never runs the pipeline, takes no lock, and the converter package
 (`detectkit/semantic/`) is not imported by load/detect/alert — so it can't affect
 a running project. OSI is treated as an *interchange* format (define the KPI once,
-consume in BI + AI), not an execution engine.
+consume in BI + AI), not an execution engine. OSI adoption is still early, so the
+broadly-useful piece today is `ai_context` (see the metrics rule) — the converters
+are a forward bridge for teams that already run a governed semantic layer.
 
 - `dtk osi import <model.osi.yml> --metric <name> --interval <grain>` — the
   "enhanced init": resolve one OSI metric and **scaffold a normal native metric**
@@ -221,7 +223,9 @@ consume in BI + AI), not an execution engine.
   to use `query_file:` — never a plausible-but-wrong series.
 - `dtk osi compile <model> --metric <name> --interval <g>` prints just the SQL
   (for review). `dtk osi export [--select <sel>]` writes an OSI fragment carrying
-  the exact config in `custom_extensions[detectkit]` + the `ai_context`.
+  a lossless snapshot of the config in `custom_extensions[detectkit]` + the
+  `ai_context` — a **one-way carrier** (`import` does not reconstruct from it; the
+  metric YAML stays the source of truth).
 
 ```bash
 dtk osi compile model.osi.yml -m total_sales -i 1h          # preview the SQL

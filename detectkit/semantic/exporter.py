@@ -1,17 +1,22 @@
-"""Export native detectkit metrics into an OSI fragment (the CI hedge).
+"""Export native detectkit metrics into an OSI fragment (a forward hedge).
 
 ``dtk osi export`` publishes detectkit's metrics into the governed layer: each
 metric becomes an OSI ``metrics`` entry carrying its ``ai_context`` (so BI / the
-agent see the same business meaning) plus a **lossless** ``custom_extensions``
-block under the ``detectkit`` vendor namespace that round-trips the full detect /
-alert config.
+agent see the same business meaning) plus a **lossless snapshot** of the full
+detect / alert config in a ``custom_extensions`` block under the ``detectkit``
+vendor namespace, so the definition travels with the fragment.
+
+This is a **one-way carrier, not a round-trip**: ``dtk osi import`` does not
+reconstruct a metric from the ``custom_extensions[detectkit]`` block — the metric
+YAML stays the source of truth. ``export`` is for publishing the definition
+outward (to BI / the agent / a catalog), not for backup/restore.
 
 Honesty about the measure: a detectkit metric's query is an arbitrary
 GROUP-BY-time SQL that does **not** cleanly decompose into a portable OSI
 ``expression`` measure, so the emitted ``expression`` is a placeholder and the
 real, exact definition rides in ``custom_extensions[detectkit].data`` (a JSON
 string, per the verified spec). Other OSI tools still get the metric's name +
-``ai_context``; a detectkit-aware reader gets everything.
+``ai_context``; the detectkit block carries the exact config for reference.
 """
 
 from __future__ import annotations

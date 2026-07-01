@@ -17,6 +17,14 @@ The whole feature is **isolated and additive**. The converter package
 `dtk osi` command takes no lock and writes no internal table, so it cannot affect
 a running project. Remove it and detectkit behaves exactly as before.
 
+**Which part do you need?** For most projects the immediately useful piece is
+**`ai_context`** (see the section below) — descriptive KPI grounding that works on
+any metric with **no OSI model and nothing extra to install**. The `dtk osi`
+converters are a **forward bridge** for teams that already run a governed semantic
+layer (Cube, dbt MetricFlow, Snowflake…): OSI adoption is still early, so if you
+don't yet have an OSI model to point at, reach for `ai_context` today and keep the
+converters ready for when you do.
+
 ## Install
 
 OSI compilation for the ClickHouse target uses [sqlglot](https://github.com/tobymao/sqlglot)
@@ -169,9 +177,15 @@ dtk osi export --select tag:critical                # a subset, to stdout
 
 Because a detectkit metric's query is an arbitrary group-by-time SQL that does
 not decompose into a clean portable OSI measure, the OSI `expression` is a
-placeholder and the real definition rides in the `custom_extensions` — so a
-detectkit-aware reader round-trips it losslessly while other OSI tools still get
-the metric name + `ai_context`.
+placeholder and the real definition rides in the `custom_extensions` — a
+**lossless snapshot** so the definition travels with the fragment, while other OSI
+tools still get the metric name + `ai_context`.
+
+> **One-way carrier, not a round-trip.** `dtk osi import` does **not** reconstruct
+> a metric from the `custom_extensions[detectkit]` block — re-importing an exported
+> fragment scaffolds a fresh metric from the OSI measure. Keep your metric YAML as
+> the source of truth; `export` publishes the definition outward (to BI / the agent
+> / a catalog), it is not backup/restore.
 
 ## `ai_context` — grounding without OSI
 

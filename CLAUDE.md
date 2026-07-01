@@ -121,9 +121,12 @@ rendered on the docs site under **For developers**). Read the relevant one:
   `--target cube` emits a Cube SQL-API `MEASURE(...)` query for dashboard
   number-parity), compiling only provably per-bucket-additive measures and
   hard-refusing the rest; `export` publishes metrics back as an OSI fragment with
-  the exact config in `custom_extensions[detectkit]`. The metric-level
-  `ai_context` (`{instructions, synonyms, examples}`, mirroring OSI) is
-  descriptive grounding — opt-in `{synonyms}`/`{synonyms_line}` alert vars (no
+  a lossless snapshot of the config in `custom_extensions[detectkit]` (a **one-way
+  carrier** — `import` doesn't reconstruct from it; the metric YAML stays source of
+  truth). OSI adoption is early, so the broadly-useful piece today is the
+  metric-level `ai_context` (`{instructions, synonyms, examples}`, mirroring OSI) —
+  descriptive grounding usable on any metric with no OSI model: opt-in
+  `{synonyms}`/`{synonyms_line}` alert vars (no
   default-message change) + the tune cockpit payload. sqlglot is the optional
   `[osi]` extra (lazy import). A live runtime `osi_source` binding is deliberately
   deferred. Keep the `dtk osi` docs (cli reference + the OSI guide) in sync on

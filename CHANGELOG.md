@@ -5,7 +5,7 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.47.0] - 2026-06-30
+## [0.47.0] - 2026-07-01
 
 ### Added
 - **OSI-compatible `ai_context` on a metric (grounding for humans + AI).** A new
@@ -50,9 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     a clear message pointing at `query_file:` — a wrong monitored series is worse
     than no integration.
   - `dtk osi compile` prints just the generated SQL for review; `dtk osi export`
-    publishes detectkit metrics into an OSI fragment, carrying the **exact**
-    detect/alert config in a `custom_extensions[detectkit]` block (a JSON string,
-    per the OSI spec) plus the metric's `ai_context`.
+    publishes detectkit metrics into an OSI fragment, carrying a lossless snapshot
+    of the detect/alert config in a `custom_extensions[detectkit]` block (a JSON
+    string, per the OSI spec) plus the metric's `ai_context` — a **one-way
+    carrier** (`dtk osi import` does not reconstruct from it; the metric YAML stays
+    the source of truth).
+  - **Positioning.** OSI adoption is still early, so the immediately useful piece
+    for most projects is `ai_context` (grounding on any metric, no OSI model or
+    extra install needed); the `dtk osi` converters are a forward bridge for teams
+    that already run a governed semantic layer (Cube, dbt MetricFlow, Snowflake…).
+    The whole layer is isolated and additive — remove it and detectkit is unchanged.
   - sqlglot is an **optional** dependency — the `[osi]` extra
     (`pip install 'detectkit[osi]'`), needed only for the ClickHouse target. The
     core library and the rest of the CLI never import it.

@@ -66,9 +66,10 @@ false_alert_budget: 0.3        # optional — `dtk tune` target false-alert rate
 project-wide default; unset → project, then a built-in `0.5`. Tuning-only — it never
 affects the load/detect/alert pipeline.
 
-`ai_context` is **OSI-compatible grounding** — the metric's business meaning
-(`instructions`), alternative names (`synonyms`) and example values (`examples`),
-mirroring the [Open Semantic Interchange](https://github.com/open-semantic-interchange/OSI)
+`ai_context` is **OSI-compatible grounding** you can add to any metric with **no
+OSI model needed** — the metric's business meaning (`instructions`), alternative
+names (`synonyms`) and example values (`examples`), mirroring the
+[Open Semantic Interchange](https://github.com/open-semantic-interchange/OSI)
 `ai_context` shape so a metric's meaning is portable to/from an OSI semantic model.
 Accepts a bare string (→ `instructions`) or the full mapping. It is **purely
 descriptive**: it never affects load/detect/alert or the detector id, and it does

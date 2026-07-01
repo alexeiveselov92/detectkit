@@ -1178,10 +1178,12 @@ Key options: `--target {clickhouse,cube}`, `--dataset`, `--time-field`,
 ### `dtk osi export`
 
 Publish native detectkit metrics into an OSI fragment. Each metric becomes an OSI
-`metrics` entry carrying its `ai_context` plus the **exact** detect/alert config
-in a `custom_extensions[detectkit]` block (a JSON string, per the OSI spec), so a
-detectkit-aware reader round-trips it losslessly while other OSI tools still see
-the metric name + `ai_context`.
+`metrics` entry carrying its `ai_context` plus a **lossless snapshot** of the
+detect/alert config in a `custom_extensions[detectkit]` block (a JSON string, per
+the OSI spec), so the definition travels with the fragment while other OSI tools
+still see the metric name + `ai_context`. This is a **one-way carrier**: `dtk osi
+import` does not reconstruct a metric from that block (keep your metric YAML as the
+source of truth).
 
 ```bash
 dtk osi export --out semantic/detectkit.osi.yml          # all metrics

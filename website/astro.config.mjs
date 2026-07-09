@@ -85,6 +85,7 @@ export default defineConfig({
             { label: 'Detectors', link: '/guides/detectors/' },
             { label: 'Auto-tuning', link: '/guides/autotuning/' },
             { label: 'Tuning (manual)', link: '/guides/tuning/' },
+            { label: 'Project UI', link: '/guides/project-ui/' },
             { label: 'Semantic layer (OSI)', link: '/guides/osi/' },
             { label: 'Visualizing results', link: '/guides/visualizing-results/' },
           ],

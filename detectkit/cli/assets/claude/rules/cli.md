@@ -12,6 +12,7 @@ Run all commands from a project directory (the one containing
 | `dtk run --select <sel>` | Run the load → detect → alert pipeline |
 | `dtk autotune --select <sel>` | Auto-configure a metric's detector (see `autotune.md`) |
 | `dtk tune --select <sel>` | Interactively tune a detector on real data, write it back in place |
+| `dtk ui` | Project-wide live overview + browser pipeline control panel |
 | `dtk test-alert <metric>` | Send a mock alert to the metric's channels |
 | `dtk unlock --select <sel>` | Clear a stuck pipeline lock |
 | `dtk clean --select <sel>` | Prune internal data that no longer matches the config |
@@ -170,6 +171,44 @@ re-run `dtk run` afterward to recompute detections under the new config.
 `--no-serve` writes a static read-only preview HTML instead (no write-back —
 **Save incidents** downloads the labels file); `--from` / `--to` bound the window;
 `--no-open` prints the URL without opening a browser.
+
+## `dtk ui`
+
+A **project-wide** localhost cockpit over every selected metric's alerting
+behavior — the live counterpart to a one-off `--report` file. Opens an
+**overview** table (grouped by `metrics/` subfolder, filterable by tag) with,
+per metric: alerts in the selected window + per-day rate + last alert,
+no-data events, anomaly rate, data freshness, and a sparkline — all
+**replayed** from stored detections through the same seam `dtk run --report`
+uses, so the counts match what the pipeline would actually have alerted.
+When `incidents/<metric>/` labels exist (from `dtk tune`'s Label/Review +
+Save incidents), the row also shows recall / false-alert rate / reviewed,
+matched the same way the `dtk tune` cockpit's metrics bar does; without
+labels the row still shows frequency stats to eyeball.
+
+```bash
+dtk ui [-s/--select "*"] [--window 24h|7d|30d|90d|all] [--profile NAME] [--no-open]
+```
+
+- `--select` — same selector syntax as `dtk run`; scopes which metrics the
+  overview and pipeline panel cover (default `*`, everything).
+- `--window` — the preset selected when the page opens (default `30d`);
+  switch freely in the browser afterward.
+- `--profile` — forwarded to the DB connection **and** to every subprocess
+  the pipeline panel spawns.
+- `--no-open` — print the URL instead of opening a browser tab.
+
+Clicking a metric's **Open** shows the existing self-contained HTML report
+(the same one `--report` writes) in an overlay. A **pipeline panel** drives
+the real CLI as subprocesses — `dtk run` (select/steps/from/to/force/
+full-refresh), `dtk autotune`, `dtk unlock` — streaming their terminal
+output live; **only one of these three runs at a time** (they'd contend for
+the same pipeline lock anyway). **Tune** launches `dtk tune --select
+<metric>` for a metric and opens its cockpit in a new tab — unlike
+run/autotune/unlock, **multiple tune jobs run concurrently**, since each is
+its own isolated, lock-free session. The `dtk ui` server itself takes **no
+pipeline lock** and never mutates anything — every spawned command behaves
+exactly as if typed into a terminal.
 
 ## `dtk test-alert <metric>`
 

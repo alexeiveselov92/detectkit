@@ -311,6 +311,60 @@ def autotune(
 @click.option(
     "--select",
     "-s",
+    default="*",
+    show_default=True,
+    help="Selector for the metrics the UI covers (metric name, path, or tag)",
+)
+@click.option(
+    "--profile",
+    help="Profile to use (default: from project config)",
+)
+@click.option(
+    "--window",
+    default="30d",
+    show_default=True,
+    help="Initial window preset: 24h, 7d, 30d, 90d, or all",
+)
+@click.option(
+    "--no-open",
+    is_flag=True,
+    help="Don't auto-open the browser (just print the local URL)",
+)
+def ui(select: str, profile: str, window: str, no_open: bool) -> None:
+    """
+    Open the project-level monitoring cockpit.
+
+    A localhost web UI over the already-persisted _dtk_* tables: an overview
+    of every selected metric's alerting behavior (how often alerts fire, per
+    metric / per tag / per metrics/ folder), a per-metric detail view (the
+    existing HTML report in an iframe), and a pipeline control panel that runs
+    `dtk run` / `dtk autotune` / `dtk unlock` / `dtk tune` as subprocesses —
+    exactly as if typed at a terminal. Alert counts are replayed from stored
+    detections, so the numbers match what the pipeline would actually have
+    alerted.
+
+    Takes no pipeline lock itself; spawned commands take their own lock.
+    Selector semantics match `dtk run`.
+
+    Examples:
+        # Cover every metric, starting on the last 30 days
+        dtk ui
+
+        # Only metrics tagged critical, starting on the last 7 days
+        dtk ui --select "tag:critical" --window 7d
+
+        # Don't auto-open the browser
+        dtk ui --no-open
+    """
+    from detectkit.cli.commands.ui import run_ui
+
+    run_ui(select=select, profile=profile, window=window, no_open=no_open)
+
+
+@cli.command()
+@click.option(
+    "--select",
+    "-s",
     help="Selector for the single metric to tune (metric name, path, or tag)",
     required=True,
 )

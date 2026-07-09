@@ -108,6 +108,8 @@ exclude = ["tests*", "docs*"]
 # Pre-built interactive tuning renderer bundle (shared detector port + chart core),
 # inlined into the self-contained tuning page by `dtk tune`.
 "detectkit.tuning" = ["assets/*.js"]
+# Pre-built project-cockpit renderer bundle, inlined into the page served by `dtk ui`.
+"detectkit.ui" = ["assets/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

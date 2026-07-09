@@ -1,13 +1,17 @@
 # Visualizing Results
 
 detectkit writes everything it computes into a handful of internal `_dtk_*`
-tables in your database. There are two ways to see it:
+tables in your database. There are a few ways to see it:
 
 - **HTML reports** — the quickest look. `dtk run --report` (or
   `dtk autotune --report`) writes a single self-contained HTML file per metric
   that you open in a browser — values, the detector's confidence band, anomalies,
   and the alerts that fired, with a built-in period selector. No BI tool, no SQL.
   See [HTML reports](#html-reports) below.
+- **`dtk ui`** — for a live view **across the whole project**, not one metric
+  at a time: an overview of every metric's alert frequency, freshness, and a
+  panel to drive the pipeline, right in the browser. See the
+  [Project UI guide](project-ui.md).
 - **Your own BI / dashboarding tool** — for shared dashboards and custom panels,
   point **any** BI tool at the `_dtk_*` tables and chart them with plain SQL
   (Grafana, Apache Superset, Metabase, Tableau, Redash, Looker, …, or SQL
@@ -431,6 +435,8 @@ inflates anomaly counts. Pick the detector you want from the listing query in
 - [Alerting guide](alerting.md) — the alert rule that interprets these detections
 - [Auto-tuning guide](autotuning.md) — inspecting the detector `dtk autotune`
   chose (uses these same recipes with the run's `winning_detector_id`)
+- [Project UI guide](project-ui.md) — a live, project-wide view built on the
+  same `_dtk_*` tables and alert-replay logic
 - [Profiles configuration](configuration-profiles.md) — where the
   `internal_database` lives
 - [CLI reference](../reference/cli.md) — running the pipeline that fills these

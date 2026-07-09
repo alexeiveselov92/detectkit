@@ -260,4 +260,3 @@ alert_channels:
 - `channel` - Override the receiver's default channel
 - `timeout` (default: `10`) - HTTP request timeout
 - `extra_headers`: Dict of additional HTTP headers to send
-

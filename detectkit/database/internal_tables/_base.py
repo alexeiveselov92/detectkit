@@ -9,7 +9,7 @@ look for those helpers.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from detectkit.database.manager import BaseDatabaseManager
 
@@ -24,12 +24,19 @@ class _InternalTablesBase:
 
     @staticmethod
     def _normalize_max_timestamp(value: datetime | None) -> datetime | None:
-        """Treat the Unix epoch sentinel as a missing value.
+        """Treat the Unix epoch sentinel as a missing value; return naive UTC.
 
         ClickHouse's ``max(timestamp)`` over an empty selection returns
         ``1970-01-01 00:00:00`` instead of NULL. Without normalisation,
         idempotency checks would think we already processed everything up
         to 1970 and refuse to do work.
+
+        The driver may also hand back an *aware* datetime (clickhouse-driver
+        attaches the server column's timezone), while everything in-memory in
+        detectkit is naive UTC — mixing the two raises ``TypeError`` on the
+        first comparison/subtraction. Cursor reads are normalized to naive
+        UTC here, at the single seam every reader shares, instead of at each
+        call site.
         """
         if value is None:
             return None
@@ -38,4 +45,6 @@ class _InternalTablesBase:
             epoch = epoch.replace(tzinfo=value.tzinfo)
         if value == epoch:
             return None
+        if value.tzinfo is not None:
+            return value.astimezone(timezone.utc).replace(tzinfo=None)
         return value

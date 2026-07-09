@@ -392,4 +392,3 @@ alerting:
 **Warning**: Without a cooldown, a persistent anomaly fires a duplicate
 alert on every `dtk run` (e.g. every cron tick). Setting `alert_cooldown`
 is recommended for production metrics.
-

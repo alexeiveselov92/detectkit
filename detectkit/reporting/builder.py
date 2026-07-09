@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 
-from detectkit.alerting.orchestrator import AlertOrchestrator
+from detectkit.alerting.orchestrator import AlertOrchestrator, ReplayedEvent
 from detectkit.alerting.orchestrator._types import (
     AlertConditions,
     DetectionRecord,
@@ -176,7 +176,7 @@ def resolve_window(
     return start, end
 
 
-def _record_from_row(row: dict) -> DetectionRecord:
+def record_from_row(row: dict) -> DetectionRecord:
     """Build a :class:`DetectionRecord` from a flat ``load_detections`` row.
 
     Mirrors ``hydrate_detection_records`` (direction/severity derived from
@@ -202,6 +202,61 @@ def _record_from_row(row: dict) -> DetectionRecord:
         severity=severity,
         detection_metadata=metadata,
     )
+
+
+def replay_alert_events(
+    metric_config: MetricConfig,
+    internal_unused: InternalTablesManager | None,
+    records: list[DetectionRecord],
+    value_at: dict[np.datetime64, float | None],
+    start: datetime,
+    end: datetime,
+    project_name: str | None,
+) -> list[tuple[str, ReplayedEvent]]:
+    """Replay every *enabled* alerting config over ``[start, end]``.
+
+    The per-alert-config replay loop of :func:`build_report_payload`, extracted
+    so ``detectkit/ui/overview.py`` can reuse the exact same code path — the
+    alert numbers on both the report and the overview cockpit come from an
+    identical replay, not two implementations that could drift.
+
+    ``internal_unused`` is threaded into :class:`AlertOrchestrator` for
+    constructor parity with the live/dispatch path, but the pure ``replay()``
+    method never reads it (no DB, no wall-clock — everything comes from
+    ``records`` / ``value_at``).
+
+    Returns ``(config_id, event)`` pairs in the order the configs were
+    evaluated (each config's events are chronological; pairs across configs
+    are NOT globally sorted — sort on the caller's chosen key, e.g. timestamp).
+    """
+    name = metric_config.name
+    interval = metric_config.get_interval()
+    out: list[tuple[str, ReplayedEvent]] = []
+    active_configs = [c for c in (metric_config.alerting or []) if c.enabled and c.channels]
+    for cfg in active_configs:
+        config_id = make_alert_config_id(cfg)
+        orchestrator = AlertOrchestrator(
+            metric_name=name,
+            interval=interval,
+            alert_config_id=config_id,
+            conditions=AlertConditions(
+                min_detectors=cfg.min_detectors,
+                direction=cfg.direction,
+                consecutive_anomalies=cfg.consecutive_anomalies,
+            ),
+            timezone_display=cfg.timezone,
+            internal=internal_unused,
+            alert_config=cfg,
+            description=metric_config.description,
+            mentions=cfg.mentions,
+            dashboard_url=cfg.dashboard_url,
+            links=cfg.links,
+            project_name=project_name,
+            help_url=None,
+        )
+        for event in orchestrator.replay(records, value_at, start, end):
+            out.append((config_id, event))
+    return out
 
 
 def _event_to_payload(event: Any, config_id: str) -> dict:
@@ -342,33 +397,13 @@ def build_report_payload(
         slot["effective_start"] = grid_ms[warm] if 0 < warm < n_grid else None
 
     # ---- alerts: replay every active alert config over the period -------------
-    records = [_record_from_row(r) for r in det_rows]
-    alerts: list[dict] = []
-    active_configs = [c for c in (metric_config.alerting or []) if c.enabled and c.channels]
-    for cfg in active_configs:
-        config_id = make_alert_config_id(cfg)
-        orchestrator = AlertOrchestrator(
-            metric_name=name,
-            interval=interval,
-            alert_config_id=config_id,
-            conditions=AlertConditions(
-                min_detectors=cfg.min_detectors,
-                direction=cfg.direction,
-                consecutive_anomalies=cfg.consecutive_anomalies,
-            ),
-            timezone_display=cfg.timezone,
-            internal=internal,
-            alert_config=cfg,
-            description=metric_config.description,
-            mentions=cfg.mentions,
-            dashboard_url=cfg.dashboard_url,
-            links=cfg.links,
-            project_name=project_name,
-            help_url=None,
+    records = [record_from_row(r) for r in det_rows]
+    alerts: list[dict] = [
+        _event_to_payload(event, config_id)
+        for config_id, event in replay_alert_events(
+            metric_config, internal, records, value_at, start, end, project_name
         )
-        for event in orchestrator.replay(records, value_at, start, end):
-            alerts.append(_event_to_payload(event, config_id))
-
+    ]
     alerts.sort(key=lambda a: a["t"])
     summary = {
         "anomalies": len(anomalous_timestamps),

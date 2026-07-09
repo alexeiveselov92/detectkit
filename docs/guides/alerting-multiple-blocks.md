@@ -29,4 +29,3 @@ Each config is evaluated and sent independently. Single dict format (backward-co
 > [`dtk clean --select <metric>`](../reference/cli.md#dtk-clean) to prune it.
 > (Disabling a block with `enabled: false` keeps its state — the hash is
 > unchanged — so a temporarily-paused alert is never treated as orphaned.)
-

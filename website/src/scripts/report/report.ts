@@ -397,14 +397,16 @@ function createReportChart(
   // matching the demo chart, which keeps the y-domain stable).
   let vmin = 0;
   let vmax = 1;
+  // y = 0 reference line + 0-relative scaling (toggled via setZeroLine).
+  // Declared before the first computeValueDomain() call, which reads it — a
+  // later declaration is a TDZ ReferenceError that kills the whole render.
+  let showZero = false;
   computeValueDomain();
 
   let viewMin = tmin;
   let viewMax = tmax;
   let dpr = 1;
   let hoverTs: number | null = null;
-  // y = 0 reference line + 0-relative scaling (toggled via setZeroLine).
-  let showZero = false;
 
   function computeValueDomain(): void {
     let lo = Infinity;

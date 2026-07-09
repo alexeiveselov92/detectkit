@@ -36,6 +36,7 @@ const PAGES = [
   { src: 'docs/guides/detectors.md', dest: 'guides/detectors.md' },
   { src: 'docs/guides/autotuning.md', dest: 'guides/autotuning.md' },
   { src: 'docs/guides/tuning.md', dest: 'guides/tuning.md' },
+  { src: 'docs/guides/project-ui.md', dest: 'guides/project-ui.md' },
   { src: 'docs/guides/osi.md', dest: 'guides/osi.md' },
   { src: 'docs/guides/alerting.md', dest: 'guides/alerting.md' },
   { src: 'docs/guides/alerting-channels.md', dest: 'guides/alerting-channels.md' },

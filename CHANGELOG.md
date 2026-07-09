@@ -5,6 +5,57 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.49.0] - 2026-07-09
+
+### Fixed
+- **Timestamp cursor reads now always return naive UTC.** On ClickHouse the
+  driver hands back the last/first datapoint (and last detection) timestamps
+  as *timezone-aware* datetimes, while everything in-memory in detectkit is
+  naive UTC — any code doing arithmetic between the two raised
+  ``TypeError: can't subtract offset-naive and offset-aware datetimes``. The
+  pipeline defended itself at each call site, but newer read paths (the
+  `dtk ui` overview, a report window pinned with an explicit start) hit the
+  mix. The normalization now happens once, at the shared reader seam
+  (`_normalize_max_timestamp`), so every consumer gets the documented
+  naive-UTC convention.
+- **`dtk run --report` / `dtk autotune --report` pages failed to render** since
+  the y = 0 toggle shipped: the report chart read the toggle's `let showZero`
+  binding before its declaration ran (a temporal-dead-zone `ReferenceError` in
+  the bundled renderer), so every report page showed "Failed to render report:
+  ReferenceError …" instead of the chart. The declaration now precedes the
+  first value-domain computation and the committed `report.js` bundle is
+  regenerated. Found by the new `dtk ui` end-to-end check, which embeds the
+  same report page in its detail view.
+
+### Added
+- **`dtk ui` — a project-level monitoring cockpit.** One CLI command serves an
+  interactive localhost page over the already-persisted `_dtk_*` tables for the
+  **whole project**: every metric — grouped by its `metrics/` folder, filterable
+  by tag — with alert-frequency stats over a selectable window (24h / 7d / 30d /
+  90d / all): alerts in window and per-day rate, last alert, no-data events,
+  anomaly rate, data freshness, and a sparkline. Alert counts are **replayed**
+  from the stored detections through the same pure replay seam as
+  `dtk run --report`, so the numbers match what the pipeline would actually have
+  alerted — no event log is required. Labeling stays optional: when
+  `incidents/<metric>/` labels exist (from `dtk tune`), per-metric **recall /
+  false-alert rate / reviewed** chips appear (matched on streak-span overlap,
+  with the `false_alert_budget` flagging an over-budget metric); without labels
+  the overview still quantifies "how often do alerts come" and the user can eyeball
+  each metric's chart. Clicking a metric opens the existing self-contained HTML
+  report in an overlay (same renderer as `dtk run --report`). A **pipeline
+  panel** drives the real CLI commands as subprocesses — `dtk run` (select,
+  steps, from/to, force, full-refresh), `dtk autotune`, `dtk unlock` — streaming
+  their terminal output live into the page (one pipeline job at a time); a
+  **Tune** button launches `dtk tune` for the metric and opens its cockpit in a
+  new tab. The UI server itself takes **no pipeline lock** and never mutates
+  anything — spawned commands behave exactly as if run from the terminal
+  (locking included). Flags: `-s/--select` (default `*`), `--window` (initial
+  preset, default `30d`), `--profile` (also forwarded to spawned commands),
+  `--no-open`. The server binds to `127.0.0.1` with a per-session token checked
+  on every route. Ships a committed `detectkit/ui/assets/ui.js` renderer bundle
+  (built by `website/scripts/gen-ui-bundle.mjs`, same generated-asset pattern as
+  the report/tune bundles).
+
 ## [0.48.0] - 2026-07-01
 
 ### Fixed

@@ -117,6 +117,15 @@ rendered on the docs site under **For developers**). Read the relevant one:
   the renderer TS changes. Takes no pipeline lock. `dtk init-claude` ships a
   `dtk-tune` skill (the hands-on entry point for the user's assistant — the
   cockpit umbrella, with autotune built in) — keep it in sync on release.
+- **Project UI** lives in `detectkit/ui/` (the `dtk ui` command): a
+  project-wide localhost cockpit — an overview of every metric's alert
+  frequency/freshness (replayed via the same seam as `dtk run --report`;
+  quality chips when `incidents/` labels exist) plus a pipeline panel that
+  drives `dtk run` / `dtk autotune` / `dtk unlock` as real subprocesses and
+  launches `dtk tune` per metric. Takes no pipeline lock, never mutates
+  anything itself. Committed bundle `assets/ui.js` (built by
+  `website/scripts/gen-ui-bundle.mjs`) ships in the wheel — keep it and the
+  docs in sync on release.
 - **OSI interop** lives in `detectkit/semantic/` (the `dtk osi import` /
   `export` / `compile` commands): an **isolated, additive** bridge to
   [Open Semantic Interchange](https://github.com/open-semantic-interchange/OSI) —

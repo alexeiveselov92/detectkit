@@ -210,13 +210,17 @@ class TestGetLastDatapointTimestamp:
     """Test get_last_datapoint_timestamp() method."""
 
     def test_returns_last_timestamp(self, internal_manager, mock_manager):
-        """Test getting last timestamp."""
-        expected_ts = datetime(2024, 1, 1, 23, 59, tzinfo=timezone.utc)
-        mock_manager.get_last_timestamp.return_value = expected_ts
+        """An aware driver value is normalized to the in-memory naive-UTC convention."""
+        mock_manager.get_last_timestamp.return_value = datetime(
+            2024, 1, 1, 23, 59, tzinfo=timezone.utc
+        )
 
         ts = internal_manager.get_last_datapoint_timestamp("cpu_usage")
 
-        assert ts == expected_ts
+        # clickhouse-driver attaches the server column's timezone; the reader
+        # strips it (converting to UTC) so cursor math never mixes aware/naive.
+        assert ts == datetime(2024, 1, 1, 23, 59)
+        assert ts.tzinfo is None
         mock_manager.get_last_timestamp.assert_called_once_with(
             f"detectk_internal.{TABLE_DATAPOINTS}", "cpu_usage"
         )

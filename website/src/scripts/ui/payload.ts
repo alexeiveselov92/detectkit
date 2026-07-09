@@ -89,6 +89,13 @@ export interface OverviewMetric {
   /** anomalous timestamps (ms), union across detectors, capped ~400 */
   spark_anoms: number[];
   error: string | null;
+  /**
+   * Client-only: never sent by the server. Set while the cockpit is still
+   * waiting on this metric's `GET /api/stats/<name>` fetch (the row is a
+   * boot-metadata-only placeholder — see `ui.ts`'s `buildPendingRow`) and
+   * cleared once the real row lands (success or per-metric error).
+   */
+  pending?: boolean;
 }
 
 export interface OverviewWindow {

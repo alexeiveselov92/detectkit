@@ -15,7 +15,7 @@ import { esc } from './format';
 import {
   fetchJobDetail,
   fetchJobs,
-  fetchOverview,
+  fetchMetricStats,
   postAutotune,
   postRun,
   postStopJob,
@@ -26,7 +26,7 @@ import { ROOT_CLASS, injectStyle } from './style';
 import { toast } from './toast';
 import { buildTiles } from './tiles';
 import { UNTAGGED, buildTags } from './tags';
-import { DEFAULT_SORT_DIR, buildMetricsTable } from './table';
+import { DEFAULT_SORT_DIR, buildMetricsTable, buildPendingRow } from './table';
 import type { SortKey, SortState } from './table';
 import { openDetailOverlay } from './detail';
 import type { DetailHandle } from './detail';
@@ -34,14 +34,10 @@ import { buildRunPanel } from './run-panel';
 import type { RunPanelHandle, RunRequestDraft } from './run-panel';
 import { buildJobsDrawer } from './jobs-drawer';
 import type { JobsDrawerHandle } from './jobs-drawer';
-import type {
-  BootMetric,
-  BootPayload,
-  DtkUiGlobal,
-  JobKind,
-  JobSnapshot,
-  OverviewPayload,
-} from './payload';
+import type { BootPayload, DtkUiGlobal, JobKind, JobSnapshot, OverviewMetric } from './payload';
+
+/** Per-metric stats fetches in flight at once (the server serializes DB access anyway). */
+const STATS_CONCURRENCY = 3;
 
 const WINDOW_PRESETS: Array<{ value: string; label: string }> = [
   { value: '24h', label: '24h' },
@@ -53,8 +49,14 @@ const WINDOW_PRESETS: Array<{ value: string; label: string }> = [
 
 interface State {
   windowPreset: string;
-  overview: OverviewPayload | null;
-  overviewError: string | null;
+  /**
+   * One row per boot metric, always fully populated (never `null`/empty while
+   * loading) — a row not yet fetched carries `pending: true` (see
+   * `table.ts`'s `buildPendingRow`). The cockpit fetches stats incrementally,
+   * one metric at a time, instead of one monolithic `/api/overview` call (see
+   * `loadOverview` below).
+   */
+  metrics: OverviewMetric[];
   jobs: JobSnapshot[];
   followedJobId: string | null;
   followOffset: number;
@@ -73,8 +75,7 @@ function render(boot: BootPayload, mount: HTMLElement): void {
 
   const state: State = {
     windowPreset: boot.initial_window || '30d',
-    overview: null,
-    overviewError: null,
+    metrics: boot.metrics.map(buildPendingRow),
     jobs: [],
     followedJobId: null,
     followOffset: 0,
@@ -86,18 +87,15 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   let jobsPollHandle: number | undefined;
   let jobDetailHandle: number | undefined;
 
-  // ---- select-field options (metric names + tag:x), from boot + overview --
+  // ---- select-field options (metric names + tag:x), from the boot list -----
+  // (name/tags are known up front — no need to wait on any per-metric fetch)
   function selectOptions(): string[] {
     const names = new Set<string>();
     const tags = new Set<string>();
-    const collect = (list: Array<BootMetric | { name: string; tags: string[] }>): void => {
-      for (const m of list) {
-        names.add(m.name);
-        for (const t of m.tags) tags.add(t);
-      }
-    };
-    collect(boot.metrics);
-    if (state.overview) collect(state.overview.metrics);
+    for (const m of boot.metrics) {
+      names.add(m.name);
+      for (const t of m.tags) tags.add(t);
+    }
     return [...names, ...[...tags].map((t) => `tag:${t}`)];
   }
 
@@ -136,7 +134,7 @@ function render(boot: BootPayload, mount: HTMLElement): void {
       seg.querySelectorAll('.dtk-ui-seg-btn').forEach((b) => b.classList.remove('on'));
       btn.classList.add('on');
       if (detailHandle) detailHandle.setWindow(preset.value);
-      void refreshOverview();
+      void loadOverview();
     };
     seg.appendChild(btn);
   }
@@ -147,7 +145,7 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   refreshBtn.className = 'dtk-ui-iconbtn';
   refreshBtn.title = 'Refresh overview';
   refreshBtn.textContent = '⟳';
-  refreshBtn.onclick = (): void => void refreshOverview();
+  refreshBtn.onclick = (): void => void loadOverview();
   headerRight.appendChild(refreshBtn);
 
   const runPipelineBtn = document.createElement('button');
@@ -156,6 +154,22 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   runPipelineBtn.textContent = 'Run pipeline';
   runPipelineBtn.onclick = (): void => openRunPanel();
   headerRight.appendChild(runPipelineBtn);
+
+  // Small "n/N" progress chip — visible only while the incremental per-metric
+  // stats load is in flight, hidden the instant it completes.
+  const progressChip = document.createElement('span');
+  progressChip.className = 'dtk-ui-progresschip';
+  progressChip.style.display = 'none';
+  headerRight.appendChild(progressChip);
+
+  function setLoadProgress(loaded: number, total: number): void {
+    if (total === 0 || loaded >= total) {
+      progressChip.style.display = 'none';
+      return;
+    }
+    progressChip.textContent = `${loaded}/${total}`;
+    progressChip.style.display = '';
+  }
 
   const jobsChip = document.createElement('button');
   jobsChip.type = 'button';
@@ -184,43 +198,40 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   function renderContent(): void {
     content.innerHTML = '';
 
-    if (state.overviewError) {
-      const banner = document.createElement('div');
-      banner.className = 'dtk-ui-banner';
-      banner.innerHTML = `<span>Failed to load overview: ${esc(state.overviewError)}</span>`;
-      const retry = document.createElement('button');
-      retry.type = 'button';
-      retry.className = 'dtk-ui-banner-retry';
-      retry.textContent = 'Retry';
-      retry.onclick = (): void => void refreshOverview();
-      banner.appendChild(retry);
-      content.appendChild(banner);
-    }
-
-    if (!state.overview) {
-      if (!state.overviewError) {
-        const loading = document.createElement('div');
-        loading.className = 'dtk-ui-empty';
-        loading.textContent = 'Loading overview…';
-        content.appendChild(loading);
-      }
-      return;
-    }
-
-    const ov = state.overview;
-    if (ov.metrics.length === 0) {
+    const total = boot.metrics.length;
+    if (total === 0) {
       const empty = document.createElement('div');
       empty.className = 'dtk-ui-empty';
-      empty.textContent = boot.metrics.length === 0
-        ? 'No metrics found for this project/selector.'
-        : 'No metrics in this window.';
+      empty.textContent = 'No metrics found for this project/selector.';
       content.appendChild(empty);
       return;
     }
 
-    content.appendChild(buildTiles(ov));
+    const landed = state.metrics.filter((m) => !m.pending);
+    const failed = landed.filter((m) => m.error !== null);
+    // Every metric fetched, and every single one failed — the closest thing
+    // left to the old monolithic "failed to load overview" case (a per-metric
+    // failure alone just red-flags that one row and never blocks the rest).
+    if (landed.length === total && failed.length === total) {
+      const banner = document.createElement('div');
+      banner.className = 'dtk-ui-banner';
+      const detail = failed[0]?.error ?? 'unknown error';
+      banner.innerHTML = `<span>Failed to load overview: every metric failed (${esc(detail)}).</span>`;
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'dtk-ui-banner-retry';
+      retry.textContent = 'Retry';
+      retry.onclick = (): void => void loadOverview();
+      banner.appendChild(retry);
+      content.appendChild(banner);
+    }
+
+    // Tiles get every row (the metrics enabled/total count is config-derived
+    // and correct immediately; buildTiles skips pending rows for the stat
+    // aggregates itself); the tag rollup reflects only landed rows.
+    content.appendChild(buildTiles(state.metrics));
     content.appendChild(
-      buildTags(ov.metrics, state.tagFilter, (tag) => {
+      buildTags(landed, state.tagFilter, (tag) => {
         state.tagFilter = tag;
         renderContent();
       }),
@@ -228,12 +239,12 @@ function render(boot: BootPayload, mount: HTMLElement): void {
 
     const filtered =
       state.tagFilter === null
-        ? ov.metrics
-        : ov.metrics.filter((m) =>
+        ? state.metrics
+        : state.metrics.filter((m) =>
             state.tagFilter === UNTAGGED ? m.tags.length === 0 : m.tags.includes(state.tagFilter as string),
           );
 
-    const tableResult = buildMetricsTable(filtered, state.sort, ov.now, {
+    const tableResult = buildMetricsTable(filtered, state.sort, Date.now(), {
       onOpen: openDetail,
       onTune: (name) => void submitTune(name),
       onRun: (name) => openRunPanel(name),
@@ -448,17 +459,73 @@ function render(boot: BootPayload, mount: HTMLElement): void {
     jobDetailHandle = window.setTimeout(tick, 0);
   }
 
-  // ---- overview fetch ---------------------------------------------------------
-  async function refreshOverview(): Promise<void> {
+  // ---- overview load: incremental, per-metric --------------------------------
+  //
+  // The page used to fetch one monolithic `/api/overview` covering every
+  // metric's stats in a single request; on a production-sized project that
+  // read is serialized on one DB connection and can take minutes, long
+  // enough for the browser to abort it — an endless "Loading overview…"
+  // followed by "Failed to fetch". Instead: render every row immediately as
+  // `pending` (boot metadata is enough for name/dir/file/tags/interval/
+  // enabled), then fetch each metric's stats individually through a small
+  // concurrency pool, patching rows in place as they land so the table, tiles
+  // and tag rollup all fill in progressively instead of blocking on the
+  // slowest metric.
+  //
+  // A `generation` counter guards against a window change or manual refresh
+  // racing an in-flight load: every call bumps it, and any pool worker whose
+  // captured generation no longer matches the live one silently stops (its
+  // in-flight response is applied nowhere).
+  let loadGeneration = 0;
+
+  async function loadOverview(): Promise<void> {
+    const generation = ++loadGeneration;
+    const windowPreset = state.windowPreset;
+
+    state.metrics = boot.metrics.map(buildPendingRow);
     refreshBtn.classList.add('spinning');
-    try {
-      state.overview = await fetchOverview(state.windowPreset);
-      state.overviewError = null;
-    } catch (e) {
-      state.overviewError = (e as Error).message;
-    } finally {
+    setLoadProgress(0, boot.metrics.length);
+    renderContent();
+
+    if (boot.metrics.length === 0) {
       refreshBtn.classList.remove('spinning');
-      renderContent();
+      setLoadProgress(0, 0);
+      return;
+    }
+
+    const queue = [...boot.metrics];
+    let landedCount = 0;
+
+    async function worker(): Promise<void> {
+      for (;;) {
+        if (generation !== loadGeneration) return; // superseded — stop pulling work
+        const bm = queue.shift();
+        if (!bm) return;
+        let row: OverviewMetric;
+        try {
+          row = await fetchMetricStats(bm.name, windowPreset);
+          row.pending = false;
+        } catch (e) {
+          // A failed per-metric fetch degrades to that one row's error
+          // treatment (table.ts renders the red glyph + tooltip) and never
+          // blocks the rest of the pool.
+          row = { ...buildPendingRow(bm), pending: false, error: (e as Error).message };
+        }
+        if (generation !== loadGeneration) return; // this load was superseded meanwhile
+        const idx = state.metrics.findIndex((m) => m.name === bm.name);
+        if (idx !== -1) state.metrics[idx] = row;
+        landedCount++;
+        setLoadProgress(landedCount, boot.metrics.length);
+        renderContent();
+      }
+    }
+
+    const workerCount = Math.min(STATS_CONCURRENCY, boot.metrics.length);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+
+    if (generation === loadGeneration) {
+      refreshBtn.classList.remove('spinning');
+      setLoadProgress(landedCount, boot.metrics.length);
       runPanel.refreshOptions();
     }
   }
@@ -466,7 +533,7 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   // ---- boot ---------------------------------------------------------------
   renderContent();
   runPanel.refreshOptions();
-  void refreshOverview();
+  void loadOverview();
   void refreshJobs();
 }
 

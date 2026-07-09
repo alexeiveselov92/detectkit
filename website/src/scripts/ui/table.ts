@@ -7,7 +7,45 @@
 
 import { esc, fmtAgo, fmtInterval, fmtLag, fmtPct, fmtPerDay, fmtStamp, groupBy } from './format';
 import { paintSpark } from './spark';
-import type { OverviewMetric } from './payload';
+import type { BootMetric, OverviewMetric } from './payload';
+
+/** Muted stand-in for a stat cell whose per-metric fetch hasn't landed yet. */
+const PENDING_CELL = '<span class="dtk-ui-pending">···</span>';
+
+/**
+ * A full-shape placeholder row for a metric whose `GET /api/stats/<name>`
+ * fetch is still in flight — mirrors the server's own `_empty_row` (see
+ * `detectkit/ui/overview.py`): every boot-known field (name/dir/file/tags/
+ * interval_seconds/enabled) is filled in immediately so the table, tiles and
+ * tag rollup all render at once, while every DB-driven stat field stays at
+ * its "no data yet" default until the real row lands.
+ */
+export function buildPendingRow(bm: BootMetric): OverviewMetric {
+  return {
+    name: bm.name,
+    dir: bm.dir,
+    file: bm.file,
+    tags: bm.tags,
+    enabled: bm.enabled,
+    interval_seconds: bm.interval_seconds,
+    detectors: [],
+    alert_rule: null,
+    last_point: null,
+    first_point_in_window: null,
+    lag_seconds: null,
+    locked: false,
+    points: 0,
+    flagged: 0,
+    anomaly_rate: null,
+    alerts: { anomaly: 0, recovery: 0, no_data: 0, per_day: null, last_ts: null },
+    quality: null,
+    budget: 0,
+    spark: [],
+    spark_anoms: [],
+    error: null,
+    pending: true,
+  };
+}
 
 export type SortKey = 'alerts' | 'name' | 'rate' | 'freshness';
 export interface SortState {
@@ -37,6 +75,9 @@ interface Freshness {
 }
 
 function freshness(m: OverviewMetric): Freshness {
+  if (m.pending) {
+    return { color: 'var(--faint)', title: 'loading…', rank: 0 };
+  }
   if (!m.enabled) {
     return { color: 'var(--faint)', title: 'disabled', rank: -1 };
   }
@@ -95,7 +136,11 @@ function buildRow(
   sparkQueue: SparkJob[],
 ): HTMLTableRowElement {
   const tr = document.createElement('tr');
-  tr.className = 'dtk-ui-row' + (m.enabled ? '' : ' disabled') + (m.error ? ' errored' : '');
+  tr.className =
+    'dtk-ui-row' +
+    (m.enabled ? '' : ' disabled') +
+    (m.error ? ' errored' : '') +
+    (m.pending ? ' pending' : '');
 
   const fresh = freshness(m);
   const tdDot = document.createElement('td');
@@ -118,7 +163,9 @@ function buildRow(
 
   const tdSpark = document.createElement('td');
   tdSpark.className = 'dtk-ui-sparkcell';
-  if (m.spark.length === 0) {
+  if (m.pending) {
+    tdSpark.innerHTML = '<span class="dtk-ui-spark-loading">loading…</span>';
+  } else if (m.spark.length === 0) {
     tdSpark.innerHTML = '<span class="dtk-ui-spark-empty">no data yet</span>';
   } else {
     const canvas = document.createElement('canvas');
@@ -131,14 +178,20 @@ function buildRow(
 
   const tdAlerts = document.createElement('td');
   tdAlerts.className = 'dtk-ui-alertscell';
-  const overBudget = m.quality !== null && m.quality.fdr !== null && m.quality.fdr > m.budget;
-  const nCls = 'dtk-ui-alerts-n' + (m.alerts.anomaly > 0 ? ' hasany' : '') + (overBudget ? ' overbudget' : '');
-  const sub = m.alerts.per_day !== null ? `<span class="dtk-ui-alerts-sub">· ${esc(fmtPerDay(m.alerts.per_day))}</span>` : '';
-  tdAlerts.innerHTML = `<span class="${nCls}">${m.alerts.anomaly}</span>${sub}`;
+  if (m.pending) {
+    tdAlerts.innerHTML = PENDING_CELL;
+  } else {
+    const overBudget = m.quality !== null && m.quality.fdr !== null && m.quality.fdr > m.budget;
+    const nCls = 'dtk-ui-alerts-n' + (m.alerts.anomaly > 0 ? ' hasany' : '') + (overBudget ? ' overbudget' : '');
+    const sub = m.alerts.per_day !== null ? `<span class="dtk-ui-alerts-sub">· ${esc(fmtPerDay(m.alerts.per_day))}</span>` : '';
+    tdAlerts.innerHTML = `<span class="${nCls}">${m.alerts.anomaly}</span>${sub}`;
+  }
   tr.appendChild(tdAlerts);
 
   const tdLast = document.createElement('td');
-  if (m.alerts.last_ts !== null) {
+  if (m.pending) {
+    tdLast.innerHTML = PENDING_CELL;
+  } else if (m.alerts.last_ts !== null) {
     tdLast.innerHTML = `<span class="dtk-ui-lastalert" title="${esc(fmtStamp(m.alerts.last_ts))} UTC">${esc(
       fmtAgo(now, m.alerts.last_ts),
     )}</span>`;
@@ -148,11 +201,11 @@ function buildRow(
   tr.appendChild(tdLast);
 
   const tdRate = document.createElement('td');
-  tdRate.innerHTML = `<span class="dtk-ui-rate">${esc(fmtPct(m.anomaly_rate))}</span>`;
+  tdRate.innerHTML = m.pending ? PENDING_CELL : `<span class="dtk-ui-rate">${esc(fmtPct(m.anomaly_rate))}</span>`;
   tr.appendChild(tdRate);
 
   const tdQuality = document.createElement('td');
-  tdQuality.innerHTML = qualityCell(m);
+  tdQuality.innerHTML = m.pending ? PENDING_CELL : qualityCell(m);
   tr.appendChild(tdQuality);
 
   const tdLock = document.createElement('td');

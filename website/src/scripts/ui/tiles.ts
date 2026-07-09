@@ -3,7 +3,7 @@
 // JetBrains Mono number, a muted label, on a thin-bordered dark surface card.
 
 import { esc, fmtInt, fmtLag, fmtPct, fmtPerDay } from './format';
-import type { OverviewMetric, OverviewPayload } from './payload';
+import type { OverviewMetric } from './payload';
 
 function tile(value: string, label: string, sub?: string, opts?: { warn?: boolean; err?: boolean }): string {
   const cls = 'dtk-ui-tile' + (opts?.err ? ' err' : '');
@@ -17,21 +17,30 @@ function tile(value: string, label: string, sub?: string, opts?: { warn?: boolea
   );
 }
 
-/** Build the stat tiles row from the overview's metric rows. */
-export function buildTiles(overview: OverviewPayload): HTMLElement {
+/**
+ * Build the stat tiles row from the overview metric rows that have landed so
+ * far (the cockpit fetches stats incrementally — see ui.ts's `loadOverview` —
+ * so this is called on every landing with a growing/shrinking `rows`, not
+ * once with a complete monolithic payload).
+ */
+export function buildTiles(rows: OverviewMetric[]): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'dtk-ui-tiles';
-  const rows = overview.metrics;
 
+  // enabled/total is config-derived and correct even for rows whose stats are
+  // still loading; every OTHER aggregate must only count landed rows (a
+  // pending row's zeroed stats would read as "fresh metric with no alerts",
+  // and its null last_point would wrongly count as stale).
   const total = rows.length;
   const enabled = rows.filter((m) => m.enabled).length;
+  const landed = rows.filter((m) => !m.pending);
 
   let anomalySum = 0;
   let noDataSum = 0;
   let alertingCount = 0;
   let perDaySum = 0;
   let havePerDay = false;
-  for (const m of rows) {
+  for (const m of landed) {
     anomalySum += m.alerts.anomaly;
     noDataSum += m.alerts.no_data;
     if (m.alerts.anomaly > 0) alertingCount++;
@@ -45,7 +54,7 @@ export function buildTiles(overview: OverviewPayload): HTMLElement {
   // or no datapoint at all yet). Disabled metrics are intentionally quiet and
   // don't count.
   const stale: Array<{ m: OverviewMetric; lag: number }> = [];
-  for (const m of rows) {
+  for (const m of landed) {
     if (!m.enabled) continue;
     if (m.last_point === null) {
       stale.push({ m, lag: Infinity });
@@ -70,7 +79,7 @@ export function buildTiles(overview: OverviewPayload): HTMLElement {
 
   // Labeled quality aggregates — only shown when at least one metric carries
   // ground-truth incidents.
-  const labeled = rows.filter((m) => m.quality !== null);
+  const labeled = landed.filter((m) => m.quality !== null);
   if (labeled.length > 0) {
     let caughtSum = 0;
     let inWindowSum = 0;

@@ -459,6 +459,28 @@ def test_job_manager_caps_retained_jobs(monkeypatch, tmp_path):
     assert [s["id"] for s in snapshots] == [ids[2], ids[1]]  # newest first, oldest capped out
 
 
+def test_metric_stats_endpoint_returns_one_row(tmp_path):
+    """/api/stats/<name> serves a single overview row (the incremental unit)."""
+    server, url = _build(tmp_path, metrics=_metrics(["orders", "signups"]))
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        row = json.loads(_get(f"{base}/api/stats/orders?token={token}&window=7d").read())
+        assert row["name"] == "orders"
+        # Same shape as an /api/overview row.
+        for key in ("alerts", "spark", "quality", "lag_seconds", "error", "budget"):
+            assert key in row
+        assert row["error"] is None
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _get(f"{base}/api/stats/nope?token={token}&window=7d")
+        assert ei.value.code == 404
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _get(f"{base}/api/stats/orders?token={token}&window=bogus")
+        assert ei.value.code == 400
+    finally:
+        _teardown(server)
+
+
 def test_spawn_pipeline_gate_is_atomic_under_contention(tmp_path):
     """N simultaneous spawn_pipeline calls admit exactly one job (TOCTOU guard)."""
     manager = JobManager()

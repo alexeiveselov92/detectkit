@@ -5,6 +5,34 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.49.1] - 2026-07-09
+
+### Fixed
+- **`dtk ui` overview no longer hangs (or over-counts) on a production
+  project.** Two compounding causes:
+  - The stats read pulled **every historical detector generation's rows**:
+    each retune/autotune changes a detector's identity and the superseded
+    ids' rows stay in `_dtk_detections` forever, so a heavily-tuned metric's
+    window read returned N× the rows — and the alert replay mixed live and
+    dead configs into one quorum, inflating alert counts a real `dtk run`
+    would never have produced. The overview now derives the **currently
+    configured** detector ids exactly the way the detect step does and reads
+    only those; the counts answer "how does the metric behave as configured
+    today". (The per-metric report keeps its "what actually ran" semantics.)
+  - The page fetched one monolithic `/api/overview` computing all metrics in
+    a single request — minutes on a real project, which the browser aborts
+    ("Failed to fetch") while the page shows an endless spinner. The overview
+    now loads **incrementally**: the table renders instantly from the metric
+    list and each row's stats stream in via per-metric `GET /api/stats/<name>`
+    (an `n/N` progress chip while loading); one slow or failing metric marks
+    its own row instead of sinking the page. `/api/overview` remains for
+    programmatic use.
+- **Quiet shutdown.** Ctrl-C (or a browser aborting a slow request) no longer
+  dumps handler-thread tracebacks into the terminal: client disconnects are
+  swallowed, other request errors echo as one compact line, and the command
+  prints a clean "Stopping… / Stopped." while terminating any jobs the UI
+  spawned.
+
 ## [0.49.0] - 2026-07-09
 
 ### Fixed

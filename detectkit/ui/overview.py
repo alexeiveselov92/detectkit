@@ -27,6 +27,7 @@ from detectkit.autotune.labels import IncidentLabels, newest_labels_file, parse_
 from detectkit.config.metric_config import AlertConfig, MetricConfig
 from detectkit.config.project_config import ProjectConfig
 from detectkit.database.internal_tables import InternalTablesManager
+from detectkit.detectors.factory import DetectorFactory
 from detectkit.reporting.builder import _ms, _num_or_none, record_from_row, replay_alert_events
 from detectkit.tuning.payload import DEFAULT_FALSE_ALERT_BUDGET
 from detectkit.utils.datetime_utils import now_utc_naive
@@ -93,6 +94,60 @@ def _alert_rule_summary(alerting: list[AlertConfig] | None) -> dict[str, Any] | 
         "direction": first.direction,
         "consecutive": first.consecutive_anomalies,
     }
+
+
+def _configured_detector_ids(config: MetricConfig) -> list[str]:
+    """The detector ids the metric's CURRENT config would run under.
+
+    Mirrors the detect step's id derivation (``get_algorithm_params`` +
+    seasonality → ``DetectorFactory.create_from_config`` → ``get_detector_id``).
+    Every retune/autotune changes a detector's id, and the superseded ids'
+    rows stay in ``_dtk_detections`` forever — so an unfiltered window read
+    returns one row-set per historical config generation: N× the volume, and
+    replayed quorums that mix live and dead configs (inflating alert counts
+    a real pipeline run would never produce). The overview answers "how does
+    the metric behave under its current config", so it reads only these ids.
+
+    Returns ``[]`` when no id can be derived (no detectors configured, or a
+    config the factory rejects) — the caller then falls back to unfiltered.
+    """
+    ids: list[str] = []
+    for detector_config in config.detectors:
+        try:
+            params = detector_config.get_algorithm_params()
+            seasonality = detector_config.get_seasonality_components()
+            if seasonality is not None:
+                params["seasonality_components"] = seasonality
+            detector = DetectorFactory.create_from_config(
+                {"type": detector_config.type, "params": params}
+            )
+            ids.append(detector.get_detector_id())
+        except Exception:  # noqa: BLE001 — fall back to unfiltered on any bad config
+            return []
+    return ids
+
+
+def _load_window_detections(
+    internal: InternalTablesManager,
+    metric_name: str,
+    detector_ids: list[str],
+    start: datetime,
+    to_exclusive: datetime,
+) -> list[dict[str, Any]]:
+    """Window detections for the given detector ids (all ids when empty).
+
+    Per-id queries push the filter into SQL instead of transferring every
+    historical generation's rows; the merged result is re-sorted to the
+    global ``(timestamp, detector_id)`` order ``load_detections`` guarantees,
+    which the replay walk expects.
+    """
+    if not detector_ids:
+        return internal.load_detections(metric_name, None, start, to_exclusive)
+    rows: list[dict[str, Any]] = []
+    for detector_id in detector_ids:
+        rows.extend(internal.load_detections(metric_name, detector_id, start, to_exclusive))
+    rows.sort(key=lambda r: (r["timestamp"], r["detector_id"]))
+    return rows
 
 
 def _resolve_metric_window(
@@ -329,7 +384,9 @@ def _fill_stats(
     row["points"] = n_points
     row["first_point_in_window"] = _ms(ts_arr[0]) if n_points else None
 
-    det_rows = internal.load_detections(name, None, start, to_exclusive)
+    det_rows = _load_window_detections(
+        internal, name, _configured_detector_ids(config), start, to_exclusive
+    )
     det_rows = [r for r in det_rows if _ms(r["timestamp"]) <= end_ms]
 
     anomalous_timestamps: set[int] = set()
@@ -384,6 +441,48 @@ def _fill_stats(
 
     row["spark"] = _spark_series(ts_arr, val_arr)
     row["spark_anoms"] = _downsample_evenly(sorted(anomalous_timestamps), _MAX_SPARK_ANOMS)
+
+
+def resolve_project_budget(project_config: ProjectConfig) -> float:
+    """The project-level ``false_alert_budget`` fallback (metric overrides it)."""
+    if project_config.false_alert_budget is not None:
+        return project_config.false_alert_budget
+    return DEFAULT_FALSE_ALERT_BUDGET
+
+
+def build_metric_row(
+    *,
+    project_config: ProjectConfig,
+    project_root: Path,
+    metric_path: Path,
+    config: MetricConfig,
+    internal: InternalTablesManager,
+    window_preset: str,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """One metric's overview row — the unit ``GET /api/stats/<name>`` serves.
+
+    The cockpit fetches rows one metric at a time (bounded, seconds each)
+    instead of one monolithic all-metrics payload: on a production-sized
+    project the combined read (full detections of every metric × the window,
+    serialized on the single DB connection) takes minutes — long enough for
+    the browser to abort the request as failed while the page shows an
+    endless spinner. Raises ``ValueError`` for an unknown *window_preset*.
+    """
+    if window_preset not in ALL_WINDOW_PRESETS:
+        allowed = ", ".join(sorted(ALL_WINDOW_PRESETS))
+        raise ValueError(f"Unknown window preset {window_preset!r}. Choose one of: {allowed}.")
+    return _build_metric_row(
+        project_root=project_root,
+        metrics_dir=project_root / "metrics",
+        metric_path=metric_path,
+        config=config,
+        internal=internal,
+        window_preset=window_preset,
+        now=now if now is not None else now_utc_naive(),
+        project_name=project_config.name,
+        project_budget=resolve_project_budget(project_config),
+    )
 
 
 def _build_metric_row(
@@ -444,11 +543,7 @@ def build_overview_payload(
 
     now_dt = now if now is not None else now_utc_naive()
     metrics_dir = project_root / "metrics"
-    project_budget = (
-        project_config.false_alert_budget
-        if project_config.false_alert_budget is not None
-        else DEFAULT_FALSE_ALERT_BUDGET
-    )
+    project_budget = resolve_project_budget(project_config)
 
     rows = [
         _build_metric_row(

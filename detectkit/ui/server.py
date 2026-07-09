@@ -37,7 +37,12 @@ from detectkit import __version__
 from detectkit.reporting import build_report_payload, render_report_html
 from detectkit.ui.html import render_ui_html
 from detectkit.ui.jobs import JobManager
-from detectkit.ui.overview import ALL_WINDOW_PRESETS, WINDOW_PRESETS, build_overview_payload
+from detectkit.ui.overview import (
+    ALL_WINDOW_PRESETS,
+    WINDOW_PRESETS,
+    build_metric_row,
+    build_overview_payload,
+)
 from detectkit.ui.overview import resolve_metric_location as _resolve_metric_location
 from detectkit.utils.datetime_utils import now_utc_naive
 
@@ -94,6 +99,19 @@ class _UiServer(ThreadingHTTPServer):
         # touches it. Never held while a subprocess runs (spawning is
         # fire-and-forget; polling its output doesn't touch the DB).
         self.db_lock = threading.Lock()
+
+    def handle_error(self, request: Any, client_address: Any) -> None:
+        """Keep the terminal clean: a client dropping its socket is routine.
+
+        The stdlib default dumps a full traceback for every handler-thread
+        exception — on Ctrl-C (or a browser aborting a slow request) that
+        floods the terminal with BrokenPipe walls. Client disconnects are
+        swallowed; anything else is echoed as one compact line.
+        """
+        exc = sys.exc_info()[1]
+        if isinstance(exc, (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)):
+            return
+        self.echo(f"  [ui] request error: {type(exc).__name__}: {exc}")
 
 
 def _find_metric(metrics: list[tuple[Path, MetricConfig]], name: str) -> MetricConfig | None:
@@ -263,6 +281,11 @@ class _Handler(BaseHTTPRequestHandler):
             window = query.get("window", [srv.initial_window])[0]
             self._handle_overview(srv, window)
             return
+        if path.startswith("/api/stats/"):
+            name = unquote(path[len("/api/stats/") :])
+            window = query.get("window", [srv.initial_window])[0]
+            self._handle_metric_stats(srv, name, window)
+            return
         if path.startswith("/metric/"):
             name = unquote(path[len("/metric/") :])
             window = query.get("window", [srv.initial_window])[0]
@@ -310,6 +333,31 @@ class _Handler(BaseHTTPRequestHandler):
                 window_preset=window,
             )
         self._reply_json(payload)
+
+    def _handle_metric_stats(self, srv: _UiServer, name: str, window: str) -> None:
+        """One metric's overview row — the page loads stats incrementally.
+
+        Small per-metric requests keep every HTTP exchange short (no browser
+        abort on a project whose combined stats take minutes) and let the page
+        fill in progressively; a failing metric degrades to its row's
+        ``error`` field without sinking the rest.
+        """
+        entry = next(((p, c) for p, c in srv.metrics if c.name == name), None)
+        if entry is None:
+            self._reply_error(404, f"unknown metric: {name}")
+            return
+        metric_path, config = entry
+        assert srv.project_config is not None and srv.internal_manager is not None
+        with srv.db_lock:
+            row = build_metric_row(
+                project_config=srv.project_config,
+                project_root=srv.project_root,
+                metric_path=metric_path,
+                config=config,
+                internal=srv.internal_manager,
+                window_preset=window,
+            )
+        self._reply_json(row)
 
     def _handle_metric_report(self, srv: _UiServer, name: str, window: str) -> None:
         config = _find_metric(srv.metrics, name)
@@ -456,7 +504,10 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _reply_json(self, payload: dict[str, Any]) -> None:
-        resp = json.dumps(payload, default=_json_default).encode("utf-8")
+        # allow_nan=False: a NaN leaking into a stat must fail loudly here (a
+        # 400 with the message) — the default emits bare `NaN`, which is not
+        # JSON and would die opaquely in the browser's JSON.parse instead.
+        resp = json.dumps(payload, default=_json_default, allow_nan=False).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(resp)))
@@ -608,7 +659,9 @@ def serve_ui(
     try:
         server.serve_forever(poll_interval=0.3)
     except KeyboardInterrupt:
-        pass
+        echo("")
+        echo("  Stopping — terminating any jobs the UI spawned…")
     finally:
         server.jobs.shutdown()
         server.server_close()
+        echo("  Stopped.")

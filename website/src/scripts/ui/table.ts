@@ -64,6 +64,7 @@ export interface TableCallbacks {
   onOpen(name: string): void;
   onTune(name: string): void;
   onRun(name: string): void;
+  onEdit(name: string): void;
   onSortChange(key: SortKey): void;
 }
 
@@ -231,7 +232,12 @@ function buildRow(
   runBtn.className = 'dtk-ui-actionbtn';
   runBtn.textContent = 'Run';
   runBtn.onclick = (): void => cb.onRun(m.name);
-  tdActions.append(openBtn, tuneBtn, runBtn);
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'dtk-ui-actionbtn';
+  editBtn.textContent = 'Edit';
+  editBtn.onclick = (): void => cb.onEdit(m.name);
+  tdActions.append(openBtn, tuneBtn, runBtn, editBtn);
   tr.appendChild(tdActions);
 
   return tr;

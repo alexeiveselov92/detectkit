@@ -76,6 +76,7 @@ dtk run --select cpu_usage
 - **[Alerting](guides/alerting.md)** - Setting up alerts and notifications
 - **[Reading an alert](guides/reading-alerts.md)** - For stakeholders who receive alerts: what they mean and what to do
 - **[Visualizing results](guides/visualizing-results.md)** - Build dashboards/charts on the `_dtk_*` tables in any BI tool
+- **[Project UI](guides/project-ui.md)** - Project-wide monitoring cockpit — overview, pipeline control, metric management
 - **[Semantic layer (OSI)](guides/osi.md)** - `ai_context` KPI grounding on any metric (no OSI model needed); plus `dtk osi` import/export as a forward bridge to a governed OSI semantic layer
 
 ### Reference
@@ -321,6 +322,15 @@ dtk clean --select cpu_usage --execute
 
 # Purge data for metrics no longer defined in the project
 dtk clean --orphaned-metrics --execute
+```
+
+### Project Cockpit
+
+```bash
+# Open the project-wide cockpit: watch every metric's alerts/freshness/quality,
+# run/autotune/unlock or launch dtk tune per metric, and create/edit/delete
+# metric YAMLs — all from the browser
+dtk ui
 ```
 
 ### Claude Code Context

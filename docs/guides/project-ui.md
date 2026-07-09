@@ -2,12 +2,16 @@
 
 `dtk ui` opens an interactive, project-wide localhost page over the metrics
 you already run: one overview of every metric's alerting behavior, a detail
-view per metric, and a panel that drives `dtk run` / `dtk autotune` /
-`dtk unlock` and launches `dtk tune` — all from the browser instead of
-memorized flags. Like `dtk tune`, it is a superstructure over the existing
-CLI: the server itself never runs the pipeline and takes no lock; every action
-it takes is the same subprocess you'd type in a terminal, streamed back into
-the page.
+view per metric, a panel that drives `dtk run` / `dtk autotune` /
+`dtk unlock` and launches `dtk tune` — plus **New metric** / **Edit** actions
+that create, edit, and delete metric YAML files — all from the browser
+instead of memorized flags and a text editor. Like `dtk tune`, it is a
+superstructure over the existing CLI and config files: the server itself
+never runs the pipeline in-process, takes no pipeline lock, and never touches
+the database; every pipeline action it takes is the same subprocess you'd
+type in a terminal, streamed back into the page, and every metric-file edit
+goes through the same validate-before-write, archive-before-overwrite
+discipline `dtk tune`'s Apply uses.
 
 ## When to use it
 
@@ -17,14 +21,18 @@ the page.
   opening N report files, you get one page ranking every metric by how often
   it's alerting, which ones have gone stale, and which ones need attention —
   with the same report still a click away in an overlay.
-- **`dtk tune`** changes a metric's detector. `dtk ui` doesn't — it's a
-  read-mostly cockpit for *surveying* the project and *driving* the pipeline;
-  when a metric needs work, its row's **Tune** button opens the real
-  `dtk tune` cockpit in a new tab.
+- **`dtk tune`** is where you turn a detector's knobs against the metric's
+  real series and watch the confidence band recompute live before writing the
+  result back. `dtk ui` is the project-wide surface around it: it surveys
+  every metric, drives the pipeline, and lets you create, edit, or delete a
+  metric's YAML directly — but it doesn't recompute a detector live; when a
+  metric needs that kind of work, its row's **Tune** button still opens the
+  real `dtk tune` cockpit in a new tab.
 - Reach for `dtk ui` when you're asking "what's alerting across the project
   right now", "which metrics have gone stale", or "did that config change
   actually reduce false alerts" — questions a single metric's report can't
-  answer.
+  answer — and increasingly also for quick metric edits (a threshold tweak, a
+  new tag, a config typo) you'd otherwise open a terminal and editor for.
 
 ## Starting it
 
@@ -157,14 +165,72 @@ terminal. Unlike `run` / `autotune` / `unlock`, **tune jobs are not mutually
 exclusive** — you can tune several metrics side by side, since each opens its
 own isolated tuning server and none of them touch the pipeline lock.
 
+## Managing metrics
+
+Every row's **Edit** action, and a **New metric** button in the header, open a
+full-screen editor over the metric's raw YAML — no separate form, no
+re-serialized config: what you type is what lands on disk (normalized only to
+end with a newline).
+
+- **New metric** seeds the editor with a starter YAML template (a name,
+  interval, query, one detector, alerting) and an optional folder field, so a
+  new file can land in a `metrics/` subfolder instead of the root. **Create
+  metric** validates the text server-side and writes
+  `metrics/[<folder>/]<name>.yml`, with the filename derived from the
+  metric's `name:`. The new metric joins the current session immediately —
+  even if it wouldn't match the `--select` the server was started with — so
+  you don't need to restart `dtk ui` to see it in the overview.
+- **Edit** opens the metric's existing YAML file verbatim in the same editor.
+  This is deliberately raw-text editing, not a generated form: the file is
+  the source of truth, and **Save changes** writes back the text you typed,
+  comments and formatting intact — there's no re-emit step to lose a
+  hand-written comment or reorder keys (the only normalization is ensuring
+  the file ends with a newline). Before overwriting, it **archives the
+  previous file verbatim** to `metrics/.history/<metric>/<metric>-<stamp>.yml`
+  — the same archive `dtk tune`'s Apply writes to, and excluded from metric
+  discovery, so it never collides with the live file as a duplicate name.
+  Saves are also **conflict-checked**: if the file changed on disk after the
+  editor was opened — a `dtk tune` Apply landed, another tab saved, or you
+  edited the file directly — Save is refused with a clear message instead of
+  silently overwriting the newer version; reopen the metric to pick up the
+  latest text.
+  Renaming a metric (changing its `name:`) is allowed; uniqueness is checked
+  against the whole project. A rename leaves the old name's rows in the
+  `_dtk_*` tables behind — run [`dtk clean`](../reference/cli.md#dtk-clean)
+  to prune them once you're sure the rename stuck.
+- **Delete metric** lives inside the edit overlay, behind an explicit
+  confirmation step — you can't delete from the row itself. The server
+  additionally requires the confirmation to echo the metric's name back, so a
+  stray click can't remove a file. Deleting archives the file to
+  `metrics/.history/<metric>/<metric>-<stamp>-deleted.yml` and then removes
+  it from `metrics/`; its rows stay in the `_dtk_*` tables until `dtk clean`
+  prunes them, and since the archived copy is a verbatim snapshot, the delete
+  is reversible by hand — restore the archived file and it's a live metric
+  again.
+- **Validation happens before anything is written**: YAML syntax first, then
+  full config validation, then a deep check of each detector's parameters (by
+  actually constructing it) — the same discipline `dtk tune`'s Apply uses. An
+  invalid config never touches the filesystem; it comes back as an error in
+  the editor's error pane so you can fix it in place.
+- **If you're tuning the metric at the same time**, Save and Delete are
+  refused while a `dtk tune` session for that metric (launched from this UI)
+  is still running — the tuner's own **Apply** would otherwise race your
+  edit. Close or apply the tune session first.
+
+None of this touches the database: create/edit/delete only read and write
+metric YAML files under `metrics/`, the same files you'd otherwise edit by
+hand.
+
 ## Security note
 
 `dtk ui` binds to `127.0.0.1` only — it is not reachable over the network.
 Every route, including the page itself, requires a random token minted when
-the server starts (the URL the CLI prints already carries it); there is no
-authentication beyond that token, so treat the printed URL like you would a
-local `dtk tune` session — don't share it, and stop the server (Ctrl-C) when
-you're done. A fresh token is minted each time you start `dtk ui`.
+the server starts (the URL the CLI prints already carries it) — this also
+guards the metric create/edit/delete routes, which only ever write inside the
+project's `metrics/` directory. There is no authentication beyond that token,
+so treat the printed URL like you would a local `dtk tune` session — don't
+share it, and stop the server (Ctrl-C) when you're done. A fresh token is
+minted each time you start `dtk ui`.
 
 ## Advanced
 

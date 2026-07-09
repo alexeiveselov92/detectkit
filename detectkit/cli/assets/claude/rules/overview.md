@@ -97,6 +97,12 @@ series, watch the band recompute live, then write the config back into the metri
 — use `dtk tune --select <m>`, the interactive sibling of `dtk autotune`
 (`cli.md`).
 
+For a **live**, project-wide view instead of a one-off file, run `dtk ui`: the
+same reports in a browser overlay plus an overview table (alert frequency,
+freshness, quality when incidents are labeled), a panel that drives
+`dtk run` / `dtk autotune` / `dtk unlock`, and an in-browser editor to create,
+edit and delete metric YAML files. See `cli.md`.
+
 ## Glossary
 
 - **metric** — a named time series (SQL + interval) you monitor.

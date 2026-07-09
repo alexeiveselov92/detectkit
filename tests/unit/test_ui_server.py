@@ -115,6 +115,29 @@ def _metrics(names: list[str]) -> list[tuple[Path, MetricConfig]]:
     ]
 
 
+def _write_metric_file(tmp_path: Path, name: str, text: str | None = None) -> Path:
+    """Write a real ``metrics/<name>.yml`` under *tmp_path* and return its path.
+
+    The CRUD routes read/write real files (``detectkit/ui/metric_files.py``),
+    unlike the stub-DB-backed report/overview routes — so those tests need an
+    actual project on disk instead of the synthetic in-memory ``_metrics()``.
+    """
+    text = text or f'name: {name}\ninterval: 1h\nquery: "SELECT 1"\n'
+    metrics_dir = tmp_path / "metrics"
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    path = metrics_dir / f"{name}.yml"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def _real_metrics(tmp_path: Path, names: list[str]) -> list[tuple[Path, MetricConfig]]:
+    """Real ``(path, config)`` pairs for :func:`_write_metric_file`-written metrics."""
+    return [
+        (path, MetricConfig.from_yaml_file(path))
+        for path in (_write_metric_file(tmp_path, name) for name in names)
+    ]
+
+
 def _build(tmp_path: Path, *, project_name: str = "proj", metrics=None, **kwargs):
     project_config = ProjectConfig(name=project_name, default_profile="p")
     return build_ui_server(
@@ -561,6 +584,207 @@ def test_job_log_offsets_keep_streaming_past_buffer_cap(tmp_path, monkeypatch):
     assert done["next_offset"] == 120
 
 
+# ── metric CRUD (detectkit/ui/metric_files.py routes) ─────────────────────────
+
+
+def test_api_metrics_returns_boot_shaped_list(tmp_path):
+    server, url = _build(tmp_path, metrics=_real_metrics(tmp_path, ["orders"]))
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        payload = json.loads(_get(f"{base}/api/metrics?token={token}").read())
+        assert [m["name"] for m in payload["metrics"]] == ["orders"]
+        entry = payload["metrics"][0]
+        for key in ("name", "dir", "file", "tags", "interval_seconds", "enabled"):
+            assert key in entry
+    finally:
+        _teardown(server)
+
+
+def test_metric_source_returns_exact_text_and_404_for_unknown(tmp_path):
+    text = 'name: orders\ninterval: 1h\nquery: "SELECT 1"\ndescription: hello\n'
+    server, url = _build(tmp_path, metrics=_real_metrics(tmp_path, ["orders"]))
+    # overwrite with our own text so we can assert exact byte equality below
+    (tmp_path / "metrics" / "orders.yml").write_text(text, encoding="utf-8")
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        row = json.loads(_get(f"{base}/api/metric-source/orders?token={token}").read())
+        assert row["name"] == "orders"
+        assert row["file"] == "metrics/orders.yml"
+        assert row["text"] == text
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _get(f"{base}/api/metric-source/nope?token={token}")
+        assert ei.value.code == 404
+    finally:
+        _teardown(server)
+
+
+def test_metric_create_writes_file_then_duplicate_and_bad_input_are_rejected(tmp_path):
+    server, url = _build(tmp_path, metrics=_real_metrics(tmp_path, ["orders"]))
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        text = 'name: signups\ninterval: 1h\nquery: "SELECT 1"\n'
+        r = _post(f"{base}/api/metric-create?token={token}", {"text": text})
+        body = json.loads(r.read())
+        assert body["name"] == "signups"
+        assert (tmp_path / "metrics" / "signups.yml").read_text(encoding="utf-8") == text
+        assert any(m["name"] == "signups" for m in body["metrics"])
+
+        # an identical second create collides with the file that now exists
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(f"{base}/api/metric-create?token={token}", {"text": text})
+        assert ei.value.code == 400
+
+        # invalid YAML text surfaces the validation message in the body
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(f"{base}/api/metric-create?token={token}", {"text": "name: broken\n"})
+        assert ei.value.code == 400
+        assert "invalid metric config" in ei.value.read().decode()
+
+        # missing 'text' is rejected too
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(f"{base}/api/metric-create?token={token}", {})
+        assert ei.value.code == 400
+    finally:
+        _teardown(server)
+
+
+def test_metric_update_success_reports_rename_and_archive(tmp_path):
+    server, url = _build(tmp_path, metrics=_real_metrics(tmp_path, ["orders"]))
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        new_text = 'name: orders_v2\ninterval: 1h\nquery: "SELECT 1"\ndescription: v2\n'
+        r = _post(f"{base}/api/metric/orders/update?token={token}", {"text": new_text})
+        body = json.loads(r.read())
+        assert body["name"] == "orders_v2"
+        assert body["renamed_from"] == "orders"
+        assert body["note"] is not None
+        assert Path(body["archived"]).exists()
+        assert (tmp_path / "metrics" / "orders.yml").read_text(encoding="utf-8") == new_text
+        assert any(m["name"] == "orders_v2" for m in body["metrics"])
+        assert not any(m["name"] == "orders" for m in body["metrics"])
+    finally:
+        _teardown(server)
+
+
+def test_metric_update_unknown_metric_404s(tmp_path):
+    server, url = _build(tmp_path, metrics=_real_metrics(tmp_path, ["orders"]))
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(
+                f"{base}/api/metric/nope/update?token={token}",
+                {"text": 'name: nope\ninterval: 1h\nquery: "SELECT 1"\n'},
+            )
+        assert ei.value.code == 404
+    finally:
+        _teardown(server)
+
+
+def test_metric_update_invalid_text_leaves_file_unchanged(tmp_path):
+    server, url = _build(tmp_path, metrics=_real_metrics(tmp_path, ["orders"]))
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        before = (tmp_path / "metrics" / "orders.yml").read_text(encoding="utf-8")
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(f"{base}/api/metric/orders/update?token={token}", {"text": "name: orders\n"})
+        assert ei.value.code == 400
+        assert (tmp_path / "metrics" / "orders.yml").read_text(encoding="utf-8") == before
+    finally:
+        _teardown(server)
+
+
+def test_metric_update_refused_while_tuner_running(tmp_path, monkeypatch):
+    server, url = _build(tmp_path, metrics=_real_metrics(tmp_path, ["orders"]))
+    monkeypatch.setattr(
+        server.jobs, "running_tune_for", lambda m: object() if m == "orders" else None
+    )
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(
+                f"{base}/api/metric/orders/update?token={token}",
+                {"text": 'name: orders\ninterval: 1h\nquery: "SELECT 1"\ndescription: x\n'},
+            )
+        assert ei.value.code == 400
+        assert "tuner" in ei.value.read().decode()
+    finally:
+        _teardown(server)
+
+
+def test_metric_delete_confirm_mismatch_leaves_file(tmp_path):
+    server, url = _build(tmp_path, metrics=_real_metrics(tmp_path, ["orders"]))
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(f"{base}/api/metric/orders/delete?token={token}", {"confirm": "wrong"})
+        assert ei.value.code == 400
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(f"{base}/api/metric/orders/delete?token={token}", {})
+        assert ei.value.code == 400
+        assert (tmp_path / "metrics" / "orders.yml").exists()
+    finally:
+        _teardown(server)
+
+
+def test_metric_delete_success_removes_file_and_archives(tmp_path):
+    server, url = _build(tmp_path, metrics=_real_metrics(tmp_path, ["orders"]))
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        r = _post(f"{base}/api/metric/orders/delete?token={token}", {"confirm": "orders"})
+        body = json.loads(r.read())
+        assert body["name"] == "orders"
+        assert Path(body["archived"]).exists()
+        assert not (tmp_path / "metrics" / "orders.yml").exists()
+        assert not any(m["name"] == "orders" for m in body["metrics"])
+
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _get(f"{base}/api/metric-source/orders?token={token}")
+        assert ei.value.code == 404
+    finally:
+        _teardown(server)
+
+
+def test_metric_delete_refused_while_tuner_running(tmp_path, monkeypatch):
+    server, url = _build(tmp_path, metrics=_real_metrics(tmp_path, ["orders"]))
+    monkeypatch.setattr(
+        server.jobs, "running_tune_for", lambda m: object() if m == "orders" else None
+    )
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(f"{base}/api/metric/orders/delete?token={token}", {"confirm": "orders"})
+        assert ei.value.code == 400
+        assert "tuner" in ei.value.read().decode()
+        assert (tmp_path / "metrics" / "orders.yml").exists()
+    finally:
+        _teardown(server)
+
+
+def test_metric_create_without_token_rejected(tmp_path):
+    server, url = _build(tmp_path, metrics=_real_metrics(tmp_path, ["orders"]))
+    _serve(server)
+    try:
+        base = url.split("/?")[0]
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(
+                f"{base}/api/metric-create",
+                {"text": 'name: x\ninterval: 1h\nquery: "SELECT 1"\n'},
+            )
+        assert ei.value.code == 403
+    finally:
+        _teardown(server)
+
+
 # ── CLI smoke test ────────────────────────────────────────────────────────────
 
 
@@ -571,6 +795,58 @@ def test_dtk_ui_help_smoke():
     assert "--select" in result.output
     assert "--window" in result.output
     assert "--no-open" in result.output
+
+
+def test_metric_update_digest_conflict_is_refused(tmp_path):
+    """A stale editor (opened before another save landed) must not clobber the file."""
+    server, url = _build(tmp_path, metrics=_real_metrics(tmp_path, ["orders"]))
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        src = json.loads(_get(f"{base}/api/metric-source/orders?token={token}").read())
+        assert src["digest"]  # the source response hands out the token
+
+        # a save that echoes the current digest goes through
+        v2 = 'name: orders\ninterval: 1h\nquery: "SELECT 1"\ndescription: v2\n'
+        _post(
+            f"{base}/api/metric/orders/update?token={token}",
+            {"text": v2, "digest": src["digest"]},
+        )
+        on_disk = (tmp_path / "metrics" / "orders.yml").read_text(encoding="utf-8")
+        assert "description: v2" in on_disk
+
+        # a second save from the ORIGINAL (now stale) digest is refused
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(
+                f"{base}/api/metric/orders/update?token={token}",
+                {"text": src["text"], "digest": src["digest"]},
+            )
+        assert ei.value.code == 400
+        assert "changed on disk" in ei.value.read().decode()
+        # ...and the newer version is still on disk
+        assert "description: v2" in (tmp_path / "metrics" / "orders.yml").read_text()
+
+        # a save WITHOUT a digest (legacy/tests) still succeeds
+        r = _post(f"{base}/api/metric/orders/update?token={token}", {"text": src["text"]})
+        assert json.loads(r.read())["name"] == "orders"
+    finally:
+        _teardown(server)
+
+
+def test_metric_create_rejects_non_string_falsy_folder(tmp_path):
+    """`folder: 0` must 400 like any other non-string, not silently mean 'root'."""
+    server, url = _build(tmp_path, metrics=_real_metrics(tmp_path, ["orders"]))
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        text = 'name: signups\ninterval: 1h\nquery: "SELECT 1"\n'
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(f"{base}/api/metric-create?token={token}", {"text": text, "folder": 0})
+        assert ei.value.code == 400
+        assert "'folder' must be a string" in ei.value.read().decode()
+        assert not (tmp_path / "metrics" / "signups.yml").exists()
+    finally:
+        _teardown(server)
 
 
 if __name__ == "__main__":

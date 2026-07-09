@@ -37,6 +37,12 @@ from detectkit import __version__
 from detectkit.reporting import build_report_payload, render_report_html
 from detectkit.ui.html import render_ui_html
 from detectkit.ui.jobs import JobManager
+from detectkit.ui.metric_files import (
+    create_metric_file,
+    delete_metric_file,
+    text_digest,
+    update_metric_file,
+)
 from detectkit.ui.overview import (
     ALL_WINDOW_PRESETS,
     WINDOW_PRESETS,
@@ -119,6 +125,13 @@ def _find_metric(metrics: list[tuple[Path, MetricConfig]], name: str) -> MetricC
         if config.name == name:
             return config
     return None
+
+
+def _find_metric_entry(
+    metrics: list[tuple[Path, MetricConfig]], name: str
+) -> tuple[Path, MetricConfig] | None:
+    """The ``(path, config)`` entry for *name* — the CRUD routes' lookup seam."""
+    return next(((p, c) for p, c in metrics if c.name == name), None)
 
 
 def _subprocess_env() -> dict[str, str]:
@@ -299,6 +312,13 @@ class _Handler(BaseHTTPRequestHandler):
             offset = _parse_int(query.get("offset", ["0"])[0], default=0)
             self._handle_job_status(srv, job_id, offset)
             return
+        if path == "/api/metrics":
+            self._reply_json({"metrics": metric_entries(srv.project_root, srv.metrics)})
+            return
+        if path.startswith("/api/metric-source/"):
+            name = unquote(path[len("/api/metric-source/") :])
+            self._handle_metric_source(srv, name)
+            return
         self._reply_error(404, "not found")
 
     def _route_post(self, srv: _UiServer, body: bytes) -> None:
@@ -314,6 +334,14 @@ class _Handler(BaseHTTPRequestHandler):
         elif path.startswith("/api/job/") and path.endswith("/stop"):
             job_id = path[len("/api/job/") : -len("/stop")].rstrip("/")
             self._handle_stop(srv, job_id)
+        elif path == "/api/metric-create":
+            self._handle_metric_create(srv, body)
+        elif path.startswith("/api/metric/") and path.endswith("/update"):
+            name = unquote(path[len("/api/metric/") : -len("/update")].rstrip("/"))
+            self._handle_metric_update(srv, name, body)
+        elif path.startswith("/api/metric/") and path.endswith("/delete"):
+            name = unquote(path[len("/api/metric/") : -len("/delete")].rstrip("/"))
+            self._handle_metric_delete(srv, name, body)
         else:
             self._reply_error(404, "not found")
 
@@ -383,6 +411,35 @@ class _Handler(BaseHTTPRequestHandler):
             self._reply_error(404, f"unknown job: {job_id}")
             return
         self._reply_json(srv.jobs.snapshot(job, offset))
+
+    def _handle_metric_source(self, srv: _UiServer, name: str) -> None:
+        """The raw YAML text of one metric's file, for the editor overlay.
+
+        Runs under ``db_lock`` like the mutation routes — the update handler
+        overwrites the same file in place (a plain truncate-and-write), so an
+        unserialized read could hand the editor a torn half-written file. The
+        ``digest`` is the optimistic-concurrency token the editor echoes back
+        on save (see ``update_metric_file``).
+        """
+        with srv.db_lock:
+            entry = _find_metric_entry(srv.metrics, name)
+            if entry is None:
+                self._reply_error(404, f"unknown metric: {name}")
+                return
+            mpath = _abs_metric_path(srv, entry[0])
+            text = mpath.read_text(encoding="utf-8")
+        dir_str, file_str = _resolve_metric_location(
+            mpath, srv.project_root, srv.project_root / "metrics"
+        )
+        self._reply_json(
+            {
+                "name": name,
+                "dir": dir_str,
+                "file": file_str,
+                "text": text,
+                "digest": text_digest(text),
+            }
+        )
 
     # ── POST handlers ────────────────────────────────────────────────────
 
@@ -493,6 +550,133 @@ class _Handler(BaseHTTPRequestHandler):
             return
         self._reply_json({"ok": True})
 
+    # ── metric file CRUD (see detectkit/ui/metric_files.py) ─────────────────
+    #
+    # File mutations don't touch the database, but they replace the in-memory
+    # `srv.metrics` list every DB route reads — so they run under `db_lock`
+    # too, which also serializes two concurrent editor saves. The list is
+    # rebuilt and reassigned atomically; in-flight readers keep the old list.
+
+    def _handle_metric_create(self, srv: _UiServer, body: bytes) -> None:
+        """Create ``metrics/[<folder>/]<name>.yml`` from raw YAML text.
+
+        The new metric joins this session's list even when it wouldn't match
+        the ``--select`` the server was started with — the user just created
+        it here and expects to see it.
+        """
+        payload = _load_json(body)
+        text = _validate_yaml_text(payload.get("text"))
+        folder = payload.get("folder")
+        if folder is None:
+            folder = ""
+        elif not isinstance(folder, str):
+            raise ValueError("'folder' must be a string")
+        with srv.db_lock:
+            written = create_metric_file(project_root=srv.project_root, text=text, folder=folder)
+            srv.metrics = sorted(
+                [*srv.metrics, (written.path, written.config)], key=lambda item: str(item[0])
+            )
+        srv.echo(f"  [ui] created metric '{written.config.name}' ({written.path})")
+        self._reply_json(
+            {
+                "name": written.config.name,
+                "file": str(written.path),
+                "metrics": metric_entries(srv.project_root, srv.metrics),
+            }
+        )
+
+    def _handle_metric_update(self, srv: _UiServer, name: str, body: bytes) -> None:
+        """Overwrite one metric's YAML (archiving the previous version first).
+
+        The existence lookup and tune-session guard run **inside** ``db_lock``,
+        atomically with the write — checked outside, two concurrent requests
+        for the same metric would both pass and the loser would hit a raw
+        ``FileNotFoundError`` instead of the clean 404/400. The optional
+        ``digest`` (from ``GET /api/metric-source``) makes a stale editor —
+        one opened before a ``dtk tune`` Apply or another tab's save — fail
+        loudly instead of silently clobbering the newer config.
+        """
+        payload = _load_json(body)
+        text = _validate_yaml_text(payload.get("text"))
+        digest = payload.get("digest")
+        if digest is not None and not isinstance(digest, str):
+            raise ValueError("'digest' must be a string")
+        with srv.db_lock:
+            entry = _find_metric_entry(srv.metrics, name)
+            if entry is None:
+                self._reply_error(404, f"unknown metric: {name}")
+                return
+            if srv.jobs.running_tune_for(name) is not None:
+                self._reply_error(
+                    400,
+                    f"a tuner for {name} is running — Apply or close it first "
+                    "(its Apply would overwrite this edit)",
+                )
+                return
+            mpath = _abs_metric_path(srv, entry[0])
+            written = update_metric_file(
+                project_root=srv.project_root, path=mpath, text=text, expected_digest=digest
+            )
+            srv.metrics = [(p, written.config if c.name == name else c) for p, c in srv.metrics]
+        renamed = written.config.name != name
+        note = (
+            f"renamed '{name}' → '{written.config.name}': rows under the old name stay "
+            "in the _dtk_* tables until `dtk clean`"
+            if renamed
+            else None
+        )
+        srv.echo(f"  [ui] updated metric '{name}' ({written.path})")
+        self._reply_json(
+            {
+                "name": written.config.name,
+                "renamed_from": name if renamed else None,
+                "archived": str(written.archived) if written.archived else None,
+                "note": note,
+                "metrics": metric_entries(srv.project_root, srv.metrics),
+            }
+        )
+
+    def _handle_metric_delete(self, srv: _UiServer, name: str, body: bytes) -> None:
+        """Delete one metric's YAML — requires the client to echo the name back.
+
+        The ``confirm`` field is the server-side half of the UI's confirmation
+        dialog: a request that doesn't carry the exact metric name is refused,
+        so nothing can delete a metric with a bare POST by accident.
+        """
+        payload = _load_json(body)
+        if payload.get("confirm") != name:
+            self._reply_error(400, "confirmation mismatch: POST {'confirm': '<metric name>'}")
+            return
+        # Lookup + tune-guard inside the lock, atomically with the delete —
+        # same reasoning as _handle_metric_update.
+        with srv.db_lock:
+            entry = _find_metric_entry(srv.metrics, name)
+            if entry is None:
+                self._reply_error(404, f"unknown metric: {name}")
+                return
+            if srv.jobs.running_tune_for(name) is not None:
+                self._reply_error(
+                    400,
+                    f"a tuner for {name} is running — close it first "
+                    "(its Apply would re-create the file)",
+                )
+                return
+            mpath = _abs_metric_path(srv, entry[0])
+            archived = delete_metric_file(project_root=srv.project_root, path=mpath)
+            srv.metrics = [(p, c) for p, c in srv.metrics if c.name != name]
+        srv.echo(f"  [ui] deleted metric '{name}' (archived at {archived})")
+        self._reply_json(
+            {
+                "name": name,
+                "archived": str(archived),
+                "note": (
+                    "the YAML file was archived and removed; rows in the _dtk_* tables "
+                    "remain until `dtk clean`"
+                ),
+                "metrics": metric_entries(srv.project_root, srv.metrics),
+            }
+        )
+
     # ── response helpers ─────────────────────────────────────────────────
 
     def _reply_html(self, html: str) -> None:
@@ -541,6 +725,17 @@ def _parse_int(value: str, *, default: int) -> int:
         return default
 
 
+def _abs_metric_path(srv: _UiServer, path: Path) -> Path:
+    """Session metric paths may be project-root-relative; resolve for file I/O."""
+    return path if path.is_absolute() else srv.project_root / path
+
+
+def _validate_yaml_text(value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("'text' must be a non-empty string (the metric YAML)")
+    return value
+
+
 def _load_json(body: bytes) -> dict[str, Any]:
     if not body:
         return {}
@@ -561,13 +756,14 @@ def _json_default(o: Any) -> Any:
     raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
 
 
-def _boot_payload(
-    project_config: ProjectConfig,
-    project_root: Path,
-    metrics: list[tuple[Path, MetricConfig]],
-    initial_window: str,
-) -> dict[str, Any]:
-    """The ``GET /`` shell payload: project + metric list, no stats, no URLs."""
+def metric_entries(
+    project_root: Path, metrics: list[tuple[Path, MetricConfig]]
+) -> list[dict[str, Any]]:
+    """The boot-shaped metric list entries — shared by ``GET /`` and ``GET /api/metrics``.
+
+    The CRUD routes return this refreshed list after every mutation so the
+    page re-syncs its session metric list in the same round trip.
+    """
     metrics_dir = project_root / "metrics"
     entries = []
     for path, config in metrics:
@@ -582,11 +778,21 @@ def _boot_payload(
                 "enabled": config.enabled,
             }
         )
+    return entries
+
+
+def _boot_payload(
+    project_config: ProjectConfig,
+    project_root: Path,
+    metrics: list[tuple[Path, MetricConfig]],
+    initial_window: str,
+) -> dict[str, Any]:
+    """The ``GET /`` shell payload: project + metric list, no stats, no URLs."""
     return {
         "project": project_config.name,
         "initial_window": initial_window,
         "version": __version__,
-        "metrics": entries,
+        "metrics": metric_entries(project_root, metrics),
         "generated_at": int(now_utc_naive().timestamp() * 1000),
     }
 

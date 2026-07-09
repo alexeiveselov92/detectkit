@@ -439,7 +439,8 @@ Now that you have a working metric:
 3. **Configure multiple detectors** - [Detectors Guide](../guides/detectors.md)
 4. **Set up multiple channels** - [Alerting Guide](../guides/alerting.md)
 5. **Fan out to independent alert rules** - `alerting:` can be a *list* of alert blocks, each with its own channels, conditions and template ([Multiple alert blocks](../guides/alerting-multiple-blocks.md#multiple-alert-configurations))
-6. **Explore examples** - [Examples](../examples/)
+6. **Open the project cockpit** - `dtk ui` shows every metric's alerts, freshness, and quality in one browser view — and lets you add or edit metrics from there too ([Project UI guide](../guides/project-ui.md))
+7. **Explore examples** - [Examples](../examples/)
 
 ## Troubleshooting
 

@@ -391,6 +391,8 @@ severity breakdowns) point any BI tool at these tables — see
   parameters autotune searches over
 - [Visualizing Results](visualizing-results.md) — chart the tuned detector in any
   BI tool
+- [Project UI](project-ui.md) — a project-wide view whose pipeline panel can
+  also drive `dtk autotune` from the browser
 - [CLI Reference](../reference/cli.md) — the rest of the `dtk` commands
 - [autotune-incidents-example.yml](../examples/autotune-incidents-example.yml) —
   a commented labels file

@@ -15,6 +15,7 @@ import { esc } from './format';
 import {
   fetchJobDetail,
   fetchJobs,
+  fetchMetricSource,
   fetchMetricStats,
   postAutotune,
   postRun,
@@ -34,7 +35,17 @@ import { buildRunPanel } from './run-panel';
 import type { RunPanelHandle, RunRequestDraft } from './run-panel';
 import { buildJobsDrawer } from './jobs-drawer';
 import type { JobsDrawerHandle } from './jobs-drawer';
-import type { BootPayload, DtkUiGlobal, JobKind, JobSnapshot, OverviewMetric } from './payload';
+import { NEW_METRIC_TEMPLATE, openMetricEditor } from './metric-editor';
+import type { EditorMode, MetricEditorHandle } from './metric-editor';
+import type {
+  BootMetric,
+  BootPayload,
+  DtkUiGlobal,
+  JobKind,
+  JobSnapshot,
+  MetricMutationResponse,
+  OverviewMetric,
+} from './payload';
 
 /** Per-metric stats fetches in flight at once (the server serializes DB access anyway). */
 const STATS_CONCURRENCY = 3;
@@ -73,9 +84,14 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   root.className = `${ROOT_CLASS}-root`;
   mount.appendChild(root);
 
+  // The session's known metrics, refreshed in place after every create/update/
+  // delete (see `applyMetricsList` below) — everything that used to read the
+  // static `boot.metrics` now reads this instead.
+  let metricsList: BootMetric[] = boot.metrics;
+
   const state: State = {
     windowPreset: boot.initial_window || '30d',
-    metrics: boot.metrics.map(buildPendingRow),
+    metrics: metricsList.map(buildPendingRow),
     jobs: [],
     followedJobId: null,
     followOffset: 0,
@@ -84,15 +100,16 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   };
 
   let detailHandle: DetailHandle | null = null;
+  let editorHandle: MetricEditorHandle | null = null;
   let jobsPollHandle: number | undefined;
   let jobDetailHandle: number | undefined;
 
-  // ---- select-field options (metric names + tag:x), from the boot list -----
+  // ---- select-field options (metric names + tag:x), from the known list -----
   // (name/tags are known up front — no need to wait on any per-metric fetch)
   function selectOptions(): string[] {
     const names = new Set<string>();
     const tags = new Set<string>();
-    for (const m of boot.metrics) {
+    for (const m of metricsList) {
       names.add(m.name);
       for (const t of m.tags) tags.add(t);
     }
@@ -155,6 +172,13 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   runPipelineBtn.onclick = (): void => openRunPanel();
   headerRight.appendChild(runPipelineBtn);
 
+  const newMetricBtn = document.createElement('button');
+  newMetricBtn.type = 'button';
+  newMetricBtn.className = 'dtk-ui-newbtn';
+  newMetricBtn.textContent = 'New metric';
+  newMetricBtn.onclick = (): void => openMetricEditorCreate();
+  headerRight.appendChild(newMetricBtn);
+
   // Small "n/N" progress chip — visible only while the incremental per-metric
   // stats load is in flight, hidden the instant it completes.
   const progressChip = document.createElement('span');
@@ -198,7 +222,7 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   function renderContent(): void {
     content.innerHTML = '';
 
-    const total = boot.metrics.length;
+    const total = metricsList.length;
     if (total === 0) {
       const empty = document.createElement('div');
       empty.className = 'dtk-ui-empty';
@@ -248,6 +272,7 @@ function render(boot: BootPayload, mount: HTMLElement): void {
       onOpen: openDetail,
       onTune: (name) => void submitTune(name),
       onRun: (name) => openRunPanel(name),
+      onEdit: (name) => void openMetricEditorEdit(name),
       onSortChange: (key: SortKey) => {
         state.sort =
           state.sort.key === key
@@ -262,6 +287,7 @@ function render(boot: BootPayload, mount: HTMLElement): void {
 
   // ---- detail overlay ---------------------------------------------------------
   function openDetail(name: string): void {
+    if (!closeEditorIfAllowed()) return; // dirty editor: user chose to keep editing
     if (detailHandle) detailHandle.close();
     detailHandle = openDetailOverlay(root, name, state.windowPreset, {
       onTune: (n) => void submitTune(n),
@@ -269,6 +295,128 @@ function render(boot: BootPayload, mount: HTMLElement): void {
         detailHandle = null;
       },
     });
+  }
+
+  // ---- metric editor overlay (create / edit / delete) -------------------------
+  /**
+   * Confirm-guarded close of any open editor. Returns false when the user
+   * chose to keep their unsaved edits — navigation to another overlay must
+   * abort then, so a programmatic close can never silently discard a dirty
+   * editor (Esc/backdrop/✕ already prompt inside the editor itself).
+   */
+  function closeEditorIfAllowed(): boolean {
+    if (!editorHandle) return true;
+    return editorHandle.requestClose(); // its onClose nulls editorHandle
+  }
+
+  function openMetricEditorCreate(): void {
+    if (!closeEditorIfAllowed()) return;
+    if (detailHandle) {
+      detailHandle.close();
+      detailHandle = null;
+    }
+    editorHandle = openMetricEditor(
+      root,
+      { mode: 'create', text: NEW_METRIC_TEMPLATE },
+      {
+        onSaved: (res, mode) => onEditorSaved(res, mode),
+        onDeleted: () => {}, // unreachable in create mode (no delete button)
+        onClose: () => {
+          editorHandle = null;
+        },
+      },
+    );
+  }
+
+  async function openMetricEditorEdit(name: string): Promise<void> {
+    // Resolve the dirty-editor question BEFORE the fetch: if the user keeps
+    // their edits nothing is fetched, and an overlay opened while the fetch
+    // was in flight can't be silently closed by its resolution below.
+    if (!closeEditorIfAllowed()) return;
+    let src;
+    try {
+      src = await fetchMetricSource(name);
+    } catch (e) {
+      toast(root, 'error', (e as Error).message);
+      return;
+    }
+    if (!closeEditorIfAllowed()) return; // an editor opened during the fetch wins
+    if (detailHandle) {
+      detailHandle.close();
+      detailHandle = null;
+    }
+    editorHandle = openMetricEditor(
+      root,
+      { mode: 'edit', name: src.name, file: src.file, text: src.text, digest: src.digest },
+      {
+        onSaved: (res, mode) => onEditorSaved(res, mode),
+        onDeleted: (res) => onEditorDeleted(res),
+        onClose: () => {
+          editorHandle = null;
+        },
+      },
+    );
+  }
+
+  function onEditorSaved(res: MetricMutationResponse, mode: EditorMode): void {
+    toast(root, 'info', `Metric '${res.name}' ${mode === 'create' ? 'created' : 'saved'}.`);
+    if (res.note) toast(root, 'info', res.note);
+    // A plain edit changes at most its own row — refresh just that one instead
+    // of flashing the whole table back to pending and re-fetching every
+    // metric's stats. Create/rename/delete change the list's shape, so they
+    // keep the full reload.
+    if (mode === 'edit' && !res.renamed_from) {
+      refreshMetricRow(res.name, res.metrics);
+    } else {
+      applyMetricsList(res.metrics);
+    }
+  }
+
+  function onEditorDeleted(res: MetricMutationResponse): void {
+    toast(root, 'info', `Metric '${res.name}' deleted (archived).`);
+    if (res.note) toast(root, 'info', res.note);
+    applyMetricsList(res.metrics);
+  }
+
+  /** Re-sync the session metric list after a create/update/delete, then reload. */
+  function applyMetricsList(entries: BootMetric[]): void {
+    metricsList = entries;
+    runPanel.refreshOptions();
+    void loadOverview();
+  }
+
+  /**
+   * Refresh a single row after an in-place edit: adopt the refreshed session
+   * list (interval/tags/enabled may have changed), set just that row pending,
+   * and re-fetch its stats. Any full reload that starts meanwhile (window
+   * change, manual refresh) supersedes this via the shared generation counter.
+   */
+  function refreshMetricRow(name: string, entries: BootMetric[]): void {
+    metricsList = entries;
+    runPanel.refreshOptions();
+    const bm = entries.find((m) => m.name === name);
+    const idx = state.metrics.findIndex((m) => m.name === name);
+    if (!bm || idx === -1) {
+      void loadOverview(); // row not present — fall back to the full reload
+      return;
+    }
+    const generation = loadGeneration;
+    state.metrics[idx] = buildPendingRow(bm);
+    renderContent();
+    fetchMetricStats(name, state.windowPreset)
+      .then((row) => {
+        if (generation !== loadGeneration) return; // superseded by a full reload
+        row.pending = false;
+        const i = state.metrics.findIndex((m) => m.name === name);
+        if (i !== -1) state.metrics[i] = row;
+        renderContent();
+      })
+      .catch((e: Error) => {
+        if (generation !== loadGeneration) return;
+        const i = state.metrics.findIndex((m) => m.name === name);
+        if (i !== -1) state.metrics[i] = { ...buildPendingRow(bm), pending: false, error: e.message };
+        renderContent();
+      });
   }
 
   // ---- run panel + jobs drawer -----------------------------------------------
@@ -481,19 +629,23 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   async function loadOverview(): Promise<void> {
     const generation = ++loadGeneration;
     const windowPreset = state.windowPreset;
+    // Snapshot the current metric list — `metricsList` is only ever reassigned
+    // wholesale (via `applyMetricsList`, which itself calls `loadOverview`
+    // again with a fresh generation), so one invocation stays consistent.
+    const metrics = metricsList;
 
-    state.metrics = boot.metrics.map(buildPendingRow);
+    state.metrics = metrics.map(buildPendingRow);
     refreshBtn.classList.add('spinning');
-    setLoadProgress(0, boot.metrics.length);
+    setLoadProgress(0, metrics.length);
     renderContent();
 
-    if (boot.metrics.length === 0) {
+    if (metrics.length === 0) {
       refreshBtn.classList.remove('spinning');
       setLoadProgress(0, 0);
       return;
     }
 
-    const queue = [...boot.metrics];
+    const queue = [...metrics];
     let landedCount = 0;
 
     async function worker(): Promise<void> {
@@ -515,17 +667,17 @@ function render(boot: BootPayload, mount: HTMLElement): void {
         const idx = state.metrics.findIndex((m) => m.name === bm.name);
         if (idx !== -1) state.metrics[idx] = row;
         landedCount++;
-        setLoadProgress(landedCount, boot.metrics.length);
+        setLoadProgress(landedCount, metrics.length);
         renderContent();
       }
     }
 
-    const workerCount = Math.min(STATS_CONCURRENCY, boot.metrics.length);
+    const workerCount = Math.min(STATS_CONCURRENCY, metrics.length);
     await Promise.all(Array.from({ length: workerCount }, () => worker()));
 
     if (generation === loadGeneration) {
       refreshBtn.classList.remove('spinning');
-      setLoadProgress(landedCount, boot.metrics.length);
+      setLoadProgress(landedCount, metrics.length);
       runPanel.refreshOptions();
     }
   }

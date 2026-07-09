@@ -12,7 +12,7 @@ Run all commands from a project directory (the one containing
 | `dtk run --select <sel>` | Run the load → detect → alert pipeline |
 | `dtk autotune --select <sel>` | Auto-configure a metric's detector (see `autotune.md`) |
 | `dtk tune --select <sel>` | Interactively tune a detector on real data, write it back in place |
-| `dtk ui` | Project-wide live overview + browser pipeline control panel |
+| `dtk ui` | Project-wide live overview + browser pipeline control panel + create/edit/delete metric YAMLs |
 | `dtk test-alert <metric>` | Send a mock alert to the metric's channels |
 | `dtk unlock --select <sel>` | Clear a stuck pipeline lock |
 | `dtk clean --select <sel>` | Prune internal data that no longer matches the config |
@@ -209,6 +209,32 @@ run/autotune/unlock, **multiple tune jobs run concurrently**, since each is
 its own isolated, lock-free session. The `dtk ui` server itself takes **no
 pipeline lock** and never mutates anything — every spawned command behaves
 exactly as if typed into a terminal.
+
+### Managing metrics from the UI
+
+The cockpit header has a **New metric** button — an editor overlay seeded
+with a starter YAML template, with an optional subfolder under `metrics/`;
+saving writes `metrics/[<folder>/]<name>.yml`. Every metric row also has an
+**Edit** action that opens its raw YAML in the same editor. **Save** validates
+server-side **before any write**: YAML syntax → full `MetricConfig` → a deep
+detector-params check (each factory-known detector is actually constructed) —
+an invalid config lands in the editor's error pane with nothing written. A
+successful save **archives the previous file verbatim** to
+`metrics/.history/<metric>/` (the same archive `dtk tune`'s Apply writes,
+excluded from metric discovery) and only then overwrites in place, so the
+text typed is what lands on disk, comments intact (normalized only to end
+with a newline). A save is refused when the file changed on disk after the
+editor was opened (a `dtk tune` Apply or another session saved first) —
+reopen the metric rather than overwrite it. Renaming via `name:`
+is allowed — uniqueness is enforced project-wide — and rows under the old name
+stay in the `_dtk_*` tables until `dtk clean`. **Delete** lives in the edit
+overlay behind an explicit confirmation step, and the server additionally
+requires the request to echo the metric name back; it archives the file
+(`…-deleted.yml`) before removing it, so a delete is reversible by hand, and
+its `_dtk_*` rows likewise remain until `dtk clean`. While a `dtk tune` session
+for that metric is running, Save and Delete are refused (its Apply would race
+the edit). Like the rest of `dtk ui`, metric management takes no pipeline lock
+and never touches the database — it only manages metric YAML files.
 
 ## `dtk test-alert <metric>`
 

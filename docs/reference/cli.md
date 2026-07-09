@@ -12,6 +12,8 @@ dtk init-claude                 # Set up Claude Code context for this folder
 dtk run --select <selector>     # Run metric pipeline
 dtk autotune --select <sel>     # Auto-configure a metric's detector from data
 dtk tune --select <sel>         # Interactively tune a detector, write it back
+dtk ui [--select <sel>]         # Project-wide monitoring cockpit in the browser
+dtk osi import|export|compile   # OSI semantic-model interop
 dtk test-alert <metric>         # Test alert channels
 dtk unlock --select <selector>  # Clear a stuck pipeline lock
 dtk clean --select <selector>   # Prune data that no longer matches configs
@@ -900,12 +902,17 @@ relates to `dtk autotune`.
 Open an interactive, **project-wide** localhost cockpit: one overview of every
 selected metric's alerting behavior (grouped by `metrics/` subfolder,
 filterable by tag), a per-metric detail view (the existing HTML report in an
-overlay), and a pipeline panel that drives `dtk run` / `dtk autotune` /
+overlay), a pipeline panel that drives `dtk run` / `dtk autotune` /
 `dtk unlock` as subprocesses — plus a **Tune** action that launches
-[`dtk tune`](#dtk-tune) for a metric in a new tab. Like `dtk tune`, it is a
-*superstructure* over the existing commands: the server never runs the
-pipeline in-process and takes **no pipeline lock** — every action it drives is
-the same subprocess you'd run from a terminal, streamed back into the page.
+[`dtk tune`](#dtk-tune) for a metric in a new tab — and **New metric** /
+**Edit** actions that create, edit, and delete metric YAML files straight from
+the browser (see [Managing metrics](#managing-metrics) below). Like
+`dtk tune`, it is a *superstructure* over the existing commands and files: the
+server never runs the pipeline in-process, takes **no pipeline lock**, and
+never touches the database — every pipeline action it drives is the same
+subprocess you'd run from a terminal, streamed back into the page, and every
+metric-file write goes through the same validate-before-write discipline
+`dtk tune`'s Apply uses.
 
 #### Syntax
 
@@ -997,10 +1004,53 @@ can never race the same database connection. **`dtk tune` jobs are the
 exception**: several run concurrently (one per metric you're tuning), since
 each opens its own isolated, lock-free tuning server.
 
-The `dtk ui` server itself takes **no pipeline lock** and never mutates
-anything — it only spawns and streams these commands. Every spawned command
-takes (and releases) its own lock exactly as it would from a terminal, so the
-pipeline panel is a convenience layer, not a different code path.
+The pipeline panel itself takes **no pipeline lock** and never mutates
+anything on its own — it only spawns and streams these commands. Every spawned
+command takes (and releases) its own lock exactly as it would from a
+terminal, so the pipeline panel is a convenience layer, not a different code
+path. (The metric-management routes below are a separate, file-only mutation
+path — they never touch the database.)
+
+#### Managing metrics
+
+The header's **New metric** button and each metric row's **Edit** action open
+a full-screen editor over the metric's raw YAML — a text-in, text-out model
+that mirrors `dtk tune`'s config write-back, extended to the whole file:
+
+- **New metric** opens the editor seeded with a starter YAML template plus an
+  optional folder field. **Create metric** validates server-side and writes
+  `metrics/[<folder>/]<name>.yml` (the filename is derived from the metric's
+  `name:`). The new metric joins the current session immediately, even if it
+  wouldn't match the `--select` the server was started with.
+- **Edit** opens a metric's existing YAML verbatim in the same editor.
+  **Save changes** validates, then **archives the previous file verbatim** to
+  `metrics/.history/<metric>/<metric>-<stamp>.yml` — the same archive
+  `dtk tune`'s Apply uses, excluded from metric discovery — and overwrites the
+  file in place: the text you typed lands on disk, comments intact (no
+  re-emit; the only normalization is ensuring a trailing newline). A save is
+  refused if the file changed on disk after the editor was opened (a
+  `dtk tune` Apply or another editor session landed first) — reopen the
+  metric instead of silently overwriting the newer version. Renaming a metric
+  (changing `name:`) is allowed; uniqueness is
+  enforced against the whole project, and a rename leaves the old name's rows
+  in the `_dtk_*` tables until `dtk clean` prunes them.
+- **Delete metric** lives inside the edit overlay behind an explicit
+  confirmation step; the server additionally requires the request to echo the
+  metric name, so nothing deletes on a stray click. Deleting archives the
+  file to `metrics/.history/<metric>/<metric>-<stamp>-deleted.yml` and then
+  removes it — the metric's rows stay in the `_dtk_*` tables until
+  `dtk clean` prunes them, and the archived copy makes the delete reversible
+  by restoring it.
+- **Validation is strict and server-side, before any write**: YAML syntax,
+  then full `MetricConfig` validation, then a deep detector-params check
+  (constructing each configured detector). An invalid config returns the
+  validation error into the editor's error pane and writes nothing.
+- **Guard against a running tune session**: while a `dtk tune` session for the
+  metric is running (launched from the UI), Save/Delete for that metric are
+  refused — a concurrent Apply from the tuner would race the edit.
+
+`dtk ui` still takes **no** pipeline lock, and these routes never touch the
+database — they only read and write metric YAML files under `metrics/`.
 
 #### Examples
 

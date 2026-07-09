@@ -890,8 +890,9 @@ class MetricConfig(BaseModel):
         if not data:
             raise ValueError(f"Empty metric config file: {path}")
 
-        # Support nested structure: metric: { ... }
-        if "metric" in data and isinstance(data["metric"], dict):
-            data = data["metric"]
+        # Support nested structure: metric: { ... } (shared unwrap seam)
+        from detectkit.config.metric_io import unwrap_metric_mapping
+
+        data = unwrap_metric_mapping(data)
 
         return cls.model_validate(data)

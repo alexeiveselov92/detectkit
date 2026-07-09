@@ -68,6 +68,8 @@ export function injectStyle(): void {
   animation:dtk-ui-pulse 1.2s ease-in-out infinite;}
 .dtk-ui-jobschip.running{color:var(--text);border-color:var(--clay);}
 @keyframes dtk-ui-pulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
+.dtk-ui-progresschip{font-family:var(--mono);font-size:11.5px;color:var(--faint);
+  white-space:nowrap;}
 
 /* --- banner / empty ------------------------------------------------------ */
 .dtk-ui-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;
@@ -125,6 +127,8 @@ export function injectStyle(): void {
 .dtk-ui-row:hover{background:var(--surface-2);}
 .dtk-ui-row.disabled{opacity:0.5;}
 .dtk-ui-row.errored{background:rgba(214,50,50,0.05);}
+.dtk-ui-row.pending{opacity:0.7;}
+.dtk-ui-pending{font-family:var(--mono);color:var(--faint);}
 .dtk-ui-dotcell{width:14px;}
 .dtk-ui-dot{width:9px;height:9px;border-radius:50%;display:inline-block;cursor:help;}
 .dtk-ui-namecell{min-width:170px;}
@@ -136,6 +140,8 @@ export function injectStyle(): void {
 .dtk-ui-interval{font-family:var(--mono);color:var(--muted);white-space:nowrap;}
 .dtk-ui-sparkcell{width:150px;}
 .dtk-ui-spark-empty{font-family:var(--mono);font-size:10.5px;color:var(--faint);font-style:italic;}
+.dtk-ui-spark-loading{font-family:var(--mono);font-size:10.5px;color:var(--faint);font-style:italic;
+  animation:dtk-ui-pulse 1.2s ease-in-out infinite;}
 .dtk-ui-alertscell{white-space:nowrap;}
 .dtk-ui-alerts-n{font-family:var(--mono);color:var(--text);}
 .dtk-ui-alerts-n.hasany{font-weight:700;color:var(--text-strong);}

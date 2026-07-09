@@ -875,11 +875,31 @@ POST — checks the `?token=` query param (tune only guards POSTs), and it
 holds one connection, the same reason `dtk tune` serializes `/autotune`. `dtk
 ui` itself takes **no pipeline lock** and never runs the pipeline in-process.
 
-Routes (all token-guarded): `GET /` (shell HTML), `GET /api/overview?window=`,
-`GET /metric/<name>?window=` (the detail overlay), `GET /api/jobs` /
-`GET /api/job/<id>?offset=` (job listing + paged log lines), and
-`POST /api/run` / `/api/autotune` / `/api/unlock` / `/api/tune` /
-`/api/job/<id>/stop`.
+Routes (all token-guarded): `GET /` (shell HTML), `GET /api/stats/<name>?window=`
+(**one metric's overview row — the unit the page actually loads**),
+`GET /api/overview?window=` (the same rows in one monolithic payload, kept for
+programmatic use), `GET /metric/<name>?window=` (the detail overlay),
+`GET /api/jobs` / `GET /api/job/<id>?offset=` (job listing + paged,
+**absolute-offset** log lines — a job more verbose than the line cap keeps
+streaming), and `POST /api/run` / `/api/autotune` / `/api/unlock` /
+`/api/tune` / `/api/job/<id>/stop`.
+
+**The overview loads incrementally and reads only the current config's
+detector ids.** The page renders the table instantly from the boot metric
+list, then fetches `GET /api/stats/<name>` per metric a few at a time (an
+`n/N` progress chip while loading) — a monolithic all-metrics request on a
+production-sized project takes minutes and gets aborted by the browser as
+"Failed to fetch" while the page spins. Per metric, `overview.py` derives the
+**currently-configured** detector ids exactly the way the detect step does
+(`get_algorithm_params` + seasonality → `DetectorFactory.create_from_config` →
+`get_detector_id`, `_configured_detector_ids`) and loads only those ids'
+window rows: every retune/autotune leaves the superseded generation's rows in
+`_dtk_detections` forever, so an unfiltered read returns one row-set per
+historical config — N× the transfer volume *and* replayed quorums mixing live
+and dead configs (inflating alert counts a real run would never produce). No
+derivable ids (no detectors configured / factory rejects one) → unfiltered
+fallback. This is a deliberate semantic difference from the report, which
+shows *what actually ran* (every stored detector id in its window).
 
 **Pipeline actions are real subprocesses.** `jobs.py` (`JobManager`/`Job`)
 spawns `[sys.executable, "-m", "detectkit.cli.main", "run", ...]` (and

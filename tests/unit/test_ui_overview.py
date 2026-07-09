@@ -22,7 +22,17 @@ import pytest
 import detectkit.ui.overview as overview_mod
 from detectkit.config.metric_config import AlertConfig, DetectorConfig, MetricConfig
 from detectkit.config.project_config import ProjectConfig
+from detectkit.detectors.factory import DetectorFactory
 from detectkit.ui.overview import build_overview_payload
+
+
+def _detector_id_for(dtype: str, params: dict | None = None) -> str:
+    """The real detector id the metric's config derives (the overview reads
+    only the currently-configured ids — stub rows must carry matching ids)."""
+    return DetectorFactory.create_from_config(
+        {"type": dtype, "params": params or {}}
+    ).get_detector_id()
+
 
 INTERVAL_S = 3600
 
@@ -187,8 +197,10 @@ def test_a_alert_counts_per_day_spark_union_flagged(tmp_path):
     # Two detectors: both anomalous at idx 100 (union must count that timestamp
     # once), only "mad" anomalous at idx 101 -> a grid-adjacent 2-point streak
     # that trips consecutive_anomalies=2.
-    det_rows = _dense_rows(times, "det_mad", "MADDetector", {100: "above", 101: "above"})
-    det_rows += _dense_rows(times, "det_zscore", "ZScoreDetector", {100: "above"})
+    det_rows = _dense_rows(
+        times, _detector_id_for("mad"), "MADDetector", {100: "above", 101: "above"}
+    )
+    det_rows += _dense_rows(times, _detector_id_for("zscore"), "ZScoreDetector", {100: "above"})
 
     stub = _StubManager()
     stub.add_metric("checkouts", ts=ts_arr, val=val_arr, last=now, first=base, det_rows=det_rows)
@@ -239,6 +251,72 @@ def test_a_alert_counts_per_day_spark_union_flagged(tmp_path):
     assert row["lag_seconds"] == 0.0
     assert row["locked"] is False
     assert row["quality"] is None
+
+
+def test_stale_detector_generations_are_excluded(tmp_path):
+    """Rows persisted under superseded detector ids (pre-retune generations)
+    must not inflate flagged counts or replayed alerts; a metric with no
+    configured detectors falls back to the unfiltered read."""
+    now = datetime(2026, 3, 2, 0, 0, 0)
+    n = 25
+    base = now - timedelta(hours=n - 1)
+    times = _times(base, n)
+    ts_arr = _ts_array(times)
+    val_arr = np.full(n, 100.0)
+
+    # Current config: mad, one anomalous point. A dead generation ("stale123")
+    # is anomalous EVERYWHERE — unfiltered it would fire on every timestamp.
+    det_rows = _dense_rows(times, _detector_id_for("mad"), "MADDetector", {10: "above"})
+    det_rows += _dense_rows(times, "stale123", "MADDetector", dict.fromkeys(range(n), "above"))
+
+    stub = _StubManager()
+    stub.add_metric("tuned_often", ts=ts_arr, val=val_arr, last=now, first=base, det_rows=det_rows)
+
+    config = MetricConfig(
+        name="tuned_often",
+        interval="1h",
+        query="SELECT 1",
+        detectors=[DetectorConfig(type="mad")],
+        alerting=[
+            AlertConfig(
+                channels=["slack"], min_detectors=1, direction="any", consecutive_anomalies=1
+            )
+        ],
+    )
+    payload = build_overview_payload(
+        project_config=_project_config(),
+        project_root=tmp_path,
+        metrics=[(tmp_path / "metrics" / "tuned_often.yml", config)],
+        internal=stub,
+        window_preset="24h",
+        now=now,
+    )
+    row = payload["metrics"][0]
+    assert row["error"] is None
+    assert row["flagged"] == 1  # only the live generation's anomaly
+    assert row["alerts"]["anomaly"] == 1
+    assert row["spark_anoms"] == [_ms(times[10])]
+
+    # No configured detectors -> unfiltered fallback still sees stored rows.
+    bare = MetricConfig(
+        name="tuned_often",
+        interval="1h",
+        query="SELECT 1",
+        alerting=[
+            AlertConfig(
+                channels=["slack"], min_detectors=1, direction="any", consecutive_anomalies=1
+            )
+        ],
+    )
+    payload = build_overview_payload(
+        project_config=_project_config(),
+        project_root=tmp_path,
+        metrics=[(tmp_path / "metrics" / "tuned_often.yml", bare)],
+        internal=stub,
+        window_preset="24h",
+        now=now,
+    )
+    assert payload["metrics"][0]["flagged"] == n  # stale rows visible again
 
 
 # ── (b) no-data events when no_data_alert is on and values are missing ───────
@@ -296,7 +374,7 @@ def test_c_quality_recall_fdr_reviewed(tmp_path):
     idx_missed = 2
     det_rows = _dense_rows(
         times,
-        "det_mad",
+        _detector_id_for("mad"),
         "MADDetector",
         {idx_caught: "above", idx_valid_reviewed: "above", idx_false: "above"},
     )

@@ -12,7 +12,7 @@ import type {
   JobIdResponse,
   JobsListResponse,
   OkResponse,
-  OverviewPayload,
+  OverviewMetric,
   RunRequest,
   TuneRequest,
   TuneResponse,
@@ -55,8 +55,16 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export function fetchOverview(windowPreset: string): Promise<OverviewPayload> {
-  return apiGet<OverviewPayload>('/api/overview', { window: windowPreset });
+// `/api/overview` (the monolithic all-metrics endpoint) is deliberately
+// unused by the cockpit: on a production-sized project it serializes a full
+// stats read for every metric on one DB connection, which can take minutes —
+// long enough for the browser to abort the request while the page shows an
+// endless spinner. `fetchMetricStats` below hits the per-metric endpoint
+// instead, so the page can load incrementally (see ui.ts's `loadOverview`).
+
+/** One metric's overview row — the incremental unit the cockpit fetches. */
+export function fetchMetricStats(name: string, windowPreset: string): Promise<OverviewMetric> {
+  return apiGet<OverviewMetric>(`/api/stats/${encodeURIComponent(name)}`, { window: windowPreset });
 }
 
 export function fetchJobs(): Promise<JobsListResponse> {

@@ -63,7 +63,15 @@ numbers aren't cached snapshots, they're the same counts a real `dtk run`
 would have alerted, because the anomaly / recovery / no-data counts are
 **replayed** from the stored detections through the same pure
 `AlertOrchestrator.replay` logic the HTML report uses (see
-[Visualizing Results](visualizing-results.md#html-reports)).
+[Visualizing Results](visualizing-results.md#html-reports)). Rows load
+**incrementally**: the table appears immediately and each metric's stats
+stream in (a small `n/N` progress chip shows how many have landed), so a
+large project never blocks on one slow metric — a failing one just marks its
+own row. The stats consider only the metric's **current** detector
+configuration: detections persisted by superseded configs (each retune or
+autotune run changes a detector's identity) are excluded, so the counts answer
+"how does the metric behave as configured today", not "what did some past
+config once flag".
 
 - **Alerts in window** — how many anomaly, recovery, and no-data events fired,
   from the alert rule the metric actually has configured.

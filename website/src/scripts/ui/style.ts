@@ -176,8 +176,14 @@ export function injectStyle(): void {
 .dtk-ui-overlay-close{border:1px solid var(--border);background:transparent;color:var(--muted);
   border-radius:7px;width:30px;height:30px;cursor:pointer;font-size:14px;}
 .dtk-ui-overlay-close:hover{border-color:var(--st-anomaly);color:var(--st-anomaly);}
-.dtk-ui-overlay-body{flex:1;min-height:0;}
+.dtk-ui-overlay-body{flex:1;min-height:0;position:relative;background:var(--term-bg);}
 .dtk-ui-overlay-body iframe{width:100%;height:100%;border:0;display:block;background:#fff;}
+.dtk-ui-overlay-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  gap:10px;color:var(--term-text);font-family:var(--mono);font-size:13px;}
+.dtk-ui-overlay-loading b{color:var(--clay);font-weight:600;}
+.dtk-ui-overlay-spinner{width:14px;height:14px;border-radius:50%;border:2px solid var(--term-border);
+  border-top-color:var(--clay);animation:dtk-ui-spin 0.8s linear infinite;flex:none;}
+@keyframes dtk-ui-spin{to{transform:rotate(360deg);}}
 
 /* --- drawers (run panel + jobs) --------------------------------------------- */
 .dtk-ui-drawer-backdrop{position:fixed;inset:0;background:rgba(10,9,7,0.5);z-index:40;display:none;}

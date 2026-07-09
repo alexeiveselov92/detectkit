@@ -55,9 +55,25 @@ export function openDetailOverlay(
 
   const body = document.createElement('div');
   body.className = 'dtk-ui-overlay-body';
+
+  // The report is built server-side on demand — the iframe stays hidden (and
+  // a visible loading state fills the dark body) until its document lands,
+  // instead of a blank white pane that reads as "nothing is happening".
+  const loading = document.createElement('div');
+  loading.className = 'dtk-ui-overlay-loading';
+  loading.innerHTML =
+    `<span class="dtk-ui-overlay-spinner"></span>` +
+    `<span>Building the report for <b>${esc(metric)}</b>…</span>`;
+  body.appendChild(loading);
+
   const iframe = document.createElement('iframe');
-  iframe.src = metricUrl(metric, windowPreset);
   iframe.title = `detectkit report — ${metric}`;
+  iframe.style.visibility = 'hidden';
+  iframe.addEventListener('load', () => {
+    loading.style.display = 'none';
+    iframe.style.visibility = 'visible';
+  });
+  iframe.src = metricUrl(metric, windowPreset);
   body.appendChild(iframe);
   modal.appendChild(body);
 
@@ -81,6 +97,8 @@ export function openDetailOverlay(
     setWindow(w: string): void {
       const sub = head.querySelector('.dtk-ui-overlay-sub');
       if (sub) sub.textContent = `window: ${w}`;
+      loading.style.display = '';
+      iframe.style.visibility = 'hidden';
       iframe.src = metricUrl(metric, w);
     },
     close,

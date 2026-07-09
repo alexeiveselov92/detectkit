@@ -5,6 +5,29 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.49.2] - 2026-07-09
+
+### Fixed
+- **Alert replay is now linear — a wide report window builds in under a
+  second instead of minutes.** `AlertOrchestrator.replay` rebuilt its causal
+  view (a dict comprehension + a full re-sort of every timestamp) **per grid
+  point** — O(n² log n). A 30-day window of a 1-minute metric (43k points)
+  took upwards of half an hour to build, which surfaced as `dtk ui`'s detail
+  view hanging on a white screen; the same cost applied to `dtk run --report`
+  over wide `--from` windows and autotune's alert-window sweep. The causal
+  view is now maintained incrementally across the walk (one up-front sort,
+  O(1) admission per step): 43k points now replay in ~0.8s (measured ~80×
+  faster at 3k points). Semantics unchanged — same events, verified by the
+  existing replay/report/overview suites.
+- **The detail overlay shows a loading state while the report builds.** The
+  iframe used to be a blank white pane until the server-side report landed —
+  it now stays hidden behind a spinner ("Building the report for <metric>…")
+  until its document loads, so build time no longer reads as "nothing is
+  happening".
+- `dtk ui` now echoes non-403 request errors (e.g. a 400 from a failing
+  report build) to the terminal as one compact line, so a stuck page is
+  diagnosable without opening the browser's devtools.
+
 ## [0.49.1] - 2026-07-09
 
 ### Fixed

@@ -519,8 +519,13 @@ class _Handler(BaseHTTPRequestHandler):
 
         Mirrors ``tuning/server.py``: the status line is latin-1 only, and an
         exception message can carry non-ASCII (e.g. an ``≈`` from a validation
-        error), so the detail rides in the body instead.
+        error), so the detail rides in the body instead. Errors other than the
+        routine bad-token 403 are also echoed to the terminal — a page stuck on
+        a failing request should be diagnosable without opening devtools.
         """
+        if code >= 400 and code != 403:
+            first_line = detail.splitlines()[0] if detail else ""
+            self._srv().echo(f"  [ui] {code} {urlparse(self.path).path}: {first_line}")
         body = detail.encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "text/plain; charset=utf-8")

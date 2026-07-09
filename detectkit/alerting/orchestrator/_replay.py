@@ -16,6 +16,8 @@ mutating ``_dtk_alert_states`` would be wrong.
 
 from __future__ import annotations
 
+from collections import deque
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -76,7 +78,24 @@ class _ReplayMixin(_OrchestratorBase):
         sim_last_recovery: np.datetime64 | None = None
         events: list[ReplayedEvent] = []
 
+        # The causal view grows monotonically as the grid advances, so it is
+        # maintained incrementally: one sorted pass up front, then each grid
+        # step admits the newly-covered timestamps (appendleft keeps ts_desc
+        # newest-first at O(1)). Rebuilding the dict + re-sorting per grid
+        # point — the previous shape — is O(n^2 log n) and turns a month of a
+        # 1-minute metric into a multi-minute replay.
+        all_ts_asc = sorted(by_time)
+        causal: dict[np.datetime64, list[DetectionRecord]] = {}
+        ts_desc: deque[np.datetime64] = deque()
+        next_ts = 0
+
         for t in self._replay_grid(start, end):
+            while next_ts < len(all_ts_asc) and all_ts_asc[next_ts] <= t:
+                ts = all_ts_asc[next_ts]
+                causal[ts] = by_time[ts]
+                ts_desc.appendleft(ts)
+                next_ts += 1
+
             # No-data fires independently of the quorum (a single binary
             # metric-level signal), only when configured and not in cooldown.
             if (
@@ -91,9 +110,6 @@ class _ReplayMixin(_OrchestratorBase):
                 )
                 sim_last_alert = t
                 continue
-
-            causal = {ts: recs for ts, recs in by_time.items() if ts <= t}
-            ts_desc = sorted(causal, reverse=True)
 
             consecutive, latest_quorum, direction = self._count_consecutive_anomalies(
                 causal, ts_desc
@@ -170,7 +186,7 @@ class _ReplayMixin(_OrchestratorBase):
     def _replay_recovered(
         self,
         causal: dict[np.datetime64, list[DetectionRecord]],
-        ts_desc: list[np.datetime64],
+        ts_desc: Sequence[np.datetime64],
         sim_last_alert: np.datetime64,
     ) -> bool:
         """Pure half of :meth:`_RecoveryMixin._check_recovery_since_last_alert`.
@@ -184,8 +200,9 @@ class _ReplayMixin(_OrchestratorBase):
             return True
 
         # No fresh detections after the alert → assume recovery (mirrors the
-        # live "no fresh detections" branch).
-        if not any(ts > sim_last_alert for ts in ts_desc):
+        # live "no fresh detections" branch). ts_desc is newest-first, so the
+        # head carries the maximum — no full scan needed.
+        if not ts_desc[0] > sim_last_alert:
             return True
 
         latest_ts = ts_desc[0]
@@ -242,7 +259,7 @@ class _ReplayMixin(_OrchestratorBase):
     def _replay_streak(
         self,
         causal: dict[np.datetime64, list[DetectionRecord]],
-        ts_desc: list[np.datetime64],
+        ts_desc: Sequence[np.datetime64],
     ) -> tuple[int, np.datetime64, bool]:
         """In-memory analog of :meth:`_DecisionMixin._resolve_streak`.
 

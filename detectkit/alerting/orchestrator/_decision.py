@@ -29,6 +29,7 @@ The multi-detector alert contract (documented in docs/guides/alerting.md):
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from datetime import datetime, timezone
 
 import numpy as np
@@ -166,7 +167,7 @@ class _DecisionMixin(_OrchestratorBase):
     def _count_consecutive_anomalies(
         self,
         detections_by_time: dict[np.datetime64, list[DetectionRecord]],
-        timestamps_sorted: list[np.datetime64],
+        timestamps_sorted: Sequence[np.datetime64],
     ) -> tuple[int, list[DetectionRecord] | None, str | None]:
         """Walk timestamps newest→oldest counting quorum-satisfying points.
 

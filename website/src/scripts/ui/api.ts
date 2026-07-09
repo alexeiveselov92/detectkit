@@ -11,6 +11,11 @@ import type {
   JobDetail,
   JobIdResponse,
   JobsListResponse,
+  MetricCreateRequest,
+  MetricMutationResponse,
+  MetricSourceResponse,
+  MetricsListResponse,
+  MetricUpdateRequest,
   OkResponse,
   OverviewMetric,
   RunRequest,
@@ -93,4 +98,31 @@ export function postTune(req: TuneRequest): Promise<TuneResponse> {
 
 export function postStopJob(id: string): Promise<OkResponse> {
   return apiPost<OkResponse>(`/api/job/${encodeURIComponent(id)}/stop`, {});
+}
+
+// ---- metric CRUD (see detectkit/ui/metric_files.py + server.py's metric_entries) ----
+
+/** The refreshed session metric list (used to re-sync after a create/update/delete elsewhere). */
+export function fetchMetricsList(): Promise<MetricsListResponse> {
+  return apiGet<MetricsListResponse>('/api/metrics');
+}
+
+/** One metric's raw YAML text, for the editor overlay. */
+export function fetchMetricSource(name: string): Promise<MetricSourceResponse> {
+  return apiGet<MetricSourceResponse>(`/api/metric-source/${encodeURIComponent(name)}`);
+}
+
+export function postMetricCreate(req: MetricCreateRequest): Promise<MetricMutationResponse> {
+  return apiPost<MetricMutationResponse>('/api/metric-create', req);
+}
+
+export function postMetricUpdate(name: string, req: MetricUpdateRequest): Promise<MetricMutationResponse> {
+  return apiPost<MetricMutationResponse>(`/api/metric/${encodeURIComponent(name)}/update`, req);
+}
+
+/** Builds the required `{confirm: name}` body itself — the server refuses a delete without it. */
+export function postMetricDelete(name: string): Promise<MetricMutationResponse> {
+  return apiPost<MetricMutationResponse>(`/api/metric/${encodeURIComponent(name)}/delete`, {
+    confirm: name,
+  });
 }

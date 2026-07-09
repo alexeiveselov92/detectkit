@@ -15,6 +15,14 @@ need detail on any field, read the matching file under
 `.claude/rules/detectkit/` (`metrics.md`, `detectors.md`, `alerting.md`,
 `project.md`); this skill is the procedure, those are the reference.
 
+`dtk ui` also has a browser editor for metric YAMLs (a **New metric** button
+and, per row, an **Edit** action), validated the same way before it writes.
+Prefer this skill when scaffolding from scratch — it gathers the query,
+detector and alerting choices and explains each one in context; prefer the UI
+for a quick manual edit while you're already watching the cockpit (nudging a
+threshold, adding a channel) — it's a raw-YAML editor with no procedure behind
+it.
+
 ## Step 0 — Confirm you're in a detectkit project
 
 A project root contains `detectkit_project.yml`. Verify it exists in the target

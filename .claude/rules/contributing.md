@@ -185,16 +185,19 @@ pick accents with `status_color(alert_data)` so status reads from color.
 2. **Update `CHANGELOG.md`** — Keep a Changelog format; it is the authoritative
    record of behavior changes.
 3. **Update `docs/`** — keep user-facing guides/reference in sync with behavior.
-4. **Regenerate the report + tune bundles** — if you changed the HTML report's
-   renderer TS (`website/src/scripts/core/canvas.ts`, `report/report.ts`, or
-   anything they pull in), rebuild the committed bundle with
+4. **Regenerate the report + tune + ui bundles** — if you changed the HTML
+   report's renderer TS (`website/src/scripts/core/canvas.ts`, `report/report.ts`,
+   or anything they pull in), rebuild the committed bundle with
    `node website/scripts/gen-report-bundle.mjs` (esbuild) so
    `detectkit/reporting/assets/report.js` matches the source. If you changed the
    interactive tuning renderer (`website/src/scripts/report/tune.ts` or the shared
    `demo/` detector/chart it reuses), also rebuild
    `node website/scripts/gen-tune-bundle.mjs` so
-   `detectkit/tuning/assets/tune.js` matches — same generated-asset pattern as
-   `make-bot-icon.mjs`. The renderers share the detector
+   `detectkit/tuning/assets/tune.js` matches. If you changed the project-UI
+   cockpit renderer (`website/src/scripts/ui/*.ts`), rebuild
+   `node website/scripts/gen-ui-bundle.mjs` so `detectkit/ui/assets/ui.js`
+   matches — same generated-asset pattern as
+   `make-bot-icon.mjs`. The report/tune renderers share the detector
    port with the landing playground, so run the demo parity check
    (`npm run check:demo-parity`) to confirm the TS detector port still matches the
    Python detectors.

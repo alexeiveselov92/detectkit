@@ -59,6 +59,10 @@ export function injectStyle(): void {
 .dtk-ui-runbtn{border:0;background:var(--clay);color:#fff;font-family:var(--sans);
   font-size:13px;font-weight:600;padding:8px 15px;border-radius:8px;cursor:pointer;}
 .dtk-ui-runbtn:hover{background:var(--clay-700);}
+.dtk-ui-newbtn{border:1px solid var(--clay);background:transparent;color:var(--clay);
+  font-family:var(--sans);font-size:13px;font-weight:600;padding:8px 15px;border-radius:8px;
+  cursor:pointer;}
+.dtk-ui-newbtn:hover{background:rgba(209,91,54,0.12);}
 .dtk-ui-jobschip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);
   background:var(--surface);color:var(--faint);font-family:var(--mono);font-size:11.5px;
   padding:6px 12px;border-radius:999px;cursor:pointer;white-space:nowrap;}
@@ -184,6 +188,40 @@ export function injectStyle(): void {
 .dtk-ui-overlay-spinner{width:14px;height:14px;border-radius:50%;border:2px solid var(--term-border);
   border-top-color:var(--clay);animation:dtk-ui-spin 0.8s linear infinite;flex:none;}
 @keyframes dtk-ui-spin{to{transform:rotate(360deg);}}
+
+/* --- metric editor overlay ---------------------------------------------------
+   Reuses .dtk-ui-overlay (backdrop) / .dtk-ui-overlay-modal (sizing/chrome) from
+   the detail overlay above; everything inside gets its own dtk-ui-editor-*
+   classes since the body is a form + textarea rather than a report iframe. */
+.dtk-ui-overlay-modal.dtk-ui-editor-modal{max-width:920px;}
+.dtk-ui-editor-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:11px 16px;border-bottom:1px solid var(--border);background:var(--surface-2);flex:0 0 auto;}
+.dtk-ui-editor-titlewrap{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;min-width:0;}
+.dtk-ui-editor-title{font-family:var(--mono);font-size:13.5px;color:var(--text-strong);
+  font-weight:700;white-space:nowrap;}
+.dtk-ui-editor-sub{font-family:var(--mono);font-size:11px;color:var(--faint);}
+.dtk-ui-editor-body{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;
+  padding:14px 16px;overflow-y:auto;background:var(--surface);}
+.dtk-ui-editor-field{display:flex;flex-direction:column;gap:5px;flex:0 0 auto;}
+.dtk-ui-editor-hint{font-size:11px;color:var(--faint);}
+.dtk-ui-editor-textarea{flex:1;min-height:320px;background:var(--term-bg);color:var(--term-text);
+  border:1px solid var(--term-border);border-radius:9px;padding:12px 14px;font-family:var(--mono);
+  font-size:12.5px;line-height:1.55;resize:none;tab-size:2;white-space:pre;overflow:auto;}
+.dtk-ui-editor-textarea:focus{outline:none;border-color:var(--clay);}
+.dtk-ui-editor-error{flex:0 0 auto;margin:0 16px 12px;padding:10px 12px;
+  background:rgba(214,50,50,0.1);border:1px solid rgba(214,50,50,0.4);border-radius:9px;
+  color:var(--text);font-family:var(--mono);font-size:12px;white-space:pre-wrap;
+  word-break:break-word;max-height:160px;overflow-y:auto;}
+.dtk-ui-editor-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 16px;border-top:1px solid var(--border);background:var(--surface-2);
+  flex:0 0 auto;flex-wrap:wrap;}
+.dtk-ui-editor-foot-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0;}
+.dtk-ui-editor-foot-right{display:flex;align-items:center;gap:10px;flex:0 0 auto;margin-left:auto;}
+.dtk-ui-editor-confirm{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.dtk-ui-editor-confirm-text{font-size:12px;color:var(--text);max-width:460px;}
+.dtk-ui-editor-confirm-text b{color:var(--st-anomaly);}
+.dtk-ui-editor-confirm-text code{font-family:var(--mono);font-size:11px;background:var(--surface);
+  border:1px solid var(--border);border-radius:4px;padding:1px 5px;}
 
 /* --- drawers (run panel + jobs) --------------------------------------------- */
 .dtk-ui-drawer-backdrop{position:fixed;inset:0;background:rgba(10,9,7,0.5);z-index:40;display:none;}

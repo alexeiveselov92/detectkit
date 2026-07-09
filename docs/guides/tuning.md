@@ -337,3 +337,5 @@ is read-only, and **Save incidents** downloads the labels file (drop it into
 - [Visualizing Results](visualizing-results.md) — the read-only HTML report and
   BI recipes.
 - [Detectors](detectors.md) — what each parameter does.
+- [Project UI](project-ui.md) — the cockpit that launches this session and can
+  also create/edit/delete metric YAML files directly.

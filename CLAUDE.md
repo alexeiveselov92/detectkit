@@ -122,8 +122,15 @@ rendered on the docs site under **For developers**). Read the relevant one:
   frequency/freshness (replayed via the same seam as `dtk run --report`;
   quality chips when `incidents/` labels exist) plus a pipeline panel that
   drives `dtk run` / `dtk autotune` / `dtk unlock` as real subprocesses and
-  launches `dtk tune` per metric. Takes no pipeline lock, never mutates
-  anything itself. Committed bundle `assets/ui.js` (built by
+  launches `dtk tune` per metric — and **metric management**: create / edit /
+  delete metric YAMLs from a browser editor (`ui/metric_files.py`, the
+  mutation seam) with validate-before-write (full `MetricConfig` + deep
+  detector-params), a verbatim archive to `metrics/.history/<metric>/` before
+  every overwrite/delete (same discovery-excluded archive as `dtk tune`), a
+  name-echo confirmation on delete, and a refusal while a tune session for
+  that metric runs. Takes no pipeline lock; the CRUD routes never touch the
+  database (orphaned `_dtk_*` rows wait for `dtk clean`). Committed bundle
+  `assets/ui.js` (built by
   `website/scripts/gen-ui-bundle.mjs`) ships in the wheel — keep it and the
   docs in sync on release.
 - **OSI interop** lives in `detectkit/semantic/` (the `dtk osi import` /

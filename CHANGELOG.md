@@ -5,6 +5,49 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.50.0] - 2026-07-09
+
+### Added
+- **`dtk ui` now manages metric configs — create, edit and delete metric
+  YAMLs from the browser, full cycle.** The cockpit header gains a **New
+  metric** button (an editor overlay seeded with a starter template, plus an
+  optional subfolder under `metrics/`) and every row gains an **Edit** action
+  that opens the metric's raw YAML in the same editor. Save validates
+  server-side **before any write** — YAML syntax → full `MetricConfig`
+  validation → deep detector-params check (each factory-known detector is
+  actually constructed) — and an invalid config lands in the editor's error
+  pane with nothing written. Edits **archive the previous file verbatim** to
+  `metrics/.history/<metric>/` (the same archive `dtk tune`'s Apply writes,
+  excluded from metric discovery) and then overwrite in place, so the text
+  you typed is what lands on disk, comments intact (normalized only to end
+  with a newline). Saves are **conflict-checked** via an
+  optimistic-concurrency digest: an editor opened before a `dtk tune` Apply
+  or another tab's save is refused with a clear message instead of silently
+  overwriting the newer config. **Delete** sits
+  behind an explicit confirmation step in the editor — and the server
+  additionally requires the request to echo the metric name — then archives
+  the file (`…-deleted.yml`) before removing it, so a delete is reversible by
+  hand. Renames are allowed (name uniqueness is enforced project-wide);
+  rows under an old or deleted name stay in the `_dtk_*` tables until
+  `dtk clean`. While a `dtk tune` session for a metric is running, Save and
+  Delete for that metric are refused (its Apply would race the edit).
+  New token-guarded routes: `GET /api/metrics`, `GET /api/metric-source/<name>`,
+  `POST /api/metric-create`, `POST /api/metric/<name>/update`,
+  `POST /api/metric/<name>/delete`; the mutation seam is the new
+  `detectkit/ui/metric_files.py`. `dtk ui` still takes no pipeline lock and
+  the CRUD routes never touch the database — they only manage metric YAML
+  files.
+
+### Documentation
+- The CLI reference's overview command listing now includes `dtk ui` and
+  `dtk osi` (both were missing since their releases), the Project UI guide is
+  indexed in the docs table of contents, the quickstart's next steps point at
+  `dtk ui`, and the tuning/autotuning guides link back to the Project UI
+  guide. The `dtk init-claude` assistant assets document the new metric
+  management (and `rules/overview.md` now mentions `dtk ui` alongside HTML
+  reports), so a freshly-run `dtk init-claude` teaches the assistant the full
+  cockpit.
+
 ## [0.49.2] - 2026-07-09
 
 ### Fixed

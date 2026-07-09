@@ -189,6 +189,53 @@ export interface OkResponse {
 }
 
 // ----------------------------------------------------------------------------
+// Metric CRUD (GET /api/metrics, /api/metric-source/<name>; POST
+// /api/metric-create, /api/metric/<name>/update, /api/metric/<name>/delete)
+// ----------------------------------------------------------------------------
+
+/** GET /api/metrics response: the refreshed session metric list (same shape as the boot payload's `metrics`). */
+export interface MetricsListResponse {
+  metrics: BootMetric[];
+}
+
+/** GET /api/metric-source/<name> response: the raw YAML text behind one metric's file, for the editor. */
+export interface MetricSourceResponse {
+  name: string;
+  dir: string;
+  file: string;
+  text: string;
+  /** Optimistic-concurrency token: echo it back on update so a stale editor can't clobber a newer save. */
+  digest: string;
+}
+
+/** POST /api/metric-create body. */
+export interface MetricCreateRequest {
+  text: string;
+  folder?: string;
+}
+
+/** POST /api/metric/<name>/update body. */
+export interface MetricUpdateRequest {
+  text: string;
+  /** The `digest` from the metric-source response this editor was opened with. */
+  digest?: string;
+}
+
+/**
+ * Response shared by create/update/delete. Fields not sent by a given route
+ * (e.g. `file` on update/delete, `renamed_from`/`archived`/`note` on create)
+ * are simply absent — every caller only reads the fields its own route sends.
+ */
+export interface MetricMutationResponse {
+  name: string;
+  file?: string;
+  renamed_from?: string | null;
+  archived?: string | null;
+  note?: string | null;
+  metrics: BootMetric[];
+}
+
+// ----------------------------------------------------------------------------
 // Renderer global entry
 // ----------------------------------------------------------------------------
 

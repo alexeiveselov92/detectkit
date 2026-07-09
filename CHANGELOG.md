@@ -38,6 +38,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the CRUD routes never touch the database — they only manage metric YAML
   files.
 
+### Changed
+- **The metric-YAML seams are shared, not parallel** (`config/metric_io.py`):
+  the `metrics/.history/<metric>/` archive convention (now **collision-safe
+  within one UTC second** — a `dtk tune` Apply and a UI save landing together
+  keep both snapshots; previously the tune Apply could silently overwrite
+  one), the nested `metric: {...}` unwrap, and the sanitized filename stem are
+  one implementation used by `MetricConfig.from_yaml_file`, `dtk tune`'s
+  write-back and the `dtk ui` editor alike.
+- **Cockpit overlays trap keyboard focus** (shared `overlay.ts` chrome for
+  the detail report and the metric editor): Tab can no longer walk onto the
+  covered page's buttons and fire them blind, and programmatic navigation
+  away from a dirty editor goes through the same discard-confirm as
+  Esc/backdrop/close.
+- **Saving an in-place metric edit refreshes only that row** — the overview
+  no longer flashes every metric back to pending and re-fetches the whole
+  project's stats after a one-line YAML change (create/rename/delete still
+  reload the list, whose shape actually changed).
+
 ### Documentation
 - The CLI reference's overview command listing now includes `dtk ui` and
   `dtk osi` (both were missing since their releases), the Project UI guide is
@@ -46,7 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guide. The `dtk init-claude` assistant assets document the new metric
   management (and `rules/overview.md` now mentions `dtk ui` alongside HTML
   reports), so a freshly-run `dtk init-claude` teaches the assistant the full
-  cockpit.
+  cockpit. The website landing gains a `dtk ui` showcase section.
 
 ## [0.49.2] - 2026-07-09
 

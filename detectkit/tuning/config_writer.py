@@ -18,13 +18,14 @@ others and, when an alert used ``min_detectors >= 2``, permanently killing it.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from detectkit.config.metric_config import MetricConfig
+from detectkit.config.metric_io import archive_metric_text, metric_stamp, unwrap_metric_mapping
 from detectkit.detectors.factory import DetectorFactory
 
 # The detector types the interactive tuner can emit: the windowed statistical
@@ -66,12 +67,6 @@ class AppliedConfig:
     # so the CLI can reassure the user that a multi-detector metric kept its others.
     updated: tuple[str, ...] = ()
     preserved: tuple[str, ...] = ()
-
-
-def _stamp(now: datetime | None = None) -> str:
-    """UTC filesystem-safe timestamp (``20260624T101530Z``)."""
-    now = now or datetime.now(timezone.utc)
-    return now.strftime("%Y%m%dT%H%M%SZ")
 
 
 def _apply_consecutive(body: dict[str, Any], consecutive: int) -> None:
@@ -192,9 +187,9 @@ def apply_tuned_config(
     if not isinstance(raw, dict):
         raise ValueError(f"metric config is empty or malformed: {original_path}")
 
-    # Support the nested `metric: { ... }` form (see MetricConfig.from_yaml_file).
-    nested = isinstance(raw.get("metric"), dict)
-    body: dict[str, Any] = raw["metric"] if nested else raw
+    # Support the nested `metric: { ... }` form (shared unwrap; the body is a
+    # reference into `raw`, so edits below land inside the original document).
+    body: dict[str, Any] = unwrap_metric_mapping(raw)
 
     existing = body.get("detectors")
     merged: list[Any] = list(existing) if isinstance(existing, list) else []
@@ -227,11 +222,10 @@ def apply_tuned_config(
     validated = MetricConfig.model_validate(body)
     metric_name = validated.name
 
-    stamp = _stamp(now)
-    archive_dir = project_root / "metrics" / ".history" / metric_name
-    archive_dir.mkdir(parents=True, exist_ok=True)
-    archive_path = archive_dir / f"{metric_name}-{stamp}.yml"
-    archive_path.write_text(original_text, encoding="utf-8")
+    stamp = metric_stamp(now)
+    # Shared, collision-safe archive seam (config/metric_io.py) — a UI save and
+    # this Apply landing in the same UTC second keep both snapshots.
+    archive_path = archive_metric_text(project_root, metric_name, original_text, stamp=stamp)
 
     try:
         archive_rel = str(archive_path.relative_to(project_root))

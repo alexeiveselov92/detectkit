@@ -12,6 +12,7 @@
 
 import { esc } from './format';
 import { postMetricCreate, postMetricDelete, postMetricUpdate } from './api';
+import { openOverlay } from './overlay';
 import type { MetricMutationResponse } from './payload';
 
 export type EditorMode = 'create' | 'edit';
@@ -89,13 +90,14 @@ export function openMetricEditor(
   let dirty = false;
   let saving = false;
 
-  // ---- chrome: reuse the detail overlay's backdrop/modal, own classes below --
-  const backdrop = document.createElement('div');
-  backdrop.className = 'dtk-ui-overlay';
-
-  const modal = document.createElement('div');
-  modal.className = 'dtk-ui-overlay-modal dtk-ui-editor-modal';
-  backdrop.appendChild(modal);
+  // ---- chrome: the shared overlay skeleton (Esc/backdrop close + focus trap) --
+  const overlay = openOverlay(root, {
+    modalClass: 'dtk-ui-editor-modal',
+    onRequestClose: (): void => {
+      requestClose();
+    },
+  });
+  const { modal } = overlay;
 
   const head = document.createElement('div');
   head.className = 'dtk-ui-editor-head';
@@ -117,7 +119,9 @@ export function openMetricEditor(
   closeBtn.className = 'dtk-ui-overlay-close';
   closeBtn.textContent = '✕';
   closeBtn.title = 'Close (Esc)';
-  closeBtn.onclick = (): void => requestClose();
+  closeBtn.onclick = (): void => {
+    requestClose();
+  };
   head.appendChild(closeBtn);
   modal.appendChild(head);
 
@@ -297,8 +301,7 @@ export function openMetricEditor(
 
   // ---- close handling: Esc / backdrop click / ✕, confirming on unsaved edits --
   function close(): void {
-    document.removeEventListener('keydown', onKey);
-    backdrop.remove();
+    overlay.close();
     cb.onClose();
   }
   function requestClose(): boolean {
@@ -306,15 +309,7 @@ export function openMetricEditor(
     close();
     return true;
   }
-  function onKey(e: KeyboardEvent): void {
-    if (e.key === 'Escape') requestClose();
-  }
-  backdrop.addEventListener('click', (e) => {
-    if (e.target === backdrop) requestClose();
-  });
-  document.addEventListener('keydown', onKey);
 
-  root.appendChild(backdrop);
   textarea.focus();
 
   // `close()` is the unconditional teardown (mirrors detail.ts);

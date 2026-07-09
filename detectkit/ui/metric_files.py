@@ -22,13 +22,16 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import yaml
 
 from detectkit.config.metric_config import MetricConfig
+from detectkit.config.metric_io import (
+    archive_metric_text,
+    safe_metric_stem,
+    unwrap_metric_mapping,
+)
 from detectkit.config.validator import discover_metric_files
 from detectkit.detectors.factory import DetectorFactory
 
@@ -45,12 +48,6 @@ class MetricWrite:
     path: Path
     config: MetricConfig
     archived: Path | None = None
-
-
-def _stamp(now: datetime | None = None) -> str:
-    """UTC filesystem-safe timestamp (``20260709T101530Z``) — matches ``dtk tune``'s archive."""
-    now = now or datetime.now(timezone.utc)
-    return now.strftime("%Y%m%dT%H%M%SZ")
 
 
 def text_digest(text: str) -> str:
@@ -79,9 +76,7 @@ def parse_metric_text(text: str) -> MetricConfig:
         raise ValueError(f"invalid YAML: {exc}") from exc
     if not isinstance(data, dict) or not data:
         raise ValueError("metric config must be a non-empty YAML mapping")
-    # Support the nested `metric: { ... }` form (see MetricConfig.from_yaml_file).
-    if isinstance(data.get("metric"), dict):
-        data = data["metric"]
+    data = unwrap_metric_mapping(data)  # the nested `metric: { ... }` form
     try:
         config = MetricConfig.model_validate(data)
     except Exception as exc:
@@ -124,8 +119,7 @@ def _lenient_name_from_text(text: str) -> str | None:
         return None
     if not isinstance(data, dict):
         return None
-    body: dict[str, Any] = data["metric"] if isinstance(data.get("metric"), dict) else data
-    name = body.get("name")
+    name = unwrap_metric_mapping(data).get("name")
     return name if isinstance(name, str) else None
 
 
@@ -164,21 +158,6 @@ def _safe_part(value: str, what: str) -> str:
     return value
 
 
-def _filename_for(name: str) -> str:
-    """A single safe path component for a metric name — sanitized, never refused.
-
-    ``MetricConfig`` accepts names (unicode letters, a leading ``-``) that make
-    unsafe or awkward filenames; rather than rejecting a valid metric, every
-    character outside the safe set is replaced with ``_`` and leading dots or
-    dashes are stripped. Path separators can never survive, so the result is
-    always one component; a same-stem collision surfaces as "file already
-    exists". Used for the created file's stem and the ``.history`` archive key.
-    """
-    stem = "".join(c if re.fullmatch(r"[A-Za-z0-9_.\-]", c) else "_" for c in name)
-    stem = stem.lstrip(".-")
-    return stem or "metric"
-
-
 def _resolve_folder(metrics_dir: Path, folder: str) -> Path:
     """``metrics/<folder>`` with each component charset-checked (no ``..``, no hidden dirs)."""
     folder = folder.strip().strip("/")
@@ -198,27 +177,6 @@ def _guard_editable(path: Path, metrics_dir: Path) -> None:
         raise ValueError(f"refusing to edit an archived/hidden metric file: {path}")
 
 
-def _archive(project_root: Path, metric_name: str, original_text: str, suffix: str = "") -> Path:
-    """Write the previous file verbatim into ``metrics/.history/<key>/`` and return the path.
-
-    The directory key is the **sanitized** metric name (``_filename_for``) —
-    the on-disk ``name:`` is attacker/editor-influenced free text at this
-    point, and joining it raw into a path would let ``../`` or an absolute
-    component escape ``metrics/.history/``.
-    """
-    key = _filename_for(metric_name)
-    archive_dir = project_root / "metrics" / ".history" / key
-    archive_dir.mkdir(parents=True, exist_ok=True)
-    base = f"{key}-{_stamp()}{suffix}"
-    archive_path = archive_dir / f"{base}.yml"
-    counter = 1
-    while archive_path.exists():  # two writes within one second — keep both
-        archive_path = archive_dir / f"{base}-{counter}.yml"
-        counter += 1
-    archive_path.write_text(original_text, encoding="utf-8")
-    return archive_path
-
-
 def _normalized(text: str) -> str:
     return text if text.endswith("\n") else text + "\n"
 
@@ -233,7 +191,7 @@ def create_metric_file(*, project_root: Path, text: str, folder: str = "") -> Me
     config = parse_metric_text(text)
     metrics_dir = project_root / "metrics"
     target_dir = _resolve_folder(metrics_dir, folder)
-    filename = _filename_for(config.name)
+    filename = safe_metric_stem(config.name)
     path = target_dir / f"{filename}.yml"
     if path.exists():
         raise ValueError(f"file already exists: {_rel(path, project_root)}")
@@ -270,7 +228,7 @@ def update_metric_file(
         )
     _ensure_unique_name(metrics_dir, config.name, exclude=path)
     old_name = _lenient_name_from_text(original_text) or path.stem
-    archived = _archive(project_root, old_name, original_text)
+    archived = archive_metric_text(project_root, old_name, original_text)
     path.write_text(_normalized(text), encoding="utf-8")
     return MetricWrite(path=path, config=config, archived=archived)
 
@@ -286,7 +244,7 @@ def delete_metric_file(*, project_root: Path, path: Path) -> Path:
     _guard_editable(path, metrics_dir)
     original_text = path.read_text(encoding="utf-8")
     name = _lenient_name_from_text(original_text) or path.stem
-    archived = _archive(project_root, name, original_text, suffix="-deleted")
+    archived = archive_metric_text(project_root, name, original_text, suffix="-deleted")
     path.unlink()
     return archived
 

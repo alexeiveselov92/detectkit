@@ -1011,6 +1011,66 @@ const dxExplainer = (() => {
       </a>
     </section>
 
+    <!-- ===== dtk ui ===== -->
+    <section class="wrap section">
+      <div class="eyebrow">dtk ui · project cockpit</div>
+      <h2>The whole project on one screen.</h2>
+      <p class="sub">
+        <code>dtk ui</code> opens a localhost cockpit over the project: every metric's alert
+        frequency and freshness at a glance (quality chips once incidents are labeled), the full
+        HTML report one click away, <strong>run / autotune / tune</strong> driven as real
+        <code>dtk</code> subprocesses — and a built-in editor to <strong>create, edit and
+        delete</strong> metric YAMLs, validated before any write, previous versions archived to
+        <code>metrics/.history/</code>.
+      </p>
+      <a class="pg-teaser pg-teaser-ui" href="/guides/project-ui/">
+        <div class="pg-teaser-chart">
+          <svg class="pg-teaser-svg" viewBox="0 0 520 200" aria-hidden="true">
+            <rect x="20" y="10" width="8" height="8" rx="2" style="fill: var(--clay)"></rect>
+            <text class="ui-txt" x="36" y="19">detectkit · shop-analytics</text>
+            <rect class="ui-btn-fill" x="332" y="5" width="90" height="17" rx="8.5"></rect>
+            <text class="ui-btn-txt" x="342" y="17">Run pipeline</text>
+            <rect class="ui-btn" x="426" y="5" width="74" height="17" rx="8.5"></rect>
+            <text class="ui-btn-txt" x="435" y="17">New metric</text>
+            <line class="hc-grid" x1="20" y1="32" x2="500" y2="32"></line>
+            <text class="ui-head" x="44" y="50">NAME</text>
+            <text class="ui-head" x="228" y="50">TREND</text>
+            <text class="ui-head" x="356" y="50">ALERTS</text>
+            <text class="ui-head" x="412" y="50">QUALITY</text>
+            <circle cx="28" cy="68" r="4" style="fill: var(--st-recovery)"></circle>
+            <text class="ui-txt" x="44" y="72">checkout_orders</text>
+            <path class="ui-spark" d="M220,70 L235,68 L250,71 L265,66 L280,69 L295,64 L310,54 L325,50 L340,60"></path>
+            <circle class="hc-halo" cx="325" cy="50" r="6"></circle>
+            <circle class="hc-anom" cx="325" cy="50" r="3"></circle>
+            <text class="ui-alert-n" x="360" y="72">3</text>
+            <text class="ui-mut" x="412" y="72">R 100% · FDR 4%</text>
+            <circle cx="28" cy="100" r="4" style="fill: var(--st-nodata)"></circle>
+            <text class="ui-txt" x="44" y="104">api_latency</text>
+            <path class="ui-spark" d="M220,102 L240,100 L260,103 L280,98 L300,101 L320,96 L340,99"></path>
+            <text class="ui-alert-n" x="360" y="104">1</text>
+            <text class="ui-mut" x="412" y="104">R 89% · FDR 8%</text>
+            <circle cx="28" cy="132" r="4" style="fill: var(--st-recovery)"></circle>
+            <text class="ui-txt" x="44" y="136">signups_daily</text>
+            <path class="ui-spark" d="M220,134 L240,133 L260,134 L280,133 L300,134 L320,133 L340,134"></path>
+            <text class="ui-zero" x="360" y="136">0</text>
+            <text class="ui-mut" x="412" y="136">—</text>
+            <circle cx="28" cy="164" r="4" style="fill: var(--st-anomaly)"></circle>
+            <text class="ui-txt" x="44" y="168">payments_errors</text>
+            <path class="ui-spark" d="M220,168 L240,166 L255,167 L270,152 L285,146 L300,152 L320,163 L340,165"></path>
+            <circle class="hc-halo" cx="285" cy="146" r="6"></circle>
+            <circle class="hc-anom" cx="285" cy="146" r="3"></circle>
+            <text class="ui-alert-n" x="360" y="168">5</text>
+            <text class="ui-mut" x="412" y="168">R 96% · FDR 5%</text>
+            <text class="ui-mut" x="44" y="192">Open · Tune · Run · Edit — per metric, one click</text>
+          </svg>
+        </div>
+        <div class="pg-teaser-cta">
+          <span class="pg-teaser-go">See dtk ui →</span>
+          <span class="pg-teaser-sub">overview · pipeline control · metric editor</span>
+        </div>
+      </a>
+    </section>
+
     <!-- ===== alerting ===== -->
     <section class="wrap section">
       <div class="eyebrow">alerting</div>

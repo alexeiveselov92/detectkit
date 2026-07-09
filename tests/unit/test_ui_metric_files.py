@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from detectkit.config import metric_io
 from detectkit.config.metric_config import MetricConfig
 from detectkit.ui import metric_files
 from detectkit.ui.metric_files import (
@@ -174,7 +175,7 @@ def test_create_name_with_leading_dash_gets_sanitized_filename(tmp_path):
 
 
 def test_update_overwrites_in_place_and_archives_original(tmp_path, monkeypatch):
-    monkeypatch.setattr(metric_files, "_stamp", lambda *a, **kw: "20260624T101530Z")
+    monkeypatch.setattr(metric_io, "metric_stamp", lambda *a, **kw: "20260624T101530Z")
     path = _write_project(tmp_path, text=_VALID_FLAT)
     new_text = _metric_yaml("orders", extra="description: updated\n")
 
@@ -188,7 +189,7 @@ def test_update_overwrites_in_place_and_archives_original(tmp_path, monkeypatch)
 
 
 def test_update_rename_works_and_archive_keyed_by_old_name(tmp_path, monkeypatch):
-    monkeypatch.setattr(metric_files, "_stamp", lambda *a, **kw: "20260624T101530Z")
+    monkeypatch.setattr(metric_io, "metric_stamp", lambda *a, **kw: "20260624T101530Z")
     path = _write_project(tmp_path, text=_metric_yaml("orders"), name="orders")
 
     written = update_metric_file(project_root=tmp_path, path=path, text=_metric_yaml("orders_v2"))
@@ -235,7 +236,7 @@ def test_update_refuses_path_under_history_archive(tmp_path):
 
 
 def test_archive_collision_within_same_second_gets_dash_one_suffix(tmp_path, monkeypatch):
-    monkeypatch.setattr(metric_files, "_stamp", lambda *a, **kw: "20260624T101530Z")
+    monkeypatch.setattr(metric_io, "metric_stamp", lambda *a, **kw: "20260624T101530Z")
     path = _write_project(tmp_path, text=_metric_yaml("orders"), name="orders")
 
     first = update_metric_file(
@@ -259,7 +260,7 @@ def test_archive_collision_within_same_second_gets_dash_one_suffix(tmp_path, mon
 
 
 def test_delete_removes_file_and_archives_verbatim(tmp_path, monkeypatch):
-    monkeypatch.setattr(metric_files, "_stamp", lambda *a, **kw: "20260624T101530Z")
+    monkeypatch.setattr(metric_io, "metric_stamp", lambda *a, **kw: "20260624T101530Z")
     path = _write_project(tmp_path, text=_VALID_FLAT)
 
     archived = delete_metric_file(project_root=tmp_path, path=path)

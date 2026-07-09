@@ -56,6 +56,8 @@ detectkit/
 │   ├── project_config.py        # ProjectConfig + paths/tables/timeouts/error_alerting
 │   ├── profile.py               # ProfileConfig / ProfilesConfig (+ create_manager)
 │   ├── metric_config.py         # MetricConfig, DetectorConfig, AlertConfig, QueryColumnsConfig
+│   ├── metric_io.py             # shared metric-YAML seams: nested-form unwrap, safe filename stem,
+│   │                            #   collision-safe metrics/.history archive (tune Apply + ui editor)
 │   └── validator.py             # validate_metric_uniqueness / validate_project_metrics
 ├── core/
 │   ├── interval.py              # Interval parser ("10min"/"1h"/"1d"/seconds)

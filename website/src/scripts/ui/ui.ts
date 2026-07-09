@@ -361,7 +361,15 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   function onEditorSaved(res: MetricMutationResponse, mode: EditorMode): void {
     toast(root, 'info', `Metric '${res.name}' ${mode === 'create' ? 'created' : 'saved'}.`);
     if (res.note) toast(root, 'info', res.note);
-    applyMetricsList(res.metrics);
+    // A plain edit changes at most its own row — refresh just that one instead
+    // of flashing the whole table back to pending and re-fetching every
+    // metric's stats. Create/rename/delete change the list's shape, so they
+    // keep the full reload.
+    if (mode === 'edit' && !res.renamed_from) {
+      refreshMetricRow(res.name, res.metrics);
+    } else {
+      applyMetricsList(res.metrics);
+    }
   }
 
   function onEditorDeleted(res: MetricMutationResponse): void {
@@ -375,6 +383,40 @@ function render(boot: BootPayload, mount: HTMLElement): void {
     metricsList = entries;
     runPanel.refreshOptions();
     void loadOverview();
+  }
+
+  /**
+   * Refresh a single row after an in-place edit: adopt the refreshed session
+   * list (interval/tags/enabled may have changed), set just that row pending,
+   * and re-fetch its stats. Any full reload that starts meanwhile (window
+   * change, manual refresh) supersedes this via the shared generation counter.
+   */
+  function refreshMetricRow(name: string, entries: BootMetric[]): void {
+    metricsList = entries;
+    runPanel.refreshOptions();
+    const bm = entries.find((m) => m.name === name);
+    const idx = state.metrics.findIndex((m) => m.name === name);
+    if (!bm || idx === -1) {
+      void loadOverview(); // row not present — fall back to the full reload
+      return;
+    }
+    const generation = loadGeneration;
+    state.metrics[idx] = buildPendingRow(bm);
+    renderContent();
+    fetchMetricStats(name, state.windowPreset)
+      .then((row) => {
+        if (generation !== loadGeneration) return; // superseded by a full reload
+        row.pending = false;
+        const i = state.metrics.findIndex((m) => m.name === name);
+        if (i !== -1) state.metrics[i] = row;
+        renderContent();
+      })
+      .catch((e: Error) => {
+        if (generation !== loadGeneration) return;
+        const i = state.metrics.findIndex((m) => m.name === name);
+        if (i !== -1) state.metrics[i] = { ...buildPendingRow(bm), pending: false, error: e.message };
+        renderContent();
+      });
   }
 
   // ---- run panel + jobs drawer -----------------------------------------------

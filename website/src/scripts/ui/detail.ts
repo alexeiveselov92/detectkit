@@ -1,11 +1,12 @@
-// Detail overlay: a fixed full-screen modal wrapping the existing per-metric
-// HTML report in an <iframe src="/metric/<name>?token=&window=">. ESC or a
-// backdrop click closes it; the window preset can be swapped in place (the
-// header's window control stays live while the overlay is open) without
-// tearing the modal down.
+// Detail overlay: a full-screen modal (shared chrome from overlay.ts) wrapping
+// the existing per-metric HTML report in an <iframe
+// src="/metric/<name>?token=&window=">. ESC or a backdrop click closes it; the
+// window preset can be swapped in place (the header's window control stays
+// live while the overlay is open) without tearing the modal down.
 
 import { esc } from './format';
 import { metricUrl } from './api';
+import { openOverlay } from './overlay';
 
 export interface DetailHandle {
   /** Point the iframe at a new window preset without closing the overlay. */
@@ -25,12 +26,8 @@ export function openDetailOverlay(
   windowPreset: string,
   cb: DetailCallbacks,
 ): DetailHandle {
-  const backdrop = document.createElement('div');
-  backdrop.className = 'dtk-ui-overlay';
-
-  const modal = document.createElement('div');
-  modal.className = 'dtk-ui-overlay-modal';
-  backdrop.appendChild(modal);
+  const overlay = openOverlay(root, { onRequestClose: (): void => close() });
+  const { modal } = overlay;
 
   const head = document.createElement('div');
   head.className = 'dtk-ui-overlay-head';
@@ -77,21 +74,11 @@ export function openDetailOverlay(
   body.appendChild(iframe);
   modal.appendChild(body);
 
-  root.appendChild(backdrop);
-
   function close(): void {
-    document.removeEventListener('keydown', onKey);
-    backdrop.remove();
+    overlay.close();
     cb.onClose();
   }
-  function onKey(e: KeyboardEvent): void {
-    if (e.key === 'Escape') close();
-  }
-  backdrop.addEventListener('click', (e) => {
-    if (e.target === backdrop) close();
-  });
   closeBtn.onclick = close;
-  document.addEventListener('keydown', onKey);
 
   return {
     setWindow(w: string): void {

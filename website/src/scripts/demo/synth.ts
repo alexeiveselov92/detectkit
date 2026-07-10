@@ -152,6 +152,17 @@ function seasonalSample(preset: SynthOptions['seasonality'], ms: number, rand: (
       return { value: baselineRate + burst - BASE_LEVEL + amp, amplitude: amp };
     }
 
+    case 'pulse': {
+      // A fast, free-running ~7-hour cycle that deliberately does NOT align with
+      // the calendar: gcd(7h, 24h) = 1h, so each hour-of-day key sees every phase
+      // and hour/dow conditioning can't capture the pattern (the per-key band
+      // spans the whole wave) — but a short AR forecast extrapolates it easily.
+      // The autoreg showcase rhythm.
+      const pulsePhase = (2 * Math.PI * (ms / 1000)) / (7 * 3600);
+      const amp = 0.45 * BASE_LEVEL;
+      return { value: amp * Math.sin(pulsePhase), amplitude: amp };
+    }
+
     default: {
       // Exhaustiveness guard — unreachable for the union above.
       const _never: never = preset;
@@ -181,6 +192,17 @@ function anomalyStartIndex(points: number): number {
   return Math.min(points - 1, Math.max(0, Math.floor(points * 0.78)));
 }
 
+/** Points per dominant seasonal cycle (~7h for pulse, week for weekly, else day). */
+function dominantPeriodPoints(opts: SynthOptions): number {
+  const cycleSeconds =
+    opts.seasonality === 'pulse'
+      ? 7 * 3600
+      : opts.seasonality === 'weekly'
+        ? SECONDS_PER_WEEK
+        : SECONDS_PER_DAY;
+  return Math.max(1, Math.round(cycleSeconds / opts.intervalSeconds));
+}
+
 /**
  * Inject the anomaly in place and flag the affected points as ground truth.
  *
@@ -195,6 +217,7 @@ function injectAnomaly(
   truth: boolean[],
   sigma: number,
   amplitudes: number[],
+  rand: () => number,
 ): void {
   const m = Math.min(1, Math.max(0, opts.anomalyMagnitude));
   const start = anomalyStartIndex(opts.points);
@@ -245,6 +268,25 @@ function injectAnomaly(
       // The series stays shifted after the ramp (not flagged — it is the new normal).
       for (let k = start + span; k < opts.points; k++) {
         values[k] += sustainedDev;
+      }
+      break;
+    }
+    case 'pattern_break': {
+      // The value FREEZES at its current reading mid-rhythm (a stuck sensor, a dead
+      // upstream, a cache serving one stale answer): every frozen point stays inside
+      // the normal envelope, so level-modeling detectors see nothing — only the
+      // SHAPE is wrong. This is the autoreg showcase. For the fast free-running
+      // pulse the freeze spans about a FULL cycle (the wave is short, so a whole
+      // stalled cycle is what reads as "stuck"); calendar rhythms freeze about a
+      // quarter cycle. The size slider stretches it 0.5x-1.5x either way.
+      const period = dominantPeriodPoints(opts);
+      const base = opts.seasonality === 'pulse' ? period : period / 4;
+      const span = Math.max(3, Math.min(40, Math.round(base * (0.5 + m))));
+      const hold = start > 0 ? values[start - 1] : values[start];
+      const jitter = 0.15 * sigma; // a hair of noise so the freeze reads as data, not a gap
+      for (let k = 0; k < span && start + k < opts.points; k++) {
+        values[start + k] = hold + gaussian(rand) * jitter;
+        truth[start + k] = true;
       }
       break;
     }
@@ -307,7 +349,7 @@ export function generateSeries(opts: SynthOptions): Series {
   // Inject the anomaly using a representative sigma (median local amplitude).
   const refAmplitude = amplitudes[anomalyStartIndex(points)] || BASE_LEVEL;
   const refSigma = NOISE_SIGMA_RATIO[opts.noise] * refAmplitude;
-  injectAnomaly(opts, values, truthAnomaly, refSigma, amplitudes);
+  injectAnomaly(opts, values, truthAnomaly, refSigma, amplitudes, rand);
 
   // Re-clamp anomaly-affected points to honour the per-preset value invariants.
   if (seasonality === 'spiky_counts') {

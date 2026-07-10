@@ -7,7 +7,7 @@
 // frame, so the VPS only ever serves the static bundle.
 
 import { createChart } from './chart';
-import { effectiveStartIndex, runDetector } from './detector';
+import { runDetector, warmupRequirement } from './detector';
 import { generateSeries } from './synth';
 import type {
   AnomalyKind,
@@ -34,10 +34,11 @@ const INTERVALS: Record<string, { seconds: number; points: number; label: string
   '1d': { seconds: 86400, points: 150, label: 'daily' }, // ~5 months
 };
 
-const DETECTOR_THRESHOLD_DEFAULT: Record<DetectorType, number> = {
+const DETECTOR_THRESHOLD_DEFAULT: Partial<Record<DetectorType, number>> = {
   mad: 3,
   zscore: 3,
   iqr: 1.5,
+  autoreg: 3,
 };
 
 function init(): void {
@@ -112,6 +113,62 @@ function init(): void {
 
   const readParams = (): DetectorParams => {
     const type = (seg('detector') || 'mad') as DetectorType;
+    const consecutiveAnomalies = num('dkx-consecutive');
+
+    // manual_bounds is stateless: no window, no statistics, just the two
+    // thresholds. Mirrors the Python detector's param surface exactly (every
+    // windowed-only knob forced to its inert default) so the effective-config
+    // echo never claims a knob the detector ignores.
+    if (type === 'manual_bounds') {
+      const a = num('dkx-lower');
+      const b = num('dkx-upper');
+      return {
+        type,
+        threshold: 0,
+        windowSize: 0,
+        minSamples: 0,
+        inputType: 'values',
+        smoothing: 'none',
+        smoothingAlpha: 0.3,
+        smoothingWindow: 10,
+        windowWeights: 'none',
+        halfLife: null,
+        detrend: 'none',
+        seasonalityComponents: null,
+        minSamplesPerGroup: 10,
+        lowerBound: Math.min(a, b),
+        upperBound: Math.max(a, b),
+        consecutiveAnomalies,
+      };
+    }
+
+    // autoreg is a prediction-based lag model: threshold/window it shares with
+    // the windowed detectors, `lags` is its own knob, and it has no
+    // seasonality/smoothing/weighting/detrend (v1 rejects them) — forced off
+    // exactly like manual_bounds. `stabilization: 'clamp'` mirrors the Python
+    // detector's default-on stabilization; the TS port needs it explicit since
+    // ChartData carries no per-type default.
+    if (type === 'autoreg') {
+      return {
+        type,
+        threshold: num('dkx-threshold'),
+        windowSize: num('dkx-window'),
+        minSamples: 30,
+        inputType: 'values',
+        smoothing: 'none',
+        smoothingAlpha: 0.3,
+        smoothingWindow: 10,
+        windowWeights: 'none',
+        halfLife: null,
+        detrend: 'none',
+        seasonalityComponents: null,
+        minSamplesPerGroup: 10,
+        lags: num('dkx-lags'),
+        stabilization: 'clamp',
+        consecutiveAnomalies,
+      };
+    }
+
     const weights = (seg('weights') || 'none') as WindowWeights;
     const smoothing = (seg('smoothing') || 'none') as Smoothing;
     return {
@@ -128,7 +185,7 @@ function init(): void {
       detrend: (seg('detrend') || 'none') as Detrend,
       seasonalityComponents: seasonalityComponents(),
       minSamplesPerGroup: type === 'zscore' ? 3 : type === 'iqr' ? 4 : 10,
-      consecutiveAnomalies: num('dkx-consecutive'),
+      consecutiveAnomalies,
     };
   };
 
@@ -267,6 +324,11 @@ function init(): void {
   const chart = createChart(canvas, { onHover, yFit: 'data', navigable: true });
 
   let currentSeries: Series | null = null;
+  // Set when the detector switches TO manual_bounds, or when a data-shaping
+  // control changes while manual_bounds is active (the metric's domain moved,
+  // so the old bounds no longer fit). Consumed once inside recompute() so a
+  // user's own slider edits are never silently overwritten.
+  let reseedBoundsPending = false;
 
   const setBadge = (sc: Scorecard, series: Series): void => {
     out('dkx-stat-caught', `${sc.caught}/${sc.injectedTotal}`);
@@ -316,15 +378,53 @@ function init(): void {
       // Size the series by the warm-up so the EFFECTIVE zone dominates the
       // chart. A provisional series at the interval's base length tells us where
       // detection reaches full power; if too little of it would actually be
-      // scored, regenerate longer so ~300+ effective points remain.
+      // scored, regenerate longer so ~300+ effective points remain. The sizing
+      // uses the UN-CLAMPED warm-up requirement (warmupRequirement, not
+      // effectiveStartIndex, which caps at the series length) so a warm-up
+      // larger than the interval's base length — autoreg on the 1d grid, whose
+      // 485-point requirement dwarfs the 150-point base — still regrows past it
+      // instead of rendering a fully-dimmed "nothing to score yet" chart.
       const provisional = generateSeries(synth);
-      const eff = effectiveStartIndex(provisional, params);
+      const need = warmupRequirement(provisional, params);
       let series = provisional;
-      if (provisional.timestamps.length - eff < 300) {
-        const points = Math.min(eff + 320, 1200);
+      if (provisional.timestamps.length - need < 300) {
+        const points = Math.min(need + 320, 1200);
         series = generateSeries({ ...synth, points });
       }
       currentSeries = series;
+
+      // Re-fit the manual bounds to the freshly generated series: sliders range over
+      // the data domain (padded), values seed at p5/p95 — same seeding idea as the
+      // dtk tune cockpit. Only on switch-to-manual / data-shape changes, so user
+      // slider edits survive reseed clicks and magnitude drags.
+      if (reseedBoundsPending && params.type === 'manual_bounds') {
+        reseedBoundsPending = false;
+        const finite = series.values.filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
+        if (finite.length > 1) {
+          const q = (p: number): number =>
+            finite[Math.min(finite.length - 1, Math.max(0, Math.floor(p * (finite.length - 1))))];
+          const lo = finite[0];
+          const hi = finite[finite.length - 1];
+          const pad = Math.max((hi - lo) * 0.1, 1);
+          const min = Math.floor(lo - pad);
+          const max = Math.ceil(hi + pad);
+          const step = Math.max((max - min) / 200, 0.1);
+          for (const [id, valId, value] of [
+            ['dkx-lower', 'dkx-lower-val', q(0.05)],
+            ['dkx-upper', 'dkx-upper-val', q(0.95)],
+          ] as const) {
+            const el = root.querySelector<HTMLInputElement>(`#${id}`);
+            if (!el) continue;
+            el.min = String(min);
+            el.max = String(max);
+            el.step = String(step);
+            el.value = String(value);
+            out(valId, value.toFixed(1));
+          }
+          params.lowerBound = q(0.05);
+          params.upperBound = q(0.95);
+        }
+      }
 
       const scored = runDetector(series, params);
       const sc = computeScorecard(series, scored, params.consecutiveAnomalies);
@@ -338,20 +438,37 @@ function init(): void {
       chart.render({ series, scored, params, alerts });
       setBadge(sc, series);
 
-      // echo the live config (so people see the knobs map to real params)
-      out(
-        'dkx-config',
-        `${params.type} · threshold=${params.threshold} · window_size=${params.windowSize}` +
-          (params.windowWeights !== 'none'
-            ? ` · weights=${params.windowWeights}${params.windowWeights === 'exponential' ? `(half_life=${params.halfLife})` : ''}`
-            : '') +
-          (params.detrend !== 'none' ? ` · detrend=${params.detrend}` : '') +
-          (params.smoothing !== 'none' ? ` · smoothing=${params.smoothing}` : '') +
-          (params.seasonalityComponents
-            ? ` · seasonality=[${params.seasonalityComponents.map((g) => g.join('+')).join(',')}]`
-            : '') +
-          ` · consecutive_anomalies=${params.consecutiveAnomalies}`,
-      );
+      // echo the live config (so people see the knobs map to real params) — per
+      // type, so it never lists a knob the detector actually ignores.
+      if (params.type === 'manual_bounds') {
+        out(
+          'dkx-config',
+          `manual_bounds · lower_bound=${(params.lowerBound ?? 0).toFixed(1)} · ` +
+            `upper_bound=${(params.upperBound ?? 0).toFixed(1)} · ` +
+            `consecutive_anomalies=${params.consecutiveAnomalies}`,
+        );
+      } else if (params.type === 'autoreg') {
+        out(
+          'dkx-config',
+          `autoreg · threshold=${params.threshold} · window_size=${params.windowSize} · ` +
+            `lags=${params.lags} · stabilization=clamp · ` +
+            `consecutive_anomalies=${params.consecutiveAnomalies}`,
+        );
+      } else {
+        out(
+          'dkx-config',
+          `${params.type} · threshold=${params.threshold} · window_size=${params.windowSize}` +
+            (params.windowWeights !== 'none'
+              ? ` · weights=${params.windowWeights}${params.windowWeights === 'exponential' ? `(half_life=${params.halfLife})` : ''}`
+              : '') +
+            (params.detrend !== 'none' ? ` · detrend=${params.detrend}` : '') +
+            (params.smoothing !== 'none' ? ` · smoothing=${params.smoothing}` : '') +
+            (params.seasonalityComponents
+              ? ` · seasonality=[${params.seasonalityComponents.map((g) => g.join('+')).join(',')}]`
+              : '') +
+            ` · consecutive_anomalies=${params.consecutiveAnomalies}`,
+        );
+      }
 
       // Surface when the window is too small to fill the chosen seasonality, so
       // the band silently uses global stats (mirrors the Python detector's runtime
@@ -385,6 +502,34 @@ function init(): void {
     });
   };
 
+  // ---- row visibility ---------------------------------------------------------
+  const rowVis = (id: string, show: boolean): void => {
+    root.querySelector<HTMLElement>(`#${id}`)?.classList.toggle('hidden', !show);
+  };
+  // Which knobs exist per detector family: windowed (mad/zscore/iqr) shows the full
+  // rail; autoreg keeps threshold/window and adds lags (v1 has no seasonality/
+  // weighting/detrend/smoothing); manual_bounds is stateless — only the two bounds.
+  const refreshDetectorRows = (): void => {
+    const t = (seg('detector') || 'mad') as DetectorType;
+    const manual = t === 'manual_bounds';
+    const autoreg = t === 'autoreg';
+    rowVis('dkx-threshold-row', !manual);
+    rowVis('dkx-window-row', !manual);
+    rowVis('dkx-lags-row', autoreg);
+    rowVis('dkx-lower-row', manual);
+    rowVis('dkx-upper-row', manual);
+    const windowed = !manual && !autoreg;
+    rowVis('dkx-weights-row', windowed);
+    rowVis('dkx-detrend-row', windowed);
+    rowVis('dkx-smoothing-row', windowed);
+    rowVis('dkx-conditioning-row', windowed);
+    rowVis('dkx-halflife-row', windowed && seg('weights') === 'exponential');
+  };
+
+  // Data-shaping controls whose change invalidates a previously-seeded manual
+  // bounds pair (the metric's value domain moved).
+  const DATA_SHAPE_CONTROLS = new Set(['seasonality', 'noise', 'trend', 'interval', 'anomaly']);
+
   // ---- wire controls ---------------------------------------------------------
   // Segmented buttons: clicking sets the active sibling and (for detector type)
   // resets the threshold default, then recomputes.
@@ -395,16 +540,20 @@ function init(): void {
         setSeg(name, btn.dataset.v as string);
         if (name === 'detector') {
           const t = btn.dataset.v as DetectorType;
+          const d = DETECTOR_THRESHOLD_DEFAULT[t];
           const tEl = root.querySelector<HTMLInputElement>('#dkx-threshold');
-          if (tEl) {
-            tEl.value = String(DETECTOR_THRESHOLD_DEFAULT[t]);
+          if (tEl && d != null) {
+            tEl.value = String(d);
             out('dkx-threshold-val', tEl.value);
           }
+          if (t === 'manual_bounds') reseedBoundsPending = true;
+          refreshDetectorRows();
         }
         if (name === 'weights') {
-          root
-            .querySelector<HTMLElement>('#dkx-halflife-row')
-            ?.classList.toggle('hidden', btn.dataset.v !== 'exponential');
+          refreshDetectorRows();
+        }
+        if (DATA_SHAPE_CONTROLS.has(name) && seg('detector') === 'manual_bounds') {
+          reseedBoundsPending = true;
         }
         recompute();
       });
@@ -418,6 +567,9 @@ function init(): void {
     ['dkx-window', 'dkx-window-val', (v) => String(v)],
     ['dkx-halflife', 'dkx-halflife-val', (v) => String(v)],
     ['dkx-consecutive', 'dkx-consecutive-val', (v) => String(v)],
+    ['dkx-lags', 'dkx-lags-val', (v) => String(v)],
+    ['dkx-lower', 'dkx-lower-val', (v) => v.toFixed(1)],
+    ['dkx-upper', 'dkx-upper-val', (v) => v.toFixed(1)],
   ];
   for (const [id, valId, fmt] of ranges) {
     const el = root.querySelector<HTMLInputElement>(`#${id}`);
@@ -440,6 +592,7 @@ function init(): void {
     const el = root.querySelector<HTMLInputElement>(`#${id}`);
     if (el) out(valId, fmt(Number(el.value)));
   }
+  refreshDetectorRows();
   recompute();
 }
 

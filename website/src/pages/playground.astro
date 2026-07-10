@@ -13,14 +13,15 @@ const description =
 // title=), so it reads the same on every platform.
 const TIP = {
   rhythm:
-    'The repeating shape of your metric — flat, a daily cycle, weekly, business-hours, or spiky counts.',
+    'The repeating shape of your metric — flat, a daily cycle, weekly, business-hours, spiky counts, or a free-running ~7h pulse that ignores the clock (try it with autoreg + pattern break).',
   noise: 'How much random jitter sits on top of the rhythm — higher noise widens the normal band.',
   trend: 'A slow upward or downward drift in the level over the whole series.',
   interval: 'The spacing between points (the metric grid step), e.g. one point every hour.',
-  incident: 'The kind of problem to inject — a spike, dip, sustained step, slow drift, or a cluster.',
+  incident:
+    'The kind of problem to inject — a spike, dip, sustained step, slow drift, a cluster, or a pattern break — the value freezes mid-rhythm: normal in level, wrong in shape (the autoreg showcase — pairs best with the pulse rhythm).',
   size: 'How large the injected incident is relative to normal — drag up to make it more obvious.',
   detector:
-    'Which statistic builds the corridor: mad (robust median), zscore (mean ± σ), or iqr (quartile fences).',
+    'Which detector builds the corridor: mad (robust median), zscore (mean ± σ), iqr (quartile fences), autoreg (predicts each point from its previous values and flags dynamics breaks), or manual (fixed lower/upper thresholds, no window).',
   threshold:
     'How wide the corridor is, in spread units — higher means fewer flags, lower means more sensitive.',
   window_size:
@@ -35,6 +36,9 @@ const TIP = {
     'Conditions the corridor on a seasonal key (hour, or hour+day-of-week) so each time-of-day has its own normal.',
   consecutive:
     'How many grid-adjacent flagged points in a row are needed before an alert actually fires.',
+  lags: 'Autoreg: how many immediately-preceding values predict the current one — more lags capture a longer local pattern.',
+  lower_bound: 'Manual: points below this line are flagged — the floor of the allowed range.',
+  upper_bound: 'Manual: points above this line are flagged — the ceiling of the allowed range.',
 };
 const tip = (key: keyof typeof TIP) =>
   `<span class="dkx-tip" tabindex="0" aria-label="${TIP[key]}"><span class="dkx-tip-i">i</span><span class="dkx-tip-bubble">${TIP[key]}</span></span>`;
@@ -131,6 +135,7 @@ const tip = (key: keyof typeof TIP) =>
                 <button data-v="daily_weekly">daily+wk</button>
                 <button data-v="business_hours">business</button>
                 <button data-v="spiky_counts">spiky</button>
+                <button data-v="pulse">pulse</button>
               </span>
             </label>
 
@@ -169,6 +174,7 @@ const tip = (key: keyof typeof TIP) =>
                 <button data-v="step">step</button>
                 <button data-v="drift">drift</button>
                 <button data-v="cluster" class="on">cluster</button>
+                <button data-v="pattern_break">pattern break</button>
               </span>
             </label>
 
@@ -190,20 +196,37 @@ const tip = (key: keyof typeof TIP) =>
                 <button data-v="mad" class="on">mad</button>
                 <button data-v="zscore">zscore</button>
                 <button data-v="iqr">iqr</button>
+                <button data-v="autoreg">autoreg</button>
+                <button data-v="manual_bounds">manual</button>
               </span>
             </label>
 
-            <label class="dkx-ctl">
+            <label class="dkx-ctl hidden" id="dkx-lower-row">
+              <span class="dkx-ctl-k">lower_bound <b id="dkx-lower-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('lower_bound')} /></span>
+              <input id="dkx-lower" type="range" min="0" max="200" step="1" value="60" />
+            </label>
+
+            <label class="dkx-ctl hidden" id="dkx-upper-row">
+              <span class="dkx-ctl-k">upper_bound <b id="dkx-upper-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('upper_bound')} /></span>
+              <input id="dkx-upper" type="range" min="0" max="200" step="1" value="140" />
+            </label>
+
+            <label class="dkx-ctl" id="dkx-threshold-row">
               <span class="dkx-ctl-k">threshold <b id="dkx-threshold-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('threshold')} /></span>
               <input id="dkx-threshold" type="range" min="1" max="6" step="0.1" value="3" />
             </label>
 
-            <label class="dkx-ctl">
+            <label class="dkx-ctl" id="dkx-window-row">
               <span class="dkx-ctl-k">window_size <b id="dkx-window-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('window_size')} /></span>
               <input id="dkx-window" type="range" min="20" max="300" step="5" value="240" />
             </label>
 
-            <label class="dkx-ctl">
+            <label class="dkx-ctl hidden" id="dkx-lags-row">
+              <span class="dkx-ctl-k">lags <b id="dkx-lags-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('lags')} /></span>
+              <input id="dkx-lags" type="range" min="1" max="40" step="1" value="5" />
+            </label>
+
+            <label class="dkx-ctl" id="dkx-weights-row">
               <span class="dkx-ctl-k">recency weighting <Fragment set:html={tip('weighting')} /></span>
               <span class="dkx-seg" data-control="weights">
                 <button data-v="none" class="on">none</button>
@@ -217,7 +240,7 @@ const tip = (key: keyof typeof TIP) =>
               <input id="dkx-halflife" type="range" min="2" max="100" step="1" value="15" />
             </label>
 
-            <label class="dkx-ctl">
+            <label class="dkx-ctl" id="dkx-detrend-row">
               <span class="dkx-ctl-k">detrend <Fragment set:html={tip('detrend')} /></span>
               <span class="dkx-seg" data-control="detrend">
                 <button data-v="none" class="on">off</button>
@@ -225,7 +248,7 @@ const tip = (key: keyof typeof TIP) =>
               </span>
             </label>
 
-            <label class="dkx-ctl">
+            <label class="dkx-ctl" id="dkx-smoothing-row">
               <span class="dkx-ctl-k">smoothing <Fragment set:html={tip('smoothing')} /></span>
               <span class="dkx-seg" data-control="smoothing">
                 <button data-v="none" class="on">none</button>
@@ -234,7 +257,7 @@ const tip = (key: keyof typeof TIP) =>
               </span>
             </label>
 
-            <label class="dkx-ctl">
+            <label class="dkx-ctl" id="dkx-conditioning-row">
               <span class="dkx-ctl-k">seasonality grouping <Fragment set:html={tip('seasonality')} /></span>
               <span class="dkx-seg" data-control="conditioning">
                 <button data-v="off">off</button>
@@ -270,8 +293,9 @@ const tip = (key: keyof typeof TIP) =>
       </div>
 
       <p class="dx-foot">
-        // the same windowed statistics that run in production — current point excluded from its own
-        window, NaN gaps skipped, seasonality &amp; recency applied per point<br />
+        // the same detector ports that run in production — windowed statistics (current point excluded
+        from its own window, NaN gaps skipped, seasonality &amp; recency applied per point), the autoreg
+        one-step forecast, and fixed manual bounds<br />
         // detection runs only in the <strong>effective zone</strong> (past warm-up, dimmed on the
         left); <strong>caught</strong> = injected incidents a flag landed on · <strong>flag rate</strong>
         = share of judged points flagged · <strong>MCC</strong> = correlation of flags with the truth ·

@@ -40,7 +40,8 @@ export type SeasonalityPreset =
   | 'weekly' // one slow cycle per week
   | 'daily_weekly' // daily cycle modulated by a weekly envelope
   | 'business_hours' // high on weekday daytime, low nights/weekends
-  | 'spiky_counts'; // low baseline with frequent positive bursts (count-like)
+  | 'spiky_counts' // low baseline with frequent positive bursts (count-like)
+  | 'pulse'; // free-running ~7h cycle, NOT calendar-aligned (the autoreg showcase)
 
 export type NoiseLevel = 'low' | 'medium' | 'high';
 export type TrendKind = 'none' | 'up' | 'down';
@@ -50,7 +51,8 @@ export type AnomalyKind =
   | 'dip' // one sharp negative outlier
   | 'step' // sustained level shift from a point onward
   | 'drift' // gradual ramp away from normal over a span
-  | 'cluster'; // a short burst of several outliers
+  | 'cluster' // a short burst of several outliers
+  | 'pattern_break'; // the value freezes mid-rhythm — normal in level, wrong in shape
 
 export interface SynthOptions {
   seasonality: SeasonalityPreset;

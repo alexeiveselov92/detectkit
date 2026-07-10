@@ -195,9 +195,10 @@ dtk autotune --select api_error_rate --incidents incidents/api_error_rate/
 ### `--scoring` (optional, default: `mcc`)
 
 The metric the search maximizes across folds. One of `mcc`, `f1`, `f_beta`,
-`balanced_accuracy`, `roc_auc`, `pr_auc` — see [Scoring metrics](#scoring-metrics).
-It applies only to **supervised** runs; without labels the search maximizes the
-no-label [band-fit objective](#unsupervised-tuning-no-labels) instead.
+`balanced_accuracy`, `roc_auc`, `pr_auc`, `event_f1` — see [Scoring
+metrics](#scoring-metrics). It applies only to **supervised** runs; without
+labels the search maximizes the no-label
+[band-fit objective](#unsupervised-tuning-no-labels) instead.
 
 ```bash
 dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml --scoring f_beta
@@ -367,10 +368,50 @@ the [band-fit objective](#unsupervised-tuning-no-labels).)
 | `balanced_accuracy` | Mean of the true-positive and true-negative rates — class-imbalance-aware accuracy |
 | `roc_auc` | Area under the ROC curve — ranking/separability across thresholds |
 | `pr_auc` | Area under the precision–recall curve — emphasizes the positive (anomaly) class on imbalanced data |
+| `event_f1` | Segment-aware (point-adjusted) F1 — scores whole labeled *incidents*, not individual points; see [Event-based scoring](#event-based-scoring-event_f1) below |
 
 The recall-vs-precision trade-off is the usual knob: tilt toward recall when
 missing an incident is the expensive outcome, toward precision when false pages
-are.
+are. `event_f1` is a different axis — segment-aware vs pointwise counting —
+independent of that trade-off.
+
+### Event-based scoring (`event_f1`)
+
+`mcc`, `f1`, `f_beta`, `balanced_accuracy`, `roc_auc` and `pr_auc` all score
+**individual points**. `event_f1` instead scores **incidents** — a
+segment-aware, Revised-Point-Adjusted-style F1 that matches how the alert
+pipeline (and the [`dtk tune`](../guides/tuning.md) cockpit's recall /
+false-alert-rate metrics bar) already judge quality: by whether an alert's
+anomaly **streak overlaps** an incident, not point-by-point.
+
+Counting rules:
+
+- an **incident** is a contiguous run of `True` points in the labeled ground
+  truth (the labels file / inline `incidents:` projected onto the grid);
+- one flagged point **anywhere inside** an incident counts the **whole**
+  incident caught — one true positive, regardless of how much of the
+  incident was actually flagged;
+- an incident with **no** flagged point anywhere inside it is one false
+  negative;
+- every flagged point **outside** every incident counts pointwise as one
+  false positive.
+
+Segments are recomputed **fold-locally** during cross-validation — a segment
+straddling a fold boundary is scored as each fold's own truncated piece, never
+double-counted across folds — and an incident the detector could not score
+anywhere in (no confidence band covered any of its points) is excluded from
+the truth rather than counted as a miss. A supervised run's
+`consecutive_anomalies` sweep also optimizes against `event_f1` when it is
+the selected metric. `mcc` remains the default.
+
+> **Advanced.** `event_f1`'s point-adjusted counting rewards firing
+> **anywhere** inside a long incident — a detector that only catches the tail
+> end of a 50-point incident gets exactly the same credit for that incident
+> as one that flags every point in it. Prefer `event_f1` when your labels
+> mark whole incident *windows* (the common shape from `dtk tune`'s
+> Label/Review modes) and you care whether the incident was caught at all;
+> prefer `mcc` (or another pointwise metric) when precise per-point coverage
+> inside an incident matters, not just whether an alert fired somewhere in it.
 
 ## The Annotated Config
 

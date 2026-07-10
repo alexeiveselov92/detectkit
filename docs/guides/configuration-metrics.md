@@ -254,7 +254,7 @@ List of detector configurations. Each detector independently analyzes the metric
 
 ```yaml
 detectors:
-  - type: mad                     # mad, zscore, iqr, manual_bounds
+  - type: mad                     # mad, zscore, iqr, manual_bounds, autoreg
     params:
       # Algorithm parameters (all participate in the detector ID)
       threshold: 3.0              # defaults: mad 3.0, zscore 3.0, iqr 1.5
@@ -308,6 +308,10 @@ alerting:
   min_detectors: 1               # Detectors that must satisfy the quorum per point (default: 1)
   direction: "same"              # "same", "any", "up", "down" (default: "same")
   consecutive_anomalies: 3       # Consecutive quorum points to trigger (default: 3)
+
+  # Fraction-based alert window (optional; OR-ed with consecutive_anomalies)
+  anomaly_window: null           # trailing window, e.g. "30min" (default: null; set with min_anomaly_share)
+  min_anomaly_share: null        # fraction in (0, 1] of window points required (default: null)
 
   # Alert cooldown - Prevent spam from persistent anomalies
   alert_cooldown: "30min"        # Minimum time between alerts
@@ -376,6 +380,18 @@ list of one block. See the [Alerting Guide](alerting.md) for full details.
   - `3` = Alert after 3 consecutive anomalies (reduces false positives)
   - Points must be exactly one metric interval apart — a gap in the
     detection grid breaks the chain
+
+- **`anomaly_window`** / **`min_anomaly_share`**: an optional second rule,
+  **OR-ed** with `consecutive_anomalies`, for a flapping incident that a
+  strict consecutive chain would reset on one clean point
+  - `null` / `null` (default) = disabled — must be set **together**
+  - Fires when the latest point meets the quorum AND at least
+    `min_anomaly_share` (a fraction in `(0, 1]`) of the trailing
+    `anomaly_window` grid points do too; missing/no-data points count only in
+    the denominator (an outage makes it harder to fire, not easier)
+  - See [Alerting → Fraction-Based Alert
+    Window](alerting.md#fraction-based-alert-window-optional) for the full
+    contract
 
 - **`alert_cooldown`**: Minimum time between alerts (e.g., `"2h"`, `1800`)
   - `null` (default) = no cooldown: a persisting anomaly re-alerts on

@@ -115,8 +115,7 @@ class _ReplayMixin(_OrchestratorBase):
                 causal, ts_desc
             )
             fired_consecutive = (
-                latest_quorum is not None
-                and consecutive >= self.conditions.consecutive_anomalies
+                latest_quorum is not None and consecutive >= self.conditions.consecutive_anomalies
             )
             # The fraction rule is OR-ed, exactly like the live path — only
             # evaluated when the consecutive rule didn't fire (and only when

@@ -3,13 +3,17 @@
 MAD, Z-Score and IQR share one windowed implementation, so every parameter
 below behaves identically across the three. Manual Bounds supports only
 `input_type` (it has no window, so smoothing, weighting and detrending do not
-apply).
+apply). [Autoreg](autoreg.md) is a separate, non-windowed (dynamics) model: it
+supports `input_type` and `stabilization` — defaulting to `clamp` there,
+unlike the windowed detectors' default of `None` — but not smoothing, recency
+weighting, detrending or seasonality; see its own page for the full parameter
+set.
 
 This page is the **single reference** for those shared parameters. Detector-specific
 parameters (each detector's `threshold` default, `min_samples` minimums,
 `min_samples_per_group` defaults, recommended `window_size`) live on the individual
 [MAD](mad.md) / [Z-Score](zscore.md) / [IQR](iqr.md) /
-[Manual Bounds](manual_bounds.md) pages.
+[Manual Bounds](manual_bounds.md) / [Autoreg](autoreg.md) pages.
 
 The full shared parameter set:
 
@@ -353,17 +357,20 @@ alerting:
 
 ## Feature Compatibility
 
-| Feature | MAD | Z-Score | IQR | Manual Bounds |
-|---------|-----|---------|-----|---------------|
-| `input_type` | Yes | Yes | Yes | Yes |
-| `smoothing` / `smoothing_alpha` / `smoothing_window` | Yes | Yes | Yes | No (N/A) |
-| `window_weights` / `half_life` | Yes | Yes | Yes | No (N/A) |
-| `detrend` | Yes | Yes | Yes | No (N/A) |
-| `stabilization` | Yes | Yes | Yes | No (N/A) |
-| `seasonality_components` | Yes | Yes | Yes | No (N/A) |
+| Feature | MAD | Z-Score | IQR | Manual Bounds | Autoreg |
+|---------|-----|---------|-----|---------------|---------|
+| `input_type` | Yes | Yes | Yes | Yes | Yes |
+| `smoothing` / `smoothing_alpha` / `smoothing_window` | Yes | Yes | Yes | No (N/A) | No (v1) |
+| `window_weights` / `half_life` | Yes | Yes | Yes | No (N/A) | No (v1) |
+| `detrend` | Yes | Yes | Yes | No (N/A) | No (v1) |
+| `stabilization` | Yes | Yes | Yes | No (N/A) | Yes (default `clamp`, unlike the windowed detectors) |
+| `seasonality_components` | Yes | Yes | Yes | No (N/A) | No — rejected at construction (v1) |
 
 **Note**: Manual Bounds uses fixed thresholds with no historical window, so
-window-based features don't apply.
+window-based features don't apply. Autoreg fits its own lag-based (AR) model
+instead of a windowed level statistic, so the windowed-only features are
+unsupported in v1 rather than N/A — see
+[Autoreg → V1 Limitations](autoreg.md#v1-limitations) for why.
 
 ## Execution Parameters
 
@@ -445,5 +452,5 @@ Detection metadata records what the detector "saw":
 ## See also
 
 - [Detectors guide](../../guides/detectors.md) — choosing a detector and tuning recipes.
-- [MAD](mad.md) / [Z-Score](zscore.md) / [IQR](iqr.md) / [Manual Bounds](manual_bounds.md) — detector-specific parameters and metadata.
+- [MAD](mad.md) / [Z-Score](zscore.md) / [IQR](iqr.md) / [Manual Bounds](manual_bounds.md) / [Autoreg](autoreg.md) — detector-specific parameters and metadata.
 - [Internal Tables](../internal-tables.md) — where `detection_metadata` is stored.

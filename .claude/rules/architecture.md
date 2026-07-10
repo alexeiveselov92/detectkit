@@ -80,7 +80,8 @@ detectkit/
 │   └── statistical/
 │       ├── _windowed.py         # WindowedStatDetector template (shared pipeline)
 │       ├── mad.py / zscore.py / iqr.py   # thin subclasses (stats + interval + severity)
-│       └── manual_bounds.py     # ManualBoundsDetector (stateless thresholds)
+│       ├── manual_bounds.py     # ManualBoundsDetector (stateless thresholds)
+│       └── autoreg.py           # AutoregDetector (prediction-based AR(p); own BaseDetector subclass)
 ├── alerting/
 │   ├── orchestrator/            # AlertOrchestrator: decision / cooldown / recovery / dispatch
 │   └── channels/                # base + factory + mattermost/slack/telegram/email/webhook
@@ -275,9 +276,32 @@ implement only the three hooks + defaults, never duplicate the pipeline.
 `upper_bound` checks (with optional `input_type`). It extends `BaseDetector`
 directly.
 
+`detectkit/detectors/statistical/autoreg.py` (`AutoregDetector`, type
+`autoreg`) is detectkit's first **prediction-based** detector: per point it
+fits AR(`lags`) on a trailing `window_size` window (numpy-only normal
+equations with a tiny ridge + `lstsq` fallback), predicts ŷ from the previous
+`lags` values and flags `|y − ŷ| > threshold·σ_r`, emitting the natural band
+`ŷ ± threshold·σ_r` — it catches *dynamics/shape* anomalies (a value normal in
+absolute terms but wrong given the last few points) that the level-modeling
+windowed detectors can't. It is a **deliberate, documented exception** to the
+"reuse the windowed template" rule — its own `BaseDetector` subclass, because
+the template's NaN-gap window splicing would fabricate lag pairs and
+seasonality multipliers are meaningless for a lag model. `stabilization:
+"clamp"` is **default-on** (flagged points enter later fits clamped to the
+violated bound — clamping, not ŷ-substitution, for the same band-collapse
+reason as the windowed clamp); v1 has no seasonality/smoothing/weighting and a
+strict NaN policy (a gap in the lag view → no score, never imputed; fit rows
+with gaps are dropped, `min_samples` valid rows required).
+`get_context_size() = window_size + lags` (+1 for change-based input, +
+another `window_size` with stabilization). Excluded from autotune
+(`detector_select._EXCLUDED_TYPES` — the grid axes assume the windowed
+constructor shape; a per-type axis seam is Phase 2) and not tunable in the
+`dtk tune` cockpit (rides read-only like prophet/timesfm, preserved verbatim
+on Apply; the TS port is Phase 3).
+
 `detectkit/detectors/factory.py` (`DetectorFactory`) is the registry mapping
-type names to classes: `mad`, `zscore`, `iqr`, `manual_bounds`, and the alias
-`manual`.
+type names to classes: `mad`, `zscore`, `iqr`, `manual_bounds`, `autoreg`,
+and the alias `manual`.
 
 ## Alerting
 
@@ -310,6 +334,32 @@ An alert fires only when the latest `consecutive_anomalies` timestamps each meet
 the quorum **and** are exactly one metric interval apart (grid adjacency — a gap
 breaks the chain). The payload is built from the highest-severity record of the
 latest quorum, with deterministic tie-breaks (name, then id).
+
+**Fraction alert window** (opt-in, OR-ed with the consecutive rule): the
+`AlertConfig` pair `anomaly_window` (duration/seconds → grid points via
+`AlertConditions.from_alert_config`, the single seam shared by
+`_alert_step.py` and `builder.replay_alert_events`) + `min_anomaly_share`
+(fraction in `(0, 1]`). `_decision._share_fire` fires when the share of
+quorum-meeting grid slots over the trailing window reaches the threshold
+**and** the latest point itself meets the quorum (a stale window never fires);
+for `same` the direction locks from the latest quorum, exactly like the
+consecutive walk. Missing slots count in the denominator only (an outage makes
+the rule *harder* to fire). The fetch width is `conditions.lookback_points =
+max(consecutive, window_points)` (recovery adds +5). Recovery gains
+**hysteresis** (`_share_still_elevated`, live + replay): besides a clean
+latest point, the window share must drop below **half** the threshold, so the
+alert can't flap around the boundary. Share-fired payloads carry
+`window_points`/`window_matched`/`min_anomaly_share`/`fired_by_share` on
+`AlertData`; `consecutive_count` holds the matched count and the onset is the
+oldest matched slot the window can see. The new fields join
+`make_alert_config_id` **only when set**, so existing configs keep their ids
+and alert state. The rule chip on every channel renders through the shared
+`format_rule_display` (`channels/base.py`) → `{rule_display}` — legacy
+configs render byte-identically; a share-configured config names both OR-ed
+rules; a share-fired alert leads with the share rule and a window-story lead
+sentence instead of the consecutive-duration one. The `dtk tune` cockpit and
+autotune's alert-window sweep still tune `consecutive_anomalies` only
+(fraction support there is tracked as issue #101).
 
 Other behaviors: **cooldown** (`_cooldown.py`) suppresses repeat alerts within
 `alert_cooldown`, optionally reset on recovery; **recovery** (`_recovery.py`)
@@ -577,7 +627,17 @@ cockpit and on the command line are the same computation). Stages
    `std`), so a regime-adaptive config that scores *better* on recent folds isn't
    punished for that upside spread. `stability_lambda` (default 0.5) is exposed via
    the `autotune:` block. Supervised metrics are pure numpy (MCC default, plus
-   `f_beta`/`balanced_accuracy`/`roc_auc`/`pr_auc`). With no labels
+   `f_beta`/`balanced_accuracy`/`roc_auc`/`pr_auc`/`event_f1`). `event_f1`
+   (`scoring.event_f_beta`) is **segment-aware / point-adjusted**: contiguous
+   True runs in `y_true` are incidents (RLE via `true_segments`) — ≥1 flagged
+   point inside → 1 TP, none → 1 FN, flags outside any incident → pointwise
+   FPs — aligning the engine's objective with the alert pipeline and the
+   `dtk tune` cockpit's streak-span-overlap recall/FDR. Its fold slices stay
+   **unmasked** (boolean-masking invalid points would splice distinct
+   incidents together); segments the detector couldn't score anywhere are
+   dropped from the truth (`scorable_event_truth`) rather than counted missed,
+   and segments recompute fold-locally by slicing. The supervised alert-window
+   sweep honors it too. With no labels
    the objective is `unsupervised_objective` = `0.4·budget + 0.3·sharpness +
    0.3·separation`: a smooth flag-rate **budget** (no flat cliff, one-sided so a
    clean metric isn't pushed to flag), **sharpness** (median band-relative
@@ -1099,9 +1159,24 @@ so they stay discoverable.
 
 - **Vectorize `WindowedStatDetector.detect()`** — points are scored in a Python
   loop. Fine for incremental runs, slow for large historical backfills; numpy
-  rolling-window operations are the main performance opportunity.
+  rolling-window operations are the main performance opportunity. (The same
+  applies, more acutely, to `AutoregDetector`'s per-point refit.)
 - **Advanced detectors** — Prophet and TimesFM integrations are planned (the
   optional extras are already reserved in `pyproject.toml`).
+- **Autoreg phases 2–3** (issue #97) — autotune integration needs a per-type
+  axis-spec seam in `grid_search.py` (axes are hardcoded to the windowed
+  constructor shape); the TS port for live cockpit tuning needs a
+  `runAutoreg` branch in `detector.ts`, both `_TUNABLE_TYPES` tuples
+  (`payload.py` + `config_writer.py`), golden parity fixtures and a bundle
+  regen.
+- **Fraction alert window in autotune + the tune cockpit** (issue #101) — the
+  supervised alert sweep is 1-D (`consecutive_anomalies` only) and
+  `tune.worker.ts` replays only the consecutive rule; a 2-D (window × share)
+  sweep and cockpit parity are the tracked follow-up to issue #96.
+- **`benchmarks/`** (top-level, dev tooling, not in the wheel) — the
+  NAB/Yahoo/synthetic harness (issue #99) scoring F1-best / AUC-PR /
+  point-adjusted F1 per detector variant; also hosts the benchmark-local
+  spectral-residual implementation kept under a measure-first gate.
 - **DB connection pooling** — each manager holds a single connection; the SQL
   backends use per-statement `executemany`, fine for incremental runs but not
   optimized for very large backfills.

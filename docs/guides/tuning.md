@@ -311,7 +311,7 @@ Tune rail. Pick which detector to tune (the chart shows one band at a time);
 switching re-seeds every knob from that detector. On **Apply**, the detectors you
 tuned are rewritten and the rest are **preserved unchanged**, so the quorum keeps
 firing — a tune never silently drops your other detectors. Non-tunable detectors
-(`prophet`/`timesfm`) are listed as preserved.
+(`prophet`/`timesfm`/`autoreg`) are listed as preserved.
 
 `dtk tune` takes **no pipeline lock** — it only edits a config file. The live
 preview is a faithful approximation; the **next `dtk run` is the source of truth**.

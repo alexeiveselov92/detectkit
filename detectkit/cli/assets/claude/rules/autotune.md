@@ -94,7 +94,15 @@ dtk autotune --select <sel> [--incidents FILE] [--scoring METRIC] \
   `incidents/<metric>/` — the **same store this command reads** — so the labels feed
   the next supervised tune with no `--incidents` flag (see `cli.md`).
 - `--scoring` — `mcc` (default), `f1`, `f_beta`, `balanced_accuracy`, `roc_auc`,
-  `pr_auc`. MCC uses the whole confusion matrix and suits rare anomalies.
+  `pr_auc`, `event_f1`. MCC uses the whole confusion matrix and suits rare
+  anomalies. `event_f1` is segment-aware (Revised-Point-Adjusted-style): one
+  flagged point anywhere inside a labeled incident counts the whole incident
+  caught (1 TP), a missed incident is 1 FN, and every flagged point outside
+  all incidents counts pointwise as an FP — this matches how the alert
+  pipeline and the `dtk tune` cockpit's recall/FDR bar already score (by
+  streak-overlap, not point-by-point). Prefer it when labels mark whole
+  incident windows and per-point coverage inside an incident doesn't matter;
+  prefer `mcc`/pointwise metrics when it does.
 - `--dry-run` — run the search but persist nothing and write no config.
 - `--report [PATH]` — after tuning, emit a self-contained **HTML report** for the
   winning config over the training window (values, confidence band, anomalies,

@@ -78,6 +78,12 @@ Pick with the user (see `detectors.md` for the decision table):
   `seasonality_components` and a window covering several cycles; add
   `seasonality_columns` to the metric for the features.
 - **Clean & normally distributed** → `zscore`. **Skewed / percentiles** → `iqr`.
+- **Fast-moving, non-seasonal, "unusual dynamics" not just unusual level**
+  (queue depth, request rate, in-flight count) → `autoreg` (`lags`,
+  `window_size`, `threshold`; `stabilization: clamp` on by default). Not yet
+  autotune-eligible (Phase 1) and rides read-only in `dtk tune` — a solid
+  choice to pair with a level detector (`mad`/`zscore`/`iqr`) via
+  `min_detectors`, not usually the first/only detector for a new metric.
 - **Unsure** → `mad` (robust default), `threshold: 3.0`.
 
 If you don't yet know the right detector or parameters, scaffold a robust starter
@@ -106,6 +112,11 @@ If the user wants notifications:
   multi-detector consensus).
 - Set `consecutive_anomalies` (1 critical / 3 balanced / 5+ noisy) and
   `min_detectors` (1, or N to require agreement).
+- For a metric that **flaps** (mostly anomalous with occasional clean points
+  that would reset a plain consecutive chain), also consider the OR-ed
+  fraction rule: `anomaly_window: "30min"` + `min_anomaly_share: 0.3` fires
+  once that share of the trailing window meets the quorum, even without an
+  unbroken streak. Set both together or neither.
 - **Always set `alert_cooldown`** (e.g. `"30min"`) — the default `null`
   re-alerts on every run. Consider `notify_on_recovery: true` for important
   metrics and `no_data_alert: true` for cron-fed metrics where absence is a

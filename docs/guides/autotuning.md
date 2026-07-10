@@ -231,11 +231,14 @@ dtk autotune --select api_error_rate \
 | `balanced_accuracy` | Class balance matters and you want both rates weighted equally |
 | `roc_auc` | You care about ranking/separability across thresholds |
 | `pr_auc` | Heavily imbalanced data — emphasizes the positive (anomaly) class |
+| `event_f1` | Your labels mark whole incident *windows* and you want scoring to match the alert pipeline's own recall/false-alert-rate (the `dtk tune` cockpit's metrics bar) instead of per-point coverage |
 
 See the [scoring-metrics catalog](../reference/autotune.md#scoring-metrics) for
 one-line definitions of each. The recall-vs-precision trade-off is the usual
 knob: optimize for recall (`f_beta` tilted toward recall) when missing an
 incident is the expensive outcome; optimize for precision when false pages are.
+`event_f1` is a different axis entirely — segment-aware vs pointwise scoring —
+see the reference for the counting rules and when to prefer it.
 
 ## Reading the Annotated Config + CV Score
 

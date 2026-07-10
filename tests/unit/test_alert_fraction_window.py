@@ -191,8 +191,9 @@ class TestShareFire:
 
     def test_same_direction_locked_across_window(self):
         """same: down-anomalies in the window don't count toward an up quorum."""
-        orch = orchestrator(direction="same", consecutive=99, window_points=6,
-                            min_anomaly_share=0.5)
+        orch = orchestrator(
+            direction="same", consecutive=99, window_points=6, min_anomaly_share=0.5
+        )
         detections = [record(T0, direction="up")]
         for k in range(1, 6):
             detections.append(record(T0 - STEP * k, direction="down"))
@@ -210,12 +211,12 @@ class TestShareFire:
 
 
 def _alert_config_stub(**over):
-    base = dict(
-        no_data_alert=False,
-        notify_on_recovery=True,
-        alert_cooldown=None,
-        cooldown_reset_on_recovery=True,
-    )
+    base = {
+        "no_data_alert": False,
+        "notify_on_recovery": True,
+        "alert_cooldown": None,
+        "cooldown_reset_on_recovery": True,
+    }
     base.update(over)
     return SimpleNamespace(**base)
 
@@ -296,25 +297,25 @@ class _Channel(BaseAlertChannel):
 
 
 def _alert_data(**over):
-    base = dict(
-        metric_name="m",
-        timestamp=T0,
-        timezone="",
-        value=100.0,
-        confidence_lower=80.0,
-        confidence_upper=95.0,
-        detector_name="MADDetector",
-        detector_params="{}",
-        direction="up",
-        severity=2.0,
-        detection_metadata={},
-        consecutive_count=3,
-        min_detectors=1,
-        direction_policy="same",
-        consecutive_required=3,
-        interval_seconds=600,
-        onset_timestamp=T0 - STEP * 2,
-    )
+    base = {
+        "metric_name": "m",
+        "timestamp": T0,
+        "timezone": "",
+        "value": 100.0,
+        "confidence_lower": 80.0,
+        "confidence_upper": 95.0,
+        "detector_name": "MADDetector",
+        "detector_params": "{}",
+        "direction": "up",
+        "severity": 2.0,
+        "detection_metadata": {},
+        "consecutive_count": 3,
+        "min_detectors": 1,
+        "direction_policy": "same",
+        "consecutive_required": 3,
+        "interval_seconds": 600,
+        "onset_timestamp": T0 - STEP * 2,
+    }
     base.update(over)
     return AlertData(**base)
 
@@ -326,9 +327,7 @@ class TestRuleDisplay:
         assert "Anomalous for" in ctx["anomaly_lead"]
 
     def test_configured_share_names_both_rules(self):
-        ctx = _Channel().build_context(
-            _alert_data(window_points=3, min_anomaly_share=0.3)
-        )
+        ctx = _Channel().build_context(_alert_data(window_points=3, min_anomaly_share=0.3))
         assert ctx["rule_display"] == (
             "min_detectors=1 · direction=same · consecutive=3 (or share>=30% over 30m)"
         )

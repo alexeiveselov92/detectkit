@@ -23,7 +23,7 @@ def _parse_detection_metadata(metadata: Any) -> dict:
         return {}
     if isinstance(metadata, dict):
         return metadata
-    if isinstance(metadata, (bytes, bytearray)):
+    if isinstance(metadata, bytes | bytearray):
         try:
             metadata = metadata.decode("utf-8")
         except Exception:
@@ -84,7 +84,7 @@ class AlertConditions:
         return max(self.consecutive_anomalies, self.window_points or 0)
 
     @classmethod
-    def from_alert_config(cls, alert_config: Any, interval_seconds: int) -> "AlertConditions":
+    def from_alert_config(cls, alert_config: Any, interval_seconds: int) -> AlertConditions:
         """Build conditions from an ``AlertConfig``, resolving the window to points.
 
         The single seam shared by the live alert step and the replay callers, so

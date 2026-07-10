@@ -76,6 +76,30 @@ alerting:
 
 **Note**: detectkit doesn't have built-in time-of-day filtering. Use external tools (cron, schedulers) to control when `dtk run` executes, or filter alerts in receiving system.
 
+### Pattern 5: Flapping Incidents (Fraction-Based Window)
+
+```yaml
+name: payment_success_rate
+detectors:
+  - type: mad
+    params:
+      threshold: 3.0
+
+alerting:
+  channels:
+    - slack_critical
+  consecutive_anomalies: 3   # still fires on an unbroken streak
+  anomaly_window: "30min"    # OR: fire on a flapping incident too
+  min_anomaly_share: 0.3     # >=30% of the last 30min's points anomalous
+```
+
+**Note**: A real incident sometimes flickers — mostly anomalous, but with an
+occasional normal-looking point that resets a pure `consecutive_anomalies`
+chain before it reaches threshold. `anomaly_window` + `min_anomaly_share`
+catch it anyway: the rule fires once enough of the trailing window is
+anomalous, independent of an unbroken streak. See [Alerting →
+Fraction-Based Alert Window](alerting.md#fraction-based-alert-window-optional).
+
 ## Troubleshooting
 
 ### No Alerts Received

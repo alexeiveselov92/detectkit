@@ -74,9 +74,7 @@ class _DecisionMixin(_OrchestratorBase):
             # the rule threshold, which can't answer "how long has this been
             # going on").
             streak, onset_ts, capped = self._resolve_streak(latest_quorum[0].timestamp)
-            return True, self._build_alert_data(
-                latest_quorum, streak, direction, onset_ts, capped
-            )
+            return True, self._build_alert_data(latest_quorum, streak, direction, onset_ts, capped)
 
         # The consecutive rule didn't fire; try the fraction rule (OR-ed).
         share_fire = self._share_fire(detections_by_time, timestamps_sorted)
@@ -123,9 +121,7 @@ class _DecisionMixin(_OrchestratorBase):
             return None
 
         locked = direction if self.conditions.direction == "same" else None
-        matched, _total, onset_ts = self._window_share_counts(
-            detections_by_time, latest_ts, locked
-        )
+        matched, _total, onset_ts = self._window_share_counts(detections_by_time, latest_ts, locked)
         if matched / window < share_required:
             return None
         return matched, onset_ts, quorum, direction

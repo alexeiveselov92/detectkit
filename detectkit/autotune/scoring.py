@@ -78,7 +78,7 @@ def true_segments(y_true: np.ndarray) -> list[tuple[int, int]]:
         starts = np.concatenate([[0], starts])
     if yt[-1]:
         ends = np.concatenate([ends, [yt.size]])
-    return list(zip(starts.tolist(), ends.tolist()))
+    return list(zip(starts.tolist(), ends.tolist(), strict=False))
 
 
 def event_f_beta(y_true: np.ndarray, y_pred: np.ndarray, beta: float = 1.0) -> float:
@@ -119,7 +119,7 @@ def scorable_event_truth(y_true: np.ndarray, valid: np.ndarray) -> np.ndarray:
     is unscorable rather than missed. Invalid points can't contribute FPs
     (``y_pred`` is always False where invalid).
     """
-    yt = np.asarray(y_true, dtype=bool).copy()
+    yt: np.ndarray = np.array(y_true, dtype=bool)
     v = np.asarray(valid, dtype=bool)
     for lo, hi in true_segments(yt):
         if not bool(np.any(v[lo:hi])):

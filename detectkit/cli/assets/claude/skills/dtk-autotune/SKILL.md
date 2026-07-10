@@ -179,9 +179,13 @@ none yet, load first: `dtk run --select <name> --steps load` (optionally
 **supervised** scoring metric is **MCC** (robust to rare anomalies). Override
 only with reason: `--scoring f_beta` (with a higher `beta:` in the `autotune:`
 block) when a miss is worse than a false page, `--scoring f1` for a balanced
-trade-off, etc. The valid values are `mcc`, `f1`, `f_beta`, `balanced_accuracy`,
-`roc_auc`, `pr_auc`. Run `dtk autotune --help` to confirm the live flags. Use
-`--dry-run` to search without writing anything.
+trade-off, `--scoring event_f1` when the labels mark whole incident *windows*
+and you want scoring to match how the alert pipeline itself judges quality
+(one flag anywhere inside a labeled incident counts the whole incident
+caught, instead of scoring individual points), etc. The valid values are
+`mcc`, `f1`, `f_beta`, `balanced_accuracy`, `roc_auc`, `pr_auc`, `event_f1`.
+Run `dtk autotune --help` to confirm the live flags. Use `--dry-run` to
+search without writing anything.
 
 **Unsupervised runs** (no labels) do **not** optimize MCC or any labeled metric —
 `--scoring` is ignored. They optimize a no-label objective

@@ -636,7 +636,10 @@ not valid in the built-in `seasonality_columns` list.
 MAD, Z-Score and IQR share one windowed implementation, so every parameter
 below behaves identically across the three. Manual Bounds supports only
 `input_type` (it has no window, so smoothing, weighting and detrending do not
-apply).
+apply). Autoreg — a separate, non-windowed dynamics model — supports
+`input_type` and `stabilization` (defaulting to `clamp` there) but not
+smoothing, recency weighting, detrending or seasonality; see its own
+[reference page](../reference/detectors/autoreg.md) for the full parameter set.
 
 The full reference for these shared parameters lives on one page —
 **[Shared Detector Parameters](../reference/detectors/shared-parameters.md)** —
@@ -657,5 +660,6 @@ which documents each with defaults, examples and tuning recipes:
 - [Z-Score Detector Reference](../reference/detectors/zscore.md)
 - [IQR Detector Reference](../reference/detectors/iqr.md)
 - [Manual Bounds Detector Reference](../reference/detectors/manual_bounds.md)
+- [Autoreg Detector Reference](../reference/detectors/autoreg.md)
 - [Configuration Guide](configuration.md)
 - [Alerting Guide](alerting.md)

@@ -67,6 +67,58 @@ grid break the chain.
 | `down` | up | up | no quorum ("up" ignored) |
 | `any` | up | down | quorum (every anomaly counts) |
 
+## Fraction-based alert window (`anomaly_window` + `min_anomaly_share`)
+
+An optional second rule, **OR-ed** with the consecutive rule above — either can
+fire an alert (if both would fire at once, the message leads with the
+consecutive-streak story):
+
+```yaml
+alerting:
+  consecutive_anomalies: 3   # still evaluated
+  anomaly_window: "30min"    # duration string or seconds → grid points via the interval
+  min_anomaly_share: 0.3     # fraction in (0, 1]
+```
+
+Must be set **together**. Fires when **both** hold: the **latest point**
+itself meets the quorum (never fires on a stale window with a clean tail),
+**and** at least `min_anomaly_share` of the trailing `anomaly_window` grid
+points also meet the quorum. Same `min_detectors` × `direction` quorum
+machinery per point as above; for `direction: same` the winning direction is
+locked from the **latest** point's quorum (same as the consecutive walk).
+
+Missing/no-data grid slots count only in the **denominator** — an outage
+makes the rule *harder* to fire, not easier (`no_data_alert` covers outages
+separately). **Recovery hysteresis**: with `notify_on_recovery`, recovery
+needs the window share to also drop **below half** `min_anomaly_share` (not
+just a clean latest point), so a share hovering at the threshold doesn't flap
+alert/recover.
+
+Use it for **flapping incidents** — mostly anomalous with occasional clean
+points that would otherwise reset a pure `consecutive_anomalies` chain and
+silently swallow an ongoing incident (the motivating case: Yandex's
+production write-up names the anomaly window as their single most effective
+false-positive fix).
+
+Message rendering: the Rule chip is now built from a shared `rule_display` —
+legacy configs (no fraction rule) render byte-identical
+(`min_detectors=… · direction=… · consecutive=…`); a share-configured metric
+also names the fraction rule (`… · consecutive=3 (or share>=30% over 30m)`),
+and a share-**fired** alert leads with it instead
+(`… · share>=30% over 30m`). A share-fired alert's lead sentence reports the
+window story directly, e.g. `14 of the last 30 10min intervals were
+anomalous (47%) — at or above the 30% share threshold over 5h.`; its "Anomaly
+began" is the first matched point the window can see (bounded by the window,
+unlike a consecutive alert's fully resolved onset). New opt-in template vars:
+`{rule_display}`, `{window_points}`, `{window_matched}` (recovery always
+renders the legacy consecutive-only chip — the fraction fields don't ride on
+the recovery payload). Reports and `dtk ui`'s overview pick up share-fired
+alerts automatically via the shared replay seam.
+
+Not yet tunable: `dtk tune`'s cockpit and `dtk autotune`'s alert-window sweep
+still only search `consecutive_anomalies` (fraction-rule support is a
+follow-up) — set `anomaly_window` / `min_anomaly_share` by hand in the YAML.
+
 ## Cooldown (spam control) — **set it in production**
 
 `alert_cooldown` defaults to **`null` = no cooldown**, meaning a persisting
@@ -305,6 +357,8 @@ referenced by path). Key variables:
 | `{expected_range}` | one-sided-aware band (`>= 7.00`, `<= 1.10`, `[lo, hi]`, `N/A`) |
 | `{detector_name}`, `{detector_count}` | who fired (`"N detectors"` for multi) |
 | `{min_detectors}` / `{direction_policy}` / `{consecutive_required}` | the configured rule |
+| `{rule_display}` | full rule chip (legacy `min_detectors=… · direction=… · consecutive=…`, or also naming `anomaly_window`/`min_anomaly_share` when configured); recovery always renders the legacy form |
+| `{window_points}` / `{window_matched}` | fraction-rule window size / matched count (empty unless configured / fired by it) |
 | `{direction}`, `{severity}` | observed values |
 | `{consecutive_count}` | **true** streak length (resolved at fire time, not capped at the rule) |
 | `{anomaly_lead}` / `{recovery_lead}` | ready-made "how long" lead sentence |

@@ -323,5 +323,6 @@ Each detection result includes metadata:
 
 - [Z-Score Detector](zscore.md) - For normally distributed data
 - [IQR Detector](iqr.md) - For extremely skewed data
+- [Autoreg Detector](autoreg.md) - Prediction-based AR detector for fast-moving, non-seasonal metrics
 - [Detectors Guide](../../guides/detectors.md) - Choosing the right detector
 - [Configuration Guide](../../guides/configuration.md) - Complete config reference

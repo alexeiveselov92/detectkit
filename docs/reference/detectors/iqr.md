@@ -389,5 +389,6 @@ interpolation.
 
 - [MAD Detector](mad.md) - Similar robustness with seasonality support
 - [Z-Score Detector](zscore.md) - For normally distributed data
+- [Autoreg Detector](autoreg.md) - Prediction-based AR detector for fast-moving, non-seasonal metrics
 - [Detectors Guide](../../guides/detectors.md) - Choosing the right detector
 - [Configuration Guide](../../guides/configuration.md) - Complete config reference

@@ -467,5 +467,6 @@ When starting monitoring:
 - [MAD Detector](mad.md) - For adaptive, data-driven detection
 - [Z-Score Detector](zscore.md) - For normally distributed data
 - [IQR Detector](iqr.md) - For skewed distributions
+- [Autoreg Detector](autoreg.md) - Prediction-based AR detector for fast-moving, non-seasonal metrics
 - [Detectors Guide](../../guides/detectors.md) - Choosing the right detector
 - [Configuration Guide](../../guides/configuration.md) - Complete config reference

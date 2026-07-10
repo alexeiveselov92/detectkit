@@ -68,6 +68,8 @@ separate from the `data_database` your queries read from.
 - `zscore` — mean/std; for clean, normally distributed data.
 - `iqr` — interquartile range; for skewed distributions / percentile metrics.
 - `manual_bounds` — fixed upper/lower thresholds (SLAs); no window, instant.
+- `autoreg` — prediction-based AR(p) on a trailing window; for fast-moving,
+  non-seasonal metrics and shape anomalies; stabilization on by default.
 
 `mad`, `zscore`, `iqr` share one windowed implementation, so they accept an
 identical parameter set (window, seasonality grouping, preprocessing, recency
@@ -78,7 +80,9 @@ weighting, detrending). See `detectors.md`.
 An **alert** is the primary entity; a detector anomaly is secondary evidence
 that a rule interprets. The rule is a per-point **quorum** (`min_detectors`
 detectors agreeing under a `direction` policy) that must hold for
-`consecutive_anomalies` grid-adjacent points. Notifications lead with the alert
+`consecutive_anomalies` grid-adjacent points — or, optionally, for a share of
+a trailing window (`anomaly_window` + `min_anomaly_share`, OR-ed with the
+consecutive rule). Notifications lead with the alert
 and the rule it fired on, with the anomaly shown as evidence. See
 `alerting.md`.
 

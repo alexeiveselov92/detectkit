@@ -89,6 +89,7 @@ dtk run --select cpu_usage
   - [Z-Score Detector](reference/detectors/zscore.md)
   - [IQR Detector](reference/detectors/iqr.md)
   - [Manual Bounds Detector](reference/detectors/manual_bounds.md)
+  - [Autoreg Detector](reference/detectors/autoreg.md)
 
 ### Examples
 - **[Examples](examples/)** - Real-world monitoring scenarios
@@ -211,7 +212,7 @@ for the per-backend breakdown.
    └──────────────────────────────────────────────────┘
       │
       ├─▶  Data source   ClickHouse query, gap-filled to the grid
-      ├─▶  Detectors     MAD · Z-Score · IQR · manual_bounds
+      ├─▶  Detectors     MAD · Z-Score · IQR · manual_bounds · autoreg
       └─▶  Channels      Mattermost · Slack · Telegram · Email · Webhook
       │
       ▼

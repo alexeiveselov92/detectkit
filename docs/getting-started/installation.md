@@ -84,8 +84,9 @@ pip install detectkit[all-db]
 
 > **Not yet implemented.** The `prophet` and `timesfm` extras install the
 > underlying libraries, but detectkit does **not** ship Prophet or TimesFM
-> detector classes yet — the only detector `type:`s that exist today are the
-> statistical detectors (`mad`, `zscore`, `iqr`) and `manual_bounds`. These
+> detector classes yet — the detector `type:`s that exist today are the
+> statistical detectors (`mad`, `zscore`, `iqr`), `manual_bounds`, and the
+> prediction-based `autoreg`. These
 > extras are placeholders for planned detectors; installing them adds the
 > dependencies but no new detector. Track progress in the changelog before
 > relying on them.

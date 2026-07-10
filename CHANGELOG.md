@@ -5,6 +5,45 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.53.3] - 2026-07-10
+
+### Added
+- **Playground: `autoreg` + `manual_bounds` in the detector switcher** (issue
+  #105; website-only). The interactive playground now exposes all five shipped
+  detector types, closing the gap the v0.53.1 notes tracked: `autoreg` gains a
+  **lags** slider and hides the windowed-only knobs (weighting, detrend,
+  smoothing, seasonality grouping), exactly like the `dtk tune` cockpit;
+  `manual` swaps in **lower/upper bound** sliders ranged over the data domain
+  and seeded at the series p5/p95 (re-seeded when the data-shaping controls
+  change). Two new synth pieces tell the prediction-based story: a **`pulse`
+  rhythm** — a free-running ~7 h cycle that deliberately doesn't align with
+  the calendar, so hour/day-of-week conditioning can't capture it — and a
+  **`pattern break` incident** that freezes the value mid-rhythm: normal in
+  level, wrong in shape. On the page defaults (medium noise, hourly grid)
+  autoreg catches the frozen span and fires the alert preview while
+  hour-conditioned `mad` sees nothing — the "normal in absolute terms, wrong
+  for the shape" showcase. The playground's series-grow heuristic now sizes
+  the regenerated series from the **un-clamped** warm-up requirement, so a
+  warm-up larger than the interval's base length (autoreg on the 1d grid) no
+  longer leaves the whole chart in the warm-up dimming. Landing teaser
+  sub-line updated in lockstep (`mad / zscore / iqr / autoreg / manual`).
+
+### Changed
+- **Split the tune-cockpit renderer into focused modules** (issue #109; no
+  behavior change). `website/src/scripts/report/tune.ts` (~2.6K lines) now
+  keeps only the composition root; the payload/contract types, the DOM control
+  builders (`segControl`/`rangeControl`), the config-text serialization, the
+  formatters, the injected styles, the detector-worker client (blob spawn /
+  kill-in-flight / 130 ms debounce) and the quality-metrics block
+  (recall/FDR/reviewed) live in `website/src/scripts/report/tune/` — the same
+  package shape as `ui/`. The tune.ts ⇄ tune.worker.ts message contract is now
+  one shared `protocol.ts` imported by both sides instead of two hand-synced
+  copies. `detectkit/tuning/assets/tune.js` regenerated from the split
+  sources; verified behavior-identical (the parity + tune-worker gates pass,
+  and a headless render of the same payload is pixel-identical to the
+  pre-split bundle across tune/review/label/autotune mode switches and a
+  threshold recompute).
+
 ## [0.53.2] - 2026-07-10
 
 ### Fixed

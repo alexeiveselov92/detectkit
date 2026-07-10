@@ -66,6 +66,7 @@ expected interval for the current point.
     window_weights: null     # null (uniform) | exponential | linear
     half_life: null          # exponential half-life: int points or "3d"/"12h"
     detrend: null            # null | linear
+    stabilization: null      # null (off) | clamp
     # --- execution (NOT hashed) ---
     start_time: "2024-01-01 00:00:00"   # optional; when detection begins (default: loading_start_time)
     batch_size: 500
@@ -161,6 +162,24 @@ Trade-off: a shorter `half_life` adapts faster but also "accepts" a real
 sustained degradation as the new normal sooner. (`weight_decay` is a deprecated
 alias for `half_life`; prefer `half_life`.)
 
+## Stabilization — sustained incidents poisoning their own baseline
+
+A sustained incident's anomalous points enter the trailing window and inflate
+the spread / drag the center toward it, so the band widens mid-incident and the
+detector stops flagging the tail ("the incident becomes the new normal") —
+z-score (mean/std) is the most vulnerable; median/quartile-based mad/iqr resist
+short incidents but still bend under a long one. `stabilization: clamp` fixes
+this: once a point is flagged anomalous, subsequent trailing windows see it
+**clamped to the confidence bound it violated** (winsorized) instead of the
+raw value — only the statistics windows read the substituted history; scored
+and persisted values are unchanged, and anomalies still render as anomalies.
+Reach for it when alerting on metrics with occasional sustained incidents; it
+composes with `window_weights`/`half_life` (where it matters most, since
+recency weighting gives an ongoing incident's points more weight), `detrend`,
+`smoothing`, `input_type` and seasonality groups, and is near-neutral on clean
+series. Enabling it is a hashed change — it produces a new `detector_id` and
+recomputes on the next run; existing configs that don't set it keep their ids.
+
 ## Feature compatibility
 
 | Feature | mad | zscore | iqr | manual_bounds |
@@ -169,6 +188,7 @@ alias for `half_life`; prefer `half_life`.)
 | `smoothing` | Yes | Yes | Yes | No |
 | `window_weights` / `half_life` | Yes | Yes | Yes | No |
 | `detrend` | Yes | Yes | Yes | No |
+| `stabilization` | Yes | Yes | Yes | No |
 | `seasonality_components` | Yes | Yes | Yes | No |
 
 `manual_bounds` has no window, so window-based features don't apply.
@@ -177,9 +197,9 @@ alias for `half_life`; prefer `half_life`.)
 
 Every parameter that affects results (threshold, window_size, min_samples,
 seasonality_components, min_samples_per_group, input_type, smoothing*,
-window_weights, half_life, detrend) is hashed into the `detector_id` — only
-non-default values participate. Execution params (`start_time`, `batch_size`)
-are **not** hashed.
+window_weights, half_life, detrend, stabilization) is hashed into the
+`detector_id` — only non-default values participate. Execution params
+(`start_time`, `batch_size`) are **not** hashed.
 
 Changing any hashed parameter creates a new `detector_id` and recomputes that
 detector's detections from scratch on the next run; old rows stay under the

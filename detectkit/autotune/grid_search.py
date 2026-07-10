@@ -1,12 +1,13 @@
 """Stage 3: bounded coordinate search over detector hyperparameters.
 
 Not a Cartesian product — a greedy coordinate sweep per candidate type:
-threshold → recency weighting → detrend (gated by a trend test) → window size
-(with the trend-gated window tie-bias from window_select) → a final threshold
-re-sweep at the chosen window (the threshold↔window coupling fix). The objective
-is the cross-validated score (settings.metric, or the unsupervised objective when
-there are no labels). Total evaluations stay in the low tens per type and are
-capped by settings.max_candidates.
+threshold → recency weighting → detrend (gated by a trend test) → stabilization
+(anomaly-robust baseline) → window size (with the trend-gated window tie-bias
+from window_select) → a final threshold re-sweep at the chosen window (the
+threshold↔window coupling fix). The objective is the cross-validated score
+(settings.metric, or the unsupervised objective when there are no labels).
+Total evaluations stay in the low tens per type and are capped by
+settings.max_candidates.
 """
 
 from __future__ import annotations
@@ -148,6 +149,19 @@ def grid_search(
                 ev = tuner.safe_evaluate(detector_type, {**accepted, "detrend": detrend})
                 if ev is not None and ev.score > best.score + eps:
                     best, accepted["detrend"] = ev, detrend
+
+        # Axis 3b: stabilization (anomaly-robust baseline; adopt only when it
+        # clears the margin). Flagged points enter subsequent windows clamped
+        # to the bound they violated, so a sustained incident cannot inflate
+        # the band and mask its own tail — usually decisive on labeled data
+        # with long incidents, near-neutral on clean series. Swept before the
+        # window axis so select_window evaluates with the adopted baseline.
+        for stabilization in (None, "clamp"):
+            if stabilization == accepted.get("stabilization"):
+                continue
+            ev = tuner.safe_evaluate(detector_type, {**accepted, "stabilization": stabilization})
+            if ev is not None and ev.score > best.score + eps:
+                best, accepted["stabilization"] = ev, stabilization
 
         # Axis 4: window size (large-window tie-bias, trend-gated in select_window).
         window_best = select_window(tuner, detector_type, accepted, best, grid)

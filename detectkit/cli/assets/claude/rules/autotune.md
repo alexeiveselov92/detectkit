@@ -45,9 +45,10 @@ same windowed detectors and `detector_id` identity). The fastest path is the
    detectors (`mad`/`zscore`/`iqr`) and cross-validation picks the winner — no
    type is excluded by heuristic.
 3. **Hyperparameters** — a bounded coordinate grid search over `threshold`,
-   recency weighting (and its **half-life** when adopted), detrending and
-   `window_size`, maximizing a cross-validated score, with a final `threshold`
-   re-sweep at the chosen window. Fold scores aggregate as
+   recency weighting (and its **half-life** when adopted), detrending,
+   **stabilization** (`clamp`, adopted only when it clears the score margin)
+   and `window_size`, maximizing a cross-validated score, with a final
+   `threshold` re-sweep at the chosen window. Fold scores aggregate as
    `mean − stability_lambda · downside_deviation` (downside-only, so a config that
    scores *better* on recent folds isn't penalized; lower `stability_lambda` for a
    regime-shift metric).

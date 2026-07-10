@@ -145,6 +145,7 @@ def seed_detector_params(dtype: str, params: dict[str, Any]) -> dict[str, Any]:
             half_life if isinstance(half_life, int) and not isinstance(half_life, bool) else None
         ),
         "detrend": params.get("detrend") or "none",
+        "stabilization": params.get("stabilization") or "none",
         "seasonalityComponents": _normalize_seasonality_components(
             params.get("seasonality_components")
         ),

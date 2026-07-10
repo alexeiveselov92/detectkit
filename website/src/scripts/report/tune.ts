@@ -28,6 +28,7 @@ import type {
   ScoredPoint,
   Series,
   Smoothing,
+  Stabilization,
   ThresholdInfo,
   WindowWeights,
 } from '../demo/types';
@@ -295,6 +296,7 @@ function applyParams(p: DetectorParams): Record<string, unknown> {
     if (p.windowWeights === 'exponential' && p.halfLife != null) out.half_life = p.halfLife;
   }
   if (p.detrend !== 'none') out.detrend = p.detrend;
+  if (p.stabilization && p.stabilization !== 'none') out.stabilization = p.stabilization;
   if (p.smoothing !== 'none') out.smoothing = p.smoothing;
   if (p.inputType !== 'values') out.input_type = p.inputType;
   if (p.seasonalityComponents && p.seasonalityComponents.length) {
@@ -558,6 +560,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     windowWeights: weightsCtl.get() as WindowWeights,
     halfLife: weightsCtl.get() === 'exponential' ? halfLifeCtl.get() : null,
     detrend: detrendCtl.get() as Detrend,
+    stabilization: stabilizationCtl.get() as Stabilization,
     seasonalityComponents: buildSeasonality(),
     minSamplesPerGroup:
       MIN_SAMPLES_PER_GROUP_DEFAULT[detectorCtl.get() as DetectorType] ?? seed.minSamplesPerGroup,
@@ -1482,6 +1485,19 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   );
   tuneGroup.appendChild(detrendCtl.row);
 
+  const stabilizationCtl = segControl(
+    'Stabilization',
+    [
+      { label: 'none', value: 'none' },
+      { label: 'clamp', value: 'clamp' },
+    ],
+    seed.stabilization ?? 'none',
+    detectorChanged,
+    'Anomaly-robust baseline: flagged points enter later windows clamped to the bound they ' +
+      'violated, so a long incident cannot inflate the band and mask itself mid-incident.',
+  );
+  tuneGroup.appendChild(stabilizationCtl.row);
+
   const smoothingCtl = segControl(
     'Smoothing',
     [
@@ -1707,6 +1723,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     windowCtl.row,
     weightsCtl.row,
     detrendCtl.row,
+    stabilizationCtl.row,
     smoothingCtl.row,
   ];
   if (seasonalityRow) windowedRows.push(seasonalityRow);
@@ -1738,6 +1755,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     weightsCtl.set(s.windowWeights);
     if (s.windowWeights === 'exponential' && s.halfLife != null) halfLifeCtl.set(s.halfLife);
     detrendCtl.set(s.detrend);
+    stabilizationCtl.set(s.stabilization ?? 'none');
     smoothingCtl.set(s.smoothing);
     setSeasonalityGroups(s.seasonalityComponents || []);
     if (s.lowerBound != null) lowerBoundCtl.set(s.lowerBound);

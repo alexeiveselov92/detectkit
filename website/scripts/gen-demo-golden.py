@@ -321,7 +321,69 @@ def _make_cases() -> list[dict[str, Any]]:
         }
     )
 
-    # 9. Manual bounds — stateless lower/upper thresholds on the raw values.
+    # 9. Stabilization (clamp) — a sustained incident: flagged points enter
+    #    subsequent windows clamped to the violated bound, so the band does not
+    #    inflate and mask the incident tail (Z-Score is the most vulnerable).
+    vals = _noisy_level(1111, 360, level=100.0, sigma=6.0, spikes={})
+    vals[200:230] += 70.0  # 30-point incident inside the 100-point window
+    cases.append(
+        {
+            "name": "zscore_stabilization_clamp",
+            "detector_type": "zscore",
+            "interval_seconds": _DEFAULT_INTERVAL,
+            "values": vals,
+            "seasonality_data": None,
+            "seasonality_columns": None,
+            "detector_params": {
+                "threshold": 3.0,
+                "window_size": 100,
+                "min_samples": 30,
+                "stabilization": "clamp",
+            },
+            "ts_params": {
+                "type": "zscore",
+                "threshold": 3.0,
+                "windowSize": 100,
+                "minSamples": 30,
+                "stabilization": "clamp",
+            },
+        }
+    )
+
+    # 10. Stabilization composed with exponential recency weighting — the
+    #     worst case stabilization guards against (recent incident points get
+    #     MORE weight), on the robust MAD detector.
+    vals = _noisy_level(1212, 360, level=40.0, sigma=3.0, spikes={330: -25.0})
+    vals[220:250] += 30.0
+    cases.append(
+        {
+            "name": "mad_stabilization_exp_weight",
+            "detector_type": "mad",
+            "interval_seconds": _DEFAULT_INTERVAL,
+            "values": vals,
+            "seasonality_data": None,
+            "seasonality_columns": None,
+            "detector_params": {
+                "threshold": 3.0,
+                "window_size": 100,
+                "min_samples": 30,
+                "window_weights": "exponential",
+                "half_life": 25,
+                "stabilization": "clamp",
+            },
+            "ts_params": {
+                "type": "mad",
+                "threshold": 3.0,
+                "windowSize": 100,
+                "minSamples": 30,
+                "windowWeights": "exponential",
+                "halfLife": 25,
+                "stabilization": "clamp",
+            },
+        }
+    )
+
+    # 11. Manual bounds — stateless lower/upper thresholds on the raw values.
     #    No window/min_samples: every non-NaN point is scored straight away.
     vals = _noisy_level(909, 360, level=50.0, sigma=4.0, spikes={120: 30.0, 240: -30.0})
     cases.append(
@@ -341,7 +403,7 @@ def _make_cases() -> list[dict[str, Any]]:
         }
     )
 
-    # 10. Manual bounds on absolute point-to-point changes — exercises the
+    # 12. Manual bounds on absolute point-to-point changes — exercises the
     #     input_type preprocessing path (the first point is NaN -> not scored).
     vals = _noisy_level(1010, 360, level=300.0, sigma=8.0, spikes={150: 70.0, 270: -65.0})
     cases.append(
@@ -400,6 +462,7 @@ _TS_PARAM_DEFAULTS: dict[str, Any] = {
     "windowWeights": "none",
     "halfLife": None,
     "detrend": "none",
+    "stabilization": "none",
     "seasonalityComponents": None,
     "minSamplesPerGroup": 10,
     "consecutiveAnomalies": 1,

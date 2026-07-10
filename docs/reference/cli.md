@@ -792,7 +792,8 @@ Profile override (default: from the project config).
 #### What you can tune
 
 Detector **type** (MAD / Z-Score / IQR / Manual bounds), **threshold**, **window
-size**, recency **weighting** + **half-life**, **detrend**, **smoothing**,
+size**, recency **weighting** + **half-life**, **detrend**, **stabilization**,
+**smoothing**,
 **seasonality conditioning** (per available seasonality column, optionally conjoined
 into one group), **direction** (both/up/down) and the alert
 **`consecutive_anomalies`** window. The "effective config" readout shows exactly

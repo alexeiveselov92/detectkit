@@ -58,8 +58,9 @@ class _RecoveryMixin(_OrchestratorBase):
             return False
 
         last_point = self.get_last_complete_point()
-        # +5 for safety margin so we don't truncate the consecutive window.
-        num_points = self.conditions.consecutive_anomalies + 5
+        # The wider of the two rules' windows, +5 safety margin so we don't
+        # truncate the consecutive/fraction window.
+        num_points = self.conditions.lookback_points + 5
 
         recent_detections = self.internal.get_recent_detections(
             metric_name=self.metric_name,
@@ -78,20 +79,33 @@ class _RecoveryMixin(_OrchestratorBase):
         latest_anomalies = [d for d in detections_by_time[timestamps_sorted[0]] if d.is_anomaly]
 
         direction_condition = self.conditions.direction
+        locked_direction: str | None = None
         if direction_condition == "down":
             blocking = [d for d in latest_anomalies if d.direction == "down"]
+            locked_direction = "down"
         elif direction_condition == "up":
             blocking = [d for d in latest_anomalies if d.direction == "up"]
+            locked_direction = "up"
         elif direction_condition == "same":
             trigger_direction = self._get_alert_trigger_direction(last_alert_timestamp)
             if trigger_direction is None:
                 blocking = latest_anomalies  # conservative fallback
             else:
                 blocking = [d for d in latest_anomalies if d.direction == trigger_direction]
+            locked_direction = trigger_direction
         else:  # "any" / unknown — preserve historical behaviour
             blocking = latest_anomalies
 
-        return len(blocking) == 0
+        if blocking:
+            return False
+        # Fraction-rule hysteresis: with the share rule configured, a clean
+        # latest point isn't enough — the window share must also drop below
+        # half the firing threshold, or the alert would flap around it.
+        # ``_share_still_elevated`` lives in _DecisionMixin; both mixins compose
+        # into AlertOrchestrator so the call resolves at runtime.
+        return not self._share_still_elevated(
+            detections_by_time, timestamps_sorted[0], locked_direction
+        )
 
     def _get_alert_trigger_direction(self, last_alert_timestamp: datetime) -> str | None:
         """Return the direction of the anomaly that triggered the last alert.

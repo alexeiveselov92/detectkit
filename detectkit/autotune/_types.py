@@ -16,7 +16,10 @@ class ScoringMetric(str, Enum):
 
     All are computed in pure numpy (see :mod:`detectkit.autotune.scoring`).
     MCC is the default: it uses all four confusion cells and is robust to the
-    heavy class imbalance of rare anomalies.
+    heavy class imbalance of rare anomalies. ``event_f1`` is segment-aware
+    (point-adjusted): one flagged point anywhere inside a labeled incident
+    counts the whole incident as caught — matching how the alert pipeline and
+    the ``dtk tune`` cockpit's recall/FDR bar treat incidents.
     """
 
     MCC = "mcc"
@@ -25,6 +28,7 @@ class ScoringMetric(str, Enum):
     BALANCED_ACCURACY = "balanced_accuracy"
     ROC_AUC = "roc_auc"
     PR_AUC = "pr_auc"
+    EVENT_F1 = "event_f1"
 
 
 class TuneMode(str, Enum):

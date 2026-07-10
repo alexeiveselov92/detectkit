@@ -61,6 +61,72 @@ def f_beta(y_true: np.ndarray, y_pred: np.ndarray, beta: float = 1.0) -> float:
     return (1.0 + b2) * tp / denominator
 
 
+def true_segments(y_true: np.ndarray) -> list[tuple[int, int]]:
+    """Contiguous ``True`` runs in *y_true* as ``[lo, hi)`` index pairs.
+
+    Run-length encoding over the boolean truth: the contiguity of positive
+    points already encodes incident boundaries, so segment-aware metrics need
+    no extra segment argument.
+    """
+    yt = np.asarray(y_true, dtype=bool)
+    if yt.size == 0:
+        return []
+    diff = np.diff(yt.astype(np.int8))
+    starts = np.flatnonzero(diff == 1) + 1
+    ends = np.flatnonzero(diff == -1) + 1
+    if yt[0]:
+        starts = np.concatenate([[0], starts])
+    if yt[-1]:
+        ends = np.concatenate([ends, [yt.size]])
+    return list(zip(starts.tolist(), ends.tolist()))
+
+
+def event_f_beta(y_true: np.ndarray, y_pred: np.ndarray, beta: float = 1.0) -> float:
+    """Segment-aware (point-adjusted) F-beta — the alert-centric score.
+
+    Incidents are the contiguous ``True`` runs in *y_true*. Counting follows
+    the Revised-Point-Adjusted convention: a segment with **at least one**
+    predicted point is one TP (the incident was caught — one alert fires per
+    incident), a segment with none is one FN, and every predicted positive
+    **outside** all segments counts pointwise as an FP. This deliberately mixes
+    segment-level TP/FN with pointwise FP: catching a 50-point incident with a
+    single flag is full credit, while scattered false flags each cost.
+
+    Contiguity is meaningful here — callers must NOT boolean-mask the arrays
+    before calling (masking splices distinct incidents together); see
+    :func:`scorable_event_truth` for handling unscorable points.
+    """
+    yt = np.asarray(y_true, dtype=bool)
+    yp = np.asarray(y_pred, dtype=bool)
+    segments = true_segments(yt)
+    tp = sum(1 for lo, hi in segments if bool(np.any(yp[lo:hi])))
+    fn = len(segments) - tp
+    fp = int(np.sum(yp & ~yt))
+    b2 = beta * beta
+    denominator = (1.0 + b2) * tp + b2 * fn + fp
+    if denominator == 0.0:
+        return 0.0
+    return (1.0 + b2) * tp / denominator
+
+
+def scorable_event_truth(y_true: np.ndarray, valid: np.ndarray) -> np.ndarray:
+    """Zero out truth segments the detector could not score anywhere.
+
+    The pointwise metrics drop invalid points by boolean masking; the event
+    metric cannot (masking splices segments). Instead the full-length arrays
+    are scored and any incident containing **no** valid point is removed from
+    the truth — the detector had no confidence band anywhere inside it, so it
+    is unscorable rather than missed. Invalid points can't contribute FPs
+    (``y_pred`` is always False where invalid).
+    """
+    yt = np.asarray(y_true, dtype=bool).copy()
+    v = np.asarray(valid, dtype=bool)
+    for lo, hi in true_segments(yt):
+        if not bool(np.any(v[lo:hi])):
+            yt[lo:hi] = False
+    return yt
+
+
 def balanced_accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     """Mean of sensitivity (TPR) and specificity (TNR)."""
     tp, fp, tn, fn = confusion(y_true, y_pred)
@@ -152,6 +218,8 @@ def score_predictions(
         return roc_auc(y_true, y_score)
     if metric == ScoringMetric.PR_AUC:
         return pr_auc(y_true, y_score)
+    if metric == ScoringMetric.EVENT_F1:
+        return event_f_beta(y_true, y_pred, 1.0)
     raise ValueError(f"Unknown scoring metric: {metric}")
 
 

@@ -41,4 +41,11 @@ def make_alert_config_id(alerting_config) -> str:
         ),
         "cooldown_reset_on_recovery": alerting_config.cooldown_reset_on_recovery,
     }
+    # The fraction rule joins the hash only when configured, so every existing
+    # config keeps its id (and its alert state) byte-identical.
+    anomaly_window = getattr(alerting_config, "anomaly_window", None)
+    min_anomaly_share = getattr(alerting_config, "min_anomaly_share", None)
+    if anomaly_window is not None or min_anomaly_share is not None:
+        config_dict["anomaly_window"] = str(anomaly_window)
+        config_dict["min_anomaly_share"] = min_anomaly_share
     return hashlib.md5(json_dumps_sorted(config_dict).encode()).hexdigest()[:16]

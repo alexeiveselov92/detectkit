@@ -239,11 +239,7 @@ def replay_alert_events(
             metric_name=name,
             interval=interval,
             alert_config_id=config_id,
-            conditions=AlertConditions(
-                min_detectors=cfg.min_detectors,
-                direction=cfg.direction,
-                consecutive_anomalies=cfg.consecutive_anomalies,
-            ),
+            conditions=AlertConditions.from_alert_config(cfg, interval.seconds),
             timezone_display=cfg.timezone,
             internal=internal_unused,
             alert_config=cfg,
@@ -266,6 +262,12 @@ def _event_to_payload(event: Any, config_id: str) -> dict:
         f"min_detectors={ad.min_detectors} · direction={ad.direction_policy} "
         f"· consecutive={ad.consecutive_required}"
     )
+    if ad.fired_by_share and ad.window_points and ad.min_anomaly_share is not None:
+        pct = f"{ad.min_anomaly_share * 100:g}%"
+        rule = (
+            f"min_detectors={ad.min_detectors} · direction={ad.direction_policy} "
+            f"· share>={pct} over {ad.window_points} points"
+        )
     return {
         "kind": event.kind,
         "t": _ms(event.timestamp),

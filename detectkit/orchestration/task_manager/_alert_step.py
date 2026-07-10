@@ -54,15 +54,12 @@ class _AlertStepMixin(_TaskManagerBase):
             help_resolver = getattr(self.project_config, "resolve_alert_help_url", None)
             help_url = help_resolver() if callable(help_resolver) else None
 
+            conditions = AlertConditions.from_alert_config(alerting_config, interval.seconds)
             orchestrator = AlertOrchestrator(
                 metric_name=config.name,
                 interval=interval,
                 alert_config_id=alert_config_id,
-                conditions=AlertConditions(
-                    min_detectors=alerting_config.min_detectors,
-                    direction=alerting_config.direction,
-                    consecutive_anomalies=alerting_config.consecutive_anomalies,
-                ),
+                conditions=conditions,
                 timezone_display=alerting_config.timezone,
                 internal=self.internal,
                 alert_config=alerting_config,
@@ -102,7 +99,10 @@ class _AlertStepMixin(_TaskManagerBase):
             recent_detections = self._load_recent_detections(
                 metric_name=config.name,
                 last_point=last_point,
-                num_points=alerting_config.consecutive_anomalies,
+                # The wider of the two rules' windows (consecutive_anomalies
+                # when the fraction rule isn't configured) — a too-narrow fetch
+                # would silently starve the fraction rule.
+                num_points=conditions.lookback_points,
             )
 
             if not recent_detections:

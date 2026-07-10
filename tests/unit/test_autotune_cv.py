@@ -77,6 +77,24 @@ def test_run_cv_returns_fold_scores():
     assert -1.0 <= scores.aggregate <= 1.0
 
 
+def test_run_cv_event_f1_keeps_incident_contiguity():
+    # A labeled incident interval where the detector flags only a few points:
+    # pointwise F1 punishes the unflagged bulk, event_f1 counts the incident
+    # caught — so on the same detector event_f1 must score >= plain f1.
+    data, ts = _series()
+    n = len(ts)
+    y = np.zeros(n, dtype=bool)
+    y[295:315] = True  # incident window around the injected spike
+    gt = GroundTruth(y_true=y, mode=TuneMode.SUPERVISED, n_positive=20, n_intervals=1, n_points=0)
+    plan = build_cv_plan(n, context_size=100, fold_count=5)
+    detector = DetectorFactory.create("zscore", {"window_size": 100, "min_samples": 30})
+    event = run_cv(detector, data, plan, gt, TuneSettings(metric=ScoringMetric.EVENT_F1))
+    plain = run_cv(detector, data, plan, gt, TuneSettings(metric=ScoringMetric.F1))
+    assert event.per_fold  # the labeled fold is scored
+    assert event.aggregate >= plain.aggregate
+    assert all(0.0 <= s <= 1.0 for s in event.per_fold)
+
+
 # ── downside-only stability penalty ──────────────────────────────────────────
 
 

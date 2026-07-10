@@ -385,11 +385,7 @@ class EmailChannel(BaseAlertChannel):
         Mirrors the inline-code "Rule chip" the webhook/Telegram channels render,
         so the same firing rule reads the same way in every channel.
         """
-        expr = (
-            f"min_detectors={ctx['min_detectors']} &middot; "
-            f"direction={html.escape(str(ctx['direction_policy']))} &middot; "
-            f"consecutive={ctx['consecutive_required']}"
-        )
+        expr = html.escape(str(ctx["rule_display"]))
         return (
             f'<tr><td style="padding:0 24px 14px 24px;font-family:{_SANS};font-size:13px;'
             f'color:{_MUTED};mso-line-height-rule:exactly;line-height:22px;">'

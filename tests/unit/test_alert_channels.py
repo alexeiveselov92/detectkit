@@ -160,10 +160,10 @@ class TestBaseAlertChannel:
         assert "Alert" in template
         assert "Anomaly detected" not in template
         assert "{metric_name}" in template
-        # The parameters the alert fired with are foregrounded.
-        assert "{min_detectors}" in template
-        assert "{direction_policy}" in template
-        assert "{consecutive_required}" in template
+        # The parameters the alert fired with are foregrounded (the shared
+        # rule chip renders min_detectors/direction/consecutive — and the
+        # fraction rule when configured).
+        assert "{rule_display}" in template
         # The anomaly value is still present (secondary).
         assert "{value_display}" in template
 

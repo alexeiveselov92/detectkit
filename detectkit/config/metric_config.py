@@ -157,6 +157,22 @@ class AlertConfig(BaseModel):
     consecutive_anomalies: int = Field(
         default=3, description="Consecutive anomalies to trigger alert"
     )
+    anomaly_window: str | int | None = Field(
+        default=None,
+        description="Trailing window for the fraction-based alert rule (duration string like "
+        "'30min' or seconds as int; converted to grid points via the metric interval). Must be "
+        "set together with min_anomaly_share. When set, an alert also fires when the share of "
+        "window points meeting the quorum reaches min_anomaly_share AND the latest point itself "
+        "meets the quorum — tolerant of scattered normal points inside a real incident, where "
+        "consecutive_anomalies alone would reset. The two rules are OR-ed.",
+    )
+    min_anomaly_share: float | None = Field(
+        default=None,
+        description="Fraction in (0, 1] of anomaly_window points that must meet the quorum for "
+        "the fraction rule to fire (e.g. 0.3 = 30% of the window). Must be set together with "
+        "anomaly_window. Missing/no-data points count in the denominator (an outage makes the "
+        "rule harder to fire, not easier); the no-data alert covers outages separately.",
+    )
     no_data_alert: bool = Field(default=False, description="Alert when no data is available")
     template_single: str | None = Field(
         default=None, description="Custom template for single anomaly"
@@ -221,6 +237,38 @@ class AlertConfig(BaseModel):
             raise ValueError("consecutive_anomalies must be at least 1")
         return v
 
+    @field_validator("min_anomaly_share")
+    @classmethod
+    def validate_min_anomaly_share(cls, v: float | None) -> float | None:
+        """The fraction threshold, if set, must be in ``(0, 1]``."""
+        if v is None:
+            return v
+        if not 0.0 < v <= 1.0:
+            raise ValueError("min_anomaly_share must be a fraction in (0, 1] (e.g. 0.3 = 30%)")
+        return v
+
+    @field_validator("anomaly_window")
+    @classmethod
+    def validate_anomaly_window(cls, v: str | int | None) -> str | int | None:
+        """The window, if set, must parse as an interval (e.g. '30min', '1h', 1800)."""
+        if v is None:
+            return v
+        try:
+            Interval(v)
+        except Exception as exc:
+            raise ValueError(f"anomaly_window must be a valid interval: {exc}") from exc
+        return v
+
+    @model_validator(mode="after")
+    def validate_fraction_rule(self) -> "AlertConfig":
+        """``anomaly_window`` and ``min_anomaly_share`` come as a pair."""
+        if (self.anomaly_window is None) != (self.min_anomaly_share is None):
+            raise ValueError(
+                "anomaly_window and min_anomaly_share must be set together "
+                "(the fraction rule needs both the window and the share threshold)"
+            )
+        return self
+
     @field_validator("dashboard_url")
     @classmethod
     def validate_dashboard_url(cls, v: str | None) -> str | None:
@@ -284,7 +332,10 @@ class TablesConfig(BaseModel):
 # Detector types the autotune engine can select between (statistical, windowed).
 # ``manual_bounds`` is excluded — it needs domain thresholds, not tuning.
 _AUTOTUNE_DETECTOR_TYPES = {"mad", "zscore", "iqr"}
-# Scoring metrics the grid search can optimize. MCC is the default.
+# Scoring metrics the grid search can optimize. MCC is the default;
+# ``event_f1`` is segment-aware (point-adjusted): one flagged point inside a
+# labeled incident counts the whole incident as caught, aligning the engine
+# with the alert pipeline and the `dtk tune` cockpit's recall/FDR bar.
 _AUTOTUNE_SCORING_METRICS = {
     "mcc",
     "f1",
@@ -292,6 +343,7 @@ _AUTOTUNE_SCORING_METRICS = {
     "balanced_accuracy",
     "roc_auc",
     "pr_auc",
+    "event_f1",
 }
 # Seasonality columns the search may consider (mirrors MetricConfig).
 _AUTOTUNE_SEASONALITY_COLUMNS = {
@@ -340,7 +392,8 @@ class AutoTuneConfig(BaseModel):
     scoring_metric: str | None = Field(
         default=None,
         description="Optimization target: mcc (default), f1, f_beta, balanced_accuracy, "
-        "roc_auc, pr_auc",
+        "roc_auc, pr_auc, event_f1 (segment-aware: one flag inside a labeled incident "
+        "counts the whole incident as caught)",
     )
     beta: float = Field(
         default=1.0, description="Beta for scoring_metric: f_beta (recall weight); >0"

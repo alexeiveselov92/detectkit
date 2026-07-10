@@ -64,11 +64,47 @@ class AlertConditions:
 
     Defaults mirror :class:`detectkit.config.metric_config.AlertConfig`
     so direct API users get the same behavior as YAML users.
+
+    ``window_points`` / ``min_anomaly_share`` carry the optional fraction rule
+    (``AlertConfig.anomaly_window`` resolved to grid points): fire when the
+    share of quorum-meeting points over the trailing window reaches the
+    threshold AND the latest point itself meets the quorum. OR-ed with the
+    consecutive rule; both unset (the default) leaves behavior unchanged.
     """
 
     min_detectors: int = 1
     direction: str = "same"  # "any", "same", "up", "down"
     consecutive_anomalies: int = 3
+    window_points: int | None = None
+    min_anomaly_share: float | None = None
+
+    @property
+    def lookback_points(self) -> int:
+        """Detection points the decision needs: the wider of the two rules."""
+        return max(self.consecutive_anomalies, self.window_points or 0)
+
+    @classmethod
+    def from_alert_config(cls, alert_config: Any, interval_seconds: int) -> "AlertConditions":
+        """Build conditions from an ``AlertConfig``, resolving the window to points.
+
+        The single seam shared by the live alert step and the replay callers, so
+        the fraction-rule resolution (duration → grid points) can never drift
+        between them. ``getattr`` keeps duck-typed test stubs working.
+        """
+        from detectkit.core.interval import Interval
+
+        window_points: int | None = None
+        window = getattr(alert_config, "anomaly_window", None)
+        share = getattr(alert_config, "min_anomaly_share", None)
+        if window is not None and share is not None and interval_seconds > 0:
+            window_points = max(1, Interval(window).seconds // interval_seconds)
+        return cls(
+            min_detectors=alert_config.min_detectors,
+            direction=alert_config.direction,
+            consecutive_anomalies=alert_config.consecutive_anomalies,
+            window_points=window_points,
+            min_anomaly_share=share if window_points is not None else None,
+        )
 
 
 @dataclass

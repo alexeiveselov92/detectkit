@@ -28,7 +28,12 @@ const WEBSITE = path.resolve(here, '..');
 const DETECTOR_TS = path.join(WEBSITE, 'src', 'scripts', 'demo', 'detector.ts');
 const GOLDEN_JSON = path.join(WEBSITE, 'src', 'scripts', 'demo', 'golden.json');
 
+// Band tolerance is SCALE-AWARE: 1e-6 absolute for unit-scale series, relaxed
+// proportionally for large-magnitude bands (the autoreg large-magnitude case
+// runs at ~1e9, where float64 op-order differences between numpy and JS are
+// ~1e-7 absolute despite being ~1e-16 relative).
 const TOL = 1e-6;
+const tolFor = (...vals) => TOL * Math.max(1, ...vals.map((v) => Math.abs(v)));
 
 /** Bundle detector.ts to ESM and dynamically import its `runDetector`. */
 async function loadRunDetector() {
@@ -108,15 +113,16 @@ function checkCase(name, scored, expected) {
       );
     }
 
+    const tol = tolFor(exp.lower, exp.upper);
     const dLower = Math.abs(got.lower - exp.lower);
     const dUpper = Math.abs(got.upper - exp.upper);
-    if (!(dLower < TOL)) {
+    if (!(dLower < tol)) {
       mismatches.push(
         `idx ${i}: lower off by ${dLower.toExponential(3)} ` +
           `(got ${got.lower}, expected ${exp.lower})`,
       );
     }
-    if (!(dUpper < TOL)) {
+    if (!(dUpper < tol)) {
       mismatches.push(
         `idx ${i}: upper off by ${dUpper.toExponential(3)} ` +
           `(got ${got.upper}, expected ${exp.upper})`,

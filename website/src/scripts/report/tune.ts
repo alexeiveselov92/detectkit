@@ -91,6 +91,11 @@ interface TunePayload {
   /** slot the cockpit opens on (first windowed, then first tunable); null = none tunable. */
   detector_index?: number | null;
   consecutive_anomalies: number;
+  /** fraction alert rule seeds (issue #101): the first alert config's
+   * anomaly_window pre-resolved to grid points + its share; null/absent = the
+   * legacy consecutive-only rule. Both-or-neither, like the config model. */
+  anomaly_window_points?: number | null;
+  min_anomaly_share?: number | null;
   /** alert-layer direction the view filter seeds to ('any' = both). */
   direction?: AlertDirection;
   /** localhost POST endpoint for Apply; null = static read-only preview. */
@@ -113,6 +118,9 @@ interface TunePayload {
 interface AutotuneResult {
   detector: DetectorSeed;
   consecutive_anomalies: number | null;
+  /** fraction rule the sweep adopted (points + share), null when not chosen. */
+  anomaly_window_points?: number | null;
+  min_anomaly_share?: number | null;
   seasonality: string[][] | null;
   score: number;
   scoring_metric: string;
@@ -130,7 +138,12 @@ type UiMode = ChartMode | 'autotune';
 
 // Per-type interval-width default (mirrors the detector classes / the demo).
 // Partial: manual_bounds has no threshold / per-group default.
-const THRESHOLD_DEFAULT: Partial<Record<DetectorType, number>> = { mad: 3.0, zscore: 3.0, iqr: 1.5 };
+const THRESHOLD_DEFAULT: Partial<Record<DetectorType, number>> = {
+  mad: 3.0,
+  zscore: 3.0,
+  iqr: 1.5,
+  autoreg: 3.0,
+};
 const MIN_SAMPLES_PER_GROUP_DEFAULT: Partial<Record<DetectorType, number>> = {
   mad: 10,
   zscore: 3,
@@ -287,6 +300,24 @@ function applyParams(p: DetectorParams): Record<string, unknown> {
     if (p.inputType !== 'values') mb.input_type = p.inputType;
     return mb;
   }
+  if (p.type === 'autoreg') {
+    // Prediction-based AR(p): its own param set — lags/threshold/window +
+    // min_samples (emitted explicitly, clamped valid: the Python constructor
+    // requires lags+2 <= min_samples <= window_size) + stabilization, which
+    // is DEFAULT-ON for autoreg, so turning it off must be written as null.
+    // Never seasonality/weights/detrend/smoothing (v1 has none; the detector
+    // rejects truthy seasonality_components).
+    const lags = Math.max(1, Math.round(p.lags ?? 5));
+    const ar: Record<string, unknown> = {
+      lags,
+      threshold: p.threshold,
+      window_size: p.windowSize,
+      min_samples: Math.min(Math.max(p.minSamples, lags + 2), p.windowSize),
+    };
+    if (p.stabilization !== 'clamp') ar.stabilization = null;
+    if (p.inputType !== 'values') ar.input_type = p.inputType;
+    return ar;
+  }
   const out: Record<string, unknown> = {
     threshold: p.threshold,
     window_size: p.windowSize,
@@ -306,7 +337,12 @@ function applyParams(p: DetectorParams): Record<string, unknown> {
   return out;
 }
 
-function configText(p: DetectorParams, consecutive: number): string {
+function configText(
+  p: DetectorParams,
+  consecutive: number,
+  windowPoints?: number | null,
+  share?: number | null,
+): string {
   const ap = applyParams(p);
   const parts = [`type: ${p.type}`];
   for (const [k, v] of Object.entries(ap)) {
@@ -314,6 +350,10 @@ function configText(p: DetectorParams, consecutive: number): string {
   }
   if (p.direction && p.direction !== 'any') parts.push(`direction=${p.direction}`);
   parts.push(`consecutive_anomalies=${consecutive}`);
+  if (windowPoints != null && share != null) {
+    parts.push(`anomaly_window=${windowPoints}p`);
+    parts.push(`min_anomaly_share=${share}`);
+  }
   return parts.join('  ·  ');
 }
 
@@ -471,6 +511,14 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   // the passthrough knobs (minSamples/inputType/smoothing*/minSamplesPerGroup) off it.
   let seed = payload.detector;
   let consecutive = payload.consecutive_anomalies;
+  // Fraction alert rule (issue #101): OR-ed with the consecutive rule, exactly
+  // like the pipeline. 0/absent window ⇒ off (legacy consecutive-only); the
+  // pair is both-or-neither (the share control only matters with a window).
+  let anomalyWindowPoints = payload.anomaly_window_points ?? 0;
+  let minAnomalyShare = payload.min_anomaly_share ?? 0.3;
+  const shareWindowPoints = (): number | null =>
+    anomalyWindowPoints >= 2 ? anomalyWindowPoints : null;
+  const shareValue = (): number | null => (anomalyWindowPoints >= 2 ? minAnomalyShare : null);
 
   // ---- multi-detector picker state ------------------------------------------
   // The cockpit tunes ONE detector at a time but a metric can configure several
@@ -570,6 +618,8 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     // ignore these, the manual_bounds port reads them.
     lowerBound: lowerBoundCtl.get(),
     upperBound: upperBoundCtl.get(),
+    // autoreg only — ignored by the other detectors.
+    lags: lagsCtl.get(),
   });
 
   // ---- header ---------------------------------------------------------------
@@ -1221,7 +1271,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       `${res.flagged} flagged · ${res.fires.length} alert${res.fires.length === 1 ? '' : 's'} · ` +
       `warm-up ${res.eff} pts`;
     updateSeasonWarn(params);
-    configEcho.textContent = configText(params, consecutive);
+    configEcho.textContent = configText(params, consecutive, shareWindowPoints(), shareValue());
   };
   const onWorkerError = (): void => {
     inFlight = false;
@@ -1251,7 +1301,15 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     }
     inFlight = true;
     spinner.classList.add('on');
-    worker.postMessage({ type: 'run', id: reqId, params: lastParams });
+    worker.postMessage({
+      type: 'run',
+      id: reqId,
+      params: lastParams,
+      // Fraction alert rule — top-level (never DetectorParams: it changes which
+      // alerts fire, not the band). null when off ⇒ legacy consecutive-only.
+      anomalyWindowPoints: shareWindowPoints(),
+      minAnomalyShare: shareValue(),
+    });
   };
 
   // ---- trim: re-slice the active series, re-post, recompute -----------------
@@ -1343,6 +1401,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       { label: 'MAD', value: 'mad' },
       { label: 'Z-Score', value: 'zscore' },
       { label: 'IQR', value: 'iqr' },
+      { label: 'Autoreg', value: 'autoreg' },
       { label: 'Manual', value: 'manual_bounds' },
     ],
     seed.type,
@@ -1354,7 +1413,8 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       recompute();
     },
     'The statistic for the band: MAD (robust median, default), Z-Score (mean/std) or IQR ' +
-      '(quartiles) — all windowed — or Manual (fixed lower/upper thresholds, no window/history).',
+      '(quartiles) — all windowed — Autoreg (predicts each point from its previous values and ' +
+      'flags dynamics breaks) or Manual (fixed lower/upper thresholds, no window/history).',
   );
   tuneGroup.appendChild(detectorCtl.row);
 
@@ -1434,6 +1494,22 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     detectorChanged,
   );
   tuneGroup.appendChild(windowCtl.row);
+
+  // autoreg: AR order (lags) — shown only for that detector.
+  const lagsCtl = rangeControl(
+    'Lags (AR order)',
+    {
+      min: 1,
+      max: 24,
+      step: 1,
+      value: Math.max(1, Math.round(seed.lags ?? 5)),
+      fmt: (v) => String(v),
+      hint: 'Autoreg: how many immediately-preceding values predict the current one. More lags ' +
+        'capture longer short-range patterns but need more history per fit.',
+    },
+    detectorChanged,
+  );
+  tuneGroup.appendChild(lagsCtl.row);
 
   const weightsCtl = segControl(
     'Recency weighting',
@@ -1608,6 +1684,53 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   );
   alertCommon.appendChild(consecutiveCtl.row);
 
+  // Fraction alert rule (issue #101): an anomaly-window (in grid points; 'off'
+  // below 2) + a min share of flagged points within it. OR-ed with the
+  // consecutive rule, exactly like the pipeline — good for diffuse incidents
+  // where anomalies are frequent but never strictly consecutive.
+  const anomalyWindowCtl = rangeControl(
+    'Alert: anomaly window (points)',
+    {
+      min: 0,
+      max: Math.max(96, anomalyWindowPoints),
+      step: 1,
+      value: anomalyWindowPoints,
+      fmt: (v) =>
+        v >= 2 ? `${v} · ${fmtDur(v * payload.interval_seconds * 1000)}` : 'off',
+      hint: 'Fraction rule (OR-ed with the consecutive rule): also fire when at least the share ' +
+        'below of the trailing window is anomalous AND the latest point is anomalous. Set to ' +
+        'off (< 2) for the classic consecutive-only alert.',
+    },
+    (v) => {
+      anomalyWindowPoints = v;
+      refreshShareVisibility();
+      recompute();
+    },
+  );
+  alertCommon.appendChild(anomalyWindowCtl.row);
+
+  const minAnomalyShareCtl = rangeControl(
+    'Alert: min share in window',
+    {
+      min: 0.05,
+      max: 1,
+      step: 0.05,
+      value: minAnomalyShare,
+      fmt: (v) => `${Math.round(v * 100)}%`,
+      hint: 'Fraction rule: the share of the anomaly window that must be flagged for the alert ' +
+        'to fire. Missing points count against the share (an outage never makes it easier).',
+    },
+    (v) => {
+      minAnomalyShare = v;
+      recompute();
+    },
+  );
+  alertCommon.appendChild(minAnomalyShareCtl.row);
+  const refreshShareVisibility = (): void => {
+    minAnomalyShareCtl.row.style.display = anomalyWindowPoints >= 2 ? '' : 'none';
+  };
+  refreshShareVisibility();
+
   // y = 0 reference line.
   const zeroRow = el('div', 'dtk-ctl');
   const zeroLab = el('label', 'dtk-check');
@@ -1715,25 +1838,27 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     }
   }
 
-  // Show only the controls relevant to the selected detector: the windowed knobs
-  // for MAD/Z-Score/IQR, or the bound sliders for manual_bounds. Direction +
-  // consecutive (alert-layer) are always shown.
-  const windowedRows = [
-    thresholdCtl.row,
-    windowCtl.row,
-    weightsCtl.row,
-    detrendCtl.row,
-    stabilizationCtl.row,
-    smoothingCtl.row,
-  ];
-  if (seasonalityRow) windowedRows.push(seasonalityRow);
+  // Show only the controls relevant to the selected detector — a 3-way split:
+  // band rows (threshold/window/stabilization) for every history-based detector
+  // (windowed AND autoreg), windowed-only rows (weights/detrend/smoothing/
+  // seasonality) hidden for autoreg (v1 has none — the detector rejects
+  // seasonality), lags for autoreg only, bounds for manual_bounds only.
+  // Direction + consecutive + the anomaly-window pair (alert-layer) always show.
+  const bandRows = [thresholdCtl.row, windowCtl.row, stabilizationCtl.row];
+  const windowedOnlyRows = [weightsCtl.row, detrendCtl.row, smoothingCtl.row];
+  if (seasonalityRow) windowedOnlyRows.push(seasonalityRow);
   function refreshVisibility(): void {
-    const manual = (detectorCtl.get() as DetectorType) === 'manual_bounds';
-    for (const row of windowedRows) row.style.display = manual ? 'none' : '';
+    const t = detectorCtl.get() as DetectorType;
+    const manual = t === 'manual_bounds';
+    const autoreg = t === 'autoreg';
+    for (const row of bandRows) row.style.display = manual ? 'none' : '';
+    for (const row of windowedOnlyRows) row.style.display = manual || autoreg ? 'none' : '';
+    lagsCtl.row.style.display = autoreg ? '' : 'none';
     lowerBoundCtl.row.style.display = manual ? '' : 'none';
     upperBoundCtl.row.style.display = manual ? '' : 'none';
     // half-life only when windowed AND exponential weighting.
-    halfLifeRow.style.display = !manual && weightsCtl.get() === 'exponential' ? '' : 'none';
+    halfLifeRow.style.display =
+      !manual && !autoreg && weightsCtl.get() === 'exponential' ? '' : 'none';
   }
   refreshVisibility();
 
@@ -1760,6 +1885,9 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     setSeasonalityGroups(s.seasonalityComponents || []);
     if (s.lowerBound != null) lowerBoundCtl.set(s.lowerBound);
     if (s.upperBound != null) upperBoundCtl.set(s.upperBound);
+    if (s.lags != null || s.type === 'autoreg') {
+      lagsCtl.set(Math.max(1, Math.round(s.lags ?? 5)));
+    }
     refreshVisibility();
   }
 
@@ -1840,7 +1968,16 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       fetch(payload.save_url as string, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ detectors: out, consecutive_anomalies: consecutive }),
+        body: JSON.stringify({
+          detectors: out,
+          consecutive_anomalies: consecutive,
+          // Fraction rule: exact-seconds duration (lossless points round-trip)
+          // + share, or nulls to remove the pair from the alerting block.
+          anomaly_window: shareWindowPoints()
+            ? `${(shareWindowPoints() as number) * payload.interval_seconds}s`
+            : null,
+          min_anomaly_share: shareValue(),
+        }),
       })
         .then((r) =>
           r.ok
@@ -1998,6 +2135,19 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       consecutive = res.consecutive_anomalies;
       consecutiveCtl.set(consecutive);
     }
+    // Fraction rule from the sweep: re-seed the pair, or switch it off when the
+    // legacy consecutive-only rule won (null ⇒ off).
+    if (res.anomaly_window_points != null && res.min_anomaly_share != null) {
+      anomalyWindowPoints = res.anomaly_window_points;
+      minAnomalyShare = res.min_anomaly_share;
+      anomalyWindowCtl.setMax(Math.max(96, anomalyWindowPoints));
+      anomalyWindowCtl.set(anomalyWindowPoints);
+      minAnomalyShareCtl.set(minAnomalyShare);
+    } else {
+      anomalyWindowPoints = 0;
+      anomalyWindowCtl.set(0);
+    }
+    refreshShareVisibility();
     recompute();
   }
 
@@ -2048,6 +2198,9 @@ function render(payload: TunePayload, mount: HTMLElement): void {
           'dtk-at-meta',
           `${res.n_candidates} candidate${res.n_candidates === 1 ? '' : 's'} · ${res.n_points} pts` +
             (res.consecutive_anomalies != null ? ` · consecutive ${res.consecutive_anomalies}` : '') +
+            (res.anomaly_window_points != null && res.min_anomaly_share != null
+              ? ` · window ${res.anomaly_window_points}p × ${res.min_anomaly_share}`
+              : '') +
             (res.seasonality && res.seasonality.length
               ? ` · seasonality ${JSON.stringify(res.seasonality)}`
               : ' · no seasonality'),

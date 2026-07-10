@@ -29,9 +29,9 @@ from detectkit.config.metric_io import archive_metric_text, metric_stamp, unwrap
 from detectkit.detectors.factory import DetectorFactory
 
 # The detector types the interactive tuner can emit: the windowed statistical
-# detectors plus the stateless manual_bounds (lower/upper threshold) detector,
-# whose bounds the tuner lets you drag against the real series.
-_TUNABLE_TYPES = {"mad", "zscore", "iqr", "manual_bounds"}
+# detectors, the stateless manual_bounds (lower/upper threshold) detector, and
+# the prediction-based autoreg. Hand-synced with payload._TUNABLE_TYPES.
+_TUNABLE_TYPES = {"mad", "zscore", "iqr", "manual_bounds", "autoreg"}
 
 # Execution-only params the tuner never surfaces: they steer the pipeline (when to
 # start detecting / how big a batch), not the detection maths, so the detector
@@ -69,18 +69,47 @@ class AppliedConfig:
     preserved: tuple[str, ...] = ()
 
 
+def _first_alerting_block(body: dict[str, Any]) -> dict[str, Any] | None:
+    """The metric's first alerting config (the YAML allows a dict or a list)."""
+    alerting = body.get("alerting")
+    if isinstance(alerting, dict):
+        return alerting
+    if isinstance(alerting, list) and alerting and isinstance(alerting[0], dict):
+        return alerting[0]
+    return None
+
+
 def _apply_consecutive(body: dict[str, Any], consecutive: int) -> None:
     """Set ``consecutive_anomalies`` on the metric's first alerting config.
 
-    Accepts the YAML's normalized forms (a single dict or a list of dicts).
     Does nothing when the metric has no ``alerting`` block — tuning never invents
     alerting that wasn't configured.
     """
-    alerting = body.get("alerting")
-    if isinstance(alerting, dict):
-        alerting["consecutive_anomalies"] = consecutive
-    elif isinstance(alerting, list) and alerting and isinstance(alerting[0], dict):
-        alerting[0]["consecutive_anomalies"] = consecutive
+    block = _first_alerting_block(body)
+    if block is not None:
+        block["consecutive_anomalies"] = consecutive
+
+
+def _apply_anomaly_window(
+    body: dict[str, Any], anomaly_window: str | None, min_anomaly_share: float | None
+) -> None:
+    """Write the fraction alert rule into the first alerting config (issue #101).
+
+    Sets the pair together or removes both — never leaves a half-pair, which
+    ``AlertConfig`` rejects. Does nothing when the metric has no ``alerting``
+    block (tuning never invents alerting).
+    """
+    if (anomaly_window is None) != (min_anomaly_share is None):
+        raise ValueError("anomaly_window and min_anomaly_share must be set together")
+    block = _first_alerting_block(body)
+    if block is None:
+        return
+    if anomaly_window is not None and min_anomaly_share is not None:
+        block["anomaly_window"] = anomaly_window
+        block["min_anomaly_share"] = min_anomaly_share
+    else:
+        block.pop("anomaly_window", None)
+        block.pop("min_anomaly_share", None)
 
 
 def _changed_line(updated: list[str], preserved: list[str]) -> str:
@@ -160,6 +189,7 @@ def apply_tuned_config(
     project_root: Path,
     detectors: list[TunedDetector],
     consecutive_anomalies: int | None = None,
+    anomaly_window_update: tuple[str | None, float | None] | None = None,
     now: datetime | None = None,
 ) -> AppliedConfig:
     """Validate, archive, then re-emit ``original_path`` with the tuned detector(s) merged in.
@@ -175,6 +205,11 @@ def apply_tuned_config(
     detector types updated vs preserved). Raises ``ValueError`` (writing nothing) on
     an unknown/untunable detector type, invalid detector params, an empty detector
     list, or a config body that fails ``MetricConfig`` validation.
+
+    ``anomaly_window_update`` drives the fraction alert rule (issue #101):
+    ``None`` leaves the metric's existing pair untouched (legacy callers);
+    ``(window, share)`` writes the pair; ``(None, None)`` removes it. The pair
+    is always written/removed together — never a half-pair.
     """
     if not detectors:
         raise ValueError("no detector to apply")
@@ -217,6 +252,8 @@ def apply_tuned_config(
 
     if consecutive_anomalies is not None:
         _apply_consecutive(body, consecutive_anomalies)
+    if anomaly_window_update is not None:
+        _apply_anomaly_window(body, anomaly_window_update[0], anomaly_window_update[1])
 
     # Validate the whole metric before touching the filesystem.
     validated = MetricConfig.model_validate(body)

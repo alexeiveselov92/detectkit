@@ -83,6 +83,32 @@ def _trending_level(
     return vals.astype(float)
 
 
+def _ar2_series(
+    seed: int,
+    n: int,
+    a: float = 0.85,
+    b: float = -0.3,
+    c: float = 30.0,
+    sigma: float = 2.0,
+    spikes: dict[int, float] | None = None,
+) -> np.ndarray:
+    """A noisy AR(2) recurrence (damped oscillation) + injected dynamics breaks.
+
+    The natural habitat of the autoreg detector: the series has real short-range
+    structure an AR(p) fit captures, so its band is tight and an injected spike
+    is a genuine dynamics anomaly (not just a level outlier).
+    """
+    rng = np.random.RandomState(seed)
+    noise = rng.normal(0.0, sigma, n)
+    y = np.zeros(n)
+    y[0] = y[1] = c
+    for t in range(2, n):
+        y[t] = a * y[t - 1] + b * y[t - 2] + c + noise[t]
+    for idx, mag in (spikes or {}).items():
+        y[idx] += mag
+    return y.astype(float)
+
+
 def _hourly_seasonal(
     seed: int, n: int, interval_seconds: int, spikes: dict[int, float]
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -428,6 +454,133 @@ def _make_cases() -> list[dict[str, Any]]:
         }
     )
 
+    # 13. Autoreg base — AR(5) fit on an AR(2) series with a dynamics break.
+    #     Stabilization is DEFAULT-ON for autoreg; stated explicitly on both
+    #     sides so the case reads unambiguously.
+    vals = _ar2_series(1313, 360, spikes={250: 30.0})
+    cases.append(
+        {
+            "name": "autoreg_base",
+            "detector_type": "autoreg",
+            "interval_seconds": _DEFAULT_INTERVAL,
+            "values": vals,
+            "seasonality_data": None,
+            "seasonality_columns": None,
+            "detector_params": {
+                "lags": 5,
+                "threshold": 3.0,
+                "window_size": 100,
+                "min_samples": 30,
+                "stabilization": "clamp",
+            },
+            "ts_params": {
+                "type": "autoreg",
+                "lags": 5,
+                "threshold": 3.0,
+                "windowSize": 100,
+                "minSamples": 30,
+                "stabilization": "clamp",
+            },
+        }
+    )
+
+    # 14. Autoreg with NaN gaps, stabilization off — locks the strict v1 lag
+    #     policy (a gap in the lag view -> missing_lags, never imputed; fit rows
+    #     with gaps are dropped).
+    vals = _ar2_series(1414, 360, spikes={220: 28.0})
+    vals[100] = np.nan
+    vals[101] = np.nan
+    vals[160] = np.nan
+    cases.append(
+        {
+            "name": "autoreg_nan_gaps_no_stab",
+            "detector_type": "autoreg",
+            "interval_seconds": _DEFAULT_INTERVAL,
+            "values": vals,
+            "seasonality_data": None,
+            "seasonality_columns": None,
+            "detector_params": {
+                "lags": 5,
+                "threshold": 3.0,
+                "window_size": 100,
+                "min_samples": 30,
+                "stabilization": None,
+            },
+            "ts_params": {
+                "type": "autoreg",
+                "lags": 5,
+                "threshold": 3.0,
+                "windowSize": 100,
+                "minSamples": 30,
+                "stabilization": "none",
+            },
+        }
+    )
+
+    # 15. Autoreg on point-to-point changes — the input_type preprocessing path
+    #     (first point NaN -> missing_data, +1 context) with a different order.
+    vals = _ar2_series(1515, 360, spikes={230: 25.0})
+    cases.append(
+        {
+            "name": "autoreg_input_changes",
+            "detector_type": "autoreg",
+            "interval_seconds": _DEFAULT_INTERVAL,
+            "values": vals,
+            "seasonality_data": None,
+            "seasonality_columns": None,
+            "detector_params": {
+                "lags": 4,
+                "threshold": 3.0,
+                "window_size": 100,
+                "min_samples": 30,
+                "input_type": "changes",
+                "stabilization": "clamp",
+            },
+            "ts_params": {
+                "type": "autoreg",
+                "lags": 4,
+                "threshold": 3.0,
+                "windowSize": 100,
+                "minSamples": 30,
+                "inputType": "changes",
+                "stabilization": "clamp",
+            },
+        }
+    )
+
+    # 16. Autoreg at ~1e9 magnitude with a sustained incident — locks the
+    #     Phase-0 numerics (centered/scaled normal equations + the clamp
+    #     substitution capped to the observed window range). Without them the
+    #     Gram matrix conditioning collapses and the fit explodes to inf.
+    rng = np.random.RandomState(1616)
+    vals = (2.5e9 + rng.normal(0.0, 5e6, 360)).astype(float)
+    vals[240:270] += 8e7
+    cases.append(
+        {
+            "name": "autoreg_large_magnitude",
+            "detector_type": "autoreg",
+            "interval_seconds": _DEFAULT_INTERVAL,
+            "values": vals,
+            "seasonality_data": None,
+            "seasonality_columns": None,
+            "detector_params": {
+                "lags": 5,
+                "threshold": 3.0,
+                "window_size": 100,
+                "min_samples": 30,
+                "stabilization": "clamp",
+            },
+            "ts_params": {
+                "type": "autoreg",
+                "lags": 5,
+                "threshold": 3.0,
+                "windowSize": 100,
+                "minSamples": 30,
+                "stabilization": "clamp",
+            },
+        }
+    )
+
     return cases
 
 
@@ -471,6 +624,8 @@ _TS_PARAM_DEFAULTS: dict[str, Any] = {
     "lowerBound": None,
     "upperBound": None,
     "direction": "any",
+    # autoreg AR order (ignored by the other detectors).
+    "lags": 5,
 }
 
 

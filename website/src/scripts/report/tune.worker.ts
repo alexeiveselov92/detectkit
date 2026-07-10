@@ -25,6 +25,14 @@ interface RunMsg {
   type: 'run';
   id: number;
   params: DetectorParams;
+  /**
+   * Fraction alert rule (issue #101), OR-ed with the consecutive rule exactly
+   * like the pipeline. Top-level fields, NOT DetectorParams: they change which
+   * alerts fire, never the band, so they must not join the detector-param
+   * identity. Both-or-neither (mirrors the AlertConfig validator).
+   */
+  anomalyWindowPoints?: number | null;
+  minAnomalyShare?: number | null;
 }
 interface SeriesMsg {
   type: 'series';
@@ -90,6 +98,67 @@ function alertFireRuns(scored: ScoredPoint[], intervalMs: number, consecutive: n
   return runs;
 }
 
+/**
+ * Share-rule fires (port of the pipeline's `_decision._share_fire` semantics
+ * onto the cockpit's gap-filled grid): a point fires when it is itself flagged
+ * (a stale window never fires) AND the flagged share over the trailing
+ * `windowPoints` grid slots (current inclusive) reaches `share`. Slots before
+ * the series start / NaN gaps count in the denominator only. Fires within one
+ * window of each other collapse into a single episode (one marker), whose span
+ * runs from the onset (oldest flagged slot the firing window sees) to the last
+ * firing point — so recall/FDR overlap matching covers the whole diffuse
+ * incident, not just the fire instant.
+ */
+function shareFireRuns(
+  scored: ScoredPoint[],
+  windowPoints: number,
+  share: number
+): FireRun[] {
+  const n = scored.length;
+  const flags: boolean[] = new Array(n);
+  for (let t = 0; t < n; t++) flags[t] = scored[t].scored && scored[t].isAnomaly;
+  const need = share * windowPoints;
+
+  const runs: FireRun[] = [];
+  let cur: FireRun | null = null;
+  let lastFire = -Infinity;
+  let count = 0;
+  for (let t = 0; t < n; t++) {
+    if (flags[t]) count++;
+    if (t - windowPoints >= 0 && flags[t - windowPoints]) count--;
+    if (!flags[t] || count < need) continue;
+    if (cur && t - lastFire <= windowPoints) {
+      cur.endTs = scored[t].timestamp; // same elevated episode — extend
+    } else {
+      if (cur) runs.push(cur);
+      let onset = t;
+      for (let k = Math.max(0, t - windowPoints + 1); k <= t; k++) {
+        if (flags[k]) {
+          onset = k;
+          break;
+        }
+      }
+      cur = { fire: t, startTs: scored[onset].timestamp, endTs: scored[t].timestamp };
+    }
+    lastFire = t;
+  }
+  if (cur) runs.push(cur);
+  return runs;
+}
+
+/**
+ * OR-merge the two rules' fires, dedup by fire point (a point fires once no
+ * matter which rule tripped — mirrors the pipeline replay's per-timestamp
+ * dedup); the consecutive rule's run wins the tie for the span.
+ */
+function mergeFireRuns(consecutive: FireRun[], share: FireRun[]): FireRun[] {
+  const seen = new Set(consecutive.map((r) => r.fire));
+  const merged = consecutive.slice();
+  for (const r of share) if (!seen.has(r.fire)) merged.push(r);
+  merged.sort((a, b) => a.fire - b.fire);
+  return merged;
+}
+
 self.onmessage = (e: { data: unknown }): void => {
   const msg = e.data as RunMsg | SeriesMsg;
   if (msg.type === 'series') {
@@ -101,7 +170,12 @@ self.onmessage = (e: { data: unknown }): void => {
     const scored = runDetector(series, params);
     applyDirection(scored, params.direction);
     const intervalMs = series.intervalSeconds * 1000;
-    const runs = alertFireRuns(scored, intervalMs, params.consecutiveAnomalies);
+    let runs = alertFireRuns(scored, intervalMs, params.consecutiveAnomalies);
+    const wp = msg.anomalyWindowPoints ?? null;
+    const shareReq = msg.minAnomalyShare ?? null;
+    if (wp !== null && shareReq !== null && wp >= 2 && shareReq > 0) {
+      runs = mergeFireRuns(runs, shareFireRuns(scored, wp, shareReq));
+    }
     const fires = runs.map((r) => r.fire);
     const fireSpans = runs.map((r) => [r.startTs, r.endTs] as [number, number]);
     const eff = effectiveStartIndex(series, params);

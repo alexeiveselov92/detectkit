@@ -166,11 +166,23 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             payload = json.loads(body.decode("utf-8"))
             consecutive = payload.get("consecutive_anomalies")
+            # Fraction rule (issue #101): the page always posts both keys (a
+            # value to set, null to remove); a legacy page posts neither, which
+            # leaves the metric's existing pair untouched.
+            window_update: tuple[str | None, float | None] | None = None
+            if "anomaly_window" in payload or "min_anomaly_share" in payload:
+                raw_window = payload.get("anomaly_window")
+                raw_share = payload.get("min_anomaly_share")
+                window_update = (
+                    None if raw_window is None else str(raw_window),
+                    None if raw_share is None else float(raw_share),
+                )
             applied = apply_tuned_config(
                 original_path=srv.original_path,
                 project_root=srv.project_root,
                 detectors=_parse_tuned_detectors(payload),
                 consecutive_anomalies=None if consecutive is None else int(consecutive),
+                anomaly_window_update=window_update,
             )
         except Exception as exc:
             # Keep serving so the user can fix the knobs and retry.

@@ -43,8 +43,8 @@ _SMOOTHING_WINDOW_DEFAULT = 10
 _SMOOTHING_ALPHA_DEFAULT = 0.3
 
 # Per-detector-type floors / per-group defaults, keyed by the lowercase type.
-_MIN_SAMPLES_FLOOR: dict[str, int] = {"mad": 1, "zscore": 2, "iqr": 4}
-_MIN_SAMPLES_PER_GROUP_DEFAULT: dict[str, int] = {"mad": 10, "zscore": 3, "iqr": 4}
+_MIN_SAMPLES_FLOOR: dict[str, int] = {"mad": 1, "zscore": 2, "iqr": 4, "autoreg": 1}
+_MIN_SAMPLES_PER_GROUP_DEFAULT: dict[str, int] = {"mad": 10, "zscore": 3, "iqr": 4, "autoreg": 10}
 
 
 def _detector_type(detector_name: str) -> str:
@@ -59,6 +59,8 @@ def _detector_type(detector_name: str) -> str:
         return "zscore"
     if name.startswith("iqr"):
         return "iqr"
+    if name.startswith("autoreg"):
+        return "autoreg"
     return "mad"
 
 

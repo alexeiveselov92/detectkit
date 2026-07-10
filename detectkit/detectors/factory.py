@@ -3,6 +3,7 @@ Detector factory for creating detector instances from configuration.
 """
 
 from detectkit.detectors.base import BaseDetector
+from detectkit.detectors.statistical.autoreg import AutoregDetector
 from detectkit.detectors.statistical.iqr import IQRDetector
 from detectkit.detectors.statistical.mad import MADDetector
 from detectkit.detectors.statistical.manual_bounds import ManualBoundsDetector
@@ -29,6 +30,7 @@ class DetectorFactory:
         "iqr": IQRDetector,
         "manual_bounds": ManualBoundsDetector,
         "manual": ManualBoundsDetector,  # Alias
+        "autoreg": AutoregDetector,
     }
 
     @classmethod

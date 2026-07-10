@@ -17,7 +17,7 @@ class DetectorConfig(BaseModel):
     Configuration for a single detector.
 
     Attributes:
-        type: Detector type ("mad", "zscore", "iqr", "manual_bounds", etc.)
+        type: Detector type ("mad", "zscore", "iqr", "manual_bounds", "autoreg", etc.)
         params: Detector-specific parameters including:
             - Algorithm params: threshold, window_size, etc.
             - Execution params: start_time, batch_size, min_samples, etc.
@@ -58,6 +58,7 @@ class DetectorConfig(BaseModel):
             "zscore",
             "iqr",
             "manual_bounds",
+            "autoreg",
             "prophet",
             "timesfm",
         }

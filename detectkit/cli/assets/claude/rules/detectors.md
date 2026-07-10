@@ -90,10 +90,16 @@ band, or paired with a level detector (`mad`/`zscore`/`iqr`) via
 alert rule. Not a drop-in replacement — a metric with seasonal patterns still
 wants a windowed detector.
 
-**Not yet in `dtk autotune`** (Phase 1) — `autotune.detector_types` can't
-select it and the search never considers it. It also **rides read-only in
-`dtk tune`**: like `prophet`/`timesfm`, it isn't one of the cockpit's tunable
-slots, but Apply preserves it verbatim alongside whatever detector you did tune.
+**Autotune-eligible** via its own axis set — `autotune.detector_types` may
+include `autoreg`, and the grid search sweeps threshold / `lags` /
+stabilization / window size for it (no weighting, detrend or seasonality; a
+mildly conservative suitability vote favors it on clean/normal data, but all
+four types are still grid-searched). It's also **tunable in the `dtk tune`
+cockpit**: picking Autoreg swaps in a **Lags** knob and hides the
+windowed-only controls. (v0.53.0, `ALGORITHM_VERSION` 2: each fit window is
+centered/scaled before the normal equations, and the clamp substitution above
+is capped to the observed window range — detector ids change and detections
+recompute on the next run.)
 
 ## Windowed detectors (`mad`, `zscore`, `iqr`)
 

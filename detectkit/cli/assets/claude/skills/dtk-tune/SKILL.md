@@ -90,18 +90,21 @@ points so recompute (and the read) is faster — view-only, never written.
 
 These controls stay visible in **every** mode (they shape the band and the
 alerts): **Points shown**, the alert rule (**direction** + **consecutive
-anomalies**), and the **y = 0** reference-line toggle.
+anomalies** + the **anomaly_window**/**min_anomaly_share** fraction pair), and
+the **y = 0** reference-line toggle.
 
 ## Step 3 — The four modes (autotune is one of them)
 
 Walk the user to the mode that fits what they want to do:
 
 - **Tune** — *turn the knobs.* The band leads. Adjust **detector type** (MAD /
-  Z-Score / IQR, or **Manual** = fixed lower/upper bounds), **threshold**,
-  **window size**, **recency weighting + half-life**, **detrend**, **smoothing**,
-  and **seasonality groups**; the band + anomalies + would-fire alerts recompute
-  on every change. The window-size / half-life readouts show the equivalent
-  wall-clock span. **Stabilization** (none / clamp) clamps a flagged point to
+  Z-Score / IQR, **Autoreg** = predicts each point from its previous values
+  (**Lags** knob; the windowed-only knobs hide), or **Manual** = fixed
+  lower/upper bounds), **threshold**, **window size**, **recency weighting +
+  half-life**, **detrend**, **smoothing**, and **seasonality groups**; the band
+  + anomalies + would-fire alerts recompute on every change. The window-size /
+  half-life readouts show the equivalent wall-clock span. **Stabilization**
+  (none / clamp) clamps a flagged point to
   the bound it violated in later windows' statistics — try it when a sustained
   incident visibly balloons the band mid-incident and the detector stops
   flagging its tail. This is the core "turn the knobs yourself" loop.
@@ -137,17 +140,9 @@ ground truth, then **Autotune** for a strong config, then **Tune** by eye, then
 **Apply**. If they just want a quick strong default, go straight to **Autotune**
 (unsupervised) and refine. If they want full manual control, stay in **Tune**.
 
-**Two things the cockpit doesn't cover yet:**
-- The alerting rail control only tunes `consecutive_anomalies`. If the metric
-  also has (or should have) the OR-ed fraction-based alert window
-  (`anomaly_window` + `min_anomaly_share` — see `alerting.md` — useful for a
-  metric that *flaps*, mostly anomalous with occasional clean points that
-  would reset a pure consecutive chain), set those two fields by hand in the
-  metric YAML; the cockpit and `dtk autotune`'s alert-window sweep don't
-  search them yet (a tracked follow-up).
-- A metric with an `autoreg` detector: it rides **read-only** in the cockpit,
-  like `prophet`/`timesfm` — not one of the tunable slots, but Apply preserves
-  it verbatim alongside whatever detector you did tune.
+A metric with a `prophet`/`timesfm` detector: it rides **read-only** in the
+cockpit — not one of the tunable slots, but Apply preserves it verbatim
+alongside whatever detector you did tune.
 
 ## Step 4 — Read the live quality, then Apply
 
@@ -163,7 +158,8 @@ When the user is happy, they click **Apply to metric**. detectkit then, in order
 written**), **archives** the current YAML verbatim under
 `metrics/.history/<metric>/`, and **re-emits** the metric in place, **merging** the
 tuned detector(s) back in (and updating the first alerting block's
-`consecutive_anomalies` if it has one). Applying ends the session; saving incidents
+`consecutive_anomalies` and `anomaly_window`/`min_anomaly_share` pair if it has
+one — the pair is removed together when turned off). Applying ends the session; saving incidents
 does not. **Merge, not replace:** only the detector(s) the user tuned are
 rewritten; every other detector is kept **verbatim** — so a metric with a
 `manual_bounds` floor alongside a `mad` detector (and a `min_detectors: 2` alert)

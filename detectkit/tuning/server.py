@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import parse_qs, urlparse
 
 from detectkit.autotune.labels import parse_incident_labels, versioned_labels_path
+from detectkit.core.interval import Interval
 from detectkit.tuning.config_writer import AppliedConfig, TunedDetector, apply_tuned_config
 from detectkit.tuning.html import render_tune_html
 
@@ -165,11 +166,23 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             payload = json.loads(body.decode("utf-8"))
             consecutive = payload.get("consecutive_anomalies")
+            # Fraction rule (issue #101): the page always posts both keys (a
+            # value to set, null to remove); a legacy page posts neither, which
+            # leaves the metric's existing pair untouched.
+            window_update: tuple[str | None, float | None] | None = None
+            if "anomaly_window" in payload or "min_anomaly_share" in payload:
+                raw_window = payload.get("anomaly_window")
+                raw_share = payload.get("min_anomaly_share")
+                window_update = (
+                    None if raw_window is None else str(raw_window),
+                    None if raw_share is None else float(raw_share),
+                )
             applied = apply_tuned_config(
                 original_path=srv.original_path,
                 project_root=srv.project_root,
                 detectors=_parse_tuned_detectors(payload),
                 consecutive_anomalies=None if consecutive is None else int(consecutive),
+                anomaly_window_update=window_update,
             )
         except Exception as exc:
             # Keep serving so the user can fix the knobs and retry.
@@ -363,6 +376,14 @@ def _run_autotune(srv: _TuneServer, body: bytes) -> dict[str, Any]:
     return {
         "detector": seed_detector_params(result.chosen_detector_type, params),
         "consecutive_anomalies": result.consecutive_anomalies,
+        # Fraction rule (issue #101): pre-resolved to grid points for the page
+        # (the worker sweeps in points), same floor-div as AlertConditions.
+        "anomaly_window_points": (
+            max(1, Interval(result.anomaly_window).seconds // srv.interval_seconds)
+            if result.anomaly_window is not None
+            else None
+        ),
+        "min_anomaly_share": result.min_anomaly_share,
         "seasonality": result.chosen_seasonality,
         "score": result.score,
         "scoring_metric": result.scoring_metric,
@@ -449,6 +470,11 @@ def _echo_autotune_result(*, echo: Callable[[str], None], result: Any) -> None:
     season_line = f"Seasonality: {result.chosen_seasonality or 'none'}  |  CV folds: {folds}"
     if result.consecutive_anomalies is not None:
         season_line += f"  |  consecutive_anomalies={result.consecutive_anomalies}"
+    if result.anomaly_window is not None:
+        season_line += (
+            f"  |  anomaly_window={result.anomaly_window} "
+            f"× min_anomaly_share={result.min_anomaly_share}"
+        )
     echo_block(
         "RESULT",
         [

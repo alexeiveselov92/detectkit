@@ -83,9 +83,11 @@ Full reference: `autotune.md`.
 
 The **manual, interactive** sibling of `dtk autotune`. Opens a localhost browser
 view of the metric's **real** persisted series and lets you turn the detector's
-knobs (type — including **Manual bounds** with lower/upper sliders — threshold,
+knobs (type — including **Manual bounds** with lower/upper sliders and
+**Autoreg** with a **Lags** knob (windowed-only knobs hide for it) — threshold,
 window, recency weighting + half-life, detrend, stabilization, smoothing, **seasonality groups**,
-**direction** (both/up/down), alert `consecutive_anomalies`) while the confidence
+**direction** (both/up/down), alert `consecutive_anomalies` plus the
+**anomaly_window** / **min_anomaly_share** fraction pair) while the confidence
 band and flagged anomalies **recompute live**. The whole screen is a **chart-first
 cockpit**: ONE chart (the windshield) fills the view, the live metrics ride
 **pinned in a HUD over the chart** (the speedometer), and every control lives in an
@@ -94,7 +96,8 @@ knobs + effective config + Apply, Review the verdict actions, Label the capture
 tools + incident list + Save, Autotune the search button + winning config), while
 the controls that aren't detector-specific —
 the **Points shown** data window, the alert rule (**direction** + **consecutive
-anomalies**) and the **y = 0** toggle — stay visible in every mode. The chart is
+anomalies** + the **anomaly_window**/**min_anomaly_share** pair) and the
+**y = 0** toggle — stay visible in every mode. The chart is
 **zoomable** (scroll/drag + navigator strip) with a **"Points shown"** trim slider.
 Clicking **Apply** writes the chosen
 config back into the metric YAML **in place** (autotune, by contrast, writes a new
@@ -104,7 +107,7 @@ only the detector(s) you tuned and keeps every **other** detector unchanged, so 
 survives a retune. If a metric configures **more than one detector**, a **Tuning
 detector** picker in the Tune rail lets you choose which one to tune (the cockpit
 shows one band at a time); switching re-seeds every knob from that detector, and
-non-tunable detectors (`prophet`/`timesfm`/`autoreg`) plus the ones you didn't
+non-tunable detectors (`prophet`/`timesfm`) plus the ones you didn't
 touch are listed as "preserved on Apply". Reads the metric's loaded
 datapoints (run `dtk run --steps load` first if empty); the selector must resolve
 to a single metric.
@@ -127,8 +130,10 @@ each run also streams a structured `LABELS → … → RESULT` log to the termin
 `dtk run`). The Autotune mode is **advisory** — it computes + re-seeds only and persists nothing (no
 run record / `__tuned_<id>.yml` / detections, so `dtk tune` stays lock-free); review
 the band and **Apply** to write it back. It honours the metric's `autotune:` block,
-is supervised when incidents are marked (also picks `consecutive_anomalies`) else
-unsupervised, and needs the live server (unavailable under `--no-serve`).
+is supervised when incidents are marked (also sweeps the alert window —
+`consecutive_anomalies` then the 2-D `anomaly_window` × `min_anomaly_share`
+pair) else unsupervised, and needs the live server (unavailable under
+`--no-serve`).
 **Confirming an alert valid IS marking an
 incident**: the confirmed streak becomes a first-class **ground-truth incident** that
 shows in the Marked-incidents list (a read-only "✓ confirmed alert" row; its ✕

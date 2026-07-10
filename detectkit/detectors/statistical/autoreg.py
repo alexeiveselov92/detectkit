@@ -85,7 +85,7 @@ class AutoregDetector(BaseDetector):
     hash — see ``_get_non_default_params``.
     """
 
-    ALGORITHM_VERSION = 1
+    ALGORITHM_VERSION = 2
 
     def __init__(
         self,
@@ -341,15 +341,31 @@ class AutoregDetector(BaseDetector):
 
             x_valid = x_lags_all[valid_mask]
             y_valid = y_all[valid_mask]
-            design = np.column_stack([np.ones(n_valid), x_valid])
 
-            coef = self._fit_ar(design, y_valid)
+            # Center/scale the fit window before assembling the design matrix.
+            # OLS with an intercept is affine-equivariant, so the model is the
+            # same in exact arithmetic — but with raw values ~1e9 the Gram
+            # matrix mixes an intercept column of ones with lag columns of
+            # ~1e18, a conditioning gap beyond float64 precision that produced
+            # garbage coefficients (and, clamp-amplified, inf) on real NAB
+            # series. Fitting at ~unit scale fixes the conditioning; the
+            # prediction and residual scale are transformed back afterwards.
+            center = float(np.mean(y_valid))
+            scale = float(np.std(y_valid))
+            if not np.isfinite(center):
+                center = 0.0
+            if not np.isfinite(scale) or scale <= 0.0:
+                scale = 1.0
+            design = np.column_stack([np.ones(n_valid), (x_valid - center) / scale])
+            y_scaled = (y_valid - center) / scale
 
-            residuals = y_valid - design @ coef
-            sigma = float(np.sqrt(np.sum(residuals**2) / max(n_valid - (lags + 1), 1)))
+            coef = self._fit_ar(design, y_scaled)
 
-            pred_features = np.concatenate([[1.0], lag_vec])
-            pred = float(pred_features @ coef)
+            residuals = y_scaled - design @ coef
+            sigma = float(np.sqrt(np.sum(residuals**2) / max(n_valid - (lags + 1), 1))) * scale
+
+            pred_features = np.concatenate([[1.0], (lag_vec - center) / scale])
+            pred = float(pred_features @ coef) * scale + center
 
             lower = pred - threshold * sigma
             upper = pred + threshold * sigma
@@ -367,9 +383,18 @@ class AutoregDetector(BaseDetector):
             # center-substitution failure measured and rejected for the
             # windowed detectors in v0.51.0). The clamped value keeps a
             # threshold * sigma residual, so the AR model keeps flagging a
-            # sustained incident instead of adapting to it.
+            # sustained incident instead of adapting to it. The substitution
+            # is additionally capped to the observed (raw) range of the fit
+            # window, so a degenerate fit whose bound explodes can never write
+            # an astronomic value into the working history and amplify itself
+            # through later fits (measured on NAB, see _fit_ar conditioning).
             if stabilization == "clamp" and is_anomaly:
-                work[i] = lower if current_processed < lower else upper
+                bound = lower if current_processed < lower else upper
+                raw_window = processed[lag_start:i]
+                finite_raw = raw_window[np.isfinite(raw_window)]
+                if finite_raw.size:
+                    bound = float(np.clip(bound, np.min(finite_raw), np.max(finite_raw)))
+                work[i] = bound
                 replaced[i] = True  # type: ignore[index]
 
             metadata = {

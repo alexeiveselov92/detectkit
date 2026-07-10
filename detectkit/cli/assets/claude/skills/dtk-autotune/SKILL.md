@@ -86,7 +86,9 @@ generalize is rejected.
 
 Labels turn tuning from a good unsupervised default into a config optimised
 against *your* real incidents (it then optimises MCC and also tunes the alert
-window `consecutive_anomalies`). **The easiest, most reliable way to produce them
+window — `consecutive_anomalies` first, then a 2-D sweep of `anomaly_window` ×
+`min_anomaly_share` OR-ed with it, adopted only on a strictly better score).
+**The easiest, most reliable way to produce them
 is to mark incidents in `dtk tune` — offer this first**: open the cockpit and
 **guide the user through marking incidents on the chart** (see the **`dtk-tune`**
 skill for driving it), rather than asking them to recall timestamps:
@@ -208,15 +210,17 @@ the fallback for inline inspection.
 Read the emitted `metrics/<name>__tuned_<id>.yml` (do not re-run the search).
 The `#` comment header walks the whole decision; summarize for the user:
 
-- which **detector** won. All statistical detectors (mad / zscore / iqr) are
+- which **detector** won. All four types (mad / zscore / iqr / autoreg) are
   grid-searched and **cross-validation picks the winner** — the distribution
-  suitability vote only *orders* which is tried first, it never excludes one. So
-  describe the winner as "highest CV score", and mention the vote only as the
-  ordering hint it is.
+  suitability vote only *orders* which is tried first, it never excludes one.
+  `autoreg` is swept via its own axis set (threshold / `lags` / stabilization /
+  window size — no weighting, detrend or seasonality). So describe the winner
+  as "highest CV score", and mention the vote only as the ordering hint it is.
 - the chosen **seasonality** grouping and `seasonality_columns` (or "none" — a
   legitimate result when no key tightened the held-out band; see Step 1).
 - key params (`threshold`, `window_size`, `min_samples`, weighting/detrend) and
-  the alert `consecutive_anomalies`.
+  the alert window: `consecutive_anomalies`, plus `anomaly_window` /
+  `min_anomaly_share` when the fraction rule was adopted.
 - the score line. For a **supervised** run the header reads
   `Scoring metric : <metric> = …`; for an **unsupervised** run it reads
   `Objective : unsupervised (band-fit + flag-budget) = …` (it never claims an

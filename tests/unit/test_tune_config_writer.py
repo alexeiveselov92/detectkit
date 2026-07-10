@@ -402,3 +402,157 @@ detectors:
     assert det.params["window_size"] == 200
     assert det.params["start_time"] == "2024-02-01 00:00:00"  # carried over
     assert det.params["batch_size"] == 500  # carried over
+
+
+# ── autoreg write-back (issue #97 Phase 3) ───────────────────────────────────
+
+
+def test_apply_autoreg_swaps_detector(tmp_path):
+    path = _project(tmp_path)
+    res = apply_tuned_config(
+        original_path=path,
+        project_root=tmp_path,
+        detectors=_one(
+            "autoreg",
+            {"lags": 3, "threshold": 3.5, "window_size": 150, "min_samples": 20},
+        ),
+        now=_FIXED,
+    )
+    assert res.updated == ("autoreg",)
+    cfg = MetricConfig.from_yaml_file(path)
+    det = cfg.detectors[0]
+    assert det.type == "autoreg"
+    assert det.params["lags"] == 3
+    assert det.params["min_samples"] == 20
+
+
+def test_apply_autoreg_stabilization_off_written_as_null(tmp_path):
+    """autoreg's stabilization is default-ON, so turning it off must land as an
+    explicit null in the YAML (an absent key would silently mean clamp)."""
+    path = _project(tmp_path)
+    apply_tuned_config(
+        original_path=path,
+        project_root=tmp_path,
+        detectors=_one(
+            "autoreg",
+            {
+                "lags": 5,
+                "threshold": 3.0,
+                "window_size": 100,
+                "min_samples": 20,
+                "stabilization": None,
+            },
+        ),
+        now=_FIXED,
+    )
+    text = path.read_text()
+    assert "stabilization" in text
+    cfg = MetricConfig.from_yaml_file(path)
+    assert cfg.detectors[0].params["stabilization"] is None
+
+
+def test_apply_autoreg_invalid_lags_write_nothing(tmp_path):
+    path = _project(tmp_path)
+    before = path.read_text()
+    with pytest.raises(ValueError):
+        apply_tuned_config(
+            original_path=path,
+            project_root=tmp_path,
+            detectors=_one("autoreg", {"lags": 0, "window_size": 100}),
+            now=_FIXED,
+        )
+    assert path.read_text() == before
+
+
+# ── fraction alert rule write-back (issue #101 Part 2) ───────────────────────
+
+_PAIR_YAML = """name: orders
+interval: 1h
+query: "SELECT timestamp, value FROM t"
+detectors:
+  - type: mad
+    params:
+      threshold: 3.0
+      window_size: 100
+alerting:
+  - channels: [slack_alerts]
+    consecutive_anomalies: 3
+    anomaly_window: 21600s
+    min_anomaly_share: 0.5
+"""
+
+
+def test_apply_writes_the_fraction_pair(tmp_path):
+    path = _project(tmp_path)
+    apply_tuned_config(
+        original_path=path,
+        project_root=tmp_path,
+        detectors=_one("mad", {"threshold": 3.0, "window_size": 100}),
+        consecutive_anomalies=2,
+        anomaly_window_update=("14400s", 0.3),
+        now=_FIXED,
+    )
+    cfg = MetricConfig.from_yaml_file(path)
+    alert = cfg.alerting[0]
+    assert alert.anomaly_window == "14400s"
+    assert alert.min_anomaly_share == 0.3
+    assert alert.consecutive_anomalies == 2
+
+
+def test_apply_removes_the_pair_when_unset(tmp_path):
+    path = _project(tmp_path, text=_PAIR_YAML)
+    apply_tuned_config(
+        original_path=path,
+        project_root=tmp_path,
+        detectors=_one("mad", {"threshold": 3.0, "window_size": 100}),
+        anomaly_window_update=(None, None),
+        now=_FIXED,
+    )
+    cfg = MetricConfig.from_yaml_file(path)
+    assert cfg.alerting[0].anomaly_window is None
+    assert cfg.alerting[0].min_anomaly_share is None
+
+
+def test_apply_without_update_leaves_existing_pair(tmp_path):
+    """A legacy caller that doesn't pass anomaly_window_update must not strip a
+    configured pair."""
+    path = _project(tmp_path, text=_PAIR_YAML)
+    apply_tuned_config(
+        original_path=path,
+        project_root=tmp_path,
+        detectors=_one("mad", {"threshold": 2.5, "window_size": 100}),
+        now=_FIXED,
+    )
+    cfg = MetricConfig.from_yaml_file(path)
+    assert cfg.alerting[0].anomaly_window == "21600s"
+    assert cfg.alerting[0].min_anomaly_share == 0.5
+
+
+def test_apply_half_pair_rejected(tmp_path):
+    path = _project(tmp_path)
+    before = path.read_text()
+    with pytest.raises(ValueError):
+        apply_tuned_config(
+            original_path=path,
+            project_root=tmp_path,
+            detectors=_one("mad", {"threshold": 3.0, "window_size": 100}),
+            anomaly_window_update=("14400s", None),
+            now=_FIXED,
+        )
+    assert path.read_text() == before
+
+
+def test_apply_invalid_window_write_nothing(tmp_path):
+    """A window under 2 metric intervals fails MetricConfig validation → nothing
+    is written."""
+    path = _project(tmp_path)
+    before = path.read_text()
+    with pytest.raises(Exception):
+        apply_tuned_config(
+            original_path=path,
+            project_root=tmp_path,
+            detectors=_one("mad", {"threshold": 3.0, "window_size": 100}),
+            anomaly_window_update=("3600s", 0.3),  # 1 interval — validator rejects
+            now=_FIXED,
+        )
+    assert path.read_text() == before

@@ -74,8 +74,9 @@ export type GenerateSeries = (opts: SynthOptions) => Series;
 // Detector (detector.ts) — faithful port of WindowedStatDetector
 // ----------------------------------------------------------------------------
 
-export type DetectorType = 'mad' | 'zscore' | 'iqr' | 'manual_bounds';
-/** The windowed statistical detectors (everything except stateless manual_bounds). */
+export type DetectorType = 'mad' | 'zscore' | 'iqr' | 'manual_bounds' | 'autoreg';
+/** The windowed statistical detectors (not stateless manual_bounds, not the
+ * prediction-based autoreg — both have their own runDetector branches). */
 export type WindowedType = 'mad' | 'zscore' | 'iqr';
 /** Alert-layer direction filter: which anomaly direction counts ('any' = both). */
 export type AlertDirection = 'any' | 'up' | 'down';
@@ -129,6 +130,11 @@ export interface DetectorParams {
   lowerBound?: number | null;
   upperBound?: number | null;
   /**
+   * autoreg only — AR order: how many immediately-preceding values predict the
+   * current one. Ignored by the other detectors. Omitted = 5.
+   */
+  lags?: number;
+  /**
    * Alert-layer knob (NOT a band parameter): which anomaly direction is counted
    * as a flag for the alert timeline / dots ('any' = both). Omitted = 'any'.
    * The per-point band math is unaffected.
@@ -137,7 +143,9 @@ export interface DetectorParams {
 }
 
 export type AnomalyDirection = 'above' | 'below' | null;
-export type ScoreReason = 'ok' | 'missing_data' | 'insufficient_data';
+/** `missing_lags` is autoreg-only: a NaN gap inside the lag view (strict v1
+ * policy — never impute across a gap). Rendered like insufficient_data. */
+export type ScoreReason = 'ok' | 'missing_data' | 'insufficient_data' | 'missing_lags';
 
 /** One scored grid point. lower/upper/center are NaN when `scored` is false. */
 export interface ScoredPoint {

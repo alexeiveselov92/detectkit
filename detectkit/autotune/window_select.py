@@ -15,7 +15,7 @@ import numpy as np
 
 from detectkit.autotune._base import _AutoTuneBase
 from detectkit.autotune._types import CandidateEval
-from detectkit.detectors.factory import DetectorFactory
+from detectkit.autotune.axis_spec import resolve_floor
 from detectkit.detectors.seasonality import parse_seasonality_data
 from detectkit.detectors.statistical._windowed import WindowedStatDetector
 
@@ -27,9 +27,17 @@ from detectkit.detectors.statistical._windowed import WindowedStatDetector
 _MSPG_REF = int(WindowedStatDetector.MIN_SAMPLES_PER_GROUP_DEFAULT)
 
 
-def min_samples_for(window_size: int, floor: int) -> int:
-    """Derived min_samples: a quarter of the window, clamped to ``[floor, window]``."""
-    return min(window_size, max(floor, round(window_size / 4)))
+def min_samples_for(window_size: int, floor: int, lags: int | None = None) -> int:
+    """Derived min_samples: a quarter of the window, clamped to ``[floor, window]``.
+
+    For the autoreg detector the floor additionally tracks the AR order: the
+    AR(p) + intercept model has ``lags + 1`` unknowns, so at least ``lags + 2``
+    fit rows are required (the detector validates exactly that).
+    """
+    ms = min(window_size, max(floor, round(window_size / 4)))
+    if lags is not None:
+        ms = min(window_size, max(ms, lags + 2))
+    return ms
 
 
 def max_seasonal_cardinality(tuner: _AutoTuneBase) -> int:
@@ -184,12 +192,13 @@ def select_window(
     grid: list[int],
 ) -> CandidateEval:
     """Sweep the window grid (final axis); return the tie-biased-largest winner."""
-    floor = int(getattr(DetectorFactory.DETECTOR_TYPES[detector_type], "MIN_SAMPLES_FLOOR", 1))
+    floor = resolve_floor(detector_type)
+    lags = accepted.get("lags")
     evals: list[tuple[int, CandidateEval]] = []
     for w in grid:
         if w < floor:
             continue
-        candidate = {**accepted, "window_size": w, "min_samples": min_samples_for(w, floor)}
+        candidate = {**accepted, "window_size": w, "min_samples": min_samples_for(w, floor, lags)}
         ev = tuner.safe_evaluate(detector_type, candidate)
         if ev is not None:
             evals.append((w, ev))

@@ -20,12 +20,10 @@ from detectkit.autotune.distribution import compute_distribution_features
 from detectkit.detectors.factory import DetectorFactory
 from detectkit.detectors.seasonality import parse_seasonality_data
 
-# Detector types the engine can auto-tune (windowed statistical detectors).
-# Derived from the factory minus the manual/stateless ones.
-# "autoreg" is prediction-based (fits AR coefficients, not the windowed
-# center/spread stats this module's grid axes assume) — Phase 2 will add a
-# per-type grid seam before it can be tuned here.
-_EXCLUDED_TYPES = {"manual", "manual_bounds", "autoreg"}
+# Detector types the engine can auto-tune. Derived from the factory minus the
+# manual/stateless ones; the prediction-based "autoreg" participates via its
+# AxisSpec (see autotune/axis_spec.py), which gates the windowed-only axes.
+_EXCLUDED_TYPES = {"manual", "manual_bounds"}
 # A seasonal sub-group needs at least this many points to vote.
 _MIN_GROUP_FOR_VOTE = 10
 # Cap on voting sub-groups so a high-cardinality component can't explode cost.
@@ -56,6 +54,13 @@ def detector_suitability(detector_type: str, features: dict[str, float]) -> floa
     if detector_type == "iqr":
         # Best on skewed / asymmetric distributions.
         return _clip01(0.3 + 0.5 * min(1.0, skewness / 3.0) + 0.4 * outlier_fraction)
+    if detector_type == "autoreg":
+        # Prediction-based: models short-range dynamics, not level, and the
+        # distribution shape says little about dynamics — so the vote is
+        # mildly conservative (clean data, where a per-window AR fit is
+        # stable, nudges it up; it never outranks a clearly-matched level
+        # detector). Ordering only; the grid search still evaluates it.
+        return _clip01(0.3 + 0.3 * normality * (1.0 - outlier_fraction))
     return 0.5
 
 

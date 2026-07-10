@@ -93,6 +93,7 @@ detectkit/
 │   ├── runner.py                # autotune_from_data: cap→scoring→ground-truth→settings→engine (CLI + dtk tune)
 │   ├── labels.py / scoring.py / distribution.py / crossval.py   # ground truth, metrics, CV
 │   ├── seasonality_search.py / detector_select.py / grid_search.py / window_select.py  # stages
+│   ├── axis_spec.py             # per-detector-type AxisSpec: which grid axes apply + floors + max CV context
 │   └── result.py / config_emitter.py / settings.py / _types.py / _base.py
 ├── reporting/                   # self-contained HTML reports (`dtk run/autotune --report`)
 │   ├── builder.py               # build_report_payload: reads _dtk_* + replays alerts → JSON
@@ -293,11 +294,17 @@ reason as the windowed clamp); v1 has no seasonality/smoothing/weighting and a
 strict NaN policy (a gap in the lag view → no score, never imputed; fit rows
 with gaps are dropped, `min_samples` valid rows required).
 `get_context_size() = window_size + lags` (+1 for change-based input, +
-another `window_size` with stabilization). Excluded from autotune
-(`detector_select._EXCLUDED_TYPES` — the grid axes assume the windowed
-constructor shape; a per-type axis seam is Phase 2) and not tunable in the
-`dtk tune` cockpit (rides read-only like prophet/timesfm, preserved verbatim
-on Apply; the TS port is Phase 3).
+another `window_size` with stabilization). **Numerics (ALGORITHM_VERSION 2,
+measured on NAB):** each fit window is centered/scaled before the normal
+equations (an intercept column of ones next to raw ~1e9-scale lag columns
+puts the Gram matrix's conditioning beyond float64 — garbage fits that the
+clamp then amplified to inf), and the clamp substitution is capped to the
+observed window range so a degenerate fit can never write an astronomic value
+into later history; detection flags are affine-invariant. Fully **autotunable**
+(via its `AxisSpec` — threshold/lags/stabilization/window axes only, see
+Auto-tuning below) and **tunable in the `dtk tune` cockpit** (a `runAutoreg`
+branch in the parity-checked TS port + a Lags knob; the windowed-only knobs
+hide).
 
 `detectkit/detectors/factory.py` (`DetectorFactory`) is the registry mapping
 type names to classes: `mad`, `zscore`, `iqr`, `manual_bounds`, `autoreg`,
@@ -357,9 +364,11 @@ and alert state. The rule chip on every channel renders through the shared
 `format_rule_display` (`channels/base.py`) → `{rule_display}` — legacy
 configs render byte-identically; a share-configured config names both OR-ed
 rules; a share-fired alert leads with the share rule and a window-story lead
-sentence instead of the consecutive-duration one. The `dtk tune` cockpit and
-autotune's alert-window sweep still tune `consecutive_anomalies` only
-(fraction support there is tracked as issue #101).
+sentence instead of the consecutive-duration one. Both optimization paths
+tune the pair: supervised autotune sweeps it 2-D (window × share, OR-ed with
+the chosen consecutive rule — see Auto-tuning), and the `dtk tune` cockpit
+has anomaly-window/min-share rail controls whose fires the worker replays
+with the same latest-point-gate/denominator semantics.
 
 Other behaviors: **cooldown** (`_cooldown.py`) suppresses repeat alerts within
 `alert_cooldown`, optionally reset on recovery; **recovery** (`_recovery.py`)
@@ -598,7 +607,15 @@ cockpit and on the command line are the same computation). Stages
    chosen window, since the optimal threshold depends on window size) maximizing
    the cross-validated score. The threshold grid carries high "near-suppress" rungs
    so a heavy-tailed metric can widen the band under the flag-rate budget instead
-   of being trapped flagging its tail.
+   of being trapped flagging its tail. Which axes apply is dispatched per
+   detector type through the **`AxisSpec`** seam (`axis_spec.py`): the windowed
+   types get exactly the axes above (behavior-identical), `autoreg` sweeps only
+   threshold / **lags** (`TuneSettings.lags_grid`, min_samples floored at
+   `lags + 2`) / stabilization / window and never receives
+   `seasonality_components` (v1 rejects them); unlisted future types default to
+   the windowed axes. The spec also drives the CV plan's context reservation
+   (`max_context_size` — stabilization warm-up + lags, not just the raw max
+   window, so folds never silently score unscorable points).
 4. **Window selection** (`window_select.py`) — window grid in natural seasonal
    units, **plus a seasonality-fill candidate** (`seasonal_fill_window` =
    `min_samples_per_group × max_seasonal_cardinality`, capped to the fold budget)
@@ -608,7 +625,13 @@ cockpit and on the command line are the same computation). Stages
    **trend-gated** by `trend_present` (a midpoint-median
    test): stationary → prefer the **larger** window ("more history is better");
    trend / regime shift present → prefer the **smaller** (fresher baseline).
-   Supervised runs also sweep `consecutive_anomalies` for the alert window.
+   Supervised runs also sweep the alert rule (`autotuner._select_alert_window`):
+   the 1-D `consecutive_anomalies` loop first, then a 2-D (window × share)
+   sweep of the **fraction rule OR-ed with the chosen consecutive rule** —
+   scoring exactly the composite the pipeline deploys — adopted only on a
+   strictly greater score (legacy rule wins ties, existing tunes byte-stable);
+   an adopted pair emits `anomaly_window` as an exact-seconds duration
+   (lossless grid-points round-trip) + `min_anomaly_share`.
    Because `trend_present` only compares the two halves' medians against the
    *global* MAD, it misses a level shift that sits off-center (both halves
    straddle it) or one big enough to inflate that MAD; `detect_level_shift`
@@ -716,7 +739,12 @@ also rides in Autotune, so the searched config can be Applied in place) — neve
 every control at once. Two **always-visible common groups**
 sandwich the per-mode group (never toggled by `setUiMode`): `topCommon` (the
 **Points shown** data-window trim) above it and `alertCommon` (the alert rule —
-**direction** + **consecutive anomalies** — plus the **y = 0** view toggle) below
+**direction** + **consecutive anomalies** + the fraction pair **anomaly
+window / min share** (off below 2 points ⇒ legacy consecutive-only; the worker's
+`shareFireRuns` replays it with pipeline semantics — latest-point gate, missing
+slots in the denominator only — and OR-merges the fires with the consecutive
+rule's, deduped per fire point; Apply writes the pair into the first alerting
+block or removes both, never a half-pair) — plus the **y = 0** view toggle) below
 it, since those shape the band / the reviewed alerts / the recall+FDR in every
 mode. The **mode switch** lives in the HUD. `UiMode = ChartMode | 'autotune'`: the
 chart itself only knows the three **layer**-modes (`ChartMode = tune | review |
@@ -1163,20 +1191,12 @@ so they stay discoverable.
   applies, more acutely, to `AutoregDetector`'s per-point refit.)
 - **Advanced detectors** — Prophet and TimesFM integrations are planned (the
   optional extras are already reserved in `pyproject.toml`).
-- **Autoreg phases 2–3** (issue #97) — autotune integration needs a per-type
-  axis-spec seam in `grid_search.py` (axes are hardcoded to the windowed
-  constructor shape); the TS port for live cockpit tuning needs a
-  `runAutoreg` branch in `detector.ts`, both `_TUNABLE_TYPES` tuples
-  (`payload.py` + `config_writer.py`), golden parity fixtures and a bundle
-  regen.
-- **Fraction alert window in autotune + the tune cockpit** (issue #101) — the
-  supervised alert sweep is 1-D (`consecutive_anomalies` only) and
-  `tune.worker.ts` replays only the consecutive rule; a 2-D (window × share)
-  sweep and cockpit parity are the tracked follow-up to issue #96.
 - **`benchmarks/`** (top-level, dev tooling, not in the wheel) — the
   NAB/Yahoo/synthetic harness (issue #99) scoring F1-best / AUC-PR /
   point-adjusted F1 per detector variant; also hosts the benchmark-local
-  spectral-residual implementation kept under a measure-first gate.
+  spectral-residual implementation kept under a measure-first gate (measured
+  weaker than everything on synthetic AND NAB — a documented negative
+  result). First full NAB numbers live in `benchmarks/README.md`.
 - **DB connection pooling** — each manager holds a single connection; the SQL
   backends use per-statement `executemany`, fine for incremental runs but not
   optimized for very large backfills.

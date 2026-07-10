@@ -517,3 +517,91 @@ def test_explicit_from_not_widened_by_incidents():
         incidents=[{"start": "2020-01-01 00:00:00", "end": "2020-01-01 06:00:00"}],
     )
     assert rec.requested_from == explicit
+
+
+# ── autoreg seeding (issue #97 Phase 3) ──────────────────────────────────────
+
+
+def test_seed_detector_params_autoreg_maps_lags_and_default_on_clamp():
+    seed = seed_detector_params("autoreg", {"lags": 3, "threshold": 3.5, "window_size": 150})
+    assert seed["type"] == "autoreg"
+    assert seed["lags"] == 3
+    assert seed["threshold"] == 3.5
+    # stabilization is default-ON for autoreg: an absent key seeds "clamp"...
+    assert seed["stabilization"] == "clamp"
+    # ...and only an explicit null reads as none.
+    off = seed_detector_params("autoreg", {"stabilization": None})
+    assert off["stabilization"] == "none"
+
+
+def test_seed_detector_params_windowed_carries_default_lags():
+    # harmless default so switching the picker to autoreg never hits an empty slider
+    assert seed_detector_params("mad", {})["lags"] == 5
+
+
+def test_detectors_payload_autoreg_is_tunable_but_windowed_opens_first():
+    m = _metric(
+        detectors=[
+            {"type": "autoreg", "params": {"lags": 3, "window_size": 150}},
+            {"type": "mad", "params": {"threshold": 3.0}},
+        ]
+    )
+    from detectkit.tuning.payload import _detectors_payload
+
+    entries, active = _detectors_payload(m)
+    assert [e["tunable"] for e in entries] == [True, True]
+    assert entries[0]["seed"]["lags"] == 3
+    assert "lags=3" in entries[0]["summary"]
+    # the cockpit still opens on the band-centric windowed detector
+    assert active == 1
+
+
+def test_detectors_payload_autoreg_only_opens_on_autoreg():
+    m = _metric(detectors=[{"type": "autoreg", "params": {"lags": 3, "window_size": 150}}])
+    from detectkit.tuning.payload import _detectors_payload
+
+    entries, active = _detectors_payload(m)
+    assert active == 0
+    assert entries[0]["seed"]["type"] == "autoreg"
+
+
+# ── fraction alert rule seeds (issue #101 Part 2) ────────────────────────────
+
+
+def test_payload_bakes_anomaly_window_points():
+    internal = FakeInternal(n=48)
+    m = _metric(
+        detectors=[{"type": "mad", "params": {"threshold": 3.0}}],
+        alerting=[
+            {
+                "channels": ["slack"],
+                "consecutive_anomalies": 3,
+                "anomaly_window": "6h",
+                "min_anomaly_share": 0.3,
+            }
+        ],
+    )
+    payload = build_tune_payload(
+        metric_config=m,
+        internal=internal,
+        start=datetime(2026, 1, 1),
+        end=datetime(2026, 1, 2, 23),
+    )
+    assert payload["anomaly_window_points"] == 6  # 6h @ 1h grid
+    assert payload["min_anomaly_share"] == 0.3
+
+
+def test_payload_anomaly_window_absent_seeds_none():
+    internal = FakeInternal(n=48)
+    m = _metric(
+        detectors=[{"type": "mad", "params": {"threshold": 3.0}}],
+        alerting=[{"channels": ["slack"], "consecutive_anomalies": 3}],
+    )
+    payload = build_tune_payload(
+        metric_config=m,
+        internal=internal,
+        start=datetime(2026, 1, 1),
+        end=datetime(2026, 1, 2, 23),
+    )
+    assert payload["anomaly_window_points"] is None
+    assert payload["min_anomaly_share"] is None

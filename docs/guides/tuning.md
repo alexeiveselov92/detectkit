@@ -50,9 +50,12 @@ dtk tune --select api_error_rate --from 2026-05-01 --to 2026-06-01
 
 In the browser you can adjust:
 
-- **Detector** — MAD, Z-Score, IQR (all windowed statistical) or **Manual**
+- **Detector** — MAD, Z-Score, IQR (all windowed statistical), **Autoreg**
+  (predicts each point from its previous values — see below), or **Manual**
   (fixed bounds; see below). Switching to Manual swaps the windowed knobs for the
-  bound sliders.
+  bound sliders; switching to Autoreg swaps the windowed-only knobs (recency
+  weighting, detrend, smoothing, seasonality) for a single **Lags** (AR order)
+  knob, keeping threshold, window size and stabilization.
 - **Threshold** — interval width in σ-equivalent units.
 - **Window size** — the trailing window each point is compared against. The
   readout shows the equivalent **wall-clock span** on the metric grid next to the
@@ -86,6 +89,10 @@ In the browser you can adjust:
   from the metric's alerting, with the multi-detector `same` reading as `any`) —
   it never changes the band itself.
 - **Alert: consecutive anomalies** — the alert window (`consecutive_anomalies`).
+- **Alert: anomaly window (points)** / **Alert: min share in window** — the
+  fraction-alert pair (`anomaly_window` + `min_anomaly_share`), OR-ed with the
+  consecutive rule; leaving the window below 2 points keeps the legacy
+  consecutive-only behavior.
 
 Every control carries an **ⓘ tooltip** explaining what it does. The confidence
 band, the flagged points and the would-fire alert markers update when you
@@ -126,7 +133,8 @@ needs (the detector knobs + Apply in Tune, the verdict actions in Review, the
 capture tools + Save in Label, the search button + result in Autotune), and
 collapses to give the chart the whole width.
 The controls that aren't detector-specific — the **Points shown** data window, the
-alert rule (**direction** + **consecutive anomalies**) and the **y = 0** toggle —
+alert rule (**direction** + **consecutive anomalies** + the
+**anomaly-window/min-share** pair) and the **y = 0** toggle —
 stay visible in every mode, since they shape the band, the alerts you review, and
 the recall/FDR you watch while labeling. A
 **mode switch** above the chart picks the job; the layers that don't matter to it
@@ -214,10 +222,11 @@ the band, then **Apply** (in Autotune or Tune mode) to write it back.
 - Watch the **terminal** you launched `dtk tune` from: each run streams a structured,
   blocked log (`LABELS → SEASONALITY → … → RESULT`, the same look as `dtk run` and
   `dtk autotune`) so you can follow what it's computing.
-- With incidents marked, the search is **supervised** (it also picks
-  `consecutive_anomalies`); with none, it falls back to the **unsupervised**
-  objective. Mark a few incidents first for a sharper result — the Autotune panel
-  tells you which mode it ran.
+- With incidents marked, the search is **supervised** (it also sweeps the alert
+  window — `consecutive_anomalies` first, then the 2-D `anomaly_window` ×
+  `min_anomaly_share` pair OR-ed with it); with none, it falls back to the
+  **unsupervised** objective. Mark a few incidents first for a sharper result —
+  the Autotune panel tells you which mode it ran.
 - It honours the metric's `autotune:` config block (`scoring_metric`, `folds`,
   `detector_types`, `force_seasonality`, …), exactly like the CLI.
 - It is **advisory**: nothing is written until you **Apply**. Unlike `dtk autotune`,
@@ -299,9 +308,10 @@ Click **Apply to metric**. detectkit then, in order:
    trips a "duplicate metric name" error against its own snapshots.)
 3. **Re-emits** the metric file in place, **merging** the tuned detector(s) back
    in — only the detector(s) you tuned are rewritten; every **other** detector is
-   kept **verbatim**, and the first `alerting` block's `consecutive_anomalies` is
-   updated if the metric has one. The re-emitted header names what was updated vs
-   preserved.
+   kept **verbatim**, and the first `alerting` block's `consecutive_anomalies`
+   and `anomaly_window`/`min_anomaly_share` pair are updated if the metric has
+   one (the pair is removed together when turned off — never a half-pair). The
+   re-emitted header names what was updated vs preserved.
 
 **Metrics with more than one detector.** If a metric configures several detectors
 — e.g. a `mad` pattern detector **plus** a
@@ -311,7 +321,7 @@ Tune rail. Pick which detector to tune (the chart shows one band at a time);
 switching re-seeds every knob from that detector. On **Apply**, the detectors you
 tuned are rewritten and the rest are **preserved unchanged**, so the quorum keeps
 firing — a tune never silently drops your other detectors. Non-tunable detectors
-(`prophet`/`timesfm`/`autoreg`) are listed as preserved.
+(`prophet`/`timesfm`) are listed as preserved.
 
 `dtk tune` takes **no pipeline lock** — it only edits a config file. The live
 preview is a faithful approximation; the **next `dtk run` is the source of truth**.

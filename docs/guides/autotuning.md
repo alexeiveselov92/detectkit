@@ -29,16 +29,22 @@ every choice:
    isn't implemented yet, so it is always `false` and carries no signal.)
 2. **Detector type** — a distribution decision tree votes per seasonality group:
    Gaussian / light-tailed → `zscore`; heavy tails or outliers → `mad`; skewed →
-   `iqr`. The winners are shortlisted.
+   `iqr`; clean/normal-looking dynamics → a mildly conservative vote for
+   `autoreg`. The vote only orders the candidates — all four types are still
+   grid-searched, and cross-validation picks the winner.
 3. **Hyperparameters** — a bounded coordinate grid search over `threshold`,
-   recency weighting, detrending and `window_size`, maximizing a cross-validated
-   score.
+   recency weighting, detrending and `window_size` for the windowed types
+   (`mad`/`zscore`/`iqr`); `autoreg` sweeps its own axis set — `threshold`,
+   `lags`, stabilization and `window_size` — since it has no weighting,
+   detrend or seasonality. Both maximize a cross-validated score.
 4. **History window** — prefers a larger `window_size` on near-ties ("more
    history is better"), and sets `loading_start_time` to cover the lead-in (and
    pins the detector's `start_time` to it, so the first `dtk run` detects across
    all loaded history).
-5. **Alert window** (supervised only) — sweeps `consecutive_anomalies` against
-   the labeled incidents.
+5. **Alert window** (supervised only) — sweeps `consecutive_anomalies` first,
+   then a 2-D sweep of `anomaly_window` × `min_anomaly_share` OR-ed with that
+   consecutive rule, against the labeled incidents; the fraction pair is
+   adopted only on a strictly better score.
 
 Cross-validation is automatic **walk-forward** (expanding-window) folds — there
 are no split ratios to choose.
@@ -294,7 +300,7 @@ YAML. It is fully optional — absent means "tune everything automatically":
 ```yaml
 autotune:
   enabled: true
-  detector_types: [mad, zscore]      # restrict candidates (subset of mad/zscore/iqr)
+  detector_types: [mad, zscore]      # restrict candidates (subset of mad/zscore/iqr/autoreg)
   scoring_metric: mcc                # default optimization target
   beta: 1.0                          # only used for scoring_metric: f_beta
   labels_file: incidents/orders.yml  # external labels file, OR inline (below)

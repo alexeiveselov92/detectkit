@@ -21,11 +21,13 @@ class TestValidateMetricUniqueness:
         """Test validation with a single valid metric."""
         # Create metric file
         metric_file = tmp_path / "cpu.yml"
-        metric_file.write_text("""
+        metric_file.write_text(
+            """
 name: cpu_usage
 interval: 1min
 query: "SELECT * FROM metrics"
-""")
+"""
+        )
 
         # Validate
         result = validate_metric_uniqueness([metric_file])
@@ -39,18 +41,22 @@ query: "SELECT * FROM metrics"
         """Test validation with multiple metrics with unique names."""
         # Create metric files
         cpu_file = tmp_path / "cpu.yml"
-        cpu_file.write_text("""
+        cpu_file.write_text(
+            """
 name: cpu_usage
 interval: 1min
 query: "SELECT * FROM cpu_metrics"
-""")
+"""
+        )
 
         mem_file = tmp_path / "memory.yml"
-        mem_file.write_text("""
+        mem_file.write_text(
+            """
 name: memory_usage
 interval: 1min
 query: "SELECT * FROM memory_metrics"
-""")
+"""
+        )
 
         # Validate
         result = validate_metric_uniqueness([cpu_file, mem_file])
@@ -63,18 +69,22 @@ query: "SELECT * FROM memory_metrics"
         """Test that duplicate metric names raise ValueError."""
         # Create metric files with same name
         api_cpu = tmp_path / "api_cpu.yml"
-        api_cpu.write_text("""
+        api_cpu.write_text(
+            """
 name: cpu_usage
 interval: 1min
 query: "SELECT * FROM api_metrics"
-""")
+"""
+        )
 
         system_cpu = tmp_path / "system_cpu.yml"
-        system_cpu.write_text("""
+        system_cpu.write_text(
+            """
 name: cpu_usage
 interval: 1min
 query: "SELECT * FROM system_metrics"
-""")
+"""
+        )
 
         # Validate - should raise ValueError
         with pytest.raises(ValueError) as exc_info:
@@ -89,11 +99,13 @@ query: "SELECT * FROM system_metrics"
         """Test that invalid YAML raises ValueError."""
         # Create invalid YAML file (malformed YAML syntax)
         invalid_file = tmp_path / "invalid.yml"
-        invalid_file.write_text("""
+        invalid_file.write_text(
+            """
 name: cpu_usage
 interval: "10min
 query: "SELECT * FROM metrics"
-""")
+"""
+        )
 
         # Validate - should raise ValueError
         with pytest.raises(ValueError) as exc_info:
@@ -107,10 +119,12 @@ query: "SELECT * FROM metrics"
         """Test that missing required fields raise ValueError."""
         # Create file without required fields
         incomplete_file = tmp_path / "incomplete.yml"
-        incomplete_file.write_text("""
+        incomplete_file.write_text(
+            """
 name: cpu_usage
 # Missing interval and query
-""")
+"""
+        )
 
         # Validate - should raise ValueError
         with pytest.raises(ValueError) as exc_info:
@@ -134,18 +148,22 @@ name: cpu_usage
 
         # Create metrics with same name in different dirs
         api_metric = api_dir / "cpu.yml"
-        api_metric.write_text("""
+        api_metric.write_text(
+            """
 name: cpu_usage
 interval: 1min
 query: "SELECT * FROM api_metrics"
-""")
+"""
+        )
 
         system_metric = system_dir / "cpu.yml"
-        system_metric.write_text("""
+        system_metric.write_text(
+            """
 name: cpu_usage
 interval: 1min
 query: "SELECT * FROM system_metrics"
-""")
+"""
+        )
 
         # Validate - should raise ValueError
         with pytest.raises(ValueError) as exc_info:
@@ -166,17 +184,21 @@ class TestValidateProjectMetrics:
         metrics_dir.mkdir()
 
         # Create metric files
-        (metrics_dir / "cpu.yml").write_text("""
+        (metrics_dir / "cpu.yml").write_text(
+            """
 name: cpu_usage
 interval: 1min
 query: "SELECT * FROM metrics"
-""")
+"""
+        )
 
-        (metrics_dir / "memory.yml").write_text("""
+        (metrics_dir / "memory.yml").write_text(
+            """
 name: memory_usage
 interval: 1min
 query: "SELECT * FROM metrics"
-""")
+"""
+        )
 
         # Validate project
         result = validate_project_metrics(tmp_path)
@@ -213,11 +235,13 @@ query: "SELECT * FROM metrics"
         metrics_dir.mkdir()
 
         # Create metric with .yaml extension
-        (metrics_dir / "cpu.yaml").write_text("""
+        (metrics_dir / "cpu.yaml").write_text(
+            """
 name: cpu_usage
 interval: 1min
 query: "SELECT * FROM metrics"
-""")
+"""
+        )
 
         # Validate project
         result = validate_project_metrics(tmp_path)
@@ -235,17 +259,21 @@ query: "SELECT * FROM metrics"
         api_dir.mkdir()
 
         # Create metrics in different locations
-        (metrics_dir / "cpu.yml").write_text("""
+        (metrics_dir / "cpu.yml").write_text(
+            """
 name: cpu_usage
 interval: 1min
 query: "SELECT * FROM metrics"
-""")
+"""
+        )
 
-        (api_dir / "latency.yml").write_text("""
+        (api_dir / "latency.yml").write_text(
+            """
 name: api_latency
 interval: 1min
 query: "SELECT * FROM api_metrics"
-""")
+"""
+        )
 
         # Validate project
         result = validate_project_metrics(tmp_path)
@@ -261,17 +289,21 @@ query: "SELECT * FROM api_metrics"
         metrics_dir.mkdir()
 
         # Create metrics with duplicate names
-        (metrics_dir / "cpu1.yml").write_text("""
+        (metrics_dir / "cpu1.yml").write_text(
+            """
 name: cpu_usage
 interval: 1min
 query: "SELECT * FROM metrics1"
-""")
+"""
+        )
 
-        (metrics_dir / "cpu2.yml").write_text("""
+        (metrics_dir / "cpu2.yml").write_text(
+            """
 name: cpu_usage
 interval: 1min
 query: "SELECT * FROM metrics2"
-""")
+"""
+        )
 
         # Validate project - should raise ValueError
         with pytest.raises(ValueError) as exc_info:

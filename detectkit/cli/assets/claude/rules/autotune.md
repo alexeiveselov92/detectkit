@@ -41,9 +41,11 @@ same windowed detectors and `detector_id` identity). The fastest path is the
    empty while a genuinely seasonal one gets the key it deserves.
 2. **Detector type** — a quick distribution vote orders the candidates
    (Gaussian/light-tailed → `zscore`; heavy tails/outliers → `mad`; skewed →
-   `iqr`), but it is advisory only: the grid search evaluates **all** statistical
-   detectors (`mad`/`zscore`/`iqr`) and cross-validation picks the winner — no
-   type is excluded by heuristic.
+   `iqr`; clean/normal dynamics → a mildly conservative vote for `autoreg`),
+   but it is advisory only: the grid search evaluates **all four** types
+   (`mad`/`zscore`/`iqr`/`autoreg`) and cross-validation picks the winner — no
+   type is excluded by heuristic. `autoreg` is swept via its own axis set
+   (below), not the windowed one.
 3. **Hyperparameters** — a bounded coordinate grid search over `threshold`,
    recency weighting (and its **half-life** when adopted), detrending,
    **stabilization** (`clamp`, adopted only when it clears the score margin)
@@ -51,7 +53,10 @@ same windowed detectors and `detector_id` identity). The fastest path is the
    `threshold` re-sweep at the chosen window. Fold scores aggregate as
    `mean − stability_lambda · downside_deviation` (downside-only, so a config that
    scores *better* on recent folds isn't penalized; lower `stability_lambda` for a
-   regime-shift metric).
+   regime-shift metric). `autoreg` sweeps only `threshold` / `lags` /
+   stabilization / `window_size` — no weighting, detrend or seasonality (v1
+   rejects `seasonality_components`); its `min_samples` floor tracks
+   `lags + 2`.
 4. **History window** — on near-ties uses a trend-gated tie-break: a stationary
    series prefers the **larger** `window_size` ("more history is better"), a
    trending / regime-shifting one the **smaller**; sets `loading_start_time` to
@@ -66,8 +71,11 @@ same windowed detectors and `detector_id` identity). The fastest path is the
    Advisory only; it changes no chosen parameters,
    and it detects level shifts, not variance/shape changes (label incidents for
    those).
-5. **Alert window** (supervised only) — sweeps `consecutive_anomalies` on the
-   labeled incidents.
+5. **Alert window** (supervised only) — sweeps `consecutive_anomalies` first,
+   then a 2-D sweep of `anomaly_window` × `min_anomaly_share` OR-ed with that
+   chosen consecutive rule, on the labeled incidents; the fraction pair is
+   adopted only on a strictly greater score (a tie keeps the consecutive-only
+   rule).
 
 Cross-validation is automatic walk-forward (expanding-window) folds — no split
 ratios to choose.
@@ -173,7 +181,7 @@ Add to a metric YAML to constrain the search. Fully optional — absent means
 ```yaml
 autotune:
   enabled: true
-  detector_types: [mad, zscore]   # restrict candidates (subset of mad/zscore/iqr)
+  detector_types: [mad, zscore]   # restrict candidates (subset of mad/zscore/iqr/autoreg)
   scoring_metric: mcc             # default optimization target
   beta: 1.0                       # only for scoring_metric: f_beta
   labels_file: incidents/orders.yml   # external labels file, OR inline (below)

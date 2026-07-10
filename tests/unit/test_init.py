@@ -33,9 +33,7 @@ def test_init_example_incidents_file_parses(tmp_path):
 
     run_init("demo", str(tmp_path), db_type="clickhouse")
     incidents_path = tmp_path / "demo" / "incidents" / "example_cpu_usage.yml"
-    labels = parse_labels_file(
-        incidents_path, interval_seconds=60, metric_name="example_cpu_usage"
-    )
+    labels = parse_labels_file(incidents_path, interval_seconds=60, metric_name="example_cpu_usage")
     # one interval + one point in the shipped example
     assert len(labels.intervals) == 1
     assert len(labels.points) == 1

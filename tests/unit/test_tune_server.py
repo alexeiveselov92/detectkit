@@ -391,7 +391,7 @@ def test_autotune_returns_winner_and_keeps_serving(tmp_path):
         r = _post_path(base, "/autotune", token, {"yaml": "metric: orders\nincidents: []\n"})
         assert r.status == 200
         res = json.loads(r.read())
-        assert res["detector"]["type"] in {"mad", "zscore", "iqr"}
+        assert res["detector"]["type"] in {"mad", "zscore", "iqr", "autoreg"}
         assert isinstance(res["detector"]["threshold"], int | float)
         assert isinstance(res["detector"]["windowSize"], int)
         assert res["mode"] == "unsupervised"

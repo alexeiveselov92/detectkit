@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from detectkit.config.metric_config import MetricConfig
+from detectkit.core.interval import Interval
 from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.reporting.builder import _ms, _num_or_none, _parse_seasonality
 
@@ -52,13 +53,16 @@ def default_window_points(seed_window: int) -> int:
 
 
 # Per-type interval-width defaults (mirror the detector class defaults and the
-# website demo's DETECTOR_THRESHOLD_DEFAULT).
-_THRESHOLD_DEFAULT = {"mad": 3.0, "zscore": 3.0, "iqr": 1.5}
+# website demo's DETECTOR_THRESHOLD_DEFAULT). autoreg has no per-group entry —
+# it has no seasonality.
+_THRESHOLD_DEFAULT = {"mad": 3.0, "zscore": 3.0, "iqr": 1.5, "autoreg": 3.0}
 # Per-type min-samples-per-group defaults (mirror the detector subclasses).
 _MIN_SAMPLES_PER_GROUP_DEFAULT = {"mad": 10, "zscore": 3, "iqr": 4}
 # Detector types the interactive tuner can seed/emit: the windowed statistical
-# detectors plus the stateless manual_bounds (lower/upper threshold) detector.
-_TUNABLE_TYPES = ("mad", "zscore", "iqr", "manual_bounds")
+# detectors, the stateless manual_bounds (lower/upper threshold) detector, and
+# the prediction-based autoreg (its own runAutoreg branch in the TS port).
+# Hand-synced with config_writer._TUNABLE_TYPES.
+_TUNABLE_TYPES = ("mad", "zscore", "iqr", "manual_bounds", "autoreg")
 # The windowed statistical detectors — the ones you tune against a live band. When
 # a metric mixes a windowed detector with a manual_bounds hard floor (the documented
 # combo), the cockpit opens on the windowed one (the manual floor is a fixed business
@@ -155,7 +159,15 @@ def seed_detector_params(dtype: str, params: dict[str, Any]) -> dict[str, Any]:
         # manual_bounds thresholds (None for a windowed metric).
         "lowerBound": params.get("lower_bound"),
         "upperBound": params.get("upper_bound"),
+        # autoreg AR order (harmless default for the other types' seeds).
+        "lags": params.get("lags", 5),
     }
+    if dtype == "autoreg":
+        # autoreg's stabilization is default-ON (unlike the windowed detectors),
+        # so an absent key must seed the control to "clamp", and only an
+        # explicit null in the config reads as "none".
+        raw_stab = params.get("stabilization", "clamp")
+        seed["stabilization"] = raw_stab or "none"
     return seed
 
 
@@ -190,6 +202,10 @@ def _detector_summary(dtype: str, params: dict[str, Any]) -> str:
         if params.get("upper_bound") is not None:
             bits.append(f"upper={params['upper_bound']}")
         return " · ".join(["manual_bounds", *bits]) if bits else "manual_bounds"
+    if dtype == "autoreg":
+        thr = params.get("threshold", 3.0)
+        win = params.get("window_size", 200)
+        return f"autoreg · lags={params.get('lags', 5)} · threshold={thr} · window={win}"
     if dtype in _WINDOWED_TYPES:
         thr = params.get("threshold", _THRESHOLD_DEFAULT.get(dtype, 3.0))
         win = params.get("window_size", 100)
@@ -351,8 +367,19 @@ def build_tune_payload(
             start = max(start, first)
 
     consecutive = 3
+    anomaly_window_points: int | None = None
+    min_anomaly_share: float | None = None
     if metric_config.alerting:
-        consecutive = metric_config.alerting[0].consecutive_anomalies
+        first_alert = metric_config.alerting[0]
+        consecutive = first_alert.consecutive_anomalies
+        # Fraction rule seeds (issue #101): pre-resolved to grid points with the
+        # same floor-div as AlertConditions.from_alert_config, since the worker
+        # sweeps in points.
+        if first_alert.anomaly_window is not None and first_alert.min_anomaly_share is not None:
+            anomaly_window_points = max(
+                1, Interval(first_alert.anomaly_window).seconds // interval_seconds
+            )
+            min_anomaly_share = first_alert.min_anomaly_share
     direction = _seed_direction(metric_config)
 
     empty: dict[str, Any] = {
@@ -369,6 +396,8 @@ def build_tune_payload(
         "detectors": detector_entries,
         "detector_index": active_index,
         "consecutive_anomalies": consecutive,
+        "anomaly_window_points": anomaly_window_points,
+        "min_anomaly_share": min_anomaly_share,
         "direction": direction,
         "save_url": save_url,
         "incidents": seed_incidents,
@@ -416,6 +445,8 @@ def build_tune_payload(
         "detectors": detector_entries,
         "detector_index": active_index,
         "consecutive_anomalies": consecutive,
+        "anomaly_window_points": anomaly_window_points,
+        "min_anomaly_share": min_anomaly_share,
         "direction": direction,
         "save_url": save_url,
         "incidents": seed_incidents,

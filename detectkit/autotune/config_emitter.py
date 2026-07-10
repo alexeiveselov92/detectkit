@@ -61,6 +61,11 @@ def _build_alerting(original: MetricConfig, result: AutoTuneResult) -> list[dict
     first = original.alerting[0].model_dump(exclude_none=True, exclude_defaults=True)
     if result.consecutive_anomalies is not None:
         first["consecutive_anomalies"] = result.consecutive_anomalies
+    if result.anomaly_window is not None and result.min_anomaly_share is not None:
+        # Exact-seconds duration: round-trips losslessly through
+        # `AlertConditions.from_alert_config` back to the swept point count.
+        first["anomaly_window"] = result.anomaly_window
+        first["min_anomaly_share"] = result.min_anomaly_share
     first["min_detectors"] = 1  # single tuned detector now
     return [first]
 

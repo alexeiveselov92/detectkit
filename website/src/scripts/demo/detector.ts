@@ -546,12 +546,252 @@ function runManualBounds(series: Series, params: DetectorParams): ScoredPoint[] 
   return results;
 }
 
+// ----------------------------------------------------------------------------
+// Autoreg (port of AutoregDetector, detectkit/detectors/statistical/autoreg.py,
+// ALGORITHM_VERSION 2 — includes the Phase-0 numerical hardening: each fit
+// window is centered/scaled before the normal equations, and the stabilization
+// clamp substitution is capped to the observed window range).
+// ----------------------------------------------------------------------------
+
+/**
+ * Solve the (lags+1)×(lags+1) linear system A·x = b in place via Gaussian
+ * elimination with partial pivoting — the same LU-with-pivoting family as
+ * numpy.linalg.solve. The caller adds a ridge to A, which (for a non-empty fit)
+ * makes it strictly positive definite, so a truly singular system never
+ * reaches this in practice.
+ */
+function solveLinear(a: number[][], b: number[]): number[] {
+  const m = b.length;
+  // Augment and eliminate.
+  for (let col = 0; col < m; col++) {
+    let pivot = col;
+    for (let r = col + 1; r < m; r++) {
+      if (Math.abs(a[r][col]) > Math.abs(a[pivot][col])) pivot = r;
+    }
+    if (pivot !== col) {
+      [a[col], a[pivot]] = [a[pivot], a[col]];
+      [b[col], b[pivot]] = [b[pivot], b[col]];
+    }
+    const p = a[col][col];
+    if (p === 0) continue; // singular column: leave zeros (coef 0 for it)
+    for (let r = col + 1; r < m; r++) {
+      const f = a[r][col] / p;
+      if (f === 0) continue;
+      for (let c = col; c < m; c++) a[r][c] -= f * a[col][c];
+      b[r] -= f * b[col];
+    }
+  }
+  const x = new Array<number>(m).fill(0);
+  for (let r = m - 1; r >= 0; r--) {
+    let s = b[r];
+    for (let c = r + 1; c < m; c++) s -= a[r][c] * x[c];
+    x[r] = a[r][r] !== 0 ? s / a[r][r] : 0;
+  }
+  return x;
+}
+
+/**
+ * Fit AR coefficients: normal equations with a tiny ridge for conditioning
+ * (port of AutoregDetector._fit_ar). `rows` are the scaled design rows
+ * (intercept column included), `y` the scaled targets.
+ */
+function fitAr(rows: number[][], y: number[]): number[] {
+  const p = rows[0].length;
+  const a: number[][] = Array.from({ length: p }, () => new Array<number>(p).fill(0));
+  const b = new Array<number>(p).fill(0);
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    for (let i = 0; i < p; i++) {
+      b[i] += row[i] * y[r];
+      for (let j = i; j < p; j++) a[i][j] += row[i] * row[j];
+    }
+  }
+  for (let i = 0; i < p; i++) for (let j = 0; j < i; j++) a[i][j] = a[j][i];
+  let trace = 0;
+  for (let i = 0; i < p; i++) trace += a[i][i];
+  const ridge = 1e-8 * (trace / p);
+  for (let i = 0; i < p; i++) a[i][i] += ridge;
+  return solveLinear(a, b);
+}
+
+/**
+ * Prediction-based AR(p) scoring (port of AutoregDetector.detect). Third
+ * top-level branch beside the windowed pipeline and manual_bounds — a lag
+ * model can't reuse the windowed template's NaN-gap splicing, and seasonality
+ * multipliers are meaningless for it (same rationale as the Python class).
+ * `center` on the ScoredPoint is the one-step-ahead prediction ŷ; the band is
+ * ŷ ± threshold·σ_r.
+ */
+function runAutoreg(series: Series, params: DetectorParams): ScoredPoint[] {
+  const { timestamps, values } = series;
+  const n = timestamps.length;
+  const lags = Math.max(1, Math.round(params.lags ?? 5));
+  const windowSize = params.windowSize;
+  const threshold = params.threshold;
+  // The Python detector *rejects* min_samples < lags + 2 at construction; the
+  // port clamps instead so a mid-drag slider state can't wedge the worker.
+  const minSamples = Math.max(params.minSamples, lags + 2);
+  const stabilize = params.stabilization === 'clamp';
+
+  const processed = preprocessInput(values, params); // input_type only, no smoothing
+  const work = stabilize ? processed.slice() : processed;
+
+  const results: ScoredPoint[] = [];
+
+  for (let i = 0; i < n; i++) {
+    const currentVal = values[i];
+    const currentProcessed = processed[i];
+    const ts = timestamps[i];
+
+    if (Number.isNaN(currentProcessed)) {
+      results.push(unscored(i, ts, currentVal, currentProcessed, 'missing_data'));
+      continue;
+    }
+
+    // Lag vector [work[i-lags], ..., work[i-1]] — strict v1 NaN policy: any
+    // non-finite lag (or too little history) skips scoring, never imputes.
+    let lagsOk = i >= lags;
+    if (lagsOk) {
+      for (let k = i - lags; k < i; k++) {
+        if (!Number.isFinite(work[k])) {
+          lagsOk = false;
+          break;
+        }
+      }
+    }
+    if (!lagsOk) {
+      results.push(unscored(i, ts, currentVal, currentProcessed, 'missing_lags'));
+      continue;
+    }
+
+    // Fit rows: targets work[j] for j in [start, i), each with its own lag
+    // vector work[j-lags..j); a row is valid when target + every lag is finite.
+    const start = Math.max(lags, i - windowSize);
+    const lagStart = start - lags;
+    const yValid: number[] = [];
+    const xValid: number[][] = [];
+    for (let j = start; j < i; j++) {
+      const target = work[j];
+      if (!Number.isFinite(target)) continue;
+      let ok = true;
+      const row = new Array<number>(lags);
+      for (let k = 0; k < lags; k++) {
+        const v = work[j - lags + k];
+        if (!Number.isFinite(v)) {
+          ok = false;
+          break;
+        }
+        row[k] = v;
+      }
+      if (!ok) continue;
+      yValid.push(target);
+      xValid.push(row);
+    }
+    const nValid = yValid.length;
+
+    if (nValid < minSamples) {
+      results.push(unscored(i, ts, currentVal, currentProcessed, 'insufficient_data'));
+      continue;
+    }
+
+    // Center/scale the fit window (Phase-0 numerical hardening, mirrors the
+    // Python detector exactly): OLS with an intercept is affine-equivariant,
+    // so the model is unchanged, but the normal equations run at ~unit scale.
+    let center = sum(yValid) / nValid;
+    let sq = 0;
+    for (const v of yValid) sq += (v - center) * (v - center);
+    let scale = Math.sqrt(sq / nValid); // population std, like np.std
+    if (!Number.isFinite(center)) center = 0;
+    if (!Number.isFinite(scale) || scale <= 0) scale = 1;
+
+    const design: number[][] = new Array(nValid);
+    const yScaled: number[] = new Array(nValid);
+    for (let r = 0; r < nValid; r++) {
+      const row = new Array<number>(lags + 1);
+      row[0] = 1;
+      for (let k = 0; k < lags; k++) row[k + 1] = (xValid[r][k] - center) / scale;
+      design[r] = row;
+      yScaled[r] = (yValid[r] - center) / scale;
+    }
+
+    const coef = fitAr(design, yScaled);
+
+    let rss = 0;
+    for (let r = 0; r < nValid; r++) {
+      let fit = 0;
+      for (let k = 0; k <= lags; k++) fit += design[r][k] * coef[k];
+      const res = yScaled[r] - fit;
+      rss += res * res;
+    }
+    const sigma = Math.sqrt(rss / Math.max(nValid - (lags + 1), 1)) * scale;
+
+    let predScaled = coef[0];
+    for (let k = 0; k < lags; k++) predScaled += ((work[i - lags + k] - center) / scale) * coef[k + 1];
+    const pred = predScaled * scale + center;
+
+    const lower = pred - threshold * sigma;
+    const upper = pred + threshold * sigma;
+    const isAnomaly = currentProcessed < lower || currentProcessed > upper;
+
+    // Stabilization write-back: clamp to the violated bound (never the
+    // prediction — see the Python detector for the band-collapse rationale),
+    // additionally capped to the observed raw range of the fit window so a
+    // degenerate fit can't write an astronomic value into later history.
+    if (stabilize && isAnomaly) {
+      let bound = currentProcessed < lower ? lower : upper;
+      let rawMin = Infinity;
+      let rawMax = -Infinity;
+      for (let k = lagStart; k < i; k++) {
+        const rv = processed[k];
+        if (Number.isFinite(rv)) {
+          if (rv < rawMin) rawMin = rv;
+          if (rv > rawMax) rawMax = rv;
+        }
+      }
+      if (rawMin <= rawMax) bound = Math.min(Math.max(bound, rawMin), rawMax);
+      work[i] = bound;
+    }
+
+    let direction: AnomalyDirection = null;
+    let sev = 0;
+    if (isAnomaly) {
+      let distance: number;
+      if (currentProcessed < lower) {
+        direction = 'below';
+        distance = lower - currentProcessed;
+      } else {
+        direction = 'above';
+        distance = currentProcessed - upper;
+      }
+      sev = sigma > 0 ? distance / sigma : Infinity;
+    }
+
+    results.push({
+      index: i,
+      timestamp: ts,
+      value: currentVal,
+      processedValue: currentProcessed,
+      scored: true,
+      isAnomaly,
+      lower,
+      upper,
+      center: pred,
+      direction,
+      severity: sev,
+      reason: 'ok',
+    });
+  }
+
+  return results;
+}
+
 /**
  * Score every point of `series` under `params`. Pure and deterministic;
  * reproduces the Python detectors within 1e-6.
  */
 export function runDetector(series: Series, params: DetectorParams): ScoredPoint[] {
   if (params.type === 'manual_bounds') return runManualBounds(series, params);
+  if (params.type === 'autoreg') return runAutoreg(series, params);
 
   const type = params.type as WindowedType;
   const effectiveMinSamples = Math.max(params.minSamples, MIN_SAMPLES_FLOOR[type]);
@@ -759,6 +999,17 @@ export function effectiveStartIndex(series: Series, params: DetectorParams): num
   // undefined when input_type transforms to changes.
   if (params.type === 'manual_bounds') {
     return Math.min(params.inputType !== 'values' ? 1 : 0, n);
+  }
+  // autoreg mirrors AutoregDetector.get_context_size(): a full window to fit
+  // the AR model + lags to seed the oldest lag vector, +1 for change-based
+  // input, plus another window of stabilization warm-up so the shown band
+  // matches what an incremental pipeline run would compute.
+  if (params.type === 'autoreg') {
+    const lags = Math.max(1, Math.round(params.lags ?? 5));
+    let warmup = params.windowSize + lags;
+    if (params.inputType !== 'values') warmup += 1;
+    if (params.stabilization === 'clamp') warmup += params.windowSize;
+    return Math.min(warmup, n);
   }
   let warm = Math.max(params.minSamples, MIN_SAMPLES_FLOOR[params.type as WindowedType]);
   if (params.smoothing === 'sma') warm = Math.max(warm, params.smoothingWindow - 1);

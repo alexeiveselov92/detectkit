@@ -145,6 +145,47 @@ that module — see the note in its docstring — but mirrors its behavior
 intentionally, so a detectkit contributor reading both files sees the same
 mental model).
 
+## Results — NAB, full run (v0.53.0)
+
+The first full NAB run (58 series, every group kept incl. the all-negative
+`artificialNoAnomaly` set), `python -m benchmarks.run --datasets nab` at
+detectkit **v0.53.0**. Remember the version caveat above: these numbers are
+bound to the detector behavior of that release.
+
+| detector | event_f1_best | f1_best | pr_auc | native_event_f1 |
+|---|---|---|---|---|
+| zscore (clamp) | **0.244** | **0.206** | **0.140** | 0.061 |
+| autoreg | 0.235 | 0.184 | 0.136 | 0.070 |
+| mad (clamp) | 0.234 | 0.194 | 0.137 | 0.035 |
+| iqr (clamp) | 0.224 | 0.198 | 0.137 | 0.031 |
+| mad | 0.217 | 0.184 | 0.127 | 0.035 |
+| iqr | 0.210 | 0.182 | 0.120 | 0.032 |
+| zscore | 0.173 | 0.190 | 0.110 | 0.076 |
+| spectral_residual | 0.147 | 0.142 | 0.097 | 0.123 |
+
+What the numbers established (each of these was a live design question):
+
+- **`stabilization: clamp` improves every windowed detector on real data** —
+  zscore +0.071, mad +0.017, iqr +0.014 event_f1_best. The v0.51.0 feature
+  does what it was built for outside synthetic fixtures.
+- **`autoreg` is the best un-stabilized detector** (0.235, second overall)
+  — *after* the v0.53.0 numerical hardening. Before it (v0.52.x), float64
+  overflow in the AR normal equations on large-valued series (~1e9) capped
+  it at 0.203; centering/scaling each fit window and capping the clamp
+  substitution to the observed window range recovered the difference. The
+  dynamics detector earns its place on real data, not just on the `ar2`
+  synthetic family.
+- **Spectral Residual is weaker than everything else on both synthetic and
+  NAB** (0.147, last on every ranking metric). The measure-first gate below
+  stays closed: it remains a documented negative result, not a shipped
+  detector. Its one bright spot — the best `native_event_f1` (0.123) — only
+  says its default threshold is better calibrated, not that it ranks
+  anomalies better (`pr_auc` is threshold-free and it is last there too).
+
+Absolute NAB scores in the 0.2-0.3 range are normal for point/threshold
+detectors without per-series tuning — NAB's own scoreboard leaders sit far
+from 1.0. The value here is in the *relative* ordering under one harness.
+
 ## Spectral Residual: a measure-first gate
 
 `spectral_residual.py` implements the Spectral Residual saliency algorithm

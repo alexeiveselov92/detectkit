@@ -62,8 +62,10 @@ rendered on the docs site under **For developers**). Read the relevant one:
   the search button + winner/decision-log in **Autotune**)
   and collapses to give the chart the whole width — but the controls that aren't
   detector-specific stay visible in **every** mode (the **Points shown** data
-  window, the alert rule — **direction** + **consecutive anomalies** — and the
-  **y = 0** toggle). A **mode switch** picks which layers lead / dim / hide and
+  window, the alert rule — **direction** + **consecutive anomalies** + the
+  fraction pair **anomaly window / min share** (off below 2 points = legacy
+  consecutive-only; the worker OR-merges its fires with the consecutive rule's,
+  pipeline semantics) — and the **y = 0** toggle). A **mode switch** picks which layers lead / dim / hide and
   which interactions are armed — **Tune** (band leads), **Review** (confirm the
   fired alerts: click a marker to cycle un-reviewed → valid (green) → false alarm
   (slate); **confirming an alert valid IS marking an incident** — the confirmed

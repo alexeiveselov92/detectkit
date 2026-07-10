@@ -12,7 +12,7 @@
 // Bundled to a string and embedded into tune.js (see gen-tune-bundle.mjs), then
 // instantiated from a Blob URL so the report stays a single self-contained file.
 
-import { effectiveStartIndex, runDetector } from '../demo/detector';
+import { effectiveStartIndex, runDetector, warmupRequirement } from '../demo/detector';
 import type { DetectorParams, ScoredPoint, Series } from '../demo/types';
 
 // Minimal worker-global typing (avoids pulling in the DOM/webworker lib).
@@ -179,8 +179,12 @@ self.onmessage = (e: { data: unknown }): void => {
     const fires = runs.map((r) => r.fire);
     const fireSpans = runs.map((r) => [r.startTs, r.endTs] as [number, number]);
     const eff = effectiveStartIndex(series, params);
+    // The UNCLAMPED warm-up requirement: eff is clamped to the trimmed series
+    // length, so when the whole view is warm-up only `need` still says how many
+    // points the page must show for a band to appear.
+    const need = warmupRequirement(series, params);
     let flagged = 0;
     for (const s of scored) if (s.scored && s.isAnomaly) flagged++;
-    self.postMessage({ type: 'result', id: msg.id, scored, fires, fireSpans, eff, flagged });
+    self.postMessage({ type: 'result', id: msg.id, scored, fires, fireSpans, eff, need, flagged });
   }
 };

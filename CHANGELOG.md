@@ -5,6 +5,51 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.53.2] - 2026-07-10
+
+### Fixed
+- **`dtk tune`: the cockpit now explains an all-warm-up view instead of
+  silently going blank.** With `stabilization: clamp` the detector needs an
+  extra full window of warm-up before its band matches what an incremental
+  pipeline run would compute (autoreg: `2·window_size + lags` — e.g. 405
+  points at the default `window_size: 200`), and the chart deliberately hides
+  the band/dots over that lead-in. But when the warm-up swallowed the *whole*
+  view (a low **Points shown** trim, or a raised window), the chart clipped
+  away every band segment and anomaly dot **and** skipped the warm-up
+  dimming/label too — a bare metric line with no cue, reading as "the band
+  disappeared". Now: (a) the chart dims the whole plot with a centered
+  *"all shown points are detector warm-up — nothing to score yet"* label;
+  (b) the cockpit shows an inline warning with the **un-clamped** requirement
+  and concrete fixes ("needs 405 pts (window 200 + lags 5 + window 200 for
+  stabilization) … raise Points shown above 405, or lower the Window size, or
+  turn Stabilization off") — the worker now reports that true requirement
+  (the HUD's `warm-up N pts` previously showed a value clamped to the shown
+  length, so it could read "warm-up 400 pts" while showing 400); (c) the
+  window slider's explore cap is clamp-aware for autoreg (a third of the
+  shown points instead of half, recomputed on trim/type switch), so the
+  "always a scored region" invariant holds under the doubled warm-up. The
+  band itself is *computed* for every scored point regardless — the real
+  pipeline and `dtk run --report` always show it; the clip is display-only
+  parity with what a fresh incremental run could reproduce.
+- **`dtk tune`: the windowed detectors' preview now honors the clamp warm-up
+  too.** Python's `WindowedStatDetector.get_context_size()` has always added
+  an extra `window_size` of warm-up under `stabilization: clamp` (v0.51.0),
+  but the TS port's effective-start estimate never did — so the cockpit (and
+  the band's visible start) treated clamp asymmetrically: honest for autoreg,
+  optimistic for mad/zscore/iqr, showing an early-window clamp band a real
+  incremental run wouldn't reproduce. The windowed branch now carries the
+  same `+window_size` term (display-only; detection math and the parity gate
+  are untouched — the landing playground never sets stabilization).
+- **`dtk tune`: a bare `type: autoreg` config now opens the cockpit at
+  autoreg's real default window (200).** The seed previously fell back to the
+  windowed template's `window_size` default (100) for every type, so the
+  preview ran a different window than the next `dtk run` would.
+- **`benchmarks/README.md`: recorded the MEDIFF decline rationale** (the
+  Yandex-article follow-ups' one undocumented decision): the windowed
+  detectors' per-group seasonality multipliers already provide the
+  conditioned-baseline mechanism, so a MEDIFF port would duplicate an
+  existing autotunable feature.
+
 ## [0.53.1] - 2026-07-10
 
 ### Changed

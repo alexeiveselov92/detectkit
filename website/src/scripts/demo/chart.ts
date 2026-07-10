@@ -14,6 +14,7 @@
 import {
   type Margins,
   drawAlertMarkers,
+  drawFullWarmupOverlay,
   drawSeriesDecimated,
   drawWarmupOverlay,
   fit as fitCanvas,
@@ -624,8 +625,22 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
 
     // 6. warm-up overlay: dim the lead-in + label where detection reaches full
     // power. Drawn before the hover overlay so the window box stays crisp on top.
-    if (effTs !== undefined && (!labeling || m() === 'tune')) {
-      drawWarmupOverlay(g, canvas, MARGINS, dpr, px, effTs, 'detection at full power →');
+    // When the effective start swallows the whole view (eff === n — e.g. autoreg
+    // with stabilization needs 2·window+lags and the trim shows less), the band
+    // and dots are all clipped away above, so dim the WHOLE plot with a centered
+    // explanation instead of silently showing a bare metric line.
+    if (!labeling || m() === 'tune') {
+      if (n > 0 && eff >= n) {
+        drawFullWarmupOverlay(
+          g,
+          canvas,
+          MARGINS,
+          dpr,
+          'all shown points are detector warm-up — nothing to score yet',
+        );
+      } else if (effTs !== undefined) {
+        drawWarmupOverlay(g, canvas, MARGINS, dpr, px, effTs, 'detection at full power →');
+      }
     }
 
     // 7. window overlay (hover) — band-steering context, so only in 'tune'.

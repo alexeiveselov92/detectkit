@@ -249,7 +249,10 @@ sustained incidents, the effect is near-neutral.
 
 Enabling it adds one extra `window_size` of warm-up history to
 `get_context_size()`, so incremental batches reproduce the same substitution
-history a continuous run would have seen.
+history a continuous run would have seen. The [`dtk tune`](../../guides/tuning.md)
+cockpit's visible band start honors this extra warm-up too (for both the
+windowed detectors and Autoreg), so with `clamp` enabled the band starts one
+window later than it would without it.
 
 ## Handling Metrics with Trends
 

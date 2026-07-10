@@ -99,6 +99,10 @@ the **Points shown** data window, the alert rule (**direction** + **consecutive
 anomalies** + the **anomaly_window**/**min_anomaly_share** pair) and the
 **y = 0** toggle — stay visible in every mode. The chart is
 **zoomable** (scroll/drag + navigator strip) with a **"Points shown"** trim slider.
+Trim it below what the detector needs to warm up (stabilization roughly doubles
+it — Autoreg needs `2·window_size + lags`) and the chart dims completely with an
+explanation plus an inline warning naming the shortfall and the fixes (raise
+Points shown / lower window size / disable stabilization).
 Clicking **Apply** writes the chosen
 config back into the metric YAML **in place** (autotune, by contrast, writes a new
 `__tuned_<id>.yml` and never edits the original). Apply **merges** — it rewrites

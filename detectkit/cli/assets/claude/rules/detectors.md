@@ -236,6 +236,9 @@ recency weighting gives an ongoing incident's points more weight), `detrend`,
 `smoothing`, `input_type` and seasonality groups, and is near-neutral on clean
 series. Enabling it is a hashed change — it produces a new `detector_id` and
 recomputes on the next run; existing configs that don't set it keep their ids.
+It also adds one extra `window_size` of warm-up context (`mad`/`zscore`/`iqr`
+and `autoreg` alike) — the `dtk tune` cockpit's visible band respects this,
+so with `clamp` on the band starts one window later than without it.
 
 ## Feature compatibility
 

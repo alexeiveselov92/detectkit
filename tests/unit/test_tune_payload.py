@@ -539,6 +539,16 @@ def test_seed_detector_params_windowed_carries_default_lags():
     assert seed_detector_params("mad", {})["lags"] == 5
 
 
+def test_seed_detector_params_window_default_is_per_type():
+    # a bare `type: autoreg` config must open the cockpit at the window the
+    # pipeline actually runs (AutoregDetector's default 200), not the windowed
+    # template's 100 — otherwise the preview and the next `dtk run` disagree.
+    assert seed_detector_params("autoreg", {})["windowSize"] == 200
+    # an explicit value always wins, and the windowed types keep their default.
+    assert seed_detector_params("autoreg", {"window_size": 150})["windowSize"] == 150
+    assert seed_detector_params("mad", {})["windowSize"] == 100
+
+
 def test_detectors_payload_autoreg_is_tunable_but_windowed_opens_first():
     m = _metric(
         detectors=[

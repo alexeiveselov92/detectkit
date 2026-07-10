@@ -482,6 +482,33 @@ export function drawWarmupOverlay(
   g.restore();
 }
 
+/**
+ * The `dividerTs`-less sibling of drawWarmupOverlay for the "everything shown
+ * is warm-up" state (effective start ≥ series length): dim the WHOLE plot and
+ * center the explanation, since a divider label would land off-canvas (the
+ * divider x is clamped to the plot's right edge and the label sits right of it).
+ * Without this the chart is silently bare — no band, no dots, no explanation.
+ */
+export function drawFullWarmupOverlay(
+  g: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  m: Margins,
+  dpr: number,
+  label: string,
+): void {
+  const r = plotRect(canvas, m, dpr);
+  if (r.right <= r.left || r.bottom <= r.top) return;
+  g.save();
+  g.fillStyle = 'rgba(17,15,13,0.42)';
+  g.fillRect(r.left, r.top, r.right - r.left, r.bottom - r.top);
+  g.fillStyle = rgba(token('--faint'), 0.95);
+  g.font = `${10 * dpr}px ui-monospace, monospace`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(label, (r.left + r.right) / 2, r.top + (r.bottom - r.top) * 0.3, r.right - r.left - 12 * dpr);
+  g.restore();
+}
+
 export interface AlertMark {
   t: number;
   kind: string;

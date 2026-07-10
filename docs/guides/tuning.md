@@ -117,6 +117,22 @@ a shorter period is enough, trimming it makes every knob-drag noticeably faster
 (and the period easier to read). Trimming only affects the live view — it never
 changes what **Apply** writes.
 
+### Warm-up: why the band can start late (or not appear at all)
+
+The chart hides the confidence band and anomaly dots over each detector's
+warm-up lead-in — the trailing history it needs before it can score its first
+point — so what you see matches what an incremental pipeline run would
+actually compute; the pipeline and the [HTML report](visualizing-results.md)
+always have a band for every point they score. Turning on **Stabilization**
+roughly doubles that requirement (Autoreg needs close to two window-lengths of
+history — the window size plus the lag order — at its default settings, over
+400 points), so an aggressively trimmed **Points shown** can leave nothing left
+to look at. When the shown window is *entirely* warm-up, the chart dims
+completely with a centered "all shown points are detector warm-up — nothing to
+score yet" message instead of a bare, bandless line, and an inline warning
+beneath the chart states the exact point count still needed with three fixes:
+raise **Points shown**, lower **Window size**, or turn **Stabilization** off.
+
 A **y = 0 line** toggle draws a horizontal reference line at zero and folds zero
 into the vertical scale, so a real-valued metric (one best read *relative to zero*)
 shows where it sits against zero. It is also available

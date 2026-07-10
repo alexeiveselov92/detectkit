@@ -93,6 +93,17 @@ alerts): **Points shown**, the alert rule (**direction** + **consecutive
 anomalies** + the **anomaly_window**/**min_anomaly_share** fraction pair), and
 the **y = 0** reference-line toggle.
 
+**Warm-up matters when Points shown is trimmed low.** The band and anomaly
+dots only appear once the detector has enough trailing history to warm up —
+if you trim **Points shown** below that, the whole chart dims with an
+explanation ("all shown points are detector warm-up — nothing to score yet")
+and an inline warning names the exact point count still needed, with three
+fixes: raise **Points shown**, lower **Window size**, or turn
+**Stabilization** off. **Stabilization** roughly doubles the requirement —
+Autoreg needs close to `2 · window_size + lags` points at its defaults (over
+400) — so watch for this especially right after switching to Autoreg or
+turning stabilization on with a short **Points shown**.
+
 ## Step 3 — The four modes (autotune is one of them)
 
 Walk the user to the mode that fits what they want to do:

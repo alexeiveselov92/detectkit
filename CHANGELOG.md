@@ -5,6 +5,21 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.52.1] - 2026-07-10
+
+### Fixed
+- **Docs accuracy pass after v0.52.0** (no behavior changes). The new
+  `autoreg` reference page is now actually published on the docs site (it was
+  missing from the sync manifest and the sidebar); every detector enumeration
+  across the docs (index, installation, See-Also lists, visualization guide)
+  includes `autoreg`; installation.md no longer claims only
+  mad/zscore/iqr/manual_bounds exist. The shipped `dtk init-claude` assets are
+  corrected: the assistant overview rule now lists `autoreg` and the fraction
+  alert rule, and the alerting rule's template-variable table no longer
+  describes the pre-release recovery-chip behavior (a share-configured
+  metric's recovery echoes the same combined rule chip as the firing alert).
+  The benchmarks README no longer calls `autoreg` "planned".
+
 ## [0.52.0] - 2026-07-10
 
 ### Added

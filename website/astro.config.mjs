@@ -105,6 +105,7 @@ export default defineConfig({
                 { label: 'Z-Score', link: '/reference/detectors/zscore/' },
                 { label: 'IQR', link: '/reference/detectors/iqr/' },
                 { label: 'Manual Bounds', link: '/reference/detectors/manual_bounds/' },
+                { label: 'Autoreg', link: '/reference/detectors/autoreg/' },
               ],
             },
           ],

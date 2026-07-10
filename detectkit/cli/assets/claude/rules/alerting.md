@@ -360,7 +360,7 @@ referenced by path). Key variables:
 | `{expected_range}` | one-sided-aware band (`>= 7.00`, `<= 1.10`, `[lo, hi]`, `N/A`) |
 | `{detector_name}`, `{detector_count}` | who fired (`"N detectors"` for multi) |
 | `{min_detectors}` / `{direction_policy}` / `{consecutive_required}` | the configured rule |
-| `{rule_display}` | full rule chip (legacy `min_detectors=… · direction=… · consecutive=…`, or also naming `anomaly_window`/`min_anomaly_share` when configured); recovery always renders the legacy form |
+| `{rule_display}` | full rule chip (legacy `min_detectors=… · direction=… · consecutive=…`, or also naming `anomaly_window`/`min_anomaly_share` when configured — on recovery too, so fire and recovery name one rule) |
 | `{window_points}` / `{window_matched}` | fraction-rule window size / matched count (empty unless configured / fired by it) |
 | `{direction}`, `{severity}` | observed values |
 | `{consecutive_count}` | **true** streak length (resolved at fire time, not capped at the rule) |

@@ -431,7 +431,8 @@ inflates anomaly counts. Pick the detector you want from the listing query in
   [MAD](../reference/detectors/mad.md),
   [Z-Score](../reference/detectors/zscore.md),
   [IQR](../reference/detectors/iqr.md),
-  [Manual Bounds](../reference/detectors/manual_bounds.md)
+  [Manual Bounds](../reference/detectors/manual_bounds.md),
+  [Autoreg](../reference/detectors/autoreg.md)
 - [Alerting guide](alerting.md) — the alert rule that interprets these detections
 - [Auto-tuning guide](autotuning.md) — inspecting the detector `dtk autotune`
   chose (uses these same recipes with the run's `winning_detector_id`)

@@ -55,6 +55,7 @@ const PAGES = [
   { src: 'docs/reference/detectors/zscore.md', dest: 'reference/detectors/zscore.md' },
   { src: 'docs/reference/detectors/iqr.md', dest: 'reference/detectors/iqr.md' },
   { src: 'docs/reference/detectors/manual_bounds.md', dest: 'reference/detectors/manual_bounds.md' },
+  { src: 'docs/reference/detectors/autoreg.md', dest: 'reference/detectors/autoreg.md' },
   { src: 'docs/examples/README.md', dest: 'examples.md', title: 'Examples' },
   // "For developers" — sourced from the repo's own .claude/rules so the dev
   // context is single-source (in Claude Code) and rendered on the site.

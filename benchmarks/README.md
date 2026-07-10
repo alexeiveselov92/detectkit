@@ -11,7 +11,7 @@ It exists to answer, with numbers instead of intuition:
 - How do `mad` / `zscore` / `iqr` actually compare on real labeled anomalies,
   not just synthetic unit-test fixtures?
 - Does `stabilization: clamp` help or hurt on sustained real-world incidents?
-- Is the (planned) `autoreg` detector actually better than the windowed
+- Is the `autoreg` detector (shipped in v0.52.0) actually better than the windowed
   statistical family on any of these benchmarks?
 - Is a from-scratch **Spectral Residual** implementation (see
   `spectral_residual.py`) good enough to be worth shipping as a library
@@ -104,9 +104,9 @@ The default sweep (`runner.DEFAULT_DETECTOR_MATRIX`) evaluates:
   flagged points in later trailing windows actually improves recall/precision
   on sustained real incidents (its intended purpose) rather than just being a
   plausible-sounding idea;
-- `autoreg` — resolved through `DetectorFactory`. If this worktree doesn't
-  have it registered yet, the entry is skipped with a warning instead of
-  failing the sweep (see `runner.available_detector_matrix`);
+- `autoreg` — resolved through `DetectorFactory` (registered since v0.52.0;
+  an unknown detector type is skipped with a warning instead of failing the
+  sweep — see `runner.available_detector_matrix`);
 - `spectral_residual` — the benchmark-local SR implementation
   (`spectral_residual.py`), threshold `3.0`.
 
@@ -152,7 +152,7 @@ mental model).
 library** — it lives only in this benchmark directory, evaluated here to
 decide *whether it should ever become one*. If it doesn't clear a meaningful
 bar over `mad`/`zscore`/`iqr` (with or without `stabilization: clamp`) and the
-upcoming `autoreg` detector, on real labeled benchmarks, it stays exactly
+`autoreg` detector, on real labeled benchmarks, it stays exactly
 where it is: a documented negative (or marginal) result, not a shipped
 feature. If it does show a real edge, that is the evidence needed to propose
 it as a genuine `WindowedStatDetector`-style addition (see

@@ -368,5 +368,6 @@ This provides an unbiased estimate of population standard deviation from sample 
 
 - [MAD Detector](mad.md) - For data with outliers or seasonality
 - [IQR Detector](iqr.md) - For extremely skewed data
+- [Autoreg Detector](autoreg.md) - Prediction-based AR detector for fast-moving, non-seasonal metrics
 - [Detectors Guide](../../guides/detectors.md) - Choosing the right detector
 - [Configuration Guide](../../guides/configuration.md) - Complete config reference

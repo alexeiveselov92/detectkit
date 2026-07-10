@@ -9,6 +9,7 @@ from __future__ import annotations
 import contextlib
 import logging
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -16,6 +17,7 @@ import numpy as np
 
 from detectkit.autotune._base import AutoTuneError, _AutoTuneBase
 from detectkit.autotune._types import CandidateEval, TuneMode
+from detectkit.autotune.axis_spec import max_context_size
 from detectkit.autotune.crossval import build_cv_plan, predictions_from_results
 from detectkit.autotune.detector_select import select_detector_types
 from detectkit.autotune.grid_search import grid_search
@@ -71,6 +73,33 @@ def _consecutive(flags: np.ndarray, k: int) -> np.ndarray:
     return out
 
 
+def _fraction_fire(flags: np.ndarray, window_points: int, share: float) -> np.ndarray:
+    """Mark index i where the fraction alert rule fires — the pure-numpy sibling
+    of ``_decision._share_fire``: the latest point itself is anomalous (a stale
+    window never fires) AND the anomalous share over the trailing
+    ``window_points`` slots (current point inclusive) reaches *share*. Slots
+    before the series start, gaps and invalid points all count in the
+    denominator only, exactly like the pipeline's missing-slot handling."""
+    n = len(flags)
+    if n == 0 or window_points <= 0:
+        return flags.copy()
+    counts = np.convolve(flags.astype(np.int64), np.ones(window_points, dtype=np.int64))[:n]
+    return flags & (counts >= share * window_points)
+
+
+@dataclass(frozen=True)
+class _AlertRuleChoice:
+    """Outcome of the supervised alert-rule sweep.
+
+    ``window_points``/``min_anomaly_share`` are set only when the OR-ed
+    fraction rule strictly beat the consecutive-only optimum; the deployed
+    behavior (consecutive OR fraction) is exactly what was scored."""
+
+    consecutive_anomalies: int | None
+    window_points: int | None = None
+    min_anomaly_share: float | None = None
+
+
 class AutoTuner(_AutoTuneBase):
     """Runs the load-free tuning pipeline and returns an :class:`AutoTuneResult`."""
 
@@ -83,12 +112,17 @@ class AutoTuner(_AutoTuneBase):
             )
 
         grid = window_grid(self)
-        max_window = max([*grid, 100])
-        self.cv_plan = build_cv_plan(n, max_window, self.settings.fold_count)
+        # Reserve the largest context any candidate the search can build might
+        # need (window + stabilization warm-up + AR lags), not just the raw
+        # window size — otherwise folds silently score points where detect()
+        # returns insufficient_data / missing_lags (valid=False), degrading
+        # the CV signal without erroring.
+        max_context = max_context_size(self, grid)
+        self.cv_plan = build_cv_plan(n, max_context, self.settings.fold_count)
         if not self.cv_plan.fold_bounds:
             raise AutoTuneError(
                 f"not enough datapoints ({n}) for {self.settings.fold_count}-fold "
-                f"cross-validation with a {max_window}-point context window"
+                f"cross-validation with a {max_context}-point context window"
             )
 
         gt = self.ground_truth
@@ -111,36 +145,80 @@ class AutoTuner(_AutoTuneBase):
         if best is None:
             raise AutoTuneError("no viable detector candidate found for this data")
 
-        consecutive = self._select_alert_window(best.detector_type, best.params)
+        alert_rule = self._select_alert_window(best.detector_type, best.params)
 
-        return self._build_result(seasonality, best, consecutive)
+        return self._build_result(seasonality, best, alert_rule)
 
     # ------------------------------------------------------------------
 
-    def _select_alert_window(self, detector_type: str, params: dict[str, Any]) -> int | None:
-        """Sweep consecutive_anomalies on labeled incidents (supervised only)."""
+    def _select_alert_window(
+        self, detector_type: str, params: dict[str, Any]
+    ) -> _AlertRuleChoice | None:
+        """Sweep the alert rule on labeled incidents (supervised only).
+
+        Two passes over one ``detect()`` run: the legacy 1-D
+        ``consecutive_anomalies`` sweep first, then a 2-D (window × share)
+        sweep of the fraction rule **OR-ed with the chosen consecutive rule**
+        — scoring exactly the composite the pipeline would deploy. The pair is
+        adopted only on a strictly greater score, so the legacy rule wins ties
+        and existing behavior is byte-stable when the fraction rule doesn't
+        help.
+        """
         if self.ground_truth.mode != TuneMode.SUPERVISED:
             return None
         detector = DetectorFactory.create(detector_type, params)
         y_pred, y_score, valid = predictions_from_results(detector.detect(self.data))
         y_true = self.ground_truth.y_true
+        metric, beta = self.settings.metric, self.settings.beta
+
+        def _score(alert: np.ndarray) -> float:
+            # Same invalid-point handling seam as the CV folds (pointwise
+            # metrics mask; the segment-aware one keeps unmasked arrays).
+            yt, yp, ys = arrays_for_metric(y_true, alert, y_score, valid, metric)
+            return score_predictions(yt, yp, ys, metric, beta)
+
         best_k = 1
         best_score = float("-inf")
         for k in _ALERT_WINDOW_GRID:
-            alert = _consecutive(y_pred, k)
-            # Same invalid-point handling seam as the CV folds (pointwise
-            # metrics mask; the segment-aware one keeps unmasked arrays).
-            yt, yp, ys = arrays_for_metric(y_true, alert, y_score, valid, self.settings.metric)
-            score = score_predictions(yt, yp, ys, self.settings.metric, self.settings.beta)
+            score = _score(_consecutive(y_pred, k))
             if score > best_score:
                 best_score, best_k = score, k
+
+        consecutive_fire = _consecutive(y_pred, best_k)
+        n = len(y_pred)
+        best_pair: tuple[int, float] | None = None
+        for window_points in self.settings.alert_window_points_grid:
+            # < 2 would degenerate to consecutive_anomalies=1 (MetricConfig
+            # rejects it); a window longer than the series can never be
+            # observed at its own width.
+            if window_points < 2 or window_points > n:
+                continue
+            for share in self.settings.alert_share_grid:
+                alert = consecutive_fire | _fraction_fire(y_pred, window_points, share)
+                score = _score(alert)
+                if score > best_score:
+                    best_score, best_pair = score, (window_points, share)
+
+        if best_pair is not None:
+            window_points, share = best_pair
+            self.log(
+                "window",
+                f"consecutive_anomalies={best_k} OR anomaly_window={window_points}p × "
+                f"min_anomaly_share={share} "
+                f"(max {metric.value}={best_score:.3f} on labeled incidents)",
+                consecutive_anomalies=best_k,
+                anomaly_window_points=window_points,
+                min_anomaly_share=share,
+            )
+            return _AlertRuleChoice(best_k, window_points, share)
+
         self.log(
             "window",
             f"consecutive_anomalies={best_k} "
-            f"(max {self.settings.metric.value}={best_score:.3f} on labeled incidents)",
+            f"(max {metric.value}={best_score:.3f} on labeled incidents)",
             consecutive_anomalies=best_k,
         )
-        return best_k
+        return _AlertRuleChoice(best_k)
 
     def _clean_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Drop None/empty values so the emitted config is tidy."""
@@ -154,7 +232,7 @@ class AutoTuner(_AutoTuneBase):
         return out
 
     def _build_result(
-        self, seasonality: list | None, best: CandidateEval, consecutive: int | None
+        self, seasonality: list | None, best: CandidateEval, alert_rule: _AlertRuleChoice | None
     ) -> AutoTuneResult:
         timestamps = self.data["timestamp"]
         training_start = _ts_to_dt(timestamps[0]) if len(timestamps) else None
@@ -194,7 +272,13 @@ class AutoTuner(_AutoTuneBase):
             score=best.score,
             cv_per_fold=best.fold_scores.per_fold,
             cv_stability_penalty=best.fold_scores.stability_penalty,
-            consecutive_anomalies=consecutive,
+            consecutive_anomalies=alert_rule.consecutive_anomalies if alert_rule else None,
+            anomaly_window=(
+                f"{alert_rule.window_points * self.interval_seconds}s"
+                if alert_rule and alert_rule.window_points is not None
+                else None
+            ),
+            min_anomaly_share=alert_rule.min_anomaly_share if alert_rule else None,
             candidate_detector_ids=self.evaluated_ids(),
             candidates=candidates,
             group_votes=group_votes,

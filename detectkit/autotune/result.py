@@ -35,6 +35,13 @@ class AutoTuneResult:
 
     consecutive_anomalies: int | None
     candidate_detector_ids: list[str]
+    # Fraction alert rule (issue #101): an exact-seconds duration string (e.g.
+    # "7200s", lossless through `Interval(...).seconds // interval_seconds`) +
+    # share, set only when the supervised sweep adopts the OR-ed fraction rule.
+    # Like consecutive_anomalies they are non-identity metadata — deliberately
+    # excluded from `compute_run_id`.
+    anomaly_window: str | None = None
+    min_anomaly_share: float | None = None
     candidates: list[dict[str, Any]] = field(default_factory=list)
     group_votes: list[dict[str, Any]] = field(default_factory=list)
     decision_log: list[dict[str, Any]] = field(default_factory=list)

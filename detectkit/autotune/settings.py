@@ -43,9 +43,19 @@ class TuneSettings:
     # being trapped flagging its legitimate tail.
     threshold_grid_sigma: tuple[float, ...] = (2.5, 3.0, 3.5, 4.0, 5.0, 6.0)  # mad / zscore
     threshold_grid_iqr: tuple[float, ...] = (1.5, 2.0, 3.0, 4.0, 6.0)  # iqr (Tukey)
+    # AR-order sweep for the prediction-based autoreg detector (axis gated by
+    # its AxisSpec; the residual z is in σ-units so it reuses the sigma grid).
+    lags_grid: tuple[int, ...] = (2, 3, 5, 8)
 
     # History / window selection
     window_tie_margin: float = 0.01  # prefer a larger window within this score gap
+
+    # Fraction alert window (supervised 2-D sweep, OR-ed with the consecutive
+    # rule exactly as the pipeline deploys it). Window grid is in grid points
+    # of the metric interval; entries < 2 are dropped (MetricConfig rejects an
+    # anomaly_window spanning < 2 intervals). Shares are fractions in (0, 1].
+    alert_window_points_grid: tuple[int, ...] = (4, 6, 12, 24)
+    alert_share_grid: tuple[float, ...] = (0.2, 0.3, 0.5)
 
     # Stage-1 seasonality search probe
     probe_detector_type: str = "mad"
@@ -58,5 +68,9 @@ class TuneSettings:
     max_history: int | None = None
 
     def threshold_grid(self, detector_type: str) -> tuple[float, ...]:
-        """Threshold sweep for a detector type (Tukey multipliers for IQR)."""
+        """Threshold sweep for a detector type (Tukey multipliers for IQR).
+
+        ``autoreg`` deliberately falls through to the sigma grid: its residual
+        z-score is in σ-units, directly comparable with mad/zscore thresholds.
+        """
         return self.threshold_grid_iqr if detector_type == "iqr" else self.threshold_grid_sigma

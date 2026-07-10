@@ -18,6 +18,7 @@ import numpy as np
 
 from detectkit.autotune._base import _AutoTuneBase
 from detectkit.autotune._types import CandidateEval
+from detectkit.autotune.axis_spec import axis_spec_for, resolve_floor, resolve_threshold_default
 from detectkit.autotune.window_select import (
     detect_level_shift,
     half_life_grid,
@@ -26,7 +27,6 @@ from detectkit.autotune.window_select import (
     select_window,
     trend_present,
 )
-from detectkit.detectors.factory import DetectorFactory
 
 
 def _initial_window(grid: list[int], floor: int) -> int | None:
@@ -92,9 +92,9 @@ def grid_search(
     best_overall: CandidateEval | None = None
 
     for detector_type in detector_types:
-        detector_cls = DetectorFactory.DETECTOR_TYPES[detector_type]
-        floor = int(getattr(detector_cls, "MIN_SAMPLES_FLOOR", 1))
-        threshold_default = float(getattr(detector_cls, "THRESHOLD_DEFAULT", 3.0))
+        spec = axis_spec_for(detector_type)
+        floor = resolve_floor(detector_type)
+        threshold_default = resolve_threshold_default(detector_type)
         window = _initial_window(grid, floor)
         if window is None:
             tuner.log(
@@ -104,11 +104,12 @@ def grid_search(
             continue
 
         accepted: dict[str, Any] = {
-            **base,
+            **(base if spec.seasonality else {}),
+            **spec.initial,
             "threshold": threshold_default,
             "window_size": window,
-            "min_samples": min_samples_for(window, floor),
         }
+        accepted["min_samples"] = min_samples_for(window, floor, accepted.get("lags"))
         best = tuner.safe_evaluate(detector_type, accepted)
         if best is None:
             continue
@@ -121,28 +122,47 @@ def grid_search(
             if ev is not None and ev.score > best.score:
                 best, accepted["threshold"] = ev, threshold
 
-        # Axis 2: recency weighting (only adopt if it clears the margin).
-        for weights in (None, "exponential"):
-            if weights == accepted.get("window_weights"):
-                continue
-            ev = tuner.safe_evaluate(detector_type, {**accepted, "window_weights": weights})
-            if ev is not None and ev.score > best.score + eps:
-                best, accepted["window_weights"] = ev, weights
-
-        # Axis 2b: half-life of the recency weighting — only when exponential
-        # weighting was adopted. The detector defaults to a fixed half-life; this
-        # lets the search pick a faster-forgetting baseline that tracks the current
-        # regime (the term that matters on a metric that shifted level).
-        if accepted.get("window_weights") == "exponential":
-            for half_life in half_life_grid(accepted["window_size"], accepted["min_samples"]):
-                if half_life == accepted.get("half_life"):
+        # Axis 1b: AR order (autoreg only) — swept like threshold, with the
+        # min-samples floor tracking lags + 2 (the detector validates that).
+        if spec.lags:
+            for lags in tuner.settings.lags_grid:
+                if lags == accepted.get("lags"):
                     continue
-                ev = tuner.safe_evaluate(detector_type, {**accepted, "half_life": half_life})
+                candidate = {
+                    **accepted,
+                    "lags": lags,
+                    "min_samples": min_samples_for(accepted["window_size"], floor, lags),
+                }
+                ev = tuner.safe_evaluate(detector_type, candidate)
+                if ev is not None and ev.score > best.score:
+                    best = ev
+                    accepted["lags"] = lags
+                    accepted["min_samples"] = candidate["min_samples"]
+
+        # Axis 2: recency weighting (only adopt if it clears the margin).
+        if spec.weighting:
+            for weights in (None, "exponential"):
+                if weights == accepted.get("window_weights"):
+                    continue
+                ev = tuner.safe_evaluate(detector_type, {**accepted, "window_weights": weights})
                 if ev is not None and ev.score > best.score + eps:
-                    best, accepted["half_life"] = ev, half_life
+                    best, accepted["window_weights"] = ev, weights
+
+            # Axis 2b: half-life of the recency weighting — only when exponential
+            # weighting was adopted. The detector defaults to a fixed half-life;
+            # this lets the search pick a faster-forgetting baseline that tracks
+            # the current regime (the term that matters on a metric that shifted
+            # level).
+            if accepted.get("window_weights") == "exponential":
+                for half_life in half_life_grid(accepted["window_size"], accepted["min_samples"]):
+                    if half_life == accepted.get("half_life"):
+                        continue
+                    ev = tuner.safe_evaluate(detector_type, {**accepted, "half_life": half_life})
+                    if ev is not None and ev.score > best.score + eps:
+                        best, accepted["half_life"] = ev, half_life
 
         # Axis 3: detrend (gated by the trend pre-test).
-        if has_trend:
+        if spec.detrend and has_trend:
             for detrend in (None, "linear"):
                 if detrend == accepted.get("detrend"):
                     continue
@@ -156,12 +176,15 @@ def grid_search(
         # the band and mask its own tail — usually decisive on labeled data
         # with long incidents, near-neutral on clean series. Swept before the
         # window axis so select_window evaluates with the adopted baseline.
-        for stabilization in (None, "clamp"):
-            if stabilization == accepted.get("stabilization"):
-                continue
-            ev = tuner.safe_evaluate(detector_type, {**accepted, "stabilization": stabilization})
-            if ev is not None and ev.score > best.score + eps:
-                best, accepted["stabilization"] = ev, stabilization
+        if spec.stabilization:
+            for stabilization in (None, "clamp"):
+                if stabilization == accepted.get("stabilization"):
+                    continue
+                ev = tuner.safe_evaluate(
+                    detector_type, {**accepted, "stabilization": stabilization}
+                )
+                if ev is not None and ev.score > best.score + eps:
+                    best, accepted["stabilization"] = ev, stabilization
 
         # Axis 4: window size (large-window tie-bias, trend-gated in select_window).
         window_best = select_window(tuner, detector_type, accepted, best, grid)

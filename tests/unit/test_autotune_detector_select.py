@@ -13,7 +13,7 @@ from detectkit.autotune.distribution import compute_distribution_features
 from detectkit.autotune.labels import IncidentLabels
 from detectkit.autotune.settings import TuneSettings
 
-_STAT_TYPES = {"mad", "zscore", "iqr"}
+_STAT_TYPES = {"mad", "zscore", "iqr", "autoreg"}  # every tunable type (incl. autoreg since #97 Phase 2)
 
 
 def _feat(values):

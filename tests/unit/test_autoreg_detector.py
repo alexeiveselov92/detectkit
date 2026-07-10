@@ -338,3 +338,70 @@ class TestContextSize:
     def test_stabilization_adds_a_window(self):
         det = AutoregDetector(lags=5, window_size=200, stabilization="clamp")
         assert det.get_context_size() == 205 + 200
+
+
+class TestNumericalStability:
+    """Phase-0 hardening (issue #97): the fit window is centered/scaled before
+    the normal equations, and the clamp substitution is capped to the observed
+    window range — measured on NAB, where raw ~1e9-scale series overflowed
+    ``x.T @ x`` to inf and clamp-amplified the garbage into later fits."""
+
+    def test_large_magnitude_series_stays_finite(self):
+        rng = np.random.default_rng(7)
+        n = 400
+        values = 2.5e9 + rng.normal(0, 5e6, n)
+        values[300:340] += 8e7  # sustained shift: triggers anomalies + clamp write-back
+        data = make_data(values)
+        det = AutoregDetector(lags=5, window_size=100, min_samples=20, stabilization="clamp")
+
+        results = det.detect(data)
+
+        scored = [r for r in results if r.detection_metadata.get("reason") is None]
+        assert scored, "expected scored points on a gap-free series"
+        for r in scored:
+            assert np.isfinite(r.confidence_lower)
+            assert np.isfinite(r.confidence_upper)
+            assert np.isfinite(r.detection_metadata["prediction"])
+            assert np.isfinite(r.detection_metadata["sigma_r"])
+        # The shift must actually be caught (the run isn't degenerate).
+        assert any(r.is_anomaly for r in results[300:340])
+
+    def test_flags_invariant_under_affine_rescaling(self):
+        """Centering/scaling makes detection affine-equivariant in practice:
+        the same series shifted/scaled to ~1e9 magnitude must flag the same
+        points as its unit-scale original."""
+        rng = np.random.default_rng(11)
+        n = 400
+        base = ar2_series(n=n, noise=0.5, seed=3)
+        base[350] += 25.0  # dynamics break
+        big = 1e9 + 5e7 * base
+
+        det_kwargs = dict(lags=3, window_size=80, min_samples=15, stabilization="clamp")
+        flags_base = [r.is_anomaly for r in AutoregDetector(**det_kwargs).detect(make_data(base))]
+        flags_big = [r.is_anomaly for r in AutoregDetector(**det_kwargs).detect(make_data(big))]
+
+        assert flags_base == flags_big
+        assert flags_base[350]
+
+    def test_clamp_substitution_capped_to_window_range(self):
+        """Even when the band blows far past anything observed, the value the
+        working history ingests stays within the raw window range: later
+        predictions can never exceed max(|window|) by orders of magnitude."""
+        rng = np.random.default_rng(23)
+        n = 300
+        values = 100.0 + rng.normal(0, 1.0, n)
+        values[200:] = 1e6  # extreme sustained incident
+        data = make_data(values)
+        det = AutoregDetector(lags=4, window_size=60, min_samples=15, stabilization="clamp")
+
+        results = det.detect(data)
+
+        for r in results:
+            if r.confidence_lower is not None:
+                assert np.isfinite(r.confidence_lower)
+                assert np.isfinite(r.confidence_upper)
+            pred = r.detection_metadata.get("prediction")
+            if pred is not None:
+                # Working history is capped to observed values, so predictions
+                # stay within the same order of magnitude as the data.
+                assert abs(pred) < 1e8

@@ -92,7 +92,7 @@ def test_supervised_run_produces_valid_tuned_config(tmp_path):
         interval_seconds=3600,
         settings=TuneSettings(metric=ScoringMetric.MCC),
     )
-    assert result.chosen_detector_type in {"mad", "zscore", "iqr"}
+    assert result.chosen_detector_type in {"mad", "zscore", "iqr", "autoreg"}
     assert result.winning_detector_id in result.candidate_detector_ids
     assert result.chosen_detector_params["window_size"] >= 1
 
@@ -187,7 +187,7 @@ def test_unsupervised_run_without_labels(tmp_path):
         interval_seconds=3600,
         settings=TuneSettings(),
     )
-    assert result.chosen_detector_type in {"mad", "zscore", "iqr"}
+    assert result.chosen_detector_type in {"mad", "zscore", "iqr", "autoreg"}
     assert result.consecutive_anomalies is None  # alert window only tuned when supervised
 
 

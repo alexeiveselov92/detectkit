@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import parse_qs, urlparse
 
 from detectkit.autotune.labels import parse_incident_labels, versioned_labels_path
+from detectkit.core.interval import Interval
 from detectkit.tuning.config_writer import AppliedConfig, TunedDetector, apply_tuned_config
 from detectkit.tuning.html import render_tune_html
 
@@ -363,6 +364,14 @@ def _run_autotune(srv: _TuneServer, body: bytes) -> dict[str, Any]:
     return {
         "detector": seed_detector_params(result.chosen_detector_type, params),
         "consecutive_anomalies": result.consecutive_anomalies,
+        # Fraction rule (issue #101): pre-resolved to grid points for the page
+        # (the worker sweeps in points), same floor-div as AlertConditions.
+        "anomaly_window_points": (
+            max(1, Interval(result.anomaly_window).seconds // srv.interval_seconds)
+            if result.anomaly_window is not None
+            else None
+        ),
+        "min_anomaly_share": result.min_anomaly_share,
         "seasonality": result.chosen_seasonality,
         "score": result.score,
         "scoring_metric": result.scoring_metric,
@@ -449,6 +458,11 @@ def _echo_autotune_result(*, echo: Callable[[str], None], result: Any) -> None:
     season_line = f"Seasonality: {result.chosen_seasonality or 'none'}  |  CV folds: {folds}"
     if result.consecutive_anomalies is not None:
         season_line += f"  |  consecutive_anomalies={result.consecutive_anomalies}"
+    if result.anomaly_window is not None:
+        season_line += (
+            f"  |  anomaly_window={result.anomaly_window} "
+            f"× min_anomaly_share={result.min_anomaly_share}"
+        )
     echo_block(
         "RESULT",
         [

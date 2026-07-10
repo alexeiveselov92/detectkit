@@ -68,14 +68,96 @@ class _DecisionMixin(_OrchestratorBase):
         consecutive, latest_quorum, direction = self._count_consecutive_anomalies(
             detections_by_time, timestamps_sorted
         )
-        if not latest_quorum or consecutive < self.conditions.consecutive_anomalies:
-            return False, None
+        if latest_quorum and consecutive >= self.conditions.consecutive_anomalies:
+            # The decision is made; now resolve the *true* streak length/onset
+            # for the message (the shallow alert window caps ``consecutive`` at
+            # the rule threshold, which can't answer "how long has this been
+            # going on").
+            streak, onset_ts, capped = self._resolve_streak(latest_quorum[0].timestamp)
+            return True, self._build_alert_data(latest_quorum, streak, direction, onset_ts, capped)
 
-        # The decision is made; now resolve the *true* streak length/onset for
-        # the message (the shallow alert window caps ``consecutive`` at the rule
-        # threshold, which can't answer "how long has this been going on").
-        streak, onset_ts, capped = self._resolve_streak(latest_quorum[0].timestamp)
-        return True, self._build_alert_data(latest_quorum, streak, direction, onset_ts, capped)
+        # The consecutive rule didn't fire; try the fraction rule (OR-ed).
+        share_fire = self._share_fire(detections_by_time, timestamps_sorted)
+        if share_fire is not None:
+            matched, onset_ts, quorum, share_direction = share_fire
+            return True, self._build_alert_data(
+                quorum,
+                matched,
+                share_direction,
+                onset_ts,
+                False,
+                window_matched=matched,
+                fired_by_share=True,
+            )
+        return False, None
+
+    def _share_fire(
+        self,
+        detections_by_time: dict[np.datetime64, list[DetectionRecord]],
+        timestamps_sorted: Sequence[np.datetime64],
+    ) -> tuple[int, np.datetime64, list[DetectionRecord], str | None] | None:
+        """Evaluate the fraction rule at the latest point.
+
+        Fires when the latest point itself meets the direction-aware quorum
+        (so an alert never fires on a stale window whose newest point is
+        already clean) AND at least ``min_anomaly_share`` of the trailing
+        ``window_points`` grid slots meet the quorum. Grid slots with no
+        detections (gaps, outages) count in the denominator but never in the
+        numerator — missing data makes the rule harder to fire, not easier.
+
+        Returns ``(matched, onset_ts, latest_quorum, direction)`` or ``None``.
+        For ``"same"`` the direction is locked from the latest quorum, exactly
+        like the consecutive walk.
+        """
+        window = self.conditions.window_points or 0
+        share_required = self.conditions.min_anomaly_share
+        if window <= 0 or share_required is None or not timestamps_sorted:
+            return None
+
+        latest_ts = timestamps_sorted[0]
+        latest_anomalies = [d for d in detections_by_time[latest_ts] if d.is_anomaly]
+        quorum, direction = self._quorum_at(latest_anomalies, None)
+        if quorum is None:
+            return None
+
+        locked = direction if self.conditions.direction == "same" else None
+        matched, _total, onset_ts = self._window_share_counts(detections_by_time, latest_ts, locked)
+        if matched / window < share_required:
+            return None
+        return matched, onset_ts, quorum, direction
+
+    def _window_share_counts(
+        self,
+        detections_by_time: dict[np.datetime64, list[DetectionRecord]],
+        latest_ts: np.datetime64,
+        locked_direction: str | None,
+    ) -> tuple[int, int, np.datetime64]:
+        """Count quorum-meeting grid slots in the window ending at *latest_ts*.
+
+        Walks the ``window_points`` grid slots ``latest_ts, latest_ts - step,
+        …`` looking each up in *detections_by_time* (an absent slot counts only
+        in the denominator). Returns ``(matched, window_points, onset_ts)``
+        where ``onset_ts`` is the oldest matching slot (the incident onset as
+        far as the window can see; falls back to *latest_ts* when only the
+        latest matches).
+        """
+        window = self.conditions.window_points or 0
+        step = np.timedelta64(self.interval.seconds, "s")
+        matched = 0
+        onset_ts = latest_ts
+        for k in range(window):
+            ts = latest_ts - step * k
+            records = detections_by_time.get(ts)
+            if not records:
+                continue
+            anomalies = [d for d in records if d.is_anomaly]
+            if not anomalies:
+                continue
+            quorum, _ = self._quorum_at(anomalies, locked_direction)
+            if quorum is not None:
+                matched += 1
+                onset_ts = ts
+        return matched, window, onset_ts
 
     def _resolve_streak(self, latest_ts: np.datetime64) -> tuple[int, np.datetime64, bool]:
         """Resolve the full anomalous run ending at *latest_ts*.
@@ -164,6 +246,29 @@ class _DecisionMixin(_OrchestratorBase):
             return anomalies, None
         return None, None
 
+    def _share_still_elevated(
+        self,
+        detections_by_time: dict[np.datetime64, list[DetectionRecord]],
+        latest_ts: np.datetime64,
+        locked_direction: str | None,
+    ) -> bool:
+        """Fraction-rule recovery hysteresis.
+
+        ``True`` while the window share stays at or above **half** the firing
+        threshold — a share hovering right at the threshold would otherwise
+        flap alert/recover on every boundary crossing. Always ``False`` when
+        the fraction rule isn't configured, so consecutive-only configs
+        recover exactly as before.
+        """
+        window = self.conditions.window_points or 0
+        share_required = self.conditions.min_anomaly_share
+        if window <= 0 or share_required is None:
+            return False
+        matched, total, _onset = self._window_share_counts(
+            detections_by_time, latest_ts, locked_direction
+        )
+        return total > 0 and matched / total >= share_required / 2.0
+
     def _count_consecutive_anomalies(
         self,
         detections_by_time: dict[np.datetime64, list[DetectionRecord]],
@@ -227,6 +332,8 @@ class _DecisionMixin(_OrchestratorBase):
         direction: str | None,
         onset_timestamp: np.datetime64 | None = None,
         streak_capped: bool = False,
+        window_matched: int | None = None,
+        fired_by_share: bool = False,
     ) -> AlertData:
         primary = self._primary_record(anomalies)
 
@@ -296,6 +403,13 @@ class _DecisionMixin(_OrchestratorBase):
             interval_seconds=self.interval.seconds,
             onset_timestamp=onset_timestamp,
             streak_capped=streak_capped,
+            # Fraction rule: the configured window/share ride on every alert of
+            # a share-configured config (so the rule chip can name both rules);
+            # the matched count + flag only on a share-fired one.
+            window_points=self.conditions.window_points,
+            min_anomaly_share=self.conditions.min_anomaly_share,
+            window_matched=window_matched,
+            fired_by_share=fired_by_share,
         )
 
     def should_alert_no_data(

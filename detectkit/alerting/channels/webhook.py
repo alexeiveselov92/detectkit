@@ -291,11 +291,7 @@ class WebhookChannel(BaseAlertChannel):
         # inline-code chip so it reads as "this is the config that fired" at a
         # glance. Backticks render identically on Slack and Mattermost; the bold
         # label is platform-aware (see ``_bold``). Leads the body, above the fold.
-        rule_chip = f"{self._bold('Rule')} " + code(
-            f"min_detectors={ctx['min_detectors']} · "
-            f"direction={ctx['direction_policy']} · "
-            f"consecutive={ctx['consecutive_required']}"
-        )
+        rule_chip = f"{self._bold('Rule')} " + code(ctx["rule_display"])
 
         # Links — compact clickable labels (never raw URL strings: a Grafana URL
         # can be a paragraph long once it carries variables), rendered in the
@@ -458,8 +454,7 @@ class WebhookChannel(BaseAlertChannel):
         return (
             "{description_line}"
             "{anomaly_lead}\n"
-            "Rule: min_detectors={min_detectors} · "
-            "direction={direction_policy} · consecutive={consecutive_required}\n"
+            "Rule: {rule_display}\n"
             "\n"
             "Value: {value_display} | Expected: {expected_range}\n"
             "Quorum: {detector_count}/{min_detectors} · {direction}\n"
@@ -479,8 +474,7 @@ class WebhookChannel(BaseAlertChannel):
         return (
             "{description_line}"
             "{recovery_lead}\n"
-            "Rule: min_detectors={min_detectors} · "
-            "direction={direction_policy} · consecutive={consecutive_required}\n"
+            "Rule: {rule_display}\n"
             "\n"
             "Value: {value_display} | Expected: {expected_range}\n"
             "{window_line}"

@@ -137,6 +137,18 @@ ground truth, then **Autotune** for a strong config, then **Tune** by eye, then
 **Apply**. If they just want a quick strong default, go straight to **Autotune**
 (unsupervised) and refine. If they want full manual control, stay in **Tune**.
 
+**Two things the cockpit doesn't cover yet:**
+- The alerting rail control only tunes `consecutive_anomalies`. If the metric
+  also has (or should have) the OR-ed fraction-based alert window
+  (`anomaly_window` + `min_anomaly_share` — see `alerting.md` — useful for a
+  metric that *flaps*, mostly anomalous with occasional clean points that
+  would reset a pure consecutive chain), set those two fields by hand in the
+  metric YAML; the cockpit and `dtk autotune`'s alert-window sweep don't
+  search them yet (a tracked follow-up).
+- A metric with an `autoreg` detector: it rides **read-only** in the cockpit,
+  like `prophet`/`timesfm` — not one of the tunable slots, but Apply preserves
+  it verbatim alongside whatever detector you did tune.
+
 ## Step 4 — Read the live quality, then Apply
 
 As they tune, the metrics bar shows **incident catch rate (recall)**,

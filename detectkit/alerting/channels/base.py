@@ -111,6 +111,49 @@ class AlertData:
     interval_seconds: int | None = None
     onset_timestamp: Any | None = None
     streak_capped: bool = False
+    # Fraction alert rule (``anomaly_window`` + ``min_anomaly_share``).
+    # ``window_points`` / ``min_anomaly_share`` carry the CONFIGURED rule (set on
+    # every alert of a share-configured config so the rule chip can name it);
+    # ``window_matched`` + ``fired_by_share`` are set only when the fraction rule
+    # (not the consecutive rule) actually fired, switching the lead sentence to
+    # the window story. All default off, so existing alerts render byte-identical.
+    window_points: int | None = None
+    window_matched: int | None = None
+    min_anomaly_share: float | None = None
+    fired_by_share: bool = False
+
+
+def format_rule_display(
+    *,
+    min_detectors: Any,
+    direction_policy: Any,
+    consecutive_required: Any,
+    window_points: int | None = None,
+    min_anomaly_share: float | None = None,
+    fired_by_share: bool = False,
+    interval_seconds: int | None = None,
+) -> str:
+    """The alert-rule chip content, shared by every rendering surface.
+
+    Legacy configs (no fraction rule) render the exact historical chip —
+    ``min_detectors=… · direction=… · consecutive=…`` — byte-identical. A
+    share-configured config names both OR-ed rules; a share-FIRED alert leads
+    with the share rule (the one that actually tripped).
+    """
+    from detectkit.utils.datetime_utils import format_duration
+
+    base = f"min_detectors={min_detectors} · direction={direction_policy}"
+    if window_points and min_anomaly_share is not None:
+        pct = f"{min_anomaly_share * 100:g}%"
+        if interval_seconds:
+            span = format_duration(window_points * interval_seconds)
+        else:
+            span = f"{window_points} points"
+        share_rule = f"share>={pct} over {span}"
+        if fired_by_share:
+            return f"{base} · {share_rule}"
+        return f"{base} · consecutive={consecutive_required} (or {share_rule})"
+    return f"{base} · consecutive={consecutive_required}"
 
 
 class BaseAlertChannel(ABC):
@@ -187,6 +230,10 @@ class BaseAlertChannel(ABC):
         - {consecutive_count} — true consecutive streak length (resolved at
           fire time, not capped at the rule's threshold)
         - {consecutive_required} — configured consecutive threshold (rule)
+        - {rule_display} — the full alert-rule chip content (consecutive
+          and/or the fraction rule, whichever is configured/fired)
+        - {window_points} / {window_matched} — fraction-rule window size and
+          matched count (empty when the fraction rule isn't configured/fired)
         - {interval_display} — metric interval as a string (e.g. "10min")
         - {duration_display} — how long the streak/incident lasted
           (e.g. "2h 30m"; "over …" when it predates the lookback window)
@@ -349,7 +396,42 @@ class BaseAlertChannel(ABC):
         capped = alert_data.streak_capped
         interval_display = str(Interval(interval_seconds)) if interval_seconds else ""
 
-        if interval_seconds and streak >= 1:
+        if (
+            alert_data.fired_by_share
+            and alert_data.window_points
+            and alert_data.window_matched is not None
+        ):
+            # Fraction-rule story: a share alert has scattered matches, not a
+            # contiguous streak, so the lead reports the window share instead
+            # of a consecutive-run duration.
+            window = alert_data.window_points
+            matched = alert_data.window_matched
+            observed_pct = f"{matched / window * 100:.0f}%"
+            threshold_pct = (
+                f"{alert_data.min_anomaly_share * 100:g}%"
+                if alert_data.min_anomaly_share is not None
+                else ""
+            )
+            streak_display = f"{matched}/{window}"
+            started_display = onset_str
+            if interval_seconds:
+                duration_display = format_duration(window * interval_seconds)
+                anomaly_lead = (
+                    f"{matched} of the last {window} {interval_display} intervals were "
+                    f"anomalous ({observed_pct}) — at or above the {threshold_pct} share "
+                    f"threshold over {duration_display}."
+                )
+            else:
+                duration_display = ""
+                anomaly_lead = (
+                    f"{matched} of the last {window} intervals were anomalous "
+                    f"({observed_pct}) — at or above the {threshold_pct} share threshold."
+                )
+            recovery_lead = (
+                "The alert condition no longer holds — the metric is back within "
+                "expected bounds."
+            )
+        elif interval_seconds and streak >= 1:
             duration_display = format_duration(streak * interval_seconds)
             if capped:
                 duration_display = f"over {duration_display}"
@@ -387,7 +469,14 @@ class BaseAlertChannel(ABC):
         # in (direct-API callers). The firing message doesn't show it: there it
         # coincides with the latest point the alert is firing on.
         fired_display = ""
-        if alert_data.onset_timestamp is not None and interval_seconds and not capped:
+        if (
+            alert_data.onset_timestamp is not None
+            and interval_seconds
+            and not capped
+            # A share-fired alert's onset is the first matched point in the
+            # window; onset + consecutive math doesn't describe its fire time.
+            and not alert_data.fired_by_share
+        ):
             req = (
                 consecutive_required if (consecutive_required and consecutive_required >= 1) else 1
             )
@@ -451,6 +540,20 @@ class BaseAlertChannel(ABC):
         project_name = alert_data.project_name or ""
         project_name_prefix = f"[{alert_data.project_name}] " if alert_data.project_name else ""
 
+        # Alert-rule chip content — the single shared string every surface
+        # renders (default templates, webhook attachment, Telegram HTML, email).
+        # Built from the SAME fallback-resolved values as the individual keys,
+        # so legacy configs render the historical chip byte-identically.
+        rule_display = format_rule_display(
+            min_detectors=min_detectors,
+            direction_policy=direction_policy,
+            consecutive_required=consecutive_required,
+            window_points=alert_data.window_points,
+            min_anomaly_share=alert_data.min_anomaly_share,
+            fired_by_share=alert_data.fired_by_share,
+            interval_seconds=interval_seconds,
+        )
+
         # Status keyword
         if alert_data.is_error:
             status = "ERROR"
@@ -482,6 +585,9 @@ class BaseAlertChannel(ABC):
             "severity": alert_data.severity,
             "consecutive_count": alert_data.consecutive_count,
             "consecutive_required": consecutive_required,
+            "rule_display": rule_display,
+            "window_points": alert_data.window_points or "",
+            "window_matched": alert_data.window_matched or "",
             "interval_display": interval_display,
             "duration_display": duration_display,
             "streak_display": streak_display,
@@ -617,8 +723,7 @@ class BaseAlertChannel(ABC):
             "🔴 {project_name_prefix}Alert: {metric_name}\n"
             "{description_line}"
             "{anomaly_lead}\n"
-            "Rule: min_detectors={min_detectors} · "
-            "direction={direction_policy} · consecutive={consecutive_required}\n"
+            "Rule: {rule_display}\n"
             "\n"
             "Value: {value_display} | Expected: {expected_range}\n"
             "Quorum: {detector_count}/{min_detectors} · {direction}\n"
@@ -642,8 +747,7 @@ class BaseAlertChannel(ABC):
             "🟢 {project_name_prefix}Alert cleared: {metric_name}\n"
             "{description_line}"
             "{recovery_lead}\n"
-            "Rule: min_detectors={min_detectors} · "
-            "direction={direction_policy} · consecutive={consecutive_required}\n"
+            "Rule: {rule_display}\n"
             "\n"
             "Value: {value_display} | Expected: {expected_range}\n"
             "{window_line}"

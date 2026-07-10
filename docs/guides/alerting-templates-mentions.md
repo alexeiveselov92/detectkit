@@ -112,7 +112,7 @@ both anomaly and recovery: **description → Rule → Value/Expected**.
 ```
 🔴 {project_name_prefix}Alert: {metric_name}
 {description_line}{anomaly_lead}
-Rule: min_detectors={min_detectors} · direction={direction_policy} · consecutive={consecutive_required}
+Rule: {rule_display}
 
 Value: {value_display} | Expected: {expected_range}
 Quorum: {detector_count}/{min_detectors} · {direction}
@@ -130,8 +130,12 @@ avatar. See [Channels](alerting-channels.md) for where each channel surfaces it.
 — e.g. `Anomalous for 2h 30m — 15 consecutive 10min intervals.` (the metric
 interval, the true streak length and the wall-clock duration). The `Rule:` line
 sits right above the evidence it explains and restates the configured
-thresholds; `{window_line}` gives the problematic span as
-`Anomaly began: … | Latest reading: …` (and
+thresholds via `{rule_display}` — for a config with no [fraction-based alert
+window](alerting.md#fraction-based-alert-window-optional) this renders the
+same `min_detectors=… · direction=… · consecutive=…` chip as before; a
+share-configured metric also names `anomaly_window` / `min_anomaly_share`,
+leading with whichever rule actually fired. `{window_line}` gives the
+problematic span as `Anomaly began: … | Latest reading: …` (and
 `Anomaly began: … | Alert fired: … | Recovered: …` on recovery — where
 **Alert fired** is the on-grid moment the rule first tripped, distinct from the
 onset).
@@ -196,6 +200,8 @@ alerting:
 | `direction_policy` | Configured direction rule: `"same"`, `"any"`, `"up"`, `"down"` | anomaly, recovery |
 | `consecutive_count` | **True** consecutive streak length — resolved at fire time by looking back over the detection history, not capped at the rule threshold (recovery: the just-ended incident length) | anomaly, recovery |
 | `consecutive_required` | Configured consecutive threshold the alert fired on (the rule) | anomaly, recovery |
+| `rule_display` | The full alert-rule chip — the legacy `min_detectors=… · direction=… · consecutive=…` unless the metric also configures the [fraction-based alert window](alerting.md#fraction-based-alert-window-optional), in which case it also names `anomaly_window` / `min_anomaly_share`, leading with whichever rule fired | anomaly (recovery always renders the legacy consecutive-only form) |
+| `window_points` / `window_matched` | Fraction-rule window size (in points) and the matched-quorum-point count within it; both empty unless the alert is share-configured (`window_points`) / share-fired (`window_matched`) | anomaly |
 | `interval_display` | Metric interval as a string (e.g. `"10min"`) | all |
 | `duration_display` | How long the streak/incident has run (e.g. `"2h 30m"`; `"over …"` when older than the lookback window) | anomaly, recovery |
 | `onset_display` / `started_display` | First **anomalous** timestamp of the run — the onset, **not** the alert-fire time (formatted in `{timezone}`); `started_display` adds `"or earlier"` when the run is capped | anomaly, recovery |

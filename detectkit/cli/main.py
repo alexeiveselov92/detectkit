@@ -219,7 +219,8 @@ def run(
 @click.option(
     "--scoring",
     "scoring_override",
-    help="Optimization target: mcc (default), f1, f_beta, balanced_accuracy, roc_auc, pr_auc",
+    help="Optimization target: mcc (default), f1, f_beta, balanced_accuracy, roc_auc, "
+    "pr_auc, event_f1",
 )
 @click.option(
     "--from",

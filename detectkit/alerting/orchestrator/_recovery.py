@@ -58,8 +58,9 @@ class _RecoveryMixin(_OrchestratorBase):
             return False
 
         last_point = self.get_last_complete_point()
-        # +5 for safety margin so we don't truncate the consecutive window.
-        num_points = self.conditions.consecutive_anomalies + 5
+        # The wider of the two rules' windows, +5 safety margin so we don't
+        # truncate the consecutive/fraction window.
+        num_points = self.conditions.lookback_points + 5
 
         recent_detections = self.internal.get_recent_detections(
             metric_name=self.metric_name,
@@ -78,20 +79,48 @@ class _RecoveryMixin(_OrchestratorBase):
         latest_anomalies = [d for d in detections_by_time[timestamps_sorted[0]] if d.is_anomaly]
 
         direction_condition = self.conditions.direction
+        locked_direction: str | None = None
         if direction_condition == "down":
             blocking = [d for d in latest_anomalies if d.direction == "down"]
+            locked_direction = "down"
         elif direction_condition == "up":
             blocking = [d for d in latest_anomalies if d.direction == "up"]
+            locked_direction = "up"
         elif direction_condition == "same":
             trigger_direction = self._get_alert_trigger_direction(last_alert_timestamp)
             if trigger_direction is None:
                 blocking = latest_anomalies  # conservative fallback
             else:
                 blocking = [d for d in latest_anomalies if d.direction == trigger_direction]
+            locked_direction = trigger_direction
         else:  # "any" / unknown — preserve historical behaviour
             blocking = latest_anomalies
 
-        return len(blocking) == 0
+        if blocking:
+            return False
+        # Fraction-rule hysteresis: with the share rule configured, a clean
+        # latest point isn't enough — the window share must also drop below
+        # half the firing threshold, or the alert would flap around it.
+        # The share is computed over an UNFILTERED fetch: ``recent_detections``
+        # above is ``created_after``-filtered (only rows persisted after the
+        # alert), which is right for the freshness check but would make almost
+        # every window slot look empty and defeat the hysteresis — the window
+        # walk needs the full stored history, whenever it was written.
+        # ``_share_still_elevated`` lives in _DecisionMixin; both mixins compose
+        # into AlertOrchestrator so the call resolves at runtime.
+        if self.conditions.min_anomaly_share is None or not self.conditions.window_points:
+            return True
+        window_rows = self.internal.get_recent_detections(
+            metric_name=self.metric_name,
+            last_point=last_point,
+            num_points=num_points,
+        )
+        window_records = hydrate_detection_records(window_rows)
+        if not window_records:
+            return True
+        window_by_time = self._group_by_timestamp(window_records)
+        latest_window_ts = max(window_by_time.keys())
+        return not self._share_still_elevated(window_by_time, latest_window_ts, locked_direction)
 
     def _get_alert_trigger_direction(self, last_alert_timestamp: datetime) -> str | None:
         """Return the direction of the anomaly that triggered the last alert.
@@ -194,10 +223,13 @@ class _RecoveryMixin(_OrchestratorBase):
             project_name=self.project_name,
             help_url=self.help_url,
             # Echo the rule that had fired so the recovery message names the
-            # same alert condition that just cleared.
+            # same alert condition that just cleared (including the fraction
+            # rule when configured, so fire and recovery render one chip).
             min_detectors=self.conditions.min_detectors,
             direction_policy=self.conditions.direction,
             consecutive_required=self.conditions.consecutive_anomalies,
+            window_points=self.conditions.window_points,
+            min_anomaly_share=self.conditions.min_anomaly_share,
             # Incident timing for the "Incident lasted …" line.
             interval_seconds=self.interval.seconds,
             onset_timestamp=onset_ts,

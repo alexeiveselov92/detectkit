@@ -104,8 +104,8 @@ only the detector(s) you tuned and keeps every **other** detector unchanged, so 
 survives a retune. If a metric configures **more than one detector**, a **Tuning
 detector** picker in the Tune rail lets you choose which one to tune (the cockpit
 shows one band at a time); switching re-seeds every knob from that detector, and
-non-tunable detectors (`prophet`/`timesfm`) plus the ones you didn't touch are
-listed as "preserved on Apply". Reads the metric's loaded
+non-tunable detectors (`prophet`/`timesfm`/`autoreg`) plus the ones you didn't
+touch are listed as "preserved on Apply". Reads the metric's loaded
 datapoints (run `dtk run --steps load` first if empty); the selector must resolve
 to a single metric.
 

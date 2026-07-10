@@ -25,6 +25,7 @@ detectkit/
 │   ├── semantic/         # OSI (Open Semantic Interchange) interop (`dtk osi` import/export)
 │   └── utils/            # Numpy/stats helpers, env interpolation
 ├── tests/                # Unit (numpy/mock) + integration (testcontainers)
+├── benchmarks/           # Offline public-dataset benchmark harness (dev tooling, not in the wheel)
 └── docs/                 # User-facing docs (guides, reference, examples)
 ```
 
@@ -88,7 +89,11 @@ Hooks (`.pre-commit-config.yaml`):
 - **Small, focused modules** — avoid 2K-line files; split by responsibility.
 - **Keep the library detector-agnostic** — new statistical detectors reuse the
   shared windowing pipeline (`WindowedStatDetector`); never fork the pipeline
-  or special-case a detector type in the orchestrator.
+  or special-case a detector type in the orchestrator. (The prediction-based
+  `autoreg` detector is the one documented exception — a lag model can't reuse
+  the windowed template's NaN-gap splicing or seasonality multipliers, so it
+  subclasses `BaseDetector` directly; don't add further exceptions without the
+  same level of rationale.)
 
 ## How to extend
 

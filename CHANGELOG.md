@@ -5,6 +5,93 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.52.0] - 2026-07-10
+
+### Added
+- **Fraction-based alert window — `anomaly_window` + `min_anomaly_share` on
+  `alerting:` blocks.** A new, opt-in rule pair OR-ed with
+  `consecutive_anomalies`: the alert also fires when the share of points
+  meeting the direction-aware quorum over a trailing window (e.g. "30min",
+  resolved to grid points via the metric interval; must span at least 2
+  intervals) reaches the threshold
+  (e.g. `0.3` = 30%) **and** the latest point itself meets the quorum — so a
+  flapping incident whose single normal points keep breaking the consecutive
+  chain still alerts, while a stale window whose newest point is already
+  clean never does. Missing/no-data grid slots count in the denominator only
+  (an outage makes the rule *harder* to fire; the no-data alert covers
+  outages). Recovery (with `notify_on_recovery`) gains hysteresis: besides a
+  clean latest point, the window share must fall below **half** the firing
+  threshold, so an alert can't flap around the boundary. The live path and
+  `AlertOrchestrator.replay()` share one decision seam, so HTML reports and
+  the `dtk ui` overview replay the rule automatically. Messages: share-fired
+  alerts lead with the window story ("14 of the last 30 10min intervals were
+  anomalous (47%) — at or above the 30% share threshold over 5h.") and the
+  Rule chip now renders through a shared `{rule_display}` template variable —
+  consecutive-only configs render **byte-identically** to before and keep
+  their `alert_config_id` (the new fields join the hash only when set).
+  Adapted from Yandex's Monium/Taxi write-up, where the anomaly window was
+  the single most effective false-positive fix
+  (https://habr.com/ru/companies/yandex/articles/1035520/). The `dtk tune`
+  cockpit and autotune's alert-window sweep still tune
+  `consecutive_anomalies` only — fraction-rule support there is a tracked
+  follow-up.
+- **`event_f1` — segment-aware (point-adjusted) autotune scoring metric.**
+  The engine's pointwise metrics punish a detector that flags 1 of 50 points
+  inside a long labeled incident with 49 false negatives, even though for
+  alerting purposes that incident was *caught* — so autotune could prefer
+  configs the `dtk tune` cockpit's incident-overlap recall/FDR bar rates
+  worse. `event_f1` counts contiguous labeled runs as single incidents
+  (Revised-Point-Adjusted convention: ≥1 flagged point inside → 1 TP, none →
+  1 FN, flags outside any incident → pointwise FPs), aligning the engine
+  with the alert pipeline and the cockpit. Opt-in via
+  `autotune.scoring_metric: event_f1` or `dtk autotune --scoring event_f1`;
+  MCC stays the default. Segments are recomputed fold-locally in
+  cross-validation, and incidents the detector could not score anywhere (no
+  confidence band) are excluded rather than counted missed; the supervised
+  `consecutive_anomalies` sweep honors the metric too.
+- **`autoreg` — a prediction-based autoregression detector with built-in
+  stabilization (Phase 1).** detectkit's first dynamics detector: per point
+  it fits AR(`lags`) on a trailing `window_size` window via numpy-only
+  normal equations, predicts ŷ from the previous `lags` values and flags
+  `|y − ŷ| > threshold·σ_r`, with the natural band `ŷ ± threshold·σ_r` — so
+  it catches "the value is normal in absolute terms but wrong given the last
+  few points" (shape anomalies) and adapts fast on non-seasonal metrics.
+  `stabilization: clamp` is **on by default** (the article's key novation):
+  flagged points enter later fits clamped to the violated bound — clamping
+  rather than substituting the prediction itself, because zero-residual
+  substitution collapses σ_r and cascades into false flags (the same
+  center-substitution failure measured and rejected for the windowed
+  detectors in v0.51.0). Deliberately its own `BaseDetector` subclass (the
+  windowed template's NaN-gap window splicing would fabricate lag pairs);
+  v1 scope: no seasonality/smoothing/weighting, strict NaN policy (a gap in
+  the lag view yields no score rather than an imputed one). Not autotunable
+  yet (Phase 2); rides read-only in the `dtk tune` cockpit like
+  prophet/timesfm and is preserved verbatim on Apply. Registered as
+  `type: autoreg`; every result-affecting param is hashed into
+  `detector_id` as usual.
+- **`benchmarks/` — an offline public-dataset benchmark harness (dev
+  tooling, not shipped in the wheel).** Runs the real detectors
+  (`DetectorFactory`) over NAB (downloader included), Yahoo S5
+  (license-gated, user-supplied directory) and a deterministic synthetic
+  suite; scores F1-best / AUC-PR / point-adjusted (event) F1 per detector
+  variant (mad/zscore/iqr ± `stabilization: clamp`, `autoreg`) and emits
+  markdown + JSON result tables. Includes a benchmark-local pure-numpy
+  **spectral residual** implementation (Ren et al., KDD 2019) evaluated
+  *before* any decision to ship it in the library — on the synthetic suite
+  it trails the windowed detectors on event-F1/AUC-PR, supporting the
+  measure-first gate. First measured numbers: `stabilization: clamp`
+  improves every windowed detector's event-F1-best / AUC-PR on the synthetic
+  suite (e.g. mad 0.617→0.636 event-F1-best, 0.624→0.696 AUC-PR).
+
+### Changed
+- The alert-rule chip on every channel (webhook/Slack/Mattermost, Telegram,
+  email, plain-text templates) is now built from the single shared
+  `{rule_display}` context variable instead of three hardcoded placeholders.
+  Consecutive-only configs render byte-identically; share-configured configs
+  name both OR-ed rules; share-fired alerts lead with the share rule.
+  Custom templates gain `{rule_display}`, `{window_points}` and
+  `{window_matched}`.
+
 ## [0.51.0] - 2026-07-10
 
 ### Added

@@ -656,8 +656,10 @@ dtk autotune --select api_error_rate --incidents incidents/api_error_rate.yml
 ##### `--scoring` (default: `mcc`)
 
 The metric the search maximizes across folds: `mcc` (default), `f1`, `f_beta`,
-`balanced_accuracy`, `roc_auc`, `pr_auc`. MCC uses the whole confusion matrix and
-suits rare anomalies.
+`balanced_accuracy`, `roc_auc`, `pr_auc`, `event_f1`. MCC uses the whole
+confusion matrix and suits rare anomalies; `event_f1` is segment-aware — one
+flagged point anywhere inside a labeled incident counts the whole incident
+caught — see the [scoring-metrics catalog](autotune.md#scoring-metrics).
 
 ```bash
 dtk autotune --select api_error_rate \
@@ -871,8 +873,8 @@ config is rejected and nothing is written — then archives the current YAML
 verbatim to `metrics/.history/<metric>/<metric>-<timestamp>.yml` and re-emits the
 metric in place, **merging** the tuned detector(s) back in: only the detector(s)
 you tuned are rewritten and every **other** detector (a `manual_bounds` floor, a
-`prophet`/`timesfm` detector, another windowed one) is preserved **verbatim** — so
-a `min_detectors: 2` alert isn't silently broken by a retune. The first `alerting`
+`prophet`/`timesfm`/`autoreg` detector, another windowed one) is preserved
+**verbatim** — so a `min_detectors: 2` alert isn't silently broken by a retune. The first `alerting`
 block's `consecutive_anomalies` is updated if present, and the re-emitted header
 names what was updated vs preserved. For a metric with more than one detector, a
 **Tuning detector** picker chooses which one to tune. The archive keeps a trackable

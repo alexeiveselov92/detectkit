@@ -140,6 +140,10 @@ The three conditions combine into one contract:
    satisfy the quorum AND sit on a contiguous interval grid (each point
    exactly one metric interval after the previous — gaps break the chain).
 
+An optional fourth rule — the [fraction-based alert
+window](#fraction-based-alert-window-optional) — can also fire an alert on
+its own; it is OR-ed with the consecutive rule above.
+
 ### Consecutive Anomalies
 
 Require N consecutive quorum-satisfying points before alerting.
@@ -160,6 +164,58 @@ consecutive.
 - `1` - Critical metrics (errors should be 0)
 - `3` - Standard (good balance)
 - `5+` - Noisy metrics or high false-positive cost
+
+### Fraction-Based Alert Window (Optional)
+
+A real incident sometimes **flaps** — mostly anomalous, but with an
+occasional normal-looking point mixed in. A pure `consecutive_anomalies`
+chain breaks on that one clean point and never reaches threshold, silently
+swallowing an ongoing incident. `anomaly_window` + `min_anomaly_share` add a
+second rule that looks at a **trailing window's share** instead of requiring
+an unbroken streak:
+
+```yaml
+alerting:
+  consecutive_anomalies: 3   # still evaluated — either rule can fire
+  anomaly_window: "30min"    # duration string or seconds, resolved via the interval
+  min_anomaly_share: 0.3     # fire once >= 30% of the window's points meet quorum
+```
+
+The fields must be set **together**. The rule fires when **both** hold:
+
+1. the **latest point** itself meets the quorum (so a stale window with a
+   clean tail never fires), **and**
+2. at least `min_anomaly_share` of the trailing `anomaly_window` grid points
+   also meet the quorum.
+
+It is **OR-ed** with `consecutive_anomalies` — either rule can fire an alert.
+If both would fire on the same point, the message leads with the
+consecutive-streak story (it is the more informative one to read).
+
+Missing/no-data grid slots inside the window count only in the
+**denominator** — an outage makes the fraction rule *harder* to fire, never
+easier (a separate [`no_data_alert`](alerting-no-data-errors.md) covers
+outages on its own).
+
+**Motivation**: Yandex's production incident-response write-up
+([habr.com/ru/companies/yandex/articles/1035520/](https://habr.com/ru/companies/yandex/articles/1035520/))
+reports the anomaly window as their single most effective false-positive fix.
+It also fixes a real gap in a pure `consecutive_anomalies` chain: one normal
+point inside an otherwise-flapping incident resets the streak counter to
+zero, so a real, ongoing incident can go unreported indefinitely.
+
+> **Advanced.** A window shorter than 2 metric intervals is rejected at
+> config load (it would resolve to a single grid point and fire on any lone
+> anomaly, ignoring the share threshold). The onset reported for a
+> share-fired alert is bounded by the window itself — it can't look further
+> back than `anomaly_window`, unlike a consecutive-streak alert's fully
+> resolved onset. Similarly, the recovery message's "Incident lasted …" line
+> reconstructs a *contiguous* anomalous run, so a scattered (flapping)
+> incident that fired by share may report a shorter duration than the
+> incident's full extent, or omit it. Neither the [`dtk tune`](tuning.md)
+> cockpit nor [`dtk autotune`](autotuning.md)'s alert-window sweep tunes
+> `anomaly_window` / `min_anomaly_share` yet — both still search only
+> `consecutive_anomalies` (tracked as a follow-up).
 
 ### Direction Policy
 

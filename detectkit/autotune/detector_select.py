@@ -22,7 +22,10 @@ from detectkit.detectors.seasonality import parse_seasonality_data
 
 # Detector types the engine can auto-tune (windowed statistical detectors).
 # Derived from the factory minus the manual/stateless ones.
-_EXCLUDED_TYPES = {"manual", "manual_bounds"}
+# "autoreg" is prediction-based (fits AR coefficients, not the windowed
+# center/spread stats this module's grid axes assume) — Phase 2 will add a
+# per-type grid seam before it can be tuned here.
+_EXCLUDED_TYPES = {"manual", "manual_bounds", "autoreg"}
 # A seasonal sub-group needs at least this many points to vote.
 _MIN_GROUP_FOR_VOTE = 10
 # Cap on voting sub-groups so a high-cardinality component can't explode cost.

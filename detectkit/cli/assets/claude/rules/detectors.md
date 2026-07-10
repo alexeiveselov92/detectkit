@@ -20,10 +20,12 @@ detectors:
 | `mad` | General-purpose default; outliers / non-normal data | yes | yes |
 | `zscore` | Clean, normally distributed data | no | yes |
 | `iqr` | Skewed distributions, percentile metrics (p95/p99) | yes | yes |
+| `autoreg` | Fast-moving, non-seasonal metrics; catches "unusual dynamics" (a jump/reversal), not just an unusual level | via stabilization (default on) | no (v1) |
 
 Quick decision: known bounds → `manual_bounds`; seasonal → `mad` with
 `seasonality_components`; normal & clean → `zscore`; skewed/heavy-tailed →
-`mad` or `iqr`; unsure → `mad`.
+`mad` or `iqr`; fast-moving/non-seasonal, care about dynamics breaks →
+`autoreg`; unsure → `mad`.
 
 To choose and tune the detector automatically from the data (and labeled
 incidents), use `dtk autotune` — it runs this same decision tree per seasonality
@@ -43,6 +45,55 @@ Fixed thresholds, no window, instant (no warm-up). Supports `input_type` only.
     upper_bound: 90.0     # alert when value > 90
     lower_bound: 0.8      # alert when value < 0.8  (use either or both)
 ```
+
+## `autoreg`
+
+A **dynamics** detector, not windowed like mad/zscore/iqr: it fits an AR(`lags`)
+model (intercept + one coefficient per lag, OLS) over the trailing
+`window_size` window and flags a point when it falls outside `threshold`
+residual-sigma of the model's own one-step-ahead prediction — a prediction-based
+band, not a level statistic. Catches "right level, wrong dynamics": a value
+that sits inside the metric's normal historical range but breaks its usual
+short-range trajectory (a jump, a reversal) — a level detector can miss this
+if the jump lands inside the historical value range.
+
+```yaml
+- type: autoreg
+  params:
+    lags: 5                # AR order — predictors = last N values (default 5)
+    window_size: 200        # trailing history refit at each point (default 200)
+    threshold: 3.0           # residual-sigma band half-width (default 3.0)
+    min_samples: 30          # min valid fit rows required (default 30); >= lags + 2
+    input_type: values        # values | changes | absolute_changes | log_changes
+    stabilization: clamp      # clamp (DEFAULT — unlike windowed detectors' null) | null
+```
+
+**v1 limits** (deliberate): `seasonality_components` is rejected at
+construction (`ValueError`) — a lag model already captures local dynamics and
+a per-group multiplier doesn't compose with AR coefficients; no smoothing, no
+recency weighting, no detrending — the AR residual model already adapts to
+the local level/dynamics on its own. **Strict NaN policy**: a gap inside the
+lag window or at the fit target drops that row entirely rather than being
+imputed (`missing_lags` for the scored point itself). `window_size` and
+`min_samples` must both be >= `lags + 2`.
+
+**`stabilization: clamp` defaults ON** here (unlike the windowed detectors,
+where it defaults to `None`) — once a point is flagged, later fit windows see
+it clamped to the confidence bound it violated (never the raw value or the
+model's prediction), so a sustained incident can't collapse the residual
+scale into false-flag cascades.
+
+**When to use it**: fast-moving, non-seasonal metrics (queue depth, request
+rate, in-flight count) where the *trajectory* matters more than a static
+band, or paired with a level detector (`mad`/`zscore`/`iqr`) via
+`min_detectors` to catch both "unusual level" and "unusual dynamics" in one
+alert rule. Not a drop-in replacement — a metric with seasonal patterns still
+wants a windowed detector.
+
+**Not yet in `dtk autotune`** (Phase 1) — `autotune.detector_types` can't
+select it and the search never considers it. It also **rides read-only in
+`dtk tune`**: like `prophet`/`timesfm`, it isn't one of the cockpit's tunable
+slots, but Apply preserves it verbatim alongside whatever detector you did tune.
 
 ## Windowed detectors (`mad`, `zscore`, `iqr`)
 
@@ -182,16 +233,18 @@ recomputes on the next run; existing configs that don't set it keep their ids.
 
 ## Feature compatibility
 
-| Feature | mad | zscore | iqr | manual_bounds |
-|---|---|---|---|---|
-| `input_type` | Yes | Yes | Yes | Yes |
-| `smoothing` | Yes | Yes | Yes | No |
-| `window_weights` / `half_life` | Yes | Yes | Yes | No |
-| `detrend` | Yes | Yes | Yes | No |
-| `stabilization` | Yes | Yes | Yes | No |
-| `seasonality_components` | Yes | Yes | Yes | No |
+| Feature | mad | zscore | iqr | manual_bounds | autoreg |
+|---|---|---|---|---|---|
+| `input_type` | Yes | Yes | Yes | Yes | Yes |
+| `smoothing` | Yes | Yes | Yes | No | No (v1) |
+| `window_weights` / `half_life` | Yes | Yes | Yes | No | No (v1) |
+| `detrend` | Yes | Yes | Yes | No | No (v1) |
+| `stabilization` | Yes | Yes | Yes | No | Yes (default `clamp`) |
+| `seasonality_components` | Yes | Yes | Yes | No | No — rejected (v1) |
 
 `manual_bounds` has no window, so window-based features don't apply.
+`autoreg` fits its own lag-based (AR) model instead, so those features are
+unsupported in v1 rather than N/A.
 
 ## Detector identity & recomputation
 

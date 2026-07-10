@@ -21,7 +21,7 @@ from detectkit.autotune.detector_select import select_detector_types
 from detectkit.autotune.grid_search import grid_search
 from detectkit.autotune.labels import GroundTruth
 from detectkit.autotune.result import AutoTuneResult
-from detectkit.autotune.scoring import score_predictions
+from detectkit.autotune.scoring import arrays_for_metric, score_predictions
 from detectkit.autotune.seasonality_search import search_seasonality
 from detectkit.autotune.settings import TuneSettings
 from detectkit.autotune.window_select import window_grid
@@ -128,13 +128,10 @@ class AutoTuner(_AutoTuneBase):
         best_score = float("-inf")
         for k in _ALERT_WINDOW_GRID:
             alert = _consecutive(y_pred, k)
-            score = score_predictions(
-                y_true[valid],
-                alert[valid],
-                y_score[valid],
-                self.settings.metric,
-                self.settings.beta,
-            )
+            # Same invalid-point handling seam as the CV folds (pointwise
+            # metrics mask; the segment-aware one keeps unmasked arrays).
+            yt, yp, ys = arrays_for_metric(y_true, alert, y_score, valid, self.settings.metric)
+            score = score_predictions(yt, yp, ys, self.settings.metric, self.settings.beta)
             if score > best_score:
                 best_score, best_k = score, k
         self.log(

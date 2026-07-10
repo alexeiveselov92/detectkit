@@ -16,6 +16,7 @@ from typing import Any
 
 import numpy as np
 
+from detectkit.alerting.channels.base import format_rule_display
 from detectkit.alerting.orchestrator import AlertOrchestrator, ReplayedEvent
 from detectkit.alerting.orchestrator._types import (
     AlertConditions,
@@ -43,8 +44,8 @@ _SMOOTHING_WINDOW_DEFAULT = 10
 _SMOOTHING_ALPHA_DEFAULT = 0.3
 
 # Per-detector-type floors / per-group defaults, keyed by the lowercase type.
-_MIN_SAMPLES_FLOOR: dict[str, int] = {"mad": 1, "zscore": 2, "iqr": 4}
-_MIN_SAMPLES_PER_GROUP_DEFAULT: dict[str, int] = {"mad": 10, "zscore": 3, "iqr": 4}
+_MIN_SAMPLES_FLOOR: dict[str, int] = {"mad": 1, "zscore": 2, "iqr": 4, "autoreg": 1}
+_MIN_SAMPLES_PER_GROUP_DEFAULT: dict[str, int] = {"mad": 10, "zscore": 3, "iqr": 4, "autoreg": 10}
 
 
 def _detector_type(detector_name: str) -> str:
@@ -59,6 +60,8 @@ def _detector_type(detector_name: str) -> str:
         return "zscore"
     if name.startswith("iqr"):
         return "iqr"
+    if name.startswith("autoreg"):
+        return "autoreg"
     return "mad"
 
 
@@ -94,6 +97,17 @@ def _effective_start_index(
     seasonality_components = params.get("seasonality_components")
 
     warm = max(min_samples, _MIN_SAMPLES_FLOOR[dtype])
+    if dtype == "autoreg":
+        # The AR detector's real warm-up is its fit window + lag depth (plus a
+        # second window of stabilization history — 'clamp' is its DEFAULT, so
+        # an absent param means ON, unlike the windowed detectors). Stored
+        # params carry only non-defaults, hence the autoreg-specific defaults.
+        ar_window = int(params.get("window_size", 200) or 200)
+        ar_lags = int(params.get("lags", 5) or 5)
+        ar_warm = ar_window + ar_lags
+        if params.get("stabilization", "clamp"):
+            ar_warm += ar_window
+        warm = max(warm, ar_warm)
     if smoothing == "sma":
         warm = max(warm, smoothing_window - 1)
     elif smoothing == "ema":
@@ -239,11 +253,7 @@ def replay_alert_events(
             metric_name=name,
             interval=interval,
             alert_config_id=config_id,
-            conditions=AlertConditions(
-                min_detectors=cfg.min_detectors,
-                direction=cfg.direction,
-                consecutive_anomalies=cfg.consecutive_anomalies,
-            ),
+            conditions=AlertConditions.from_alert_config(cfg, interval.seconds),
             timezone_display=cfg.timezone,
             internal=internal_unused,
             alert_config=cfg,
@@ -262,9 +272,16 @@ def replay_alert_events(
 def _event_to_payload(event: Any, config_id: str) -> dict:
     """Project a ``ReplayedEvent`` into the payload alert shape."""
     ad = event.alert_data
-    rule = (
-        f"min_detectors={ad.min_detectors} · direction={ad.direction_policy} "
-        f"· consecutive={ad.consecutive_required}"
+    # The same shared chip the channels render (legacy output byte-identical),
+    # so the report/UI alert list can never drift from the live surfaces.
+    rule = format_rule_display(
+        min_detectors=ad.min_detectors,
+        direction_policy=ad.direction_policy,
+        consecutive_required=ad.consecutive_required,
+        window_points=ad.window_points,
+        min_anomaly_share=ad.min_anomaly_share,
+        fired_by_share=ad.fired_by_share,
+        interval_seconds=ad.interval_seconds,
     )
     return {
         "kind": event.kind,

@@ -18,11 +18,11 @@
 ## Features
 
 - **Pure numpy arrays** — no pandas dependency in core logic
-- **Statistical detectors** — Z-Score, MAD, IQR, Manual Bounds
+- **Statistical detectors** — Z-Score, MAD, IQR, Manual Bounds, and a prediction-based Autoreg (AR) detector for fast-moving, non-seasonal metrics
 - **Trend & seasonality handling** — seasonality grouping, recency weighting (`half_life`), robust linear detrending for slowly drifting metrics
 - **Multi-channel alerting** — Mattermost, Slack, Telegram, Email, Webhook
 - **@mentions** — tag users/groups in alerts, each channel formats natively
-- **Alert lifecycle** — consecutive anomalies, cooldown, recovery notifications, no-data alerts
+- **Alert lifecycle** — consecutive anomalies, fraction-of-window rule (`anomaly_window` + `min_anomaly_share`), cooldown, recovery notifications, no-data alerts
 - **Project-level error alerts** — catch DB outages and pipeline crashes once per run
 - **Database agnostic** — ClickHouse, PostgreSQL, MySQL
 - **Idempotent** — resume from interruptions, no duplicate processing

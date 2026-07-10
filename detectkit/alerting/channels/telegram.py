@@ -165,11 +165,7 @@ class TelegramChannel(BaseAlertChannel):
             # Description (how long it's been going on) leads; the Rule chip sits
             # right above the evidence it explains.
             lines.append(esc(ctx["anomaly_lead"]))
-            lines.append(
-                f"<b>Rule</b> <code>min_detectors={ctx['min_detectors']} · "
-                f"direction={esc(ctx['direction_policy'])} · "
-                f"consecutive={ctx['consecutive_required']}</code>"
-            )
+            lines.append(f"<b>Rule</b> <code>{esc(ctx['rule_display'])}</code>")
             lines.append("")
             lines.append(
                 f"• Value: <code>{esc(ctx['value_display'])}</code> · "
@@ -193,11 +189,7 @@ class TelegramChannel(BaseAlertChannel):
                 lines.append(f"• Parameters: <code>{esc(params)}</code>")
         elif kind == "recovery":
             lines.append(esc(ctx["recovery_lead"]))
-            lines.append(
-                f"<b>Rule</b> <code>min_detectors={ctx['min_detectors']} · "
-                f"direction={esc(ctx['direction_policy'])} · "
-                f"consecutive={ctx['consecutive_required']}</code>"
-            )
+            lines.append(f"<b>Rule</b> <code>{esc(ctx['rule_display'])}</code>")
             lines.append("")
             lines.append(
                 f"• Value: <code>{esc(ctx['value_display'])}</code> · "

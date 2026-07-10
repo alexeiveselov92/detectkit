@@ -114,16 +114,34 @@ class _ReplayMixin(_OrchestratorBase):
             consecutive, latest_quorum, direction = self._count_consecutive_anomalies(
                 causal, ts_desc
             )
-            fired = (
-                latest_quorum is not None
-                and consecutive >= self.conditions.consecutive_anomalies
-                and not self._replay_in_cooldown(t, sim_last_alert, sim_last_recovery)
+            fired_consecutive = (
+                latest_quorum is not None and consecutive >= self.conditions.consecutive_anomalies
+            )
+            # The fraction rule is OR-ed, exactly like the live path — only
+            # evaluated when the consecutive rule didn't fire (and only when
+            # configured; ``_share_fire`` returns None otherwise).
+            share_fire = None if fired_consecutive else self._share_fire(causal, ts_desc)
+            fired = (fired_consecutive or share_fire is not None) and not self._replay_in_cooldown(
+                t, sim_last_alert, sim_last_recovery
             )
 
             if fired:
-                assert latest_quorum is not None  # narrowed by ``fired``
-                streak, onset, capped = self._replay_streak(causal, ts_desc)
-                ad = self._build_alert_data(latest_quorum, streak, direction, onset, capped)
+                if fired_consecutive:
+                    assert latest_quorum is not None  # narrowed by ``fired_consecutive``
+                    streak, onset, capped = self._replay_streak(causal, ts_desc)
+                    ad = self._build_alert_data(latest_quorum, streak, direction, onset, capped)
+                else:
+                    assert share_fire is not None  # narrowed by ``fired``
+                    matched, onset, quorum, share_direction = share_fire
+                    ad = self._build_alert_data(
+                        quorum,
+                        matched,
+                        share_direction,
+                        onset,
+                        False,
+                        window_matched=matched,
+                        fired_by_share=True,
+                    )
                 events.append(ReplayedEvent("anomaly", t, ad))
                 sim_last_alert = t
             elif (
@@ -209,20 +227,29 @@ class _ReplayMixin(_OrchestratorBase):
         latest_anomalies = [d for d in causal[latest_ts] if d.is_anomaly]
 
         policy = self.conditions.direction
+        locked_direction: str | None = None
         if policy == "down":
             blocking = [d for d in latest_anomalies if d.direction == "down"]
+            locked_direction = "down"
         elif policy == "up":
             blocking = [d for d in latest_anomalies if d.direction == "up"]
+            locked_direction = "up"
         elif policy == "same":
             trigger_direction = self._replay_trigger_direction(causal, sim_last_alert)
             if trigger_direction is None:
                 blocking = latest_anomalies  # conservative fallback
             else:
                 blocking = [d for d in latest_anomalies if d.direction == trigger_direction]
+            locked_direction = trigger_direction
         else:  # "any" / unknown — preserve historical behaviour
             blocking = latest_anomalies
 
-        return len(blocking) == 0
+        if blocking:
+            return False
+        # Fraction-rule hysteresis (in-memory analog of the live check): a share
+        # hovering at the threshold would flap alert/recover, so recovery also
+        # requires the window share to drop below half the firing threshold.
+        return not self._share_still_elevated(causal, latest_ts, locked_direction)
 
     def _replay_trigger_direction(
         self,

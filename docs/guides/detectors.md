@@ -12,6 +12,7 @@ detectkit provides several detector types for anomaly detection:
 | [Z-Score](../reference/detectors/zscore.md) | Normal distributions, clean data | Low | Yes | Very Fast |
 | [IQR](../reference/detectors/iqr.md) | Skewed distributions, outliers | High | Yes | Fast |
 | [Manual Bounds](../reference/detectors/manual_bounds.md) | Known thresholds, SLAs | N/A | No | Fastest |
+| [Autoreg](../reference/detectors/autoreg.md) | Fast-moving, non-seasonal metrics; dynamics breaks | Via stabilization | No (v1) | Fast |
 
 > **Don't want to choose by hand?** `dtk autotune` can pick the detector type,
 > hyperparameters and seasonality grouping for you from the metric's data (and
@@ -277,6 +278,37 @@ detectors:
 - Percentages (0-100% range)
 
 [Full Manual Bounds Reference →](../reference/detectors/manual_bounds.md)
+
+### Autoreg Detector
+
+MAD/Z-Score/IQR ask "is this value far from the recent center?"; Autoreg asks
+"is this value far from what the last few points would have predicted?" — it
+fits a short autoregressive model on recent history instead of a level
+statistic, so it can catch a value that sits well inside the metric's normal
+range but breaks its usual short-range dynamics (a sudden jump, a reversal).
+
+**Use when**:
+- Fast-moving, non-seasonal metrics (queue depth, request rate, in-flight count)
+- You want to catch "unusual dynamics", not just "unusual level"
+- Pairing with a level detector (`mad`/`zscore`/`iqr`) via `min_detectors` for
+  full coverage
+
+**Disadvantages**:
+- No seasonality support in v1 (rejected at construction)
+- No smoothing, recency weighting or detrending
+- Not yet supported by `dtk autotune` (Phase 2)
+
+**Configuration**:
+```yaml
+detectors:
+  - type: autoreg
+    params:
+      lags: 3            # AR order (predictors = last 3 values)
+      window_size: 300   # trailing history used to refit at each point
+      threshold: 3.5      # residual-sigma band half-width
+```
+
+[Full Autoreg Reference →](../reference/detectors/autoreg.md)
 
 ## Multiple Detectors
 
@@ -604,7 +636,10 @@ not valid in the built-in `seasonality_columns` list.
 MAD, Z-Score and IQR share one windowed implementation, so every parameter
 below behaves identically across the three. Manual Bounds supports only
 `input_type` (it has no window, so smoothing, weighting and detrending do not
-apply).
+apply). Autoreg — a separate, non-windowed dynamics model — supports
+`input_type` and `stabilization` (defaulting to `clamp` there) but not
+smoothing, recency weighting, detrending or seasonality; see its own
+[reference page](../reference/detectors/autoreg.md) for the full parameter set.
 
 The full reference for these shared parameters lives on one page —
 **[Shared Detector Parameters](../reference/detectors/shared-parameters.md)** —
@@ -625,5 +660,6 @@ which documents each with defaults, examples and tuning recipes:
 - [Z-Score Detector Reference](../reference/detectors/zscore.md)
 - [IQR Detector Reference](../reference/detectors/iqr.md)
 - [Manual Bounds Detector Reference](../reference/detectors/manual_bounds.md)
+- [Autoreg Detector Reference](../reference/detectors/autoreg.md)
 - [Configuration Guide](configuration.md)
 - [Alerting Guide](alerting.md)

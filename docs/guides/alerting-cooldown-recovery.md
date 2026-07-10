@@ -274,6 +274,18 @@ Timeline with notify_on_recovery: true and consecutive_anomalies: 3:
 11:30 - Normal point    → RECOVERY sent (new recovery)
 ```
 
+### Fraction-Rule Hysteresis
+
+When a metric also configures the [fraction-based alert
+window](alerting.md#fraction-based-alert-window-optional) (`anomaly_window` +
+`min_anomaly_share`), recovery adds one more condition: besides a clean
+latest point, the trailing window's share must also drop **below half** the
+configured `min_anomaly_share` threshold before a recovery notification
+sends. Without this, a share hovering right around the threshold (e.g. 29%
+against a 30% bar) would flip alert → recover → alert on every small
+fluctuation. Metrics configured with only `consecutive_anomalies` are
+unaffected — recovery works exactly as described above.
+
 ### Custom Recovery Template
 
 Use `template_recovery` to customize the recovery message. Supports the same variables as anomaly templates, plus `{status}`:

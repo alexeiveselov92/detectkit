@@ -99,10 +99,10 @@ function check(name, cond, detail = '') {
 async function main() {
   const w = await loadWorker();
   let id = 0;
-  const run = (values, extra = {}) => {
+  const run = (values, extra = {}, params = PARAMS) => {
     w.post({ type: 'series', series: series(values) });
     id += 1;
-    w.post({ type: 'run', id, params: PARAMS, ...extra });
+    w.post({ type: 'run', id, params, ...extra });
     const res = w.posts[w.posts.length - 1];
     if (!res || res.id !== id) throw new Error('worker did not reply');
     return res;
@@ -168,6 +168,25 @@ async function main() {
     'a half-pair (window without share) stays consecutive-only',
     JSON.stringify(offRes.fires) === JSON.stringify(legacy.fires),
     `fires=${JSON.stringify(offRes.fires)}`,
+  );
+
+  // Warm-up seam (issue #108): the worker posts the UNCLAMPED requirement
+  // (`need`, what the page must show for a band to appear) next to the
+  // shown-length-clamped `eff`, and stabilization clamp adds a full window of
+  // warm-up for autoreg AND the windowed detectors alike (get_context_size parity).
+  const flat = new Array(60).fill(0);
+  const arNeed = run(flat, {}, { ...PARAMS, type: 'autoreg', windowSize: 40, stabilization: 'clamp' });
+  check(
+    'autoreg+clamp: need is un-clamped (2*window+lags) and eff clamps to the series',
+    arNeed.need === 85 && arNeed.eff === 60,
+    `need=${arNeed.need} eff=${arNeed.eff}`,
+  );
+  const madPlain = run(flat, {}, { ...PARAMS, type: 'mad', windowSize: 40 });
+  const madClamp = run(flat, {}, { ...PARAMS, type: 'mad', windowSize: 40, stabilization: 'clamp' });
+  check(
+    'windowed clamp adds a full window of warm-up (Python get_context_size parity)',
+    madClamp.need === madPlain.need + 40,
+    `plain=${madPlain.need} clamp=${madClamp.need}`,
   );
 
   if (failures) {

@@ -851,17 +851,27 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       return;
     }
     const clamp = params.stabilization === 'clamp';
+    // The breakdown must sum to `need` exactly — every warmupRequirement term
+    // (incl. the +1 for change-based input) shows, or the arithmetic reads wrong.
     const breakdown =
       params.type === 'autoreg'
         ? ` (window ${params.windowSize} + lags ${Math.max(1, Math.round(params.lags ?? 5))}` +
+          `${params.inputType !== 'values' ? ' + 1 for change input' : ''}` +
           `${clamp ? ` + window ${params.windowSize} for stabilization` : ''})`
         : clamp
           ? ` (incl. a full window of ${params.windowSize} stabilization warm-up)`
           : '';
     const fixes: string[] = [];
     if (n > need) fixes.push(`raise Points shown above ${need}`);
-    fixes.push('lower the Window size');
+    // Suggest the Window knob only when the window actually drives the warm-up
+    // (autoreg always; windowed only under clamp) — for a plain windowed
+    // detector the requirement comes from min_samples / smoothing / the
+    // seasonality fill, which this knob can't shrink.
+    if (params.type === 'autoreg' || clamp) fixes.push('lower the Window size');
     if (clamp) fixes.push('turn Stabilization off');
+    if (params.type !== 'autoreg' && !clamp) {
+      fixes.push('reduce min_samples / smoothing / the seasonality grouping (they set this warm-up)');
+    }
     warmupWarn.textContent =
       `⚠ The whole view is detector warm-up: it needs ${need} pts${breakdown} before full ` +
       `power, but only ${shown} are shown — no band or anomaly dots can be drawn. ` +
@@ -1387,6 +1397,10 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   // never mark dirty — only genuine user edits do.
   const detectorChanged = (): void => {
     markActiveDirty();
+    // The window slider's explore cap depends on the live params (detector type,
+    // lags, stabilization — see windowReachFor), so re-derive it on every knob
+    // change. Cheap, and it only ever moves the max, never the value.
+    updateWindowReach();
     recompute();
   };
 
@@ -1516,21 +1530,38 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   };
 
   // Slider reach: enough to explore, capped so there's always a scored region.
-  // The cap is clamp-aware: autoreg's stabilization (default-on) needs
-  // 2·window+lags of warm-up, so its explore cap is a third of the shown points
-  // (the windowed detectors' min_samples-based warm-up keeps the half cap safe;
-  // their clamp adds +window, which the warm-up warning backstops). NEVER below
-  // the metric's actual window_size, so the seeded value is always representable
-  // and Apply can't silently shrink the metric's window. step=1 keeps the exact
-  // configured value addressable (a step-5 grid would snap e.g. 168 → 170 and
-  // write the wrong window back).
-  const LAGS_MAX = 24; // the Lags slider's max — the worst case the cap must absorb
-  const windowReachFor = (t: DetectorType, shown: number): number =>
-    Math.max(
-      50,
-      Math.min(2000, t === 'autoreg' ? Math.floor((shown - LAGS_MAX) / 3) : Math.floor(shown / 2)),
-    );
-  const windowMax = Math.max(windowReachFor(seed.type, n), seed.windowSize);
+  // The cap is derived from the same terms warmupRequirement uses (its warm-up
+  // is linear in window size): autoreg pays lags (+1 for change input) and
+  // DOUBLES under stabilization clamp, so its window must fit a ~⅔-of-view
+  // warm-up budget; the windowed detectors' warm-up is min_samples-based
+  // (window-independent), so they keep the classic half cap (their clamp's
+  // +window is backstopped by the warm-up warning). NEVER below the metric's
+  // actual window_size, so the seeded value is always representable and Apply
+  // can't silently shrink the metric's window. step=1 keeps the exact configured
+  // value addressable (a step-5 grid would snap e.g. 168 → 170 and write the
+  // wrong window back).
+  const windowReachFor = (
+    t: DetectorType,
+    shown: number,
+    lags: number,
+    clamp: boolean,
+    changeInput: boolean,
+  ): number => {
+    const budget =
+      Math.floor((2 * shown) / 3) - (t === 'autoreg' ? lags + (changeInput ? 1 : 0) : 0);
+    const base = t === 'autoreg' ? Math.floor(budget / (clamp ? 2 : 1)) : Math.floor(shown / 2);
+    return Math.max(50, Math.min(2000, base));
+  };
+  const windowMax = Math.max(
+    windowReachFor(
+      seed.type,
+      n,
+      Math.max(1, Math.round(seed.lags ?? 5)),
+      (seed.stabilization ?? 'none') === 'clamp',
+      seed.inputType !== 'values',
+    ),
+    seed.windowSize,
+  );
   const windowCtl = rangeControl(
     'Window size (points)',
     {
@@ -1601,18 +1632,27 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   halfLifeRow.style.display = seed.windowWeights === 'exponential' ? '' : 'none';
   tuneGroup.appendChild(halfLifeRow);
 
-  // Re-derive the window slider's reach when the detector type, the seed or the
-  // shown-point count changes (autoreg's cap is tighter — see windowReachFor).
-  // Only ever adjusts EXPLORE headroom: never below the seed or the current
-  // value, so neither a trim nor a type switch silently rewrites the knob.
+  // Re-derive the window slider's reach when the live params or the shown-point
+  // count change (autoreg's cap is tighter and depends on lags/stabilization —
+  // see windowReachFor). Only ever adjusts EXPLORE headroom: never below the
+  // seed or the current value, so neither a trim nor a type switch silently
+  // rewrites the knob. The half-life max additionally guards its own seed/live
+  // value — a configured half_life can exceed the window reach (e.g. "30d" on a
+  // 10min grid) and must never be silently clamped down by a re-seed.
   const updateWindowReach = (): void => {
     const mx = Math.max(
-      windowReachFor(detectorCtl.get() as DetectorType, series.timestamps.length),
+      windowReachFor(
+        detectorCtl.get() as DetectorType,
+        series.timestamps.length,
+        Math.max(1, Math.round(lagsCtl.get())),
+        stabilizationCtl.get() === 'clamp',
+        seed.inputType !== 'values',
+      ),
       seed.windowSize,
       windowCtl.get(),
     );
     windowCtl.setMax(mx);
-    halfLifeCtl.setMax(mx);
+    halfLifeCtl.setMax(Math.max(mx, seed.halfLife ?? 0, halfLifeCtl.get()));
   };
 
   const detrendCtl = segControl(

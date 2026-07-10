@@ -505,7 +505,12 @@ export function drawFullWarmupOverlay(
   g.font = `${10 * dpr}px ui-monospace, monospace`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.fillText(label, (r.left + r.right) / 2, r.top + (r.bottom - r.top) * 0.3, r.right - r.left - 12 * dpr);
+  // maxWidth must stay positive — a transiently tiny plot (mid-resize, rail
+  // collapse) would otherwise pass fillText a negative constraint.
+  const maxW = r.right - r.left - 12 * dpr;
+  if (maxW > 0) {
+    g.fillText(label, (r.left + r.right) / 2, r.top + (r.bottom - r.top) * 0.3, maxW);
+  }
   g.restore();
 }
 

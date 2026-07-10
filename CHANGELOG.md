@@ -5,6 +5,29 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.53.1] - 2026-07-10
+
+### Changed
+- **Landing-page refresh — the marketing site catches up with v0.51–0.53**
+  (website-only; no library behavior changes — this release stamps the
+  refresh). The detectors showcase gains a fifth `autoreg` tab (a patterned
+  wave whose anomaly sits mid-range — normal in absolute terms, outside the
+  AR forecast corridor `ŷ ± 3 × σ_residual`) and a stabilization footnote;
+  the hero "Works with" strip gains an "Alerts to" row of channel badges
+  (Slack / Mattermost / Telegram / Email / Webhook — the webhook channel was
+  previously absent from the landing entirely); the labeling teaser becomes a
+  full `dtk tune` cockpit showcase (Tune / Review / Label / Autotune mode
+  switch, live catch-rate / false-alert / reviewed HUD, knob rail with
+  Apply). Accuracy fixes from a section-by-section audit: the `dtk run` mock
+  output regains the second blank line before `┌─ LOAD`; the alert previews
+  now share the hero YAML's scenario (5min interval, `direction=up`,
+  consistent onset/fired/recovered timestamps) instead of a conflicting
+  10min/`direction=same` variant; the alerting section names the v0.52
+  fraction rule (`anomaly_window` + `min_anomaly_share`) and the generic
+  webhook channel; nav gains Playground, the footer gains the Tuning-cockpit
+  and Project-UI guides. Exposing `autoreg`/`manual_bounds` in the
+  interactive playground is tracked as #105.
+
 ## [0.53.0] - 2026-07-10
 
 ### Added

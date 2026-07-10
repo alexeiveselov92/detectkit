@@ -720,6 +720,24 @@ seeded from the metric's alerting `direction` (multi-detector `same` → `any`).
 window-size and half-life sliders echo their wall-clock span next to the point
 count.
 
+**Warm-up honesty.** Each recompute posts both the clamped `eff`
+(`effectiveStartIndex`, capped to the shown series length) and the un-clamped
+`need` (`warmupRequirement` in `demo/detector.ts`), so the HUD's warm-up stat
+reports the true requirement instead of one silently capped to the shown
+length; when `need` exceeds the shown length, `chart.ts`'s
+`drawFullWarmupOverlay` dims the whole plot with a centered explanation and
+`tune.ts` shows an inline `warmupWarn` naming the exact shortfall plus three
+fixes (raise Points shown / lower Window size / turn Stabilization off). The
+Window-size slider's explore cap is clamp-aware — a third of the shown points
+for autoreg (its default-on stabilization needs `2·window+lags`) vs half for
+the windowed detectors, recomputed via `updateWindowReach` on trim or
+detector-type switch — and `seed_detector_params` now seeds `window_size` per
+type (`_WINDOW_SIZE_DEFAULT`, autoreg 200) so a bare `type: autoreg` config
+opens at its real default, not the windowed template's 100.
+`warmupRequirement`'s windowed branch also gained the `+window_size` clamp
+term `WindowedStatDetector.get_context_size()` already had, closing the old
+TS/Python asymmetry.
+
 **The cockpit — chart-windshield + a mode-aware control rail.** `tune.ts` drives a
 **single** chart (the shared `demo/chart.ts` with `labeling:true` + a `mode`): the
 old detector and labeler charts are merged onto one canvas that fills the screen as

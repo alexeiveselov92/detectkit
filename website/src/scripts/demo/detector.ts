@@ -986,19 +986,18 @@ function seasonalityCardinality(series: Series, groups: string[][]): number {
 }
 
 /**
- * First index where the detector runs at "full power" for these params — past
- * every warm-up: the min-samples floor, smoothing / input_type, and (when
- * seasonality grouping is active AND the trailing window can actually hold
- * `minSamplesPerGroup` points of every key) the per-group fill. Before this
- * index the band is a degraded lead-in (global fallback / partial window) that
- * should not read as real detection. Returns a clamped index in [0, n].
+ * How many points of warm-up the detector needs before it runs at "full power"
+ * for these params — past the min-samples floor, smoothing / input_type,
+ * seasonality-group fill and (with `stabilization: clamp`) the extra window of
+ * clamp-substitution history. UNCLAMPED: this can exceed the series length,
+ * which is exactly the "whole view is warm-up" state the cockpit must warn
+ * about (effectiveStartIndex alone can't — it clamps to n).
  */
-export function effectiveStartIndex(series: Series, params: DetectorParams): number {
-  const n = series.timestamps.length;
+export function warmupRequirement(series: Series, params: DetectorParams): number {
   // manual_bounds is stateless: no warm-up except the first change point being
   // undefined when input_type transforms to changes.
   if (params.type === 'manual_bounds') {
-    return Math.min(params.inputType !== 'values' ? 1 : 0, n);
+    return params.inputType !== 'values' ? 1 : 0;
   }
   // autoreg mirrors AutoregDetector.get_context_size(): a full window to fit
   // the AR model + lags to seed the oldest lag vector, +1 for change-based
@@ -1009,7 +1008,7 @@ export function effectiveStartIndex(series: Series, params: DetectorParams): num
     let warmup = params.windowSize + lags;
     if (params.inputType !== 'values') warmup += 1;
     if (params.stabilization === 'clamp') warmup += params.windowSize;
-    return Math.min(warmup, n);
+    return warmup;
   }
   let warm = Math.max(params.minSamples, MIN_SAMPLES_FLOOR[params.type as WindowedType]);
   if (params.smoothing === 'sma') warm = Math.max(warm, params.smoothingWindow - 1);
@@ -1031,5 +1030,20 @@ export function effectiveStartIndex(series: Series, params: DetectorParams): num
       if (params.windowSize >= groupWarm) warm = Math.max(warm, groupWarm);
     }
   }
-  return Math.min(warm, n);
+  // Mirror WindowedStatDetector.get_context_size(): stabilization adds a full
+  // window of clamp-substitution warm-up, so a one-shot run's band start
+  // matches what an incremental pipeline run would compute (same term the
+  // autoreg branch carries — previously the windowed branch silently lacked it).
+  if (params.stabilization === 'clamp') warm += params.windowSize;
+  return warm;
+}
+
+/**
+ * First index where the detector runs at "full power" for these params (see
+ * warmupRequirement). Before this index the band is a degraded lead-in
+ * (global fallback / partial window / un-replayable clamp history) that
+ * should not read as real detection. Returns a clamped index in [0, n].
+ */
+export function effectiveStartIndex(series: Series, params: DetectorParams): number {
+  return Math.min(warmupRequirement(series, params), series.timestamps.length);
 }

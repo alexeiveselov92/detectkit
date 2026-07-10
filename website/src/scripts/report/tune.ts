@@ -47,6 +47,12 @@ interface WorkerResult {
   /** per-fire [startTs, endTs] of the whole grid-adjacent anomaly streak (ms). */
   fireSpans: Array<[number, number]>;
   eff: number;
+  /**
+   * UNCLAMPED warm-up requirement (eff is clamped to the shown length): when
+   * the whole view is warm-up, only this still says how many points the page
+   * must show for a band to appear.
+   */
+  need: number;
   flagged: number;
 }
 
@@ -830,6 +836,49 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     }
   };
 
+  // Surfaces when the warm-up swallows the whole (possibly trimmed) view — e.g.
+  // autoreg with stabilization needs 2·window+lags points — so the chart clips
+  // away every band segment and anomaly dot. The worker's `eff` is clamped to
+  // the shown length; the UNCLAMPED `need` is what tells the user how far to
+  // raise Points shown. Without this the chart is a bare line with no cue.
+  const warmupWarn = el('div', 'dtk-tune-warn');
+  warmupWarn.style.display = 'none';
+  stageFoot.appendChild(warmupWarn);
+  const updateWarmupWarn = (need: number, params: DetectorParams): void => {
+    const shown = series.timestamps.length;
+    if (shown === 0 || need < shown) {
+      warmupWarn.style.display = 'none';
+      return;
+    }
+    const clamp = params.stabilization === 'clamp';
+    // The breakdown must sum to `need` exactly — every warmupRequirement term
+    // (incl. the +1 for change-based input) shows, or the arithmetic reads wrong.
+    const breakdown =
+      params.type === 'autoreg'
+        ? ` (window ${params.windowSize} + lags ${Math.max(1, Math.round(params.lags ?? 5))}` +
+          `${params.inputType !== 'values' ? ' + 1 for change input' : ''}` +
+          `${clamp ? ` + window ${params.windowSize} for stabilization` : ''})`
+        : clamp
+          ? ` (incl. a full window of ${params.windowSize} stabilization warm-up)`
+          : '';
+    const fixes: string[] = [];
+    if (n > need) fixes.push(`raise Points shown above ${need}`);
+    // Suggest the Window knob only when the window actually drives the warm-up
+    // (autoreg always; windowed only under clamp) — for a plain windowed
+    // detector the requirement comes from min_samples / smoothing / the
+    // seasonality fill, which this knob can't shrink.
+    if (params.type === 'autoreg' || clamp) fixes.push('lower the Window size');
+    if (clamp) fixes.push('turn Stabilization off');
+    if (params.type !== 'autoreg' && !clamp) {
+      fixes.push('reduce min_samples / smoothing / the seasonality grouping (they set this warm-up)');
+    }
+    warmupWarn.textContent =
+      `⚠ The whole view is detector warm-up: it needs ${need} pts${breakdown} before full ` +
+      `power, but only ${shown} are shown — no band or anomaly dots can be drawn. ` +
+      `To see the band: ${fixes.join(', or ')}.`;
+    warmupWarn.style.display = '';
+  };
+
   // ---- live alert-quality metrics ------------------------------------------
   interface Quality {
     realIncidents: number;
@@ -1269,8 +1318,11 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     renderMetrics();
     statBar.textContent =
       `${res.flagged} flagged · ${res.fires.length} alert${res.fires.length === 1 ? '' : 's'} · ` +
-      `warm-up ${res.eff} pts`;
+      // The TRUE requirement, not the shown-length-clamped eff — so "warm-up
+      // 405 pts" reads honestly even when only 200 points are shown.
+      `warm-up ${res.need} pts`;
     updateSeasonWarn(params);
+    updateWarmupWarn(res.need, params);
     configEcho.textContent = configText(params, consecutive, shareWindowPoints(), shareValue());
   };
   const onWorkerError = (): void => {
@@ -1323,6 +1375,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   function setActivePoints(count: number): void {
     series = sliceSeries(count);
     worker.postMessage({ type: 'series', series });
+    updateWindowReach();
     recompute();
   }
   // Live echo while dragging; the (expensive) re-slice + re-post + recompute fires
@@ -1344,6 +1397,10 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   // never mark dirty — only genuine user edits do.
   const detectorChanged = (): void => {
     markActiveDirty();
+    // The window slider's explore cap depends on the live params (detector type,
+    // lags, stabilization — see windowReachFor), so re-derive it on every knob
+    // change. Cheap, and it only ever moves the max, never the value.
+    updateWindowReach();
     recompute();
   };
 
@@ -1410,6 +1467,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       thresholdCtl_setDefault(THRESHOLD_DEFAULT[v as DetectorType] ?? 3.0);
       markActiveDirty();
       refreshVisibility();
+      updateWindowReach();
       recompute();
     },
     'The statistic for the band: MAD (robust median, default), Z-Score (mean/std) or IQR ' +
@@ -1471,13 +1529,39 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     if (thresholdOut) thresholdOut.textContent = v.toFixed(1);
   };
 
-  // Slider reach: enough to explore, capped at half the shown points so there's
-  // always a scored region — but NEVER below the metric's actual window_size, so
-  // the seeded value is always representable and Apply can't silently shrink the
-  // metric's window. step=1 keeps the exact configured value addressable (a
-  // step-5 grid would snap e.g. 168 → 170 and write the wrong window back).
-  const windowReach = Math.max(50, Math.min(2000, Math.floor(n / 2)));
-  const windowMax = Math.max(windowReach, seed.windowSize);
+  // Slider reach: enough to explore, capped so there's always a scored region.
+  // The cap is derived from the same terms warmupRequirement uses (its warm-up
+  // is linear in window size): autoreg pays lags (+1 for change input) and
+  // DOUBLES under stabilization clamp, so its window must fit a ~⅔-of-view
+  // warm-up budget; the windowed detectors' warm-up is min_samples-based
+  // (window-independent), so they keep the classic half cap (their clamp's
+  // +window is backstopped by the warm-up warning). NEVER below the metric's
+  // actual window_size, so the seeded value is always representable and Apply
+  // can't silently shrink the metric's window. step=1 keeps the exact configured
+  // value addressable (a step-5 grid would snap e.g. 168 → 170 and write the
+  // wrong window back).
+  const windowReachFor = (
+    t: DetectorType,
+    shown: number,
+    lags: number,
+    clamp: boolean,
+    changeInput: boolean,
+  ): number => {
+    const budget =
+      Math.floor((2 * shown) / 3) - (t === 'autoreg' ? lags + (changeInput ? 1 : 0) : 0);
+    const base = t === 'autoreg' ? Math.floor(budget / (clamp ? 2 : 1)) : Math.floor(shown / 2);
+    return Math.max(50, Math.min(2000, base));
+  };
+  const windowMax = Math.max(
+    windowReachFor(
+      seed.type,
+      n,
+      Math.max(1, Math.round(seed.lags ?? 5)),
+      (seed.stabilization ?? 'none') === 'clamp',
+      seed.inputType !== 'values',
+    ),
+    seed.windowSize,
+  );
   const windowCtl = rangeControl(
     'Window size (points)',
     {
@@ -1547,6 +1631,29 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   const halfLifeRow = halfLifeCtl.row;
   halfLifeRow.style.display = seed.windowWeights === 'exponential' ? '' : 'none';
   tuneGroup.appendChild(halfLifeRow);
+
+  // Re-derive the window slider's reach when the live params or the shown-point
+  // count change (autoreg's cap is tighter and depends on lags/stabilization —
+  // see windowReachFor). Only ever adjusts EXPLORE headroom: never below the
+  // seed or the current value, so neither a trim nor a type switch silently
+  // rewrites the knob. The half-life max additionally guards its own seed/live
+  // value — a configured half_life can exceed the window reach (e.g. "30d" on a
+  // 10min grid) and must never be silently clamped down by a re-seed.
+  const updateWindowReach = (): void => {
+    const mx = Math.max(
+      windowReachFor(
+        detectorCtl.get() as DetectorType,
+        series.timestamps.length,
+        Math.max(1, Math.round(lagsCtl.get())),
+        stabilizationCtl.get() === 'clamp',
+        seed.inputType !== 'values',
+      ),
+      seed.windowSize,
+      windowCtl.get(),
+    );
+    windowCtl.setMax(mx);
+    halfLifeCtl.setMax(Math.max(mx, seed.halfLife ?? 0, halfLifeCtl.get()));
+  };
 
   const detrendCtl = segControl(
     'Detrend',
@@ -1873,9 +1980,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     thresholdCtl.set(s.threshold);
     // A re-seed may carry a window/half-life beyond the slider's explore reach; raise
     // the max first so .set() can't silently clamp (which would shrink what Apply writes).
-    const wMax = Math.max(windowMax, s.windowSize);
-    windowCtl.setMax(wMax);
-    halfLifeCtl.setMax(wMax);
+    updateWindowReach();
     windowCtl.set(s.windowSize);
     weightsCtl.set(s.windowWeights);
     if (s.windowWeights === 'exponential' && s.halfLife != null) halfLifeCtl.set(s.halfLife);

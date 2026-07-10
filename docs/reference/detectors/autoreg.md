@@ -278,6 +278,28 @@ historical backfill costs roughly `O(points × window_size × lags)`. Pick
 `window_size`/`lags` with backfill size in mind, exactly as documented for
 MAD/Z-Score/IQR.
 
+## Advanced: context size and warm-up
+
+Before scoring its first point, Autoreg needs a full trailing window plus a
+lag vector already available: the historical context size is `window_size +
+lags`, plus one extra point when `input_type` is a change-based transform
+(`changes`/`absolute_changes`/`log_changes`, which need one prior raw value to
+compute the first difference), plus a **second** `window_size` of lead-in when
+`stabilization: clamp` is enabled (clamping needs a full window of
+already-scored history to draw substitutions from). At the defaults
+(`window_size: 200`, `lags: 5`, `stabilization: clamp`) that comes to 405
+points before the first score.
+
+The `detect` step accounts for this automatically — it loads the extra context
+before the first requested timestamp, so a normal `dtk run` never shows a gap.
+The [`dtk tune`](../../guides/tuning.md) cockpit is more visible about it: it
+hides the band and anomaly dots over this warm-up lead-in (for parity with
+what an incremental run would compute) and, if the **Points shown** trim
+leaves less history than the warm-up requires, dims the whole chart with an
+explanation instead of silently showing a bandless line. The pipeline and
+[`dtk run --report`](../../guides/visualizing-results.md) are unaffected —
+they always persist a band for every point they actually score.
+
 ## Comparison with Other Detectors
 
 | Feature | Autoreg | MAD | Z-Score | IQR |

@@ -272,6 +272,13 @@ class TestDetectorId:
         assert "seasonality_components" not in params_json
         assert "lags" in params_json
 
+    def test_algorithm_version_changes_id(self, monkeypatch):
+        # the version tag feeds the identity hash, so an algorithm change (e.g.
+        # the v2 numerical hardening) forces recomputation for the same params
+        base = AutoregDetector().get_detector_id()
+        monkeypatch.setattr(AutoregDetector, "ALGORITHM_VERSION", 99)
+        assert AutoregDetector().get_detector_id() != base
+
 
 class TestValidation:
     def test_lags_below_one_fails(self):

@@ -56,6 +56,10 @@ def default_window_points(seed_window: int) -> int:
 # website demo's DETECTOR_THRESHOLD_DEFAULT). autoreg has no per-group entry —
 # it has no seasonality.
 _THRESHOLD_DEFAULT = {"mad": 3.0, "zscore": 3.0, "iqr": 1.5, "autoreg": 3.0}
+# Per-type window defaults (mirror the detector class defaults: the windowed
+# template's 100, autoreg's 200) — a bare ``type: autoreg`` config must open
+# the cockpit at the window the pipeline actually runs, not the windowed default.
+_WINDOW_SIZE_DEFAULT = {"mad": 100, "zscore": 100, "iqr": 100, "autoreg": 200}
 # Per-type min-samples-per-group defaults (mirror the detector subclasses).
 _MIN_SAMPLES_PER_GROUP_DEFAULT = {"mad": 10, "zscore": 3, "iqr": 4}
 # Detector types the interactive tuner can seed/emit: the windowed statistical
@@ -136,7 +140,7 @@ def seed_detector_params(dtype: str, params: dict[str, Any]) -> dict[str, Any]:
     seed: dict[str, Any] = {
         "type": dtype,
         "threshold": params.get("threshold", _THRESHOLD_DEFAULT.get(dtype, 3.0)),
-        "windowSize": params.get("window_size", 100),
+        "windowSize": params.get("window_size", _WINDOW_SIZE_DEFAULT.get(dtype, 100)),
         "minSamples": params.get("min_samples", 30),
         "inputType": params.get("input_type", "values"),
         "smoothing": params.get("smoothing") or "none",

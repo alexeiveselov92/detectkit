@@ -186,6 +186,21 @@ Absolute NAB scores in the 0.2-0.3 range are normal for point/threshold
 detectors without per-series tuning — NAB's own scoreboard leaders sit far
 from 1.0. The value here is in the *relative* ordering under one harness.
 
+## MEDIFF: declined without implementation
+
+The same Yandex article that motivated `stabilization: clamp` and the
+`autoreg` detector also describes **MEDIFF** — a detector whose baseline is
+conditioned on seasonal keys (compare against the median of *comparable*
+past points, not all past points). It was declined without even a
+benchmark-local implementation: detectkit's windowed detectors already have
+exactly that mechanism as **per-group seasonality multipliers**
+(`seasonality_components` in `WindowedStatDetector` — per-key center/scale
+corrections on top of the global window statistics), so a MEDIFF port would
+duplicate an existing, autotunable feature under a new name rather than add
+detection power. Revisit only with evidence that the multiplier form
+measurably underperforms a dedicated conditioned-baseline detector on a
+labeled benchmark.
+
 ## Spectral Residual: a measure-first gate
 
 `spectral_residual.py` implements the Spectral Residual saliency algorithm

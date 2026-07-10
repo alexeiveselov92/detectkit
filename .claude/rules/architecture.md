@@ -693,10 +693,13 @@ port (`website/src/scripts/demo/detector.ts`) + chart (`demo/chart.ts`) that
 power the landing playground — fed the real series instead of synthetic data. So
 unlike the read-only `--report` (which replays *stored* detections),
 `dtk tune` recomputes detections client-side as the user moves a slider, with no
-DB round-trip. The renderer (`website/src/scripts/report/tune.ts`) is bundled to
-the committed `detectkit/tuning/assets/tune.js` by
-`website/scripts/gen-tune-bundle.mjs` and ships in the wheel — regenerate it when
-the renderer TS changes; the detector port is the parity-checked
+DB round-trip. The renderer (`website/src/scripts/report/tune.ts`, the
+composition root — its state-free helpers (types, protocol, DOM controls,
+config-text, formatters, styles, the worker client, the quality metrics) live in
+`website/src/scripts/report/tune/`) is bundled to the committed
+`detectkit/tuning/assets/tune.js` by `website/scripts/gen-tune-bundle.mjs` and
+ships in the wheel — regenerate it when the renderer TS changes; the detector
+port is the parity-checked
 (`npm run check:demo-parity`) shared core. `demo/chart.ts` exposes an **opt-in
 `navigable` mode** (a `ChartOptions` flag the playground leaves off): when set,
 the chart gains mouse-wheel zoom, drag-to-pan, double-click reset and a bottom

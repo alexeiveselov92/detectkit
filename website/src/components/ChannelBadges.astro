@@ -1,0 +1,17 @@
+---
+// "Alerts to" channel badges for the hero works-with strip — the counterpart
+// of DbBadges.astro (where the data comes from → where the alerts land). Same
+// "logo in a chip" treatment, but on the light chip the channel marks need
+// (ChannelIcon.astro): Slack's mark is four-color and Telegram's plane is a
+// cut-out, so the chip stays light. Names take each platform's brand color;
+// Webhook is the generic catch-all channel in the neutral slate.
+import ChannelIcon from './ChannelIcon.astro';
+---
+
+<div class="ch-badges">
+  <span class="ch-badge" style="--ch-name:#4A154B"><ChannelIcon name="slack" />Slack</span>
+  <span class="ch-badge" style="--ch-name:#0058CC"><ChannelIcon name="mattermost" />Mattermost</span>
+  <span class="ch-badge" style="--ch-name:#26A5E4"><ChannelIcon name="telegram" />Telegram</span>
+  <span class="ch-badge" style="--ch-name:var(--clay-700)"><ChannelIcon name="email" />Email</span>
+  <span class="ch-badge" style="--ch-name:#5A7A8C"><ChannelIcon name="webhook" />Webhook</span>
+</div>

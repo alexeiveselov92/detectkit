@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `alerting:` blocks.** A new, opt-in rule pair OR-ed with
   `consecutive_anomalies`: the alert also fires when the share of points
   meeting the direction-aware quorum over a trailing window (e.g. "30min",
-  resolved to grid points via the metric interval) reaches the threshold
+  resolved to grid points via the metric interval; must span at least 2
+  intervals) reaches the threshold
   (e.g. `0.3` = 30%) **and** the latest point itself meets the quorum — so a
   flapping incident whose single normal points keep breaking the consecutive
   chain still alerts, while a stale window whose newest point is already

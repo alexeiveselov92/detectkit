@@ -288,6 +288,110 @@ class TestReplay:
         assert recovery_ts and recovery_ts[0] == T0 - STEP * 3
 
 
+class TestLiveRecoveryHysteresis:
+    """The live path computes the hysteresis window over an UNFILTERED fetch.
+
+    ``_check_recovery_since_last_alert``'s primary fetch is
+    ``created_after``-filtered (only rows persisted after the alert) — right
+    for the freshness check, but the window walk would see almost every slot
+    empty and recover immediately. Pins the dedicated unfiltered fetch.
+    """
+
+    @staticmethod
+    def _row(ts, is_anomaly):
+        meta = '{"direction": "above", "severity": 2.0}' if is_anomaly else "{}"
+        return {
+            "timestamp": ts.astype("datetime64[ms]").astype("datetime64[s]").item(),
+            "detector_ids": ["id_a"],
+            "detector_names": ["a"],
+            "detector_params_list": ["{}"],
+            "value": 100.0,
+            "is_anomaly_flags": [is_anomaly],
+            "confidence_lowers": [80.0],
+            "confidence_uppers": [120.0],
+            "detection_metadata_list": [meta],
+        }
+
+    class _FakeInternal:
+        def __init__(self, rows_all, rows_fresh, last_alert):
+            self.rows_all = rows_all
+            self.rows_fresh = rows_fresh
+            self.last_alert = last_alert
+
+        def get_last_alert_timestamp(self, metric_name, alert_config_id):
+            return self.last_alert
+
+        def get_last_recovery_timestamp(self, metric_name, alert_config_id):
+            return None
+
+        def get_recent_detections(self, metric_name, last_point, num_points, created_after=None):
+            return self.rows_fresh if created_after is not None else self.rows_all
+
+    def _orchestrator(self, rows_all, rows_fresh):
+        from datetime import datetime
+
+        internal = self._FakeInternal(rows_all, rows_fresh, datetime(2024, 1, 1, 11, 0, 0))
+        return AlertOrchestrator(
+            metric_name="m",
+            alert_config_id="cfg",
+            interval=Interval("10min"),
+            conditions=AlertConditions(
+                min_detectors=1,
+                direction="any",
+                consecutive_anomalies=99,
+                window_points=4,
+                min_anomaly_share=0.5,
+            ),
+            internal=internal,
+            alert_config=_alert_config_stub(),
+        )
+
+    def test_no_recovery_while_unfiltered_window_share_elevated(self):
+        # Fresh (created_after) view: only the latest, clean point. Full
+        # stored history: 3 of the previous 4 slots anomalous (share 0.75).
+        rows_fresh = [self._row(T0, False)]
+        rows_all = [self._row(T0, False)] + [self._row(T0 - STEP * k, True) for k in (1, 2, 3)]
+        orch = self._orchestrator(rows_all, rows_fresh)
+        from detectkit.alerting.orchestrator._types import hydrate_detection_records
+
+        should, _ = orch.should_send_recovery(hydrate_detection_records(rows_fresh))
+        assert should is False
+
+    def test_recovery_once_window_clears(self):
+        rows_fresh = [self._row(T0, False)]
+        rows_all = [self._row(T0 - STEP * k, False) for k in range(4)] + [
+            self._row(T0 - STEP * k, True) for k in (5, 6, 7)
+        ]
+        orch = self._orchestrator(rows_all, rows_fresh)
+        from detectkit.alerting.orchestrator._types import hydrate_detection_records
+
+        should, data = orch.should_send_recovery(hydrate_detection_records(rows_fresh))
+        assert should is True
+        # the recovery payload echoes the configured fraction rule
+        assert data.window_points == 4
+        assert data.min_anomaly_share == 0.5
+
+
+class TestWindowSpansTwoIntervals:
+    def test_metric_config_rejects_one_point_window(self):
+        from detectkit.config.metric_config import MetricConfig
+
+        with pytest.raises(ValueError, match="at least 2"):
+            MetricConfig(
+                name="m",
+                interval="10min",
+                query="SELECT 1",
+                alerting=[{"anomaly_window": "10min", "min_anomaly_share": 0.5}],
+            )
+        cfg = MetricConfig(
+            name="m",
+            interval="10min",
+            query="SELECT 1",
+            alerting=[{"anomaly_window": "20min", "min_anomaly_share": 0.5}],
+        )
+        assert cfg.alerting[0].anomaly_window == "20min"
+
+
 # ── message rendering ─────────────────────────────────────────────────────────
 
 
@@ -360,6 +464,17 @@ class TestRuleDisplay:
             interval_seconds=None,
         )
         assert chip == "min_detectors=1 · direction=any · share>=25% over 5 points"
+
+    def test_recovery_chip_names_the_configured_share_rule(self):
+        """Fire and recovery must render one consistent rule chip."""
+        orch = orchestrator(consecutive=3, window_points=6, min_anomaly_share=0.5)
+        detections = [record(T0 - STEP * k, is_anomaly=(k >= 1)) for k in range(4)]
+        data = orch._build_recovery_data(detections, incident_records=detections)
+        assert data is not None
+        assert data.window_points == 6
+        assert data.min_anomaly_share == 0.5
+        ctx = _Channel().build_context(data)
+        assert "(or share>=50% over 1h)" in ctx["rule_display"]
 
     def test_default_template_renders_share_alert(self):
         channel = _Channel()

@@ -385,7 +385,9 @@ class EmailChannel(BaseAlertChannel):
         Mirrors the inline-code "Rule chip" the webhook/Telegram channels render,
         so the same firing rule reads the same way in every channel.
         """
-        expr = html.escape(str(ctx["rule_display"]))
+        # Keep the middot as the ``&middot;`` entity the chip has always used,
+        # so legacy (consecutive-only) configs render byte-identical HTML.
+        expr = html.escape(str(ctx["rule_display"])).replace("·", "&middot;")
         return (
             f'<tr><td style="padding:0 24px 14px 24px;font-family:{_SANS};font-size:13px;'
             f'color:{_MUTED};mso-line-height-rule:exactly;line-height:22px;">'

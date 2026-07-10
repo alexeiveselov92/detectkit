@@ -127,6 +127,26 @@ def scorable_event_truth(y_true: np.ndarray, valid: np.ndarray) -> np.ndarray:
     return yt
 
 
+def arrays_for_metric(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    y_score: np.ndarray,
+    valid: np.ndarray,
+    metric: ScoringMetric,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Prepare ``(y_true, y_pred, y_score)`` for a supervised metric.
+
+    The single seam both CV folds and the alert-window sweep use, so the two
+    can never disagree on how invalid (unscorable) points are handled:
+    pointwise metrics drop them by boolean masking; the segment-aware metric
+    keeps full-length arrays (masking would splice distinct incidents) with
+    unscorable segments removed from the truth and invalid predictions zeroed.
+    """
+    if metric == ScoringMetric.EVENT_F1:
+        return scorable_event_truth(y_true, valid), y_pred & valid, y_score
+    return y_true[valid], y_pred[valid], y_score[valid]
+
+
 def balanced_accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     """Mean of sensitivity (TPR) and specificity (TNR)."""
     tp, fp, tn, fn = confusion(y_true, y_pred)

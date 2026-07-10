@@ -110,9 +110,12 @@ window story directly, e.g. `14 of the last 30 10min intervals were
 anomalous (47%) — at or above the 30% share threshold over 5h.`; its "Anomaly
 began" is the first matched point the window can see (bounded by the window,
 unlike a consecutive alert's fully resolved onset). New opt-in template vars:
-`{rule_display}`, `{window_points}`, `{window_matched}` (recovery always
-renders the legacy consecutive-only chip — the fraction fields don't ride on
-the recovery payload). Reports and `dtk ui`'s overview pick up share-fired
+`{rule_display}`, `{window_points}`, `{window_matched}`. Recovery messages
+echo the same combined chip as a consecutive-fired alert of a
+share-configured config (`… · consecutive=3 (or share>=30% over 30m)`), so
+fire and recovery always name one rule; a scattered share-fired incident's
+"Incident lasted …" line may undercount (it reconstructs a contiguous run).
+Reports and `dtk ui`'s overview pick up share-fired
 alerts automatically via the shared replay seam.
 
 Not yet tunable: `dtk tune`'s cockpit and `dtk autotune`'s alert-window sweep

@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from detectkit.autotune._types import CVPlan, FoldScores, ScoringMetric, TuneMode
+from detectkit.autotune._types import CVPlan, FoldScores, TuneMode
 from detectkit.autotune.labels import GroundTruth
 from detectkit.autotune.scoring import (
-    scorable_event_truth,
+    arrays_for_metric,
     score_predictions,
     unsupervised_objective,
 )
@@ -100,27 +100,22 @@ def run_cv(
     y_pred, y_score, valid = predictions_from_results(results)
     y_true = ground_truth.y_true
     supervised = ground_truth.mode == TuneMode.SUPERVISED
-    # The segment-aware metric scores contiguity, so its fold slices must stay
-    # unmasked (boolean-masking invalid points would splice distinct incidents
-    # together). Segments are recomputed fold-locally by slicing, so a segment
-    # straddling a fold boundary is scored as each fold's own truncated piece —
-    # never double-counted within one score.
-    event = supervised and settings.metric == ScoringMetric.EVENT_F1
 
     per_fold: list[float] = []
     for lo, hi in plan.fold_bounds:
         fold_valid = valid[lo:hi]
         if not fold_valid.any():
             continue
-        if event:
-            yt = scorable_event_truth(y_true[lo:hi], fold_valid)
-            yp = y_pred[lo:hi] & fold_valid
-            ys = y_score[lo:hi]
-        else:
-            yt = y_true[lo:hi][fold_valid]
-            yp = y_pred[lo:hi][fold_valid]
-            ys = y_score[lo:hi][fold_valid]
         if supervised:
+            # ``arrays_for_metric`` masks invalid points for the pointwise
+            # metrics and keeps full-length (unmasked) fold slices for the
+            # segment-aware one — masking would splice distinct incidents.
+            # Segments recompute fold-locally by slicing, so a segment
+            # straddling a fold boundary is scored as each fold's own
+            # truncated piece, never double-counted within one score.
+            yt, yp, ys = arrays_for_metric(
+                y_true[lo:hi], y_pred[lo:hi], y_score[lo:hi], fold_valid, settings.metric
+            )
             # Folds with no labeled incident are uninformative for a
             # supervised metric (and would drag a good candidate's variance
             # up); skip them and let the labeled folds drive the score.
@@ -128,6 +123,8 @@ def run_cv(
                 continue
             per_fold.append(score_predictions(yt, yp, ys, settings.metric, settings.beta))
         else:
+            yp = y_pred[lo:hi][fold_valid]
+            ys = y_score[lo:hi][fold_valid]
             per_fold.append(unsupervised_objective(yp, ys, settings.fpr_target))
 
     if not per_fold:

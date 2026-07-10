@@ -770,6 +770,32 @@ class MetricConfig(BaseModel):
     _interval: Interval | None = None
 
     @model_validator(mode="after")
+    def validate_alerting_windows(self) -> "MetricConfig":
+        """``anomaly_window`` must span at least 2 metric intervals.
+
+        A shorter window resolves to a single grid point, making the fraction
+        rule fire on any lone quorum-meeting point regardless of the configured
+        ``min_anomaly_share`` — silently defeating the user's threshold. Only
+        checkable here (AlertConfig doesn't know the metric interval).
+        """
+        if self.alerting:
+            try:
+                interval_seconds = self.get_interval().seconds
+            except Exception:
+                return self  # a bad interval surfaces through its own validation
+            for cfg in self.alerting:
+                if cfg.anomaly_window is None:
+                    continue
+                if Interval(cfg.anomaly_window).seconds < 2 * interval_seconds:
+                    raise ValueError(
+                        f"anomaly_window ({cfg.anomaly_window!r}) must span at least 2 "
+                        f"metric intervals (interval={self.interval!r}): a one-point "
+                        "window makes the fraction rule fire on any single anomalous "
+                        "point, ignoring min_anomaly_share"
+                    )
+        return self
+
+    @model_validator(mode="after")
     def validate_query_source(self) -> "MetricConfig":
         """Validate that exactly one of query or query_file is specified."""
         if self.query is None and self.query_file is None:

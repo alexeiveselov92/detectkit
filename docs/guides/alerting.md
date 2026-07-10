@@ -204,12 +204,16 @@ It also fixes a real gap in a pure `consecutive_anomalies` chain: one normal
 point inside an otherwise-flapping incident resets the streak counter to
 zero, so a real, ongoing incident can go unreported indefinitely.
 
-> **Advanced.** A window shorter than ~2 intervals degenerates to firing on
-> essentially single points (the "share" is then just 1 out of 1 or 2). The
-> onset reported for a share-fired alert is bounded by the window itself — it
-> can't look further back than `anomaly_window`, unlike a consecutive-streak
-> alert's fully resolved onset. Neither the [`dtk tune`](tuning.md) cockpit
-> nor [`dtk autotune`](autotuning.md)'s alert-window sweep tunes
+> **Advanced.** A window shorter than 2 metric intervals is rejected at
+> config load (it would resolve to a single grid point and fire on any lone
+> anomaly, ignoring the share threshold). The onset reported for a
+> share-fired alert is bounded by the window itself — it can't look further
+> back than `anomaly_window`, unlike a consecutive-streak alert's fully
+> resolved onset. Similarly, the recovery message's "Incident lasted …" line
+> reconstructs a *contiguous* anomalous run, so a scattered (flapping)
+> incident that fired by share may report a shorter duration than the
+> incident's full extent, or omit it. Neither the [`dtk tune`](tuning.md)
+> cockpit nor [`dtk autotune`](autotuning.md)'s alert-window sweep tunes
 > `anomaly_window` / `min_anomaly_share` yet — both still search only
 > `consecutive_anomalies` (tracked as a follow-up).
 

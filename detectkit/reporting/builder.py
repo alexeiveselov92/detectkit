@@ -16,6 +16,7 @@ from typing import Any
 
 import numpy as np
 
+from detectkit.alerting.channels.base import format_rule_display
 from detectkit.alerting.orchestrator import AlertOrchestrator, ReplayedEvent
 from detectkit.alerting.orchestrator._types import (
     AlertConditions,
@@ -96,6 +97,17 @@ def _effective_start_index(
     seasonality_components = params.get("seasonality_components")
 
     warm = max(min_samples, _MIN_SAMPLES_FLOOR[dtype])
+    if dtype == "autoreg":
+        # The AR detector's real warm-up is its fit window + lag depth (plus a
+        # second window of stabilization history — 'clamp' is its DEFAULT, so
+        # an absent param means ON, unlike the windowed detectors). Stored
+        # params carry only non-defaults, hence the autoreg-specific defaults.
+        ar_window = int(params.get("window_size", 200) or 200)
+        ar_lags = int(params.get("lags", 5) or 5)
+        ar_warm = ar_window + ar_lags
+        if params.get("stabilization", "clamp"):
+            ar_warm += ar_window
+        warm = max(warm, ar_warm)
     if smoothing == "sma":
         warm = max(warm, smoothing_window - 1)
     elif smoothing == "ema":
@@ -260,16 +272,17 @@ def replay_alert_events(
 def _event_to_payload(event: Any, config_id: str) -> dict:
     """Project a ``ReplayedEvent`` into the payload alert shape."""
     ad = event.alert_data
-    rule = (
-        f"min_detectors={ad.min_detectors} · direction={ad.direction_policy} "
-        f"· consecutive={ad.consecutive_required}"
+    # The same shared chip the channels render (legacy output byte-identical),
+    # so the report/UI alert list can never drift from the live surfaces.
+    rule = format_rule_display(
+        min_detectors=ad.min_detectors,
+        direction_policy=ad.direction_policy,
+        consecutive_required=ad.consecutive_required,
+        window_points=ad.window_points,
+        min_anomaly_share=ad.min_anomaly_share,
+        fired_by_share=ad.fired_by_share,
+        interval_seconds=ad.interval_seconds,
     )
-    if ad.fired_by_share and ad.window_points and ad.min_anomaly_share is not None:
-        pct = f"{ad.min_anomaly_share * 100:g}%"
-        rule = (
-            f"min_detectors={ad.min_detectors} · direction={ad.direction_policy} "
-            f"· share>={pct} over {ad.window_points} points"
-        )
     return {
         "kind": event.kind,
         "t": _ms(event.timestamp),

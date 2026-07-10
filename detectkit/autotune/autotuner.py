@@ -15,13 +15,13 @@ from typing import Any
 import numpy as np
 
 from detectkit.autotune._base import AutoTuneError, _AutoTuneBase
-from detectkit.autotune._types import CandidateEval, ScoringMetric, TuneMode
+from detectkit.autotune._types import CandidateEval, TuneMode
 from detectkit.autotune.crossval import build_cv_plan, predictions_from_results
 from detectkit.autotune.detector_select import select_detector_types
 from detectkit.autotune.grid_search import grid_search
 from detectkit.autotune.labels import GroundTruth
 from detectkit.autotune.result import AutoTuneResult
-from detectkit.autotune.scoring import scorable_event_truth, score_predictions
+from detectkit.autotune.scoring import arrays_for_metric, score_predictions
 from detectkit.autotune.seasonality_search import search_seasonality
 from detectkit.autotune.settings import TuneSettings
 from detectkit.autotune.window_select import window_grid
@@ -124,30 +124,14 @@ class AutoTuner(_AutoTuneBase):
         detector = DetectorFactory.create(detector_type, params)
         y_pred, y_score, valid = predictions_from_results(detector.detect(self.data))
         y_true = self.ground_truth.y_true
-        # The segment-aware metric needs unmasked arrays (masking splices
-        # incidents); unscorable segments are dropped from the truth instead.
-        event = self.settings.metric == ScoringMetric.EVENT_F1
-        event_truth = scorable_event_truth(y_true, valid) if event else None
         best_k = 1
         best_score = float("-inf")
         for k in _ALERT_WINDOW_GRID:
             alert = _consecutive(y_pred, k)
-            if event_truth is not None:
-                score = score_predictions(
-                    event_truth,
-                    alert & valid,
-                    y_score,
-                    self.settings.metric,
-                    self.settings.beta,
-                )
-            else:
-                score = score_predictions(
-                    y_true[valid],
-                    alert[valid],
-                    y_score[valid],
-                    self.settings.metric,
-                    self.settings.beta,
-                )
+            # Same invalid-point handling seam as the CV folds (pointwise
+            # metrics mask; the segment-aware one keeps unmasked arrays).
+            yt, yp, ys = arrays_for_metric(y_true, alert, y_score, valid, self.settings.metric)
+            score = score_predictions(yt, yp, ys, self.settings.metric, self.settings.beta)
             if score > best_score:
                 best_score, best_k = score, k
         self.log(

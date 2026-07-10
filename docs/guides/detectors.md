@@ -614,6 +614,7 @@ which documents each with defaults, examples and tuning recipes:
 - [Value smoothing](../reference/detectors/shared-parameters.md#value-smoothing) — EMA / SMA
 - [Window weighting](../reference/detectors/shared-parameters.md#window-weighting) — `window_weights` / `half_life` recency weighting
 - [Detrending](../reference/detectors/shared-parameters.md#detrending) — robust in-window trend removal
+- [Stabilization](../reference/detectors/shared-parameters.md#stabilization) — `stabilization: clamp` keeps a sustained incident from poisoning its own baseline
 - [Handling metrics with trends](../reference/detectors/shared-parameters.md#handling-metrics-with-trends) — the recommended recipe + its measured effect
 - [Detector identity & recomputation](../reference/detectors/shared-parameters.md#detector-identity-and-recomputation)
 - [Debugging preprocessed detections](../reference/detectors/shared-parameters.md#debugging-preprocessed-detections) — reading `detection_metadata`

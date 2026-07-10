@@ -46,14 +46,18 @@ The search runs as a sequence of stages, each recorded in the
    a heuristic can no longer drop the detector that would have scored best.
 3. **Grid search** — a bounded coordinate sweep per detector type
    (threshold → recency weighting, and when it's adopted a **half-life sweep** →
-   detrend, gated by a trend test → window size),
+   detrend, gated by a trend test → **stabilization** → window size),
    followed by a **final threshold re-sweep at the chosen window** that fixes the
    threshold↔window coupling (the optimal threshold depends on window size, but
    threshold is chosen first against a seed window). The threshold grid includes
    high "near-suppress" rungs — sigma `2.5 / 3 / 3.5 / 4 / 5 / 6` (mad / zscore)
    and Tukey `1.5 / 2 / 3 / 4 / 6` (iqr) — so a heavy-tailed metric can widen its
    band under the flag-rate budget instead of being trapped flagging its
-   legitimate tail.
+   legitimate tail. The **stabilization** axis tries
+   [`stabilization: clamp`](../reference/detectors/shared-parameters.md#stabilization)
+   — winsorizing a flagged point's contribution to later windows so a sustained
+   incident can't widen the band and mask its own tail — and adopts it only when
+   it clears the same cross-validated score margin as the other axes.
 4. **Window selection** — sweeps window sizes in natural seasonal units; on a
    near-tie the choice is **trend-gated**. A stationary series prefers the
    **larger** window ("more history is better"); under a detected trend / regime

@@ -101,7 +101,10 @@ Walk the user to the mode that fits what they want to do:
   **window size**, **recency weighting + half-life**, **detrend**, **smoothing**,
   and **seasonality groups**; the band + anomalies + would-fire alerts recompute
   on every change. The window-size / half-life readouts show the equivalent
-  wall-clock span. This is the core "turn the knobs yourself" loop.
+  wall-clock span. **Stabilization** (none / clamp) clamps a flagged point to
+  the bound it violated in later windows' statistics — try it when a sustained
+  incident visibly balloons the band mid-incident and the detector stops
+  flagging its tail. This is the core "turn the knobs yourself" loop.
 
 - **Autotune** — *let the engine search, then refine.* Click **Run autotune** and
   the **same engine `dtk autotune` uses** (seasonality → detector → grid → window,

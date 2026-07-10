@@ -83,6 +83,7 @@ export type InputType = 'values' | 'changes' | 'absolute_changes' | 'log_changes
 export type Smoothing = 'none' | 'ema' | 'sma';
 export type WindowWeights = 'none' | 'exponential' | 'linear';
 export type Detrend = 'none' | 'linear';
+export type Stabilization = 'none' | 'clamp';
 
 export interface DetectorParams {
   type: DetectorType;
@@ -102,6 +103,12 @@ export interface DetectorParams {
   /** exponential half-life in POINTS; null = adaptive default (see spec). */
   halfLife: number | null;
   detrend: Detrend;
+  /**
+   * Anomaly-robust baseline (winsorizing): flagged points enter subsequent
+   * trailing windows clamped to the confidence bound they violated, so a long
+   * incident cannot inflate the band and mask itself. Omitted = 'none'.
+   */
+  stabilization?: Stabilization;
   /**
    * Seasonality groupings, each a conjunction of column names, e.g.
    * [["hour_of_day"]] or [["hour_of_day","day_of_week"]]. null = off.

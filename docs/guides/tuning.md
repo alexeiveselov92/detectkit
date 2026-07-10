@@ -62,6 +62,11 @@ In the browser you can adjust:
   half-life (in points) when exponential. Half-life also echoes its wall-clock
   span next to the point count.
 - **Detrend** — none / linear (robust split-median slope).
+- **Stabilization** — none / clamp. Once a point is flagged anomalous, `clamp`
+  substitutes a winsorized value (clamped to the violated confidence bound) for
+  it in later windows, so a sustained incident can't widen the band and become
+  "the new normal" (see
+  [Stabilization](../reference/detectors/shared-parameters.md#stabilization)).
 - **Smoothing** — none / EMA / SMA.
 - **Lower bound** / **Upper bound** *(Manual detector only)* — the fixed
   thresholds a value is compared against. They are seeded from the metric's bounds

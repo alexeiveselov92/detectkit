@@ -20,6 +20,8 @@
 //     9. confidence interval
 //    10. anomaly flag / direction / severity (on the PROCESSED value)
 //    11. band center (median / mean / midhinge) from the adjusted stats
+//    12. optional stabilization write-back (flagged point clamped to its
+//        violated bound for subsequent windows)
 
 import type {
   AnomalyDirection,
@@ -562,6 +564,13 @@ export function runDetector(series: Series, params: DetectorParams): ScoredPoint
   const smoothed = applySmoothing(values, params);
   const processed = preprocessInput(smoothed, params);
 
+  // Stabilization (opt-in): statistics windows read from a working copy where
+  // every previously-flagged point is clamped to the confidence bound it
+  // violated, so an ongoing incident cannot inflate the band and mask itself.
+  // The scored value stays the raw processed observation.
+  const stabilize = params.stabilization === 'clamp';
+  const work = stabilize ? processed.slice() : processed;
+
   // Seasonality is active only with both components and per-point keys.
   const seasonalityActive =
     params.seasonalityComponents !== null &&
@@ -585,10 +594,12 @@ export function runDetector(series: Series, params: DetectorParams): ScoredPoint
       continue;
     }
 
-    // STEP 2: trailing window slice, current point EXCLUDED.
+    // STEP 2: trailing window slice, current point EXCLUDED. Sliced from the
+    // (possibly stabilized) working copy — both the global stats and the
+    // seasonality-group values below consume this slice.
     const windowStart = Math.max(0, i - params.windowSize);
     const sliceLen = i - windowStart; // L
-    const slice = processed.slice(windowStart, i);
+    const slice = work.slice(windowStart, i);
     const validMask: boolean[] = slice.map((v) => !Number.isNaN(v));
     const windowValid: number[] = [];
     for (let k = 0; k < slice.length; k++) if (validMask[k]) windowValid.push(slice[k]);
@@ -684,6 +695,12 @@ export function runDetector(series: Series, params: DetectorParams): ScoredPoint
         distance = currentProcessed - upper;
       }
       sev = severity(type, adjustedStats, distance);
+    }
+
+    // Stabilization write-back: later windows see this point clamped to the
+    // bound it violated, not the anomalous observation.
+    if (stabilize && isAnomaly) {
+      work[i] = currentProcessed < lower ? lower : upper;
     }
 
     // STEP 11: band center from the adjusted statistics.

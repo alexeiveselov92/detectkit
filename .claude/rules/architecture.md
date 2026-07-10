@@ -245,6 +245,13 @@ pipeline: preprocessing → trailing window (current point excluded) with NaN
 filtering → optional **time-aware recency weighting** → optional **robust linear
 detrending** (split-median slope) → global statistics + per-seasonality-group
 multipliers → confidence interval, anomaly flag, severity/direction metadata.
+Opt-in **`stabilization: clamp`** changes what later windows *see*, not what gets
+scored: once a point is flagged anomalous, it is winsorized to the confidence
+bound it violated before entering any later trailing window (global or
+seasonality-group), so a sustained incident can't inflate the spread and drag
+the band wide enough to mask its own tail; `get_context_size()` adds one extra
+`window_size` of warm-up when it's enabled, so an incremental batch reproduces
+the same substitution history a continuous run would see.
 A seasonality group's multiplier engages only when the trailing window holds
 `min_samples_per_group` points of the current point's key; since same-key points
 recur once per *cardinality*, the window must span ≈ `min_samples_per_group ×
@@ -535,7 +542,9 @@ cockpit and on the command line are the same computation). Stages
 3. **Grid search** (`grid_search.py`) — bounded coordinate sweep (threshold →
    recency weighting → **half-life** of that weighting when exponential is adopted
    (`half_life_grid`, fractions of the window floored at `min_samples/2`) → detrend,
-   gated by a trend test → window size → a **final threshold re-sweep** at the
+   gated by a trend test → **stabilization** (`none`/`clamp`, adopted only on the
+   same score-margin rule as `window_weights`/detrend) → window size → a **final
+   threshold re-sweep** at the
    chosen window, since the optimal threshold depends on window size) maximizing
    the cross-validated score. The threshold grid carries high "near-suppress" rungs
    so a heavy-tailed metric can widen the band under the flag-rate budget instead

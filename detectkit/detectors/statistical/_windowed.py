@@ -48,6 +48,7 @@ _CHANGE_INPUT_TYPES = {"changes", "absolute_changes", "log_changes"}
 _SMOOTHING_METHODS = {None, "ema", "sma"}
 _WEIGHT_METHODS = {None, "exponential", "linear"}
 _DETREND_METHODS = {None, "linear"}
+_STABILIZATION_METHODS = {None, "clamp"}
 
 
 class WindowedStatDetector(BaseDetector):
@@ -88,6 +89,18 @@ class WindowedStatDetector(BaseDetector):
             compute statistics on values projected to the current point.
             Recommended for metrics with a gradual trend so the slow
             drift itself is not flagged as anomalous.
+        stabilization (str | None): None (default) or "clamp" — when a
+            point is flagged anomalous, subsequent trailing windows see
+            the confidence bound it violated (winsorized value) instead
+            of the observed value. Keeps a long incident from poisoning
+            the baseline (inflating spread / dragging the center toward
+            the incident), so the detector keeps flagging it instead of
+            adapting to it. Clamping to the bound (not the center) is
+            deliberate: substituting the band center feeds zero-deviation
+            points back into the spread statistics, which collapses the
+            band and cascades into false flags after a long incident.
+            The scored/persisted values are unchanged — only the
+            statistics windows read the substituted history.
 
     All parameters that change detection output participate in the
     detector ID hash (only non-default values are hashed).
@@ -124,6 +137,7 @@ class WindowedStatDetector(BaseDetector):
         half_life: int | str | None = None,
         weight_decay: float | None = None,
         detrend: str | None = None,
+        stabilization: str | None = None,
     ):
         super().__init__(
             threshold=self.THRESHOLD_DEFAULT if threshold is None else threshold,
@@ -143,6 +157,7 @@ class WindowedStatDetector(BaseDetector):
             half_life=half_life,
             weight_decay=weight_decay,
             detrend=detrend,
+            stabilization=stabilization,
         )
         # Whether the one-time "seasonality groups can't fill this window" check
         # has run for this instance (so the warning fires at most once per run,
@@ -235,6 +250,10 @@ class WindowedStatDetector(BaseDetector):
         if detrend not in _DETREND_METHODS:
             raise ValueError(f"Unknown detrend method: {detrend}. Supported: linear")
 
+        stabilization = p.get("stabilization")
+        if stabilization not in _STABILIZATION_METHODS:
+            raise ValueError(f"Unknown stabilization method: {stabilization}. Supported: clamp")
+
     # ------------------------------------------------------------------
     # Identity
     # ------------------------------------------------------------------
@@ -254,6 +273,7 @@ class WindowedStatDetector(BaseDetector):
             "half_life": None,
             "weight_decay": None,
             "detrend": None,
+            "stabilization": None,
         }
 
     def _get_non_default_params(self) -> dict[str, Any]:
@@ -290,6 +310,15 @@ class WindowedStatDetector(BaseDetector):
 
         if self.params.get("input_type", "values") in _CHANGE_INPUT_TYPES:
             context += 1
+
+        if self.params.get("stabilization"):
+            # A point's substituted-history state depends on whether its own
+            # window points were flagged, which depends on THEIR windows. One
+            # extra window of warm-up lets every context point be scored on a
+            # full window, so incremental batches reproduce the same
+            # substitution history as a continuous run (residual differences
+            # decay geometrically past that).
+            context += int(self.params.get("window_size", 0) or 0)
 
         return context
 
@@ -463,11 +492,21 @@ class WindowedStatDetector(BaseDetector):
             "min_samples_per_group", self.MIN_SAMPLES_PER_GROUP_DEFAULT
         )
         detrend = self.params.get("detrend")
+        stabilization = self.params.get("stabilization")
         weighted = self.params.get("window_weights") is not None
 
         # STEP 0: Preprocessing (smoothing first, then input_type)
         smoothed_values = self._apply_smoothing(values)
         processed_values = self._preprocess_input(smoothed_values)
+
+        # Stabilization (opt-in): statistics windows read from a working copy
+        # where every previously-flagged point is clamped to the confidence
+        # bound it violated, so an ongoing incident cannot inflate the spread
+        # or drag the center toward itself. The scored value and the persisted
+        # processed_value stay the raw observations; genuinely missing (NaN)
+        # points are never substituted.
+        work_values = processed_values.copy() if stabilization else processed_values
+        replaced = np.zeros(len(processed_values), dtype=bool) if stabilization else None
 
         seasonality_dict = {}
         if seasonality_components and len(seasonality_data) > 0 and seasonality_columns:
@@ -498,9 +537,11 @@ class WindowedStatDetector(BaseDetector):
                 )
                 continue
 
-            # Trailing window, current point excluded
+            # Trailing window, current point excluded. Both the global slice
+            # and the seasonality-group slices below read window_processed, so
+            # sourcing it from work_values covers every statistics consumer.
             window_start = max(0, i - window_size)
-            window_processed = processed_values[window_start:i]
+            window_processed = work_values[window_start:i]
             valid_mask = ~np.isnan(window_processed)
             window_valid = window_processed[valid_mask]
 
@@ -586,6 +627,14 @@ class WindowedStatDetector(BaseDetector):
                 current_processed > confidence_upper
             )
 
+            # Stabilization write-back: later windows see this point clamped
+            # to the bound it violated, not the anomalous observation.
+            if stabilization == "clamp" and is_anomaly:
+                work_values[i] = (
+                    confidence_lower if current_processed < confidence_lower else confidence_upper
+                )
+                replaced[i] = True  # type: ignore[index]
+
             # STEP 5: Metadata
             metadata: dict[str, Any] = {}
             for name, _ in self.STATS:
@@ -598,6 +647,10 @@ class WindowedStatDetector(BaseDetector):
                 metadata["ess"] = round(effective_sample_size(weights), 1)
             if detrend == "linear":
                 metadata["trend_slope_per_point"] = float(slope)
+            if replaced is not None:
+                n_replaced = int(np.count_nonzero(replaced[window_start:i]))
+                if n_replaced:
+                    metadata["stabilized_in_window"] = n_replaced
 
             if self.params.get("smoothing") or self.params.get("input_type") != "values":
                 metadata["preprocessing"] = {

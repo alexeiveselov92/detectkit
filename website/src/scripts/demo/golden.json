@@ -2897,6 +2897,7 @@
         "smoothing": "none",
         "smoothingAlpha": 0.3,
         "smoothingWindow": 10,
+        "stabilization": "none",
         "threshold": 3.0,
         "type": "mad",
         "upperBound": null,
@@ -6528,6 +6529,7 @@
         "smoothing": "none",
         "smoothingAlpha": 0.3,
         "smoothingWindow": 10,
+        "stabilization": "none",
         "threshold": 3.0,
         "type": "zscore",
         "upperBound": null,
@@ -10159,6 +10161,7 @@
         "smoothing": "none",
         "smoothingAlpha": 0.3,
         "smoothingWindow": 10,
+        "stabilization": "none",
         "threshold": 1.5,
         "type": "iqr",
         "upperBound": null,
@@ -13790,6 +13793,7 @@
         "smoothing": "none",
         "smoothingAlpha": 0.3,
         "smoothingWindow": 10,
+        "stabilization": "none",
         "threshold": 3.0,
         "type": "mad",
         "upperBound": null,
@@ -17421,6 +17425,7 @@
         "smoothing": "none",
         "smoothingAlpha": 0.3,
         "smoothingWindow": 10,
+        "stabilization": "none",
         "threshold": 3.0,
         "type": "zscore",
         "upperBound": null,
@@ -21052,6 +21057,7 @@
         "smoothing": "ema",
         "smoothingAlpha": 0.3,
         "smoothingWindow": 10,
+        "stabilization": "none",
         "threshold": 3.0,
         "type": "mad",
         "upperBound": null,
@@ -24683,6 +24689,7 @@
         "smoothing": "none",
         "smoothingAlpha": 0.3,
         "smoothingWindow": 10,
+        "stabilization": "none",
         "threshold": 3.0,
         "type": "zscore",
         "upperBound": null,
@@ -29470,6 +29477,7 @@
         "smoothing": "none",
         "smoothingAlpha": 0.3,
         "smoothingWindow": 10,
+        "stabilization": "none",
         "threshold": 3.0,
         "type": "mad",
         "upperBound": null,
@@ -32006,6 +32014,7270 @@
           72.15259805232785,
           75.5870335566712,
           86.4559428977835
+        ]
+      }
+    },
+    {
+      "expected": [
+        {
+          "index": 0,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 1,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 2,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 3,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 4,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 5,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 6,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 7,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 8,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 9,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 10,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 11,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 12,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 13,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 14,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 15,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 16,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 17,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 18,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 19,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 20,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 21,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 22,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 23,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 24,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 25,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 26,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 27,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 28,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 29,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 30,
+          "isAnomaly": false,
+          "lower": 83.38877018502791,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.28474868443624
+        },
+        {
+          "index": 31,
+          "isAnomaly": false,
+          "lower": 83.69035019328285,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.14188373736025
+        },
+        {
+          "index": 32,
+          "isAnomaly": false,
+          "lower": 83.98174375159365,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.97081521915479
+        },
+        {
+          "index": 33,
+          "isAnomaly": false,
+          "lower": 84.1420251238442,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.14233469898039
+        },
+        {
+          "index": 34,
+          "isAnomaly": false,
+          "lower": 84.0390174207329,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.95563967668969
+        },
+        {
+          "index": 35,
+          "isAnomaly": false,
+          "lower": 84.02331986754068,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.73818779961475
+        },
+        {
+          "index": 36,
+          "isAnomaly": false,
+          "lower": 84.27463412146315,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.56381519212053
+        },
+        {
+          "index": 37,
+          "isAnomaly": false,
+          "lower": 84.38911154360605,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.32456496804713
+        },
+        {
+          "index": 38,
+          "isAnomaly": false,
+          "lower": 84.34602184661716,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.14274056884184
+        },
+        {
+          "index": 39,
+          "isAnomaly": false,
+          "lower": 84.20845605713811,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.01155447092614
+        },
+        {
+          "index": 40,
+          "isAnomaly": false,
+          "lower": 84.29898280118923,
+          "reason": "ok",
+          "scored": true,
+          "upper": 114.7964064003281
+        },
+        {
+          "index": 41,
+          "isAnomaly": false,
+          "lower": 84.51001002481324,
+          "reason": "ok",
+          "scored": true,
+          "upper": 114.68697353720232
+        },
+        {
+          "index": 42,
+          "isAnomaly": false,
+          "lower": 83.51678676100254,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.13728285127128
+        },
+        {
+          "index": 43,
+          "isAnomaly": false,
+          "lower": 83.44186745709662,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.59955858107021
+        },
+        {
+          "index": 44,
+          "isAnomaly": false,
+          "lower": 83.58615976794962,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.67953033463033
+        },
+        {
+          "index": 45,
+          "isAnomaly": false,
+          "lower": 83.6099127700887,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.973200090707
+        },
+        {
+          "index": 46,
+          "isAnomaly": false,
+          "lower": 83.66784388641148,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.78280966247985
+        },
+        {
+          "index": 47,
+          "isAnomaly": false,
+          "lower": 83.83140820827681,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.59830094270701
+        },
+        {
+          "index": 48,
+          "isAnomaly": false,
+          "lower": 83.65422523238466,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.5215306830086
+        },
+        {
+          "index": 49,
+          "isAnomaly": false,
+          "lower": 83.57296470345456,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.39812613283608
+        },
+        {
+          "index": 50,
+          "isAnomaly": false,
+          "lower": 83.5583057545465,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.24872535678642
+        },
+        {
+          "index": 51,
+          "isAnomaly": false,
+          "lower": 83.61871559984378,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.07858731213848
+        },
+        {
+          "index": 52,
+          "isAnomaly": false,
+          "lower": 83.72141342356908,
+          "reason": "ok",
+          "scored": true,
+          "upper": 114.90697943253583
+        },
+        {
+          "index": 53,
+          "isAnomaly": false,
+          "lower": 83.82287731596676,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.00108318062507
+        },
+        {
+          "index": 54,
+          "isAnomaly": false,
+          "lower": 83.98578523341519,
+          "reason": "ok",
+          "scored": true,
+          "upper": 114.9156515401553
+        },
+        {
+          "index": 55,
+          "isAnomaly": false,
+          "lower": 83.94408013046882,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.24432905377793
+        },
+        {
+          "index": 56,
+          "isAnomaly": false,
+          "lower": 84.09071499917566,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.21305503627825
+        },
+        {
+          "index": 57,
+          "isAnomaly": false,
+          "lower": 84.20400141948983,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.06021779613016
+        },
+        {
+          "index": 58,
+          "isAnomaly": false,
+          "lower": 84.3450745415626,
+          "reason": "ok",
+          "scored": true,
+          "upper": 114.93053106467853
+        },
+        {
+          "index": 59,
+          "isAnomaly": true,
+          "lower": 84.27473953066016,
+          "reason": "ok",
+          "scored": true,
+          "upper": 114.83508629288514
+        },
+        {
+          "index": 60,
+          "isAnomaly": false,
+          "lower": 83.54462312242093,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.07454181382808
+        },
+        {
+          "index": 61,
+          "isAnomaly": false,
+          "lower": 83.67483827107691,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.93352764744162
+        },
+        {
+          "index": 62,
+          "isAnomaly": false,
+          "lower": 83.80884841889578,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.80208725150582
+        },
+        {
+          "index": 63,
+          "isAnomaly": false,
+          "lower": 83.9400398262782,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.67432487292217
+        },
+        {
+          "index": 64,
+          "isAnomaly": false,
+          "lower": 83.94823668048238,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.55089591781311
+        },
+        {
+          "index": 65,
+          "isAnomaly": false,
+          "lower": 83.02119252772978,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.04886053632406
+        },
+        {
+          "index": 66,
+          "isAnomaly": false,
+          "lower": 83.161367790904,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.94798758297429
+        },
+        {
+          "index": 67,
+          "isAnomaly": false,
+          "lower": 83.26656875413552,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.9813922659993
+        },
+        {
+          "index": 68,
+          "isAnomaly": false,
+          "lower": 83.26145784752401,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.86654783732996
+        },
+        {
+          "index": 69,
+          "isAnomaly": false,
+          "lower": 83.12916079430619,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.28843740992417
+        },
+        {
+          "index": 70,
+          "isAnomaly": false,
+          "lower": 83.21783616145323,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.3493310205091
+        },
+        {
+          "index": 71,
+          "isAnomaly": false,
+          "lower": 83.22933735874707,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.23197818074141
+        },
+        {
+          "index": 72,
+          "isAnomaly": false,
+          "lower": 83.33942809346343,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.11018564053356
+        },
+        {
+          "index": 73,
+          "isAnomaly": false,
+          "lower": 83.29203199157648,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.0213173707363
+        },
+        {
+          "index": 74,
+          "isAnomaly": false,
+          "lower": 83.02563890275063,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.05944967326501
+        },
+        {
+          "index": 75,
+          "isAnomaly": false,
+          "lower": 83.05834052745513,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.9419956317067
+        },
+        {
+          "index": 76,
+          "isAnomaly": false,
+          "lower": 83.0451688156374,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.84220304406767
+        },
+        {
+          "index": 77,
+          "isAnomaly": false,
+          "lower": 83.00843789316062,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.09871394536887
+        },
+        {
+          "index": 78,
+          "isAnomaly": false,
+          "lower": 83.11754646689491,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.08066942181452
+        },
+        {
+          "index": 79,
+          "isAnomaly": false,
+          "lower": 83.22910645731163,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.98206857778364
+        },
+        {
+          "index": 80,
+          "isAnomaly": false,
+          "lower": 83.3311985141316,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.876348792055
+        },
+        {
+          "index": 81,
+          "isAnomaly": false,
+          "lower": 83.44429185999786,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.80974936092124
+        },
+        {
+          "index": 82,
+          "isAnomaly": false,
+          "lower": 83.55514566441519,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.73590755728782
+        },
+        {
+          "index": 83,
+          "isAnomaly": false,
+          "lower": 83.42318375541112,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.11552853924996
+        },
+        {
+          "index": 84,
+          "isAnomaly": false,
+          "lower": 83.47299553893785,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.0073738429497
+        },
+        {
+          "index": 85,
+          "isAnomaly": false,
+          "lower": 83.46781516430777,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.91662187296764
+        },
+        {
+          "index": 86,
+          "isAnomaly": false,
+          "lower": 83.50915693714782,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.0212916867292
+        },
+        {
+          "index": 87,
+          "isAnomaly": false,
+          "lower": 83.21851723250249,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.09681168489983
+        },
+        {
+          "index": 88,
+          "isAnomaly": false,
+          "lower": 83.0168664484053,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.11423960312749
+        },
+        {
+          "index": 89,
+          "isAnomaly": false,
+          "lower": 83.00022195837259,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.31382856724214
+        },
+        {
+          "index": 90,
+          "isAnomaly": false,
+          "lower": 83.09625632983648,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.22244342396647
+        },
+        {
+          "index": 91,
+          "isAnomaly": false,
+          "lower": 82.81911528816205,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.29202292548386
+        },
+        {
+          "index": 92,
+          "isAnomaly": false,
+          "lower": 82.9093134463268,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.28618366042069
+        },
+        {
+          "index": 93,
+          "isAnomaly": false,
+          "lower": 82.94259491376079,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.18900594794835
+        },
+        {
+          "index": 94,
+          "isAnomaly": false,
+          "lower": 83.03421031275737,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.1714138555909
+        },
+        {
+          "index": 95,
+          "isAnomaly": false,
+          "lower": 82.70064144678798,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.28468210471613
+        },
+        {
+          "index": 96,
+          "isAnomaly": false,
+          "lower": 82.68663254163584,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.20551873128261
+        },
+        {
+          "index": 97,
+          "isAnomaly": false,
+          "lower": 82.78366892147308,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.14447662016799
+        },
+        {
+          "index": 98,
+          "isAnomaly": false,
+          "lower": 82.6966779793524,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.10314984030607
+        },
+        {
+          "index": 99,
+          "isAnomaly": false,
+          "lower": 82.74659809145058,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.17257823948509
+        },
+        {
+          "index": 100,
+          "isAnomaly": false,
+          "lower": 82.78108657866808,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.08135145071297
+        },
+        {
+          "index": 101,
+          "isAnomaly": false,
+          "lower": 82.83728258685701,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.04945835877552
+        },
+        {
+          "index": 102,
+          "isAnomaly": false,
+          "lower": 82.91558333309804,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.0141619464171
+        },
+        {
+          "index": 103,
+          "isAnomaly": false,
+          "lower": 82.83925406803849,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.14776424556271
+        },
+        {
+          "index": 104,
+          "isAnomaly": false,
+          "lower": 82.9551468486979,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.18961654998566
+        },
+        {
+          "index": 105,
+          "isAnomaly": false,
+          "lower": 83.1118553106748,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.85151574543036
+        },
+        {
+          "index": 106,
+          "isAnomaly": false,
+          "lower": 83.09874675686277,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.94587256202186
+        },
+        {
+          "index": 107,
+          "isAnomaly": false,
+          "lower": 83.00218147790153,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.15518773911853
+        },
+        {
+          "index": 108,
+          "isAnomaly": false,
+          "lower": 83.03125731252078,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.14166224969566
+        },
+        {
+          "index": 109,
+          "isAnomaly": false,
+          "lower": 83.32934515644493,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.13163990443095
+        },
+        {
+          "index": 110,
+          "isAnomaly": false,
+          "lower": 83.05195898816365,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.25562310412087
+        },
+        {
+          "index": 111,
+          "isAnomaly": false,
+          "lower": 83.30619196709911,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.11910505467027
+        },
+        {
+          "index": 112,
+          "isAnomaly": false,
+          "lower": 83.30963873226264,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.11894507358792
+        },
+        {
+          "index": 113,
+          "isAnomaly": false,
+          "lower": 83.38085738410886,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.95439282593513
+        },
+        {
+          "index": 114,
+          "isAnomaly": false,
+          "lower": 83.41397410708025,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.02517403999194
+        },
+        {
+          "index": 115,
+          "isAnomaly": false,
+          "lower": 83.38211057467129,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.04183309826456
+        },
+        {
+          "index": 116,
+          "isAnomaly": false,
+          "lower": 83.38078589780514,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.9992217659665
+        },
+        {
+          "index": 117,
+          "isAnomaly": false,
+          "lower": 83.49823174649633,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.70934773121128
+        },
+        {
+          "index": 118,
+          "isAnomaly": false,
+          "lower": 83.62947491238104,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.4097106162241
+        },
+        {
+          "index": 119,
+          "isAnomaly": false,
+          "lower": 83.59634270141106,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.47559360347381
+        },
+        {
+          "index": 120,
+          "isAnomaly": false,
+          "lower": 83.58225656013137,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.44990465173278
+        },
+        {
+          "index": 121,
+          "isAnomaly": false,
+          "lower": 83.53448479237326,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.5482096293365
+        },
+        {
+          "index": 122,
+          "isAnomaly": false,
+          "lower": 83.54834762791538,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.45206669339476
+        },
+        {
+          "index": 123,
+          "isAnomaly": false,
+          "lower": 83.52449367622674,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.52949530937244
+        },
+        {
+          "index": 124,
+          "isAnomaly": false,
+          "lower": 83.49154336459556,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.78764202360476
+        },
+        {
+          "index": 125,
+          "isAnomaly": false,
+          "lower": 83.50289577915667,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.75291780820997
+        },
+        {
+          "index": 126,
+          "isAnomaly": false,
+          "lower": 83.48049075441152,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.82075278724646
+        },
+        {
+          "index": 127,
+          "isAnomaly": false,
+          "lower": 83.49312045699799,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.81486462499777
+        },
+        {
+          "index": 128,
+          "isAnomaly": false,
+          "lower": 83.54475117804253,
+          "reason": "ok",
+          "scored": true,
+          "upper": 115.98469241418721
+        },
+        {
+          "index": 129,
+          "isAnomaly": false,
+          "lower": 83.57826620511119,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.112360928486
+        },
+        {
+          "index": 130,
+          "isAnomaly": false,
+          "lower": 83.2756230326771,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.53772250669651
+        },
+        {
+          "index": 131,
+          "isAnomaly": false,
+          "lower": 83.07826938575627,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.89592898808252
+        },
+        {
+          "index": 132,
+          "isAnomaly": false,
+          "lower": 83.06887217383364,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.94307183738444
+        },
+        {
+          "index": 133,
+          "isAnomaly": false,
+          "lower": 83.03672360083368,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.80241178514416
+        },
+        {
+          "index": 134,
+          "isAnomaly": false,
+          "lower": 83.13670330718843,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.78423554475039
+        },
+        {
+          "index": 135,
+          "isAnomaly": false,
+          "lower": 83.06903668967766,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.12744376156002
+        },
+        {
+          "index": 136,
+          "isAnomaly": false,
+          "lower": 83.00536519494925,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.10615954503824
+        },
+        {
+          "index": 137,
+          "isAnomaly": false,
+          "lower": 83.01465830643436,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.10534628981357
+        },
+        {
+          "index": 138,
+          "isAnomaly": false,
+          "lower": 83.06626889295586,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.27510909403779
+        },
+        {
+          "index": 139,
+          "isAnomaly": false,
+          "lower": 82.89609430089631,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.37594611843484
+        },
+        {
+          "index": 140,
+          "isAnomaly": false,
+          "lower": 82.95545929173804,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.38823804075022
+        },
+        {
+          "index": 141,
+          "isAnomaly": false,
+          "lower": 82.94219072498827,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.36438705790219
+        },
+        {
+          "index": 142,
+          "isAnomaly": false,
+          "lower": 83.38088373679183,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.09723096738777
+        },
+        {
+          "index": 143,
+          "isAnomaly": false,
+          "lower": 83.39936931771169,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.86677170978186
+        },
+        {
+          "index": 144,
+          "isAnomaly": false,
+          "lower": 83.41502561340573,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.7871092868026
+        },
+        {
+          "index": 145,
+          "isAnomaly": false,
+          "lower": 83.24723657437336,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.67156493680336
+        },
+        {
+          "index": 146,
+          "isAnomaly": false,
+          "lower": 83.0616411674295,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.76410511227145
+        },
+        {
+          "index": 147,
+          "isAnomaly": false,
+          "lower": 82.92905820062953,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.09860277180627
+        },
+        {
+          "index": 148,
+          "isAnomaly": false,
+          "lower": 83.06517700594218,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.04416249287756
+        },
+        {
+          "index": 149,
+          "isAnomaly": false,
+          "lower": 82.88484976109385,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.59630267191363
+        },
+        {
+          "index": 150,
+          "isAnomaly": false,
+          "lower": 82.98317518305757,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.57525804476779
+        },
+        {
+          "index": 151,
+          "isAnomaly": false,
+          "lower": 82.9772645930756,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.81071579008179
+        },
+        {
+          "index": 152,
+          "isAnomaly": false,
+          "lower": 83.03140601525892,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.8815334328307
+        },
+        {
+          "index": 153,
+          "isAnomaly": false,
+          "lower": 82.82002793447275,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.23692804460107
+        },
+        {
+          "index": 154,
+          "isAnomaly": false,
+          "lower": 82.80123725693649,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.21754053147102
+        },
+        {
+          "index": 155,
+          "isAnomaly": false,
+          "lower": 82.86180564328711,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.0419121183586
+        },
+        {
+          "index": 156,
+          "isAnomaly": false,
+          "lower": 82.55067895137839,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.12307591879068
+        },
+        {
+          "index": 157,
+          "isAnomaly": false,
+          "lower": 82.36637245596788,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.19641020092934
+        },
+        {
+          "index": 158,
+          "isAnomaly": false,
+          "lower": 82.09028778722845,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.30365206880273
+        },
+        {
+          "index": 159,
+          "isAnomaly": false,
+          "lower": 82.15373310157764,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.50193084113724
+        },
+        {
+          "index": 160,
+          "isAnomaly": false,
+          "lower": 82.51611352677651,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.96564831801842
+        },
+        {
+          "index": 161,
+          "isAnomaly": false,
+          "lower": 82.53462489968837,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.0109710427113
+        },
+        {
+          "index": 162,
+          "isAnomaly": false,
+          "lower": 82.54193915326591,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.01804272167071
+        },
+        {
+          "index": 163,
+          "isAnomaly": false,
+          "lower": 82.53072161096422,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.13917325688077
+        },
+        {
+          "index": 164,
+          "isAnomaly": false,
+          "lower": 82.24030482386597,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.30581777521239
+        },
+        {
+          "index": 165,
+          "isAnomaly": true,
+          "lower": 82.92970167317262,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.91322714481623
+        },
+        {
+          "index": 166,
+          "isAnomaly": false,
+          "lower": 81.98128615814639,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.50359663818122
+        },
+        {
+          "index": 167,
+          "isAnomaly": false,
+          "lower": 81.9796824931628,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.50838157309984
+        },
+        {
+          "index": 168,
+          "isAnomaly": false,
+          "lower": 81.77327835080641,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.62228886325795
+        },
+        {
+          "index": 169,
+          "isAnomaly": false,
+          "lower": 81.90831360704951,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.33552880294144
+        },
+        {
+          "index": 170,
+          "isAnomaly": false,
+          "lower": 81.92793635881782,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.25019787148909
+        },
+        {
+          "index": 171,
+          "isAnomaly": false,
+          "lower": 81.93528741227523,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.24779216150272
+        },
+        {
+          "index": 172,
+          "isAnomaly": false,
+          "lower": 81.94303799717083,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.25258047604252
+        },
+        {
+          "index": 173,
+          "isAnomaly": false,
+          "lower": 81.82650241989741,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.31535544332529
+        },
+        {
+          "index": 174,
+          "isAnomaly": false,
+          "lower": 81.78695836200043,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.34073945180691
+        },
+        {
+          "index": 175,
+          "isAnomaly": false,
+          "lower": 81.41513395460628,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.55571118134394
+        },
+        {
+          "index": 176,
+          "isAnomaly": false,
+          "lower": 81.50886901749767,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.65904180945533
+        },
+        {
+          "index": 177,
+          "isAnomaly": false,
+          "lower": 81.57219914896864,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.53561877298957
+        },
+        {
+          "index": 178,
+          "isAnomaly": false,
+          "lower": 81.57471162217523,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.51583731946793
+        },
+        {
+          "index": 179,
+          "isAnomaly": false,
+          "lower": 81.55667843907023,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.50622133621971
+        },
+        {
+          "index": 180,
+          "isAnomaly": false,
+          "lower": 81.3819001841615,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.55603982771187
+        },
+        {
+          "index": 181,
+          "isAnomaly": false,
+          "lower": 80.98800872416848,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.70460764436305
+        },
+        {
+          "index": 182,
+          "isAnomaly": false,
+          "lower": 80.964405417716,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.808858556529
+        },
+        {
+          "index": 183,
+          "isAnomaly": false,
+          "lower": 81.11710234441377,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.51461657058441
+        },
+        {
+          "index": 184,
+          "isAnomaly": false,
+          "lower": 81.09084857832426,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.74644744051346
+        },
+        {
+          "index": 185,
+          "isAnomaly": false,
+          "lower": 81.15129849202648,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.892720234488
+        },
+        {
+          "index": 186,
+          "isAnomaly": false,
+          "lower": 81.18666819724734,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.76432611720583
+        },
+        {
+          "index": 187,
+          "isAnomaly": false,
+          "lower": 81.50866851296713,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.6362175443246
+        },
+        {
+          "index": 188,
+          "isAnomaly": false,
+          "lower": 81.70202757713348,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.5391083732979
+        },
+        {
+          "index": 189,
+          "isAnomaly": false,
+          "lower": 81.73369850363682,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.30846790922254
+        },
+        {
+          "index": 190,
+          "isAnomaly": false,
+          "lower": 81.74534035478091,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.33575894535996
+        },
+        {
+          "index": 191,
+          "isAnomaly": false,
+          "lower": 81.22661580551906,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.71620892529859
+        },
+        {
+          "index": 192,
+          "isAnomaly": false,
+          "lower": 81.16457177662608,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.85567856426559
+        },
+        {
+          "index": 193,
+          "isAnomaly": false,
+          "lower": 80.92842921962432,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.97435098037099
+        },
+        {
+          "index": 194,
+          "isAnomaly": false,
+          "lower": 80.58520260724413,
+          "reason": "ok",
+          "scored": true,
+          "upper": 119.05518652646538
+        },
+        {
+          "index": 195,
+          "isAnomaly": false,
+          "lower": 80.95524470261068,
+          "reason": "ok",
+          "scored": true,
+          "upper": 119.00506281146829
+        },
+        {
+          "index": 196,
+          "isAnomaly": false,
+          "lower": 80.99732612817293,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.99062494455502
+        },
+        {
+          "index": 197,
+          "isAnomaly": false,
+          "lower": 80.96255810060705,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.96469735474415
+        },
+        {
+          "index": 198,
+          "isAnomaly": false,
+          "lower": 81.1518111099777,
+          "reason": "ok",
+          "scored": true,
+          "upper": 118.97011909251779
+        },
+        {
+          "index": 199,
+          "isAnomaly": false,
+          "lower": 81.07999674531902,
+          "reason": "ok",
+          "scored": true,
+          "upper": 119.10528180234255
+        },
+        {
+          "index": 200,
+          "isAnomaly": true,
+          "lower": 81.0110788322059,
+          "reason": "ok",
+          "scored": true,
+          "upper": 119.13073066749035
+        },
+        {
+          "index": 201,
+          "isAnomaly": true,
+          "lower": 80.53731344244116,
+          "reason": "ok",
+          "scored": true,
+          "upper": 120.118808992156
+        },
+        {
+          "index": 202,
+          "isAnomaly": true,
+          "lower": 79.96140074171316,
+          "reason": "ok",
+          "scored": true,
+          "upper": 121.18285222312102
+        },
+        {
+          "index": 203,
+          "isAnomaly": true,
+          "lower": 79.28930500204578,
+          "reason": "ok",
+          "scored": true,
+          "upper": 122.12650806982981
+        },
+        {
+          "index": 204,
+          "isAnomaly": true,
+          "lower": 78.54714405971671,
+          "reason": "ok",
+          "scored": true,
+          "upper": 123.25884594803637
+        },
+        {
+          "index": 205,
+          "isAnomaly": true,
+          "lower": 77.79863334889049,
+          "reason": "ok",
+          "scored": true,
+          "upper": 124.47370730195613
+        },
+        {
+          "index": 206,
+          "isAnomaly": true,
+          "lower": 76.98878505417761,
+          "reason": "ok",
+          "scored": true,
+          "upper": 125.69465301403233
+        },
+        {
+          "index": 207,
+          "isAnomaly": true,
+          "lower": 76.15936619052741,
+          "reason": "ok",
+          "scored": true,
+          "upper": 126.89210117433566
+        },
+        {
+          "index": 208,
+          "isAnomaly": true,
+          "lower": 75.44171385469787,
+          "reason": "ok",
+          "scored": true,
+          "upper": 128.24801235852942
+        },
+        {
+          "index": 209,
+          "isAnomaly": true,
+          "lower": 74.52551989592743,
+          "reason": "ok",
+          "scored": true,
+          "upper": 129.63073882752306
+        },
+        {
+          "index": 210,
+          "isAnomaly": true,
+          "lower": 73.89992492010495,
+          "reason": "ok",
+          "scored": true,
+          "upper": 131.02679250562846
+        },
+        {
+          "index": 211,
+          "isAnomaly": true,
+          "lower": 73.04462164245277,
+          "reason": "ok",
+          "scored": true,
+          "upper": 132.570636753389
+        },
+        {
+          "index": 212,
+          "isAnomaly": true,
+          "lower": 72.12288608484897,
+          "reason": "ok",
+          "scored": true,
+          "upper": 134.1874779794486
+        },
+        {
+          "index": 213,
+          "isAnomaly": true,
+          "lower": 71.08271953169415,
+          "reason": "ok",
+          "scored": true,
+          "upper": 135.87340139390227
+        },
+        {
+          "index": 214,
+          "isAnomaly": true,
+          "lower": 69.98651620103662,
+          "reason": "ok",
+          "scored": true,
+          "upper": 137.6282550717503
+        },
+        {
+          "index": 215,
+          "isAnomaly": true,
+          "lower": 69.08201752623539,
+          "reason": "ok",
+          "scored": true,
+          "upper": 139.41317143230594
+        },
+        {
+          "index": 216,
+          "isAnomaly": true,
+          "lower": 67.94793522671782,
+          "reason": "ok",
+          "scored": true,
+          "upper": 141.32972738149198
+        },
+        {
+          "index": 217,
+          "isAnomaly": true,
+          "lower": 66.78574593558062,
+          "reason": "ok",
+          "scored": true,
+          "upper": 143.327558103014
+        },
+        {
+          "index": 218,
+          "isAnomaly": true,
+          "lower": 65.57102012960307,
+          "reason": "ok",
+          "scored": true,
+          "upper": 145.4117419183425
+        },
+        {
+          "index": 219,
+          "isAnomaly": true,
+          "lower": 64.21092105705313,
+          "reason": "ok",
+          "scored": true,
+          "upper": 147.56729112188856
+        },
+        {
+          "index": 220,
+          "isAnomaly": true,
+          "lower": 62.91649197496316,
+          "reason": "ok",
+          "scored": true,
+          "upper": 149.83220548506108
+        },
+        {
+          "index": 221,
+          "isAnomaly": true,
+          "lower": 61.443329772040954,
+          "reason": "ok",
+          "scored": true,
+          "upper": 152.1846066028998
+        },
+        {
+          "index": 222,
+          "isAnomaly": true,
+          "lower": 60.02295759128522,
+          "reason": "ok",
+          "scored": true,
+          "upper": 154.65239489313365
+        },
+        {
+          "index": 223,
+          "isAnomaly": true,
+          "lower": 58.45647688620104,
+          "reason": "ok",
+          "scored": true,
+          "upper": 157.22841367724004
+        },
+        {
+          "index": 224,
+          "isAnomaly": true,
+          "lower": 56.77967938394418,
+          "reason": "ok",
+          "scored": true,
+          "upper": 159.89980051781743
+        },
+        {
+          "index": 225,
+          "isAnomaly": true,
+          "lower": 55.1166188557213,
+          "reason": "ok",
+          "scored": true,
+          "upper": 162.7098803192821
+        },
+        {
+          "index": 226,
+          "isAnomaly": true,
+          "lower": 53.35337417574179,
+          "reason": "ok",
+          "scored": true,
+          "upper": 165.64125777454672
+        },
+        {
+          "index": 227,
+          "isAnomaly": false,
+          "lower": 51.767378158585416,
+          "reason": "ok",
+          "scored": true,
+          "upper": 168.64135057791103
+        },
+        {
+          "index": 228,
+          "isAnomaly": false,
+          "lower": 50.1632925779591,
+          "reason": "ok",
+          "scored": true,
+          "upper": 171.40435147680608
+        },
+        {
+          "index": 229,
+          "isAnomaly": true,
+          "lower": 48.3099388891803,
+          "reason": "ok",
+          "scored": true,
+          "upper": 174.55624775879454
+        },
+        {
+          "index": 230,
+          "isAnomaly": false,
+          "lower": 46.14092480413663,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.94282951961247
+        },
+        {
+          "index": 231,
+          "isAnomaly": false,
+          "lower": 45.974211227630605,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.9292898995072
+        },
+        {
+          "index": 232,
+          "isAnomaly": false,
+          "lower": 45.94295646512167,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.93249520029678
+        },
+        {
+          "index": 233,
+          "isAnomaly": false,
+          "lower": 46.18250991513359,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.8920277415216
+        },
+        {
+          "index": 234,
+          "isAnomaly": false,
+          "lower": 46.21948787219702,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.88282470191348
+        },
+        {
+          "index": 235,
+          "isAnomaly": false,
+          "lower": 46.15690553123186,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.86687353096244
+        },
+        {
+          "index": 236,
+          "isAnomaly": false,
+          "lower": 46.21912820518625,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.84719518598234
+        },
+        {
+          "index": 237,
+          "isAnomaly": false,
+          "lower": 46.31123376157056,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.82328602050012
+        },
+        {
+          "index": 238,
+          "isAnomaly": false,
+          "lower": 45.809634512030854,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.98127503736492
+        },
+        {
+          "index": 239,
+          "isAnomaly": false,
+          "lower": 46.28324601195567,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.86359645375921
+        },
+        {
+          "index": 240,
+          "isAnomaly": false,
+          "lower": 46.25324048988658,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.8709458156368
+        },
+        {
+          "index": 241,
+          "isAnomaly": false,
+          "lower": 46.21177960086882,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.88277467366484
+        },
+        {
+          "index": 242,
+          "isAnomaly": false,
+          "lower": 46.52820312716074,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.87343946993178
+        },
+        {
+          "index": 243,
+          "isAnomaly": false,
+          "lower": 46.749174934824424,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.82997352793683
+        },
+        {
+          "index": 244,
+          "isAnomaly": false,
+          "lower": 46.60673431679663,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.87315616564518
+        },
+        {
+          "index": 245,
+          "isAnomaly": false,
+          "lower": 46.80128660579872,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.79581070700226
+        },
+        {
+          "index": 246,
+          "isAnomaly": false,
+          "lower": 47.23950511991967,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.6836342091235
+        },
+        {
+          "index": 247,
+          "isAnomaly": false,
+          "lower": 46.86666722180237,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.75505953293947
+        },
+        {
+          "index": 248,
+          "isAnomaly": false,
+          "lower": 46.69273559826141,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.82609162637033
+        },
+        {
+          "index": 249,
+          "isAnomaly": false,
+          "lower": 46.38957102233894,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.81733791715396
+        },
+        {
+          "index": 250,
+          "isAnomaly": false,
+          "lower": 46.143202243661065,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.91386878206123
+        },
+        {
+          "index": 251,
+          "isAnomaly": false,
+          "lower": 45.98309738027392,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.91940397344706
+        },
+        {
+          "index": 252,
+          "isAnomaly": false,
+          "lower": 45.70212338006651,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.99995103625815
+        },
+        {
+          "index": 253,
+          "isAnomaly": false,
+          "lower": 45.526636336411315,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.9709406403709
+        },
+        {
+          "index": 254,
+          "isAnomaly": false,
+          "lower": 45.47443842526897,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.98578661391548
+        },
+        {
+          "index": 255,
+          "isAnomaly": false,
+          "lower": 45.40442421550735,
+          "reason": "ok",
+          "scored": true,
+          "upper": 178.00143180715872
+        },
+        {
+          "index": 256,
+          "isAnomaly": false,
+          "lower": 45.71795352107583,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.88926311950573
+        },
+        {
+          "index": 257,
+          "isAnomaly": false,
+          "lower": 45.974726052691935,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.80298478050423
+        },
+        {
+          "index": 258,
+          "isAnomaly": false,
+          "lower": 45.95441889863184,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.81272902085055
+        },
+        {
+          "index": 259,
+          "isAnomaly": false,
+          "lower": 45.89861019006952,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.80558894286793
+        },
+        {
+          "index": 260,
+          "isAnomaly": false,
+          "lower": 45.800670997766545,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.8104500807143
+        },
+        {
+          "index": 261,
+          "isAnomaly": false,
+          "lower": 45.38104206731761,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.96440223637603
+        },
+        {
+          "index": 262,
+          "isAnomaly": false,
+          "lower": 45.453305223772716,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.9548218405224
+        },
+        {
+          "index": 263,
+          "isAnomaly": false,
+          "lower": 45.47463815090006,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.95742413201955
+        },
+        {
+          "index": 264,
+          "isAnomaly": false,
+          "lower": 45.67861535854611,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.86649589348525
+        },
+        {
+          "index": 265,
+          "isAnomaly": false,
+          "lower": 45.714294703012285,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.86017180204047
+        },
+        {
+          "index": 266,
+          "isAnomaly": false,
+          "lower": 46.32677299565569,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.56057576428398
+        },
+        {
+          "index": 267,
+          "isAnomaly": false,
+          "lower": 46.34836645701489,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.56083539420933
+        },
+        {
+          "index": 268,
+          "isAnomaly": false,
+          "lower": 46.4710741497977,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.50466735218436
+        },
+        {
+          "index": 269,
+          "isAnomaly": false,
+          "lower": 46.35508675913735,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.53428708458404
+        },
+        {
+          "index": 270,
+          "isAnomaly": false,
+          "lower": 46.318574044956534,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.5418752803312
+        },
+        {
+          "index": 271,
+          "isAnomaly": false,
+          "lower": 46.096789489779795,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.6401012221478
+        },
+        {
+          "index": 272,
+          "isAnomaly": false,
+          "lower": 46.25537995803309,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.62945912692294
+        },
+        {
+          "index": 273,
+          "isAnomaly": false,
+          "lower": 46.569482638104304,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.52141158068952
+        },
+        {
+          "index": 274,
+          "isAnomaly": false,
+          "lower": 46.941495197032,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.38226352589376
+        },
+        {
+          "index": 275,
+          "isAnomaly": false,
+          "lower": 47.27442380360401,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.23051726955362
+        },
+        {
+          "index": 276,
+          "isAnomaly": false,
+          "lower": 47.26832898050431,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.2305983528115
+        },
+        {
+          "index": 277,
+          "isAnomaly": false,
+          "lower": 47.17459268914854,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.2431334998223
+        },
+        {
+          "index": 278,
+          "isAnomaly": false,
+          "lower": 47.35833206305546,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.28935603313337
+        },
+        {
+          "index": 279,
+          "isAnomaly": false,
+          "lower": 47.37168719655223,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.2853064857158
+        },
+        {
+          "index": 280,
+          "isAnomaly": false,
+          "lower": 47.638089650395855,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.19196112104805
+        },
+        {
+          "index": 281,
+          "isAnomaly": false,
+          "lower": 48.06074253329561,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.01821292261198
+        },
+        {
+          "index": 282,
+          "isAnomaly": false,
+          "lower": 47.946955439298705,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.03606335797195
+        },
+        {
+          "index": 283,
+          "isAnomaly": false,
+          "lower": 47.90416864029352,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.0443249746267
+        },
+        {
+          "index": 284,
+          "isAnomaly": false,
+          "lower": 47.92054012414086,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.04821540776732
+        },
+        {
+          "index": 285,
+          "isAnomaly": false,
+          "lower": 47.8179283766645,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.05891822455843
+        },
+        {
+          "index": 286,
+          "isAnomaly": false,
+          "lower": 47.83384342882488,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.05563232484985
+        },
+        {
+          "index": 287,
+          "isAnomaly": false,
+          "lower": 47.754609688279785,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.08068091257996
+        },
+        {
+          "index": 288,
+          "isAnomaly": false,
+          "lower": 47.78660623628602,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.06876107947122
+        },
+        {
+          "index": 289,
+          "isAnomaly": false,
+          "lower": 48.06664480428985,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.04762812595328
+        },
+        {
+          "index": 290,
+          "isAnomaly": false,
+          "lower": 47.93518490576437,
+          "reason": "ok",
+          "scored": true,
+          "upper": 177.0864035272381
+        },
+        {
+          "index": 291,
+          "isAnomaly": false,
+          "lower": 48.65469191024299,
+          "reason": "ok",
+          "scored": true,
+          "upper": 176.74495657839947
+        },
+        {
+          "index": 292,
+          "isAnomaly": false,
+          "lower": 48.35894392206565,
+          "reason": "ok",
+          "scored": true,
+          "upper": 176.8106719388848
+        },
+        {
+          "index": 293,
+          "isAnomaly": false,
+          "lower": 48.75021448836056,
+          "reason": "ok",
+          "scored": true,
+          "upper": 176.66004107493129
+        },
+        {
+          "index": 294,
+          "isAnomaly": false,
+          "lower": 49.21986976146084,
+          "reason": "ok",
+          "scored": true,
+          "upper": 176.48244582564774
+        },
+        {
+          "index": 295,
+          "isAnomaly": false,
+          "lower": 48.808301416587334,
+          "reason": "ok",
+          "scored": true,
+          "upper": 176.6242889889092
+        },
+        {
+          "index": 296,
+          "isAnomaly": false,
+          "lower": 48.97952546209808,
+          "reason": "ok",
+          "scored": true,
+          "upper": 176.57083958070731
+        },
+        {
+          "index": 297,
+          "isAnomaly": false,
+          "lower": 49.00769952179494,
+          "reason": "ok",
+          "scored": true,
+          "upper": 176.5613390908129
+        },
+        {
+          "index": 298,
+          "isAnomaly": false,
+          "lower": 48.76585137638769,
+          "reason": "ok",
+          "scored": true,
+          "upper": 176.64076543994486
+        },
+        {
+          "index": 299,
+          "isAnomaly": false,
+          "lower": 48.50711507180172,
+          "reason": "ok",
+          "scored": true,
+          "upper": 176.68101621314543
+        },
+        {
+          "index": 300,
+          "isAnomaly": false,
+          "lower": 48.73764124822297,
+          "reason": "ok",
+          "scored": true,
+          "upper": 176.60191641384802
+        },
+        {
+          "index": 301,
+          "isAnomaly": false,
+          "lower": 48.28637581267485,
+          "reason": "ok",
+          "scored": true,
+          "upper": 176.55800875447193
+        },
+        {
+          "index": 302,
+          "isAnomaly": false,
+          "lower": 48.067696228349675,
+          "reason": "ok",
+          "scored": true,
+          "upper": 176.41039523322985
+        },
+        {
+          "index": 303,
+          "isAnomaly": false,
+          "lower": 48.013123427707995,
+          "reason": "ok",
+          "scored": true,
+          "upper": 176.24635448028357
+        },
+        {
+          "index": 304,
+          "isAnomaly": false,
+          "lower": 47.6859648952079,
+          "reason": "ok",
+          "scored": true,
+          "upper": 176.07812529382392
+        },
+        {
+          "index": 305,
+          "isAnomaly": false,
+          "lower": 47.27882245944353,
+          "reason": "ok",
+          "scored": true,
+          "upper": 175.90820288637116
+        },
+        {
+          "index": 306,
+          "isAnomaly": false,
+          "lower": 47.19189173101951,
+          "reason": "ok",
+          "scored": true,
+          "upper": 175.62586675108236
+        },
+        {
+          "index": 307,
+          "isAnomaly": false,
+          "lower": 46.933411986439,
+          "reason": "ok",
+          "scored": true,
+          "upper": 175.32755707172538
+        },
+        {
+          "index": 308,
+          "isAnomaly": false,
+          "lower": 46.87146086079832,
+          "reason": "ok",
+          "scored": true,
+          "upper": 174.95616981579144
+        },
+        {
+          "index": 309,
+          "isAnomaly": false,
+          "lower": 46.83897919074615,
+          "reason": "ok",
+          "scored": true,
+          "upper": 174.53204355622324
+        },
+        {
+          "index": 310,
+          "isAnomaly": false,
+          "lower": 46.85165855830756,
+          "reason": "ok",
+          "scored": true,
+          "upper": 174.05249933942474
+        },
+        {
+          "index": 311,
+          "isAnomaly": false,
+          "lower": 46.98322281082036,
+          "reason": "ok",
+          "scored": true,
+          "upper": 173.61146609292555
+        },
+        {
+          "index": 312,
+          "isAnomaly": false,
+          "lower": 46.99828513234357,
+          "reason": "ok",
+          "scored": true,
+          "upper": 172.99113296293254
+        },
+        {
+          "index": 313,
+          "isAnomaly": false,
+          "lower": 47.12453956008129,
+          "reason": "ok",
+          "scored": true,
+          "upper": 172.28877009400333
+        },
+        {
+          "index": 314,
+          "isAnomaly": false,
+          "lower": 47.347633823087705,
+          "reason": "ok",
+          "scored": true,
+          "upper": 171.5065148484204
+        },
+        {
+          "index": 315,
+          "isAnomaly": false,
+          "lower": 47.43588797602807,
+          "reason": "ok",
+          "scored": true,
+          "upper": 170.61394746710278
+        },
+        {
+          "index": 316,
+          "isAnomaly": false,
+          "lower": 47.63909854705631,
+          "reason": "ok",
+          "scored": true,
+          "upper": 169.59020024889043
+        },
+        {
+          "index": 317,
+          "isAnomaly": false,
+          "lower": 48.1071601397106,
+          "reason": "ok",
+          "scored": true,
+          "upper": 168.43772818128983
+        },
+        {
+          "index": 318,
+          "isAnomaly": false,
+          "lower": 48.590547289077676,
+          "reason": "ok",
+          "scored": true,
+          "upper": 167.10567395198095
+        },
+        {
+          "index": 319,
+          "isAnomaly": false,
+          "lower": 49.28497930340078,
+          "reason": "ok",
+          "scored": true,
+          "upper": 165.60257929765058
+        },
+        {
+          "index": 320,
+          "isAnomaly": false,
+          "lower": 49.83547153474019,
+          "reason": "ok",
+          "scored": true,
+          "upper": 163.9405562921889
+        },
+        {
+          "index": 321,
+          "isAnomaly": false,
+          "lower": 50.757945868232795,
+          "reason": "ok",
+          "scored": true,
+          "upper": 161.97699627261858
+        },
+        {
+          "index": 322,
+          "isAnomaly": false,
+          "lower": 51.830989090956265,
+          "reason": "ok",
+          "scored": true,
+          "upper": 159.7484651826304
+        },
+        {
+          "index": 323,
+          "isAnomaly": false,
+          "lower": 53.280432362005705,
+          "reason": "ok",
+          "scored": true,
+          "upper": 157.157948539714
+        },
+        {
+          "index": 324,
+          "isAnomaly": false,
+          "lower": 55.08464965888467,
+          "reason": "ok",
+          "scored": true,
+          "upper": 154.15884061420795
+        },
+        {
+          "index": 325,
+          "isAnomaly": false,
+          "lower": 57.34826941519329,
+          "reason": "ok",
+          "scored": true,
+          "upper": 150.65721331654933
+        },
+        {
+          "index": 326,
+          "isAnomaly": false,
+          "lower": 60.29552732273255,
+          "reason": "ok",
+          "scored": true,
+          "upper": 146.5621458398927
+        },
+        {
+          "index": 327,
+          "isAnomaly": false,
+          "lower": 63.84352791536939,
+          "reason": "ok",
+          "scored": true,
+          "upper": 141.59216695670585
+        },
+        {
+          "index": 328,
+          "isAnomaly": false,
+          "lower": 67.98782500688074,
+          "reason": "ok",
+          "scored": true,
+          "upper": 136.27876215091024
+        },
+        {
+          "index": 329,
+          "isAnomaly": false,
+          "lower": 74.12566049725206,
+          "reason": "ok",
+          "scored": true,
+          "upper": 128.73913884853766
+        },
+        {
+          "index": 330,
+          "isAnomaly": false,
+          "lower": 84.66396791591956,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.65184474546245
+        },
+        {
+          "index": 331,
+          "isAnomaly": false,
+          "lower": 84.65763718859793,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.7175007736956
+        },
+        {
+          "index": 332,
+          "isAnomaly": false,
+          "lower": 84.39821666525242,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.78685138693703
+        },
+        {
+          "index": 333,
+          "isAnomaly": true,
+          "lower": 84.44262822941835,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.69242699535346
+        },
+        {
+          "index": 334,
+          "isAnomaly": false,
+          "lower": 83.89253427311893,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.56244643655215
+        },
+        {
+          "index": 335,
+          "isAnomaly": false,
+          "lower": 83.65294736168607,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.53749225206036
+        },
+        {
+          "index": 336,
+          "isAnomaly": false,
+          "lower": 83.681376352108,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.59017866963225
+        },
+        {
+          "index": 337,
+          "isAnomaly": false,
+          "lower": 83.48257261524465,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.98584012538625
+        },
+        {
+          "index": 338,
+          "isAnomaly": false,
+          "lower": 83.92994380006337,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.75340504335514
+        },
+        {
+          "index": 339,
+          "isAnomaly": false,
+          "lower": 84.02063934311758,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.58110701641777
+        },
+        {
+          "index": 340,
+          "isAnomaly": false,
+          "lower": 84.02440381867544,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.58203268714627
+        },
+        {
+          "index": 341,
+          "isAnomaly": false,
+          "lower": 84.00009966094692,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.58770769085228
+        },
+        {
+          "index": 342,
+          "isAnomaly": false,
+          "lower": 84.14040581021072,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.12849993436853
+        },
+        {
+          "index": 343,
+          "isAnomaly": false,
+          "lower": 84.17165161919552,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.04649269903261
+        },
+        {
+          "index": 344,
+          "isAnomaly": false,
+          "lower": 84.26439213904959,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.0353535154033
+        },
+        {
+          "index": 345,
+          "isAnomaly": false,
+          "lower": 84.06668675855364,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.12548390673616
+        },
+        {
+          "index": 346,
+          "isAnomaly": false,
+          "lower": 83.89364955172161,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.97766437064348
+        },
+        {
+          "index": 347,
+          "isAnomaly": false,
+          "lower": 84.02799782370005,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.92496784568203
+        },
+        {
+          "index": 348,
+          "isAnomaly": false,
+          "lower": 84.26276645311289,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.9525490095764
+        },
+        {
+          "index": 349,
+          "isAnomaly": false,
+          "lower": 84.21578903501421,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.96926679326751
+        },
+        {
+          "index": 350,
+          "isAnomaly": false,
+          "lower": 84.3833820445718,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.86870280128723
+        },
+        {
+          "index": 351,
+          "isAnomaly": false,
+          "lower": 84.15455764597291,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.95236224681736
+        },
+        {
+          "index": 352,
+          "isAnomaly": false,
+          "lower": 84.34965449115833,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.89003237355573
+        },
+        {
+          "index": 353,
+          "isAnomaly": false,
+          "lower": 84.08156781379259,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.97887531421074
+        },
+        {
+          "index": 354,
+          "isAnomaly": false,
+          "lower": 84.13373846783826,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.98738343562873
+        },
+        {
+          "index": 355,
+          "isAnomaly": false,
+          "lower": 83.83272134292669,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.13729658073864
+        },
+        {
+          "index": 356,
+          "isAnomaly": false,
+          "lower": 83.83395172358736,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.14184875732418
+        },
+        {
+          "index": 357,
+          "isAnomaly": false,
+          "lower": 83.75844322914469,
+          "reason": "ok",
+          "scored": true,
+          "upper": 117.12687209539726
+        },
+        {
+          "index": 358,
+          "isAnomaly": false,
+          "lower": 84.0897440197648,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.96773919670594
+        },
+        {
+          "index": 359,
+          "isAnomaly": false,
+          "lower": 84.02886166792504,
+          "reason": "ok",
+          "scored": true,
+          "upper": 116.87557522789487
+        }
+      ],
+      "name": "zscore_stabilization_clamp",
+      "params": {
+        "consecutiveAnomalies": 1,
+        "detrend": "none",
+        "direction": "any",
+        "halfLife": null,
+        "inputType": "values",
+        "lowerBound": null,
+        "minSamples": 30,
+        "minSamplesPerGroup": 10,
+        "seasonalityComponents": null,
+        "smoothing": "none",
+        "smoothingAlpha": 0.3,
+        "smoothingWindow": 10,
+        "stabilization": "clamp",
+        "threshold": 3.0,
+        "type": "zscore",
+        "upperBound": null,
+        "windowSize": 100,
+        "windowWeights": "none"
+      },
+      "series": {
+        "intervalSeconds": 600,
+        "timestamps": [
+          1767225600000,
+          1767226200000,
+          1767226800000,
+          1767227400000,
+          1767228000000,
+          1767228600000,
+          1767229200000,
+          1767229800000,
+          1767230400000,
+          1767231000000,
+          1767231600000,
+          1767232200000,
+          1767232800000,
+          1767233400000,
+          1767234000000,
+          1767234600000,
+          1767235200000,
+          1767235800000,
+          1767236400000,
+          1767237000000,
+          1767237600000,
+          1767238200000,
+          1767238800000,
+          1767239400000,
+          1767240000000,
+          1767240600000,
+          1767241200000,
+          1767241800000,
+          1767242400000,
+          1767243000000,
+          1767243600000,
+          1767244200000,
+          1767244800000,
+          1767245400000,
+          1767246000000,
+          1767246600000,
+          1767247200000,
+          1767247800000,
+          1767248400000,
+          1767249000000,
+          1767249600000,
+          1767250200000,
+          1767250800000,
+          1767251400000,
+          1767252000000,
+          1767252600000,
+          1767253200000,
+          1767253800000,
+          1767254400000,
+          1767255000000,
+          1767255600000,
+          1767256200000,
+          1767256800000,
+          1767257400000,
+          1767258000000,
+          1767258600000,
+          1767259200000,
+          1767259800000,
+          1767260400000,
+          1767261000000,
+          1767261600000,
+          1767262200000,
+          1767262800000,
+          1767263400000,
+          1767264000000,
+          1767264600000,
+          1767265200000,
+          1767265800000,
+          1767266400000,
+          1767267000000,
+          1767267600000,
+          1767268200000,
+          1767268800000,
+          1767269400000,
+          1767270000000,
+          1767270600000,
+          1767271200000,
+          1767271800000,
+          1767272400000,
+          1767273000000,
+          1767273600000,
+          1767274200000,
+          1767274800000,
+          1767275400000,
+          1767276000000,
+          1767276600000,
+          1767277200000,
+          1767277800000,
+          1767278400000,
+          1767279000000,
+          1767279600000,
+          1767280200000,
+          1767280800000,
+          1767281400000,
+          1767282000000,
+          1767282600000,
+          1767283200000,
+          1767283800000,
+          1767284400000,
+          1767285000000,
+          1767285600000,
+          1767286200000,
+          1767286800000,
+          1767287400000,
+          1767288000000,
+          1767288600000,
+          1767289200000,
+          1767289800000,
+          1767290400000,
+          1767291000000,
+          1767291600000,
+          1767292200000,
+          1767292800000,
+          1767293400000,
+          1767294000000,
+          1767294600000,
+          1767295200000,
+          1767295800000,
+          1767296400000,
+          1767297000000,
+          1767297600000,
+          1767298200000,
+          1767298800000,
+          1767299400000,
+          1767300000000,
+          1767300600000,
+          1767301200000,
+          1767301800000,
+          1767302400000,
+          1767303000000,
+          1767303600000,
+          1767304200000,
+          1767304800000,
+          1767305400000,
+          1767306000000,
+          1767306600000,
+          1767307200000,
+          1767307800000,
+          1767308400000,
+          1767309000000,
+          1767309600000,
+          1767310200000,
+          1767310800000,
+          1767311400000,
+          1767312000000,
+          1767312600000,
+          1767313200000,
+          1767313800000,
+          1767314400000,
+          1767315000000,
+          1767315600000,
+          1767316200000,
+          1767316800000,
+          1767317400000,
+          1767318000000,
+          1767318600000,
+          1767319200000,
+          1767319800000,
+          1767320400000,
+          1767321000000,
+          1767321600000,
+          1767322200000,
+          1767322800000,
+          1767323400000,
+          1767324000000,
+          1767324600000,
+          1767325200000,
+          1767325800000,
+          1767326400000,
+          1767327000000,
+          1767327600000,
+          1767328200000,
+          1767328800000,
+          1767329400000,
+          1767330000000,
+          1767330600000,
+          1767331200000,
+          1767331800000,
+          1767332400000,
+          1767333000000,
+          1767333600000,
+          1767334200000,
+          1767334800000,
+          1767335400000,
+          1767336000000,
+          1767336600000,
+          1767337200000,
+          1767337800000,
+          1767338400000,
+          1767339000000,
+          1767339600000,
+          1767340200000,
+          1767340800000,
+          1767341400000,
+          1767342000000,
+          1767342600000,
+          1767343200000,
+          1767343800000,
+          1767344400000,
+          1767345000000,
+          1767345600000,
+          1767346200000,
+          1767346800000,
+          1767347400000,
+          1767348000000,
+          1767348600000,
+          1767349200000,
+          1767349800000,
+          1767350400000,
+          1767351000000,
+          1767351600000,
+          1767352200000,
+          1767352800000,
+          1767353400000,
+          1767354000000,
+          1767354600000,
+          1767355200000,
+          1767355800000,
+          1767356400000,
+          1767357000000,
+          1767357600000,
+          1767358200000,
+          1767358800000,
+          1767359400000,
+          1767360000000,
+          1767360600000,
+          1767361200000,
+          1767361800000,
+          1767362400000,
+          1767363000000,
+          1767363600000,
+          1767364200000,
+          1767364800000,
+          1767365400000,
+          1767366000000,
+          1767366600000,
+          1767367200000,
+          1767367800000,
+          1767368400000,
+          1767369000000,
+          1767369600000,
+          1767370200000,
+          1767370800000,
+          1767371400000,
+          1767372000000,
+          1767372600000,
+          1767373200000,
+          1767373800000,
+          1767374400000,
+          1767375000000,
+          1767375600000,
+          1767376200000,
+          1767376800000,
+          1767377400000,
+          1767378000000,
+          1767378600000,
+          1767379200000,
+          1767379800000,
+          1767380400000,
+          1767381000000,
+          1767381600000,
+          1767382200000,
+          1767382800000,
+          1767383400000,
+          1767384000000,
+          1767384600000,
+          1767385200000,
+          1767385800000,
+          1767386400000,
+          1767387000000,
+          1767387600000,
+          1767388200000,
+          1767388800000,
+          1767389400000,
+          1767390000000,
+          1767390600000,
+          1767391200000,
+          1767391800000,
+          1767392400000,
+          1767393000000,
+          1767393600000,
+          1767394200000,
+          1767394800000,
+          1767395400000,
+          1767396000000,
+          1767396600000,
+          1767397200000,
+          1767397800000,
+          1767398400000,
+          1767399000000,
+          1767399600000,
+          1767400200000,
+          1767400800000,
+          1767401400000,
+          1767402000000,
+          1767402600000,
+          1767403200000,
+          1767403800000,
+          1767404400000,
+          1767405000000,
+          1767405600000,
+          1767406200000,
+          1767406800000,
+          1767407400000,
+          1767408000000,
+          1767408600000,
+          1767409200000,
+          1767409800000,
+          1767410400000,
+          1767411000000,
+          1767411600000,
+          1767412200000,
+          1767412800000,
+          1767413400000,
+          1767414000000,
+          1767414600000,
+          1767415200000,
+          1767415800000,
+          1767416400000,
+          1767417000000,
+          1767417600000,
+          1767418200000,
+          1767418800000,
+          1767419400000,
+          1767420000000,
+          1767420600000,
+          1767421200000,
+          1767421800000,
+          1767422400000,
+          1767423000000,
+          1767423600000,
+          1767424200000,
+          1767424800000,
+          1767425400000,
+          1767426000000,
+          1767426600000,
+          1767427200000,
+          1767427800000,
+          1767428400000,
+          1767429000000,
+          1767429600000,
+          1767430200000,
+          1767430800000,
+          1767431400000,
+          1767432000000,
+          1767432600000,
+          1767433200000,
+          1767433800000,
+          1767434400000,
+          1767435000000,
+          1767435600000,
+          1767436200000,
+          1767436800000,
+          1767437400000,
+          1767438000000,
+          1767438600000,
+          1767439200000,
+          1767439800000,
+          1767440400000,
+          1767441000000
+        ],
+        "values": [
+          92.1999381098706,
+          93.56206578617554,
+          104.74119516674722,
+          94.73040702183802,
+          109.01093092227936,
+          99.85642329481975,
+          101.65569327460334,
+          94.2016414963057,
+          90.51811191439543,
+          98.77795214294592,
+          90.71399752596523,
+          97.65101412654077,
+          106.5663147048363,
+          97.74598718296839,
+          94.36759449084605,
+          102.48628940709015,
+          108.1690651654514,
+          108.27435509059255,
+          104.0016965545489,
+          101.03178171879607,
+          103.34359924695478,
+          103.92780614897528,
+          101.49675772756976,
+          96.23912663115946,
+          103.71742689741191,
+          102.03174384045772,
+          94.59934144726378,
+          95.12342296411377,
+          96.81915935917958,
+          107.54194368125961,
+          102.29684288300558,
+          101.84131760700734,
+          105.4509935446303,
+          95.21723357957852,
+          95.91721351903564,
+          101.26570346928736,
+          97.61092782107637,
+          95.58347042813776,
+          94.50371940353162,
+          97.11757873309273,
+          101.63037899097252,
+          88.19729883643221,
+          107.65519796283671,
+          104.45452243617193,
+          106.77485711114373,
+          96.74499225659736,
+          99.2331334236196,
+          93.61997692131868,
+          94.57358351968298,
+          95.38405229420161,
+          96.60544647222412,
+          97.55699000317992,
+          104.49673890095735,
+          101.50383972671918,
+          107.34245968038341,
+          102.82430842592348,
+          98.52468665246039,
+          99.96231493582225,
+          94.74729921359221,
+          116.12788375754957,
+          99.48021242734448,
+          99.88384526763498,
+          99.91348224236056,
+          96.1197551206449,
+          85.80448143629471,
+          100.83200275623297,
+          104.19796683653382,
+          95.54549911051818,
+          109.55494476091381,
+          104.94371332273171,
+          96.02585028316167,
+          99.3093927720496,
+          94.7511573005249,
+          91.21102558816217,
+          96.3643286559884,
+          95.20752470022549,
+          107.90521511459194,
+          103.1050738762824,
+          100.11099422659701,
+          99.46047836119894,
+          101.4867771997615,
+          101.14451264259844,
+          109.92337813861104,
+          97.31895381084338,
+          95.66306004492765,
+          105.97071674250729,
+          90.40751708028836,
+          91.55185836044184,
+          107.70658212241489,
+          99.86624053127436,
+          90.21529979975602,
+          103.43607818949631,
+          96.62657315908807,
+          103.04489584289662,
+          89.13853278407598,
+          95.02039240364311,
+          101.1917976695039,
+          93.17650439367253,
+          105.30766521805099,
+          96.62267308773737,
+          93.41508392244505,
+          95.7122824803051,
+          107.60484687105141,
+          102.61766127595595,
+          99.94131379336021,
+          103.91883643379111,
+          107.29318818137418,
+          94.97915875612549,
+          104.92138684736847,
+          91.10780371337559,
+          96.5997440002094,
+          97.81535333059946,
+          101.89963491450682,
+          102.94088403437927,
+          93.60737078403113,
+          100.28948894888069,
+          99.54765586225051,
+          99.85465763546804,
+          105.63923536853571,
+          99.04302706775856,
+          105.8702597392346,
+          99.81380112899544,
+          104.1754909420221,
+          107.49894676121585,
+          102.54883685572803,
+          104.30324155502636,
+          94.93641846415055,
+          106.19634847581366,
+          104.8783364275508,
+          113.6778639700808,
+          110.33948460626368,
+          103.72859947597286,
+          96.81056228261846,
+          99.30740687762692,
+          109.69429348398052,
+          97.01791790677656,
+          98.03492063409904,
+          106.65213996542344,
+          91.0368410204063,
+          100.70042439094843,
+          99.77440151108466,
+          96.77414490088782,
+          97.056514128535,
+          101.25421607190977,
+          92.60818765956351,
+          92.09223068280866,
+          109.32886806036194,
+          97.70390324051459,
+          113.16423022906916,
+          99.24809203509906,
+          108.08280423882282,
+          103.80494324979112,
+          111.69756545016645,
+          99.59493019340393,
+          101.58945834229293,
+          91.32616385209212,
+          92.97607598886692,
+          91.5201748925198,
+          107.83350354777733,
+          106.13998139688903,
+          102.67191730758076,
+          100.60314189448229,
+          105.40913188778069,
+          89.93114168231197,
+          100.64479238181922,
+          81.56565364976483,
+          104.35703033328373,
+          90.92065650060462,
+          101.9687045572424,
+          101.65830433853172,
+          96.27311745671334,
+          99.93633774381972,
+          92.06312680099083,
+          90.50302311739466,
+          88.52169476313263,
+          105.06080925036545,
+          104.90056986485287,
+          102.24162486052964,
+          98.72853590893546,
+          93.21249019037097,
+          89.22059503267013,
+          105.17689292827333,
+          102.8461251762697,
+          107.59780900281969,
+          105.99919542876546,
+          101.31949613944188,
+          100.10210422221601,
+          96.3643530174239,
+          97.75810524381416,
+          101.81288489534927,
+          83.30157133359559,
+          107.30735869319795,
+          90.75306611426853,
+          89.92534252860649,
+          105.1344518025504,
+          96.40257033609197,
+          98.15701680066725,
+          102.91024175088722,
+          108.47508247635356,
+          94.44922068947241,
+          169.66604880037698,
+          171.4127500130797,
+          176.1525297711117,
+          170.25202577356237,
+          165.940731179453,
+          181.1513845745451,
+          162.94997123437935,
+          168.57480596324922,
+          164.24877904513153,
+          177.2359357499782,
+          176.699581144872,
+          160.18833600272762,
+          169.37903373167012,
+          169.0702215907903,
+          158.04569808947576,
+          173.52152377307942,
+          173.5788479369793,
+          165.55092436626143,
+          160.48407088933004,
+          170.59620249691304,
+          165.3701729630141,
+          172.26681294973113,
+          170.27855479805712,
+          176.20320855882954,
+          168.0912082696774,
+          172.40475415796374,
+          171.03546279923535,
+          164.14211438924957,
+          169.80546608803456,
+          179.65335834260628,
+          101.32682477569927,
+          102.32612639000585,
+          106.76486184445542,
+          100.69615275039152,
+          105.76761788817146,
+          99.14513435548787,
+          101.4447401792042,
+          89.47162833167873,
+          108.83348683636319,
+          99.56761638137226,
+          98.29279996160005,
+          112.12856102883032,
+          105.93180741197253,
+          96.29131705593869,
+          98.46852917751887,
+          108.39433149491853,
+          94.25823934529618,
+          92.55892673500885,
+          97.56831597212923,
+          91.75619634656569,
+          100.35432063875942,
+          93.78359637997602,
+          101.47269347304534,
+          97.72733331351499,
+          98.87100751637448,
+          101.39419474786602,
+          101.50078561959631,
+          90.9920292068323,
+          104.68606422052774,
+          101.48607867406169,
+          89.3880785682176,
+          103.73727992455898,
+          106.60589281900334,
+          95.58359013789931,
+          102.1125550328889,
+          98.57381441751825,
+          105.44968489751018,
+          94.24763903849558,
+          97.6503216442095,
+          100.21207841684985,
+          90.09518678870553,
+          107.33375639524141,
+          102.3658834928825,
+          102.14624832398893,
+          97.58081227472886,
+          104.76012225827343,
+          100.84051264760463,
+          113.73972022142972,
+          99.1938152128968,
+          101.86534464916286,
+          101.66582925585352,
+          100.38005999642762,
+          101.11986605874779,
+          108.61090485221777,
+          101.40374889450173,
+          101.95095376203273,
+          97.3928465814685,
+          97.36818876229752,
+          110.70338596810772,
+          97.17866003331609,
+          102.20457411559318,
+          95.80572730860052,
+          102.78505123133719,
+          104.52834371944344,
+          91.6481927219498,
+          102.29130220153263,
+          99.09069529079127,
+          94.78915193712204,
+          97.55080590708333,
+          102.02053954566387,
+          94.37207592128098,
+          101.80415371379172,
+          110.25217454372311,
+          97.35712212184147,
+          94.40560378718065,
+          106.01036411631694,
+          97.85518181715685,
+          105.22518209560629,
+          105.41761587751054,
+          106.28749636566714,
+          115.55334280631051,
+          102.30709632989812,
+          105.38205591987438,
+          107.91535226507767,
+          97.41259365288836,
+          98.38633907310063,
+          107.10920363417564,
+          100.89420410592403,
+          104.97860991797657,
+          91.9907524157771,
+          97.77792118117318,
+          94.41021323966363,
+          97.59872629978744,
+          97.48388224588513,
+          97.99942345031903,
+          105.31940186341231,
+          94.5423432470481,
+          105.68672867503278,
+          99.71607548797242,
+          97.10691353840973,
+          104.29308982127405,
+          92.82263088480302,
+          104.26422047357364,
+          117.16959739732587,
+          92.54056309194036,
+          103.2009047551785,
+          111.28762612373689,
+          100.21843347105874,
+          104.75336264220576,
+          99.80212369569001,
+          97.36134226047385,
+          96.18348066783452,
+          103.39373609441678,
+          100.3713838671778,
+          93.08977971936427,
+          92.35149434868384,
+          98.34082669614446,
+          105.67641640036858,
+          96.05533425174966,
+          95.10764722543273,
+          93.09607298532092,
+          100.42194497616288,
+          92.510506637511,
+          100.76127208669743,
+          91.31580852629097,
+          101.68332261017862,
+          96.9765278011165,
+          99.60042380327134,
+          97.03374818798605,
+          115.92768959747812
+        ]
+      }
+    },
+    {
+      "expected": [
+        {
+          "index": 0,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 1,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 2,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 3,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 4,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 5,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 6,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 7,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 8,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 9,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 10,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 11,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 12,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 13,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 14,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 15,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 16,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 17,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 18,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 19,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 20,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 21,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 22,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 23,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 24,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 25,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 26,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 27,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 28,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 29,
+          "isAnomaly": false,
+          "lower": null,
+          "reason": "insufficient_data",
+          "scored": false,
+          "upper": null
+        },
+        {
+          "index": 30,
+          "isAnomaly": false,
+          "lower": 31.622149015169082,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.541544713194455
+        },
+        {
+          "index": 31,
+          "isAnomaly": false,
+          "lower": 32.0297739768423,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.53098957961614
+        },
+        {
+          "index": 32,
+          "isAnomaly": false,
+          "lower": 31.27504817993066,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.87748239611547
+        },
+        {
+          "index": 33,
+          "isAnomaly": false,
+          "lower": 32.07552730408264,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.49671324362241
+        },
+        {
+          "index": 34,
+          "isAnomaly": false,
+          "lower": 31.601318856935983,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.08459056611135
+        },
+        {
+          "index": 35,
+          "isAnomaly": false,
+          "lower": 30.359499974162905,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.464148153208086
+        },
+        {
+          "index": 36,
+          "isAnomaly": false,
+          "lower": 30.151682387420507,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.53151574050284
+        },
+        {
+          "index": 37,
+          "isAnomaly": false,
+          "lower": 30.891572549102616,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.630768624090635
+        },
+        {
+          "index": 38,
+          "isAnomaly": false,
+          "lower": 30.70105695219216,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.34002152244551
+        },
+        {
+          "index": 39,
+          "isAnomaly": false,
+          "lower": 29.940276085912934,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.59561932971784
+        },
+        {
+          "index": 40,
+          "isAnomaly": false,
+          "lower": 30.132102408053257,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.562883820766615
+        },
+        {
+          "index": 41,
+          "isAnomaly": false,
+          "lower": 29.63263898980817,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.25409345010601
+        },
+        {
+          "index": 42,
+          "isAnomaly": false,
+          "lower": 29.317123587247053,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.37466062192843
+        },
+        {
+          "index": 43,
+          "isAnomaly": false,
+          "lower": 29.026740579649417,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.45022404087301
+        },
+        {
+          "index": 44,
+          "isAnomaly": false,
+          "lower": 30.434385113395095,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.49499404172748
+        },
+        {
+          "index": 45,
+          "isAnomaly": false,
+          "lower": 30.057288931302438,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.435683150069934
+        },
+        {
+          "index": 46,
+          "isAnomaly": false,
+          "lower": 29.346392593459836,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.359313276366635
+        },
+        {
+          "index": 47,
+          "isAnomaly": false,
+          "lower": 30.101632812771822,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.37441909369856
+        },
+        {
+          "index": 48,
+          "isAnomaly": false,
+          "lower": 30.65271426218981,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.2196570098176
+        },
+        {
+          "index": 49,
+          "isAnomaly": false,
+          "lower": 30.27526856012301,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.218668276468236
+        },
+        {
+          "index": 50,
+          "isAnomaly": false,
+          "lower": 30.717841828137495,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.00341853407494
+        },
+        {
+          "index": 51,
+          "isAnomaly": false,
+          "lower": 31.25343844749508,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.22159369530424
+        },
+        {
+          "index": 52,
+          "isAnomaly": false,
+          "lower": 30.987783985782027,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.73770146668163
+        },
+        {
+          "index": 53,
+          "isAnomaly": false,
+          "lower": 31.055006516772455,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.61125948487084
+        },
+        {
+          "index": 54,
+          "isAnomaly": false,
+          "lower": 31.2407388454886,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.50123967009974
+        },
+        {
+          "index": 55,
+          "isAnomaly": false,
+          "lower": 31.579493595661937,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.393950537367765
+        },
+        {
+          "index": 56,
+          "isAnomaly": false,
+          "lower": 31.01026507800008,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.72952502688988
+        },
+        {
+          "index": 57,
+          "isAnomaly": false,
+          "lower": 30.779828465095136,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.87768221136126
+        },
+        {
+          "index": 58,
+          "isAnomaly": false,
+          "lower": 31.021043372509986,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.721059921968326
+        },
+        {
+          "index": 59,
+          "isAnomaly": false,
+          "lower": 31.668891796762463,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.334885996617544
+        },
+        {
+          "index": 60,
+          "isAnomaly": false,
+          "lower": 31.294379686106673,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.44527852524552
+        },
+        {
+          "index": 61,
+          "isAnomaly": false,
+          "lower": 30.989925434214122,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.657803030021306
+        },
+        {
+          "index": 62,
+          "isAnomaly": false,
+          "lower": 31.305346224587886,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.43689648373928
+        },
+        {
+          "index": 63,
+          "isAnomaly": false,
+          "lower": 31.895404431854406,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.01481502517123
+        },
+        {
+          "index": 64,
+          "isAnomaly": false,
+          "lower": 31.717792813192204,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.30357523744685
+        },
+        {
+          "index": 65,
+          "isAnomaly": false,
+          "lower": 31.385294074553954,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.519831966770894
+        },
+        {
+          "index": 66,
+          "isAnomaly": false,
+          "lower": 31.37901152077217,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.643698490783635
+        },
+        {
+          "index": 67,
+          "isAnomaly": false,
+          "lower": 30.53734952381923,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.533798318158006
+        },
+        {
+          "index": 68,
+          "isAnomaly": false,
+          "lower": 31.398495815909232,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.62279571874784
+        },
+        {
+          "index": 69,
+          "isAnomaly": false,
+          "lower": 30.82615134029939,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.05682967606758
+        },
+        {
+          "index": 70,
+          "isAnomaly": false,
+          "lower": 30.267003329595582,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.439405664376125
+        },
+        {
+          "index": 71,
+          "isAnomaly": false,
+          "lower": 29.548473962830595,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.069969036690196
+        },
+        {
+          "index": 72,
+          "isAnomaly": false,
+          "lower": 30.397358417498538,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.31246084067702
+        },
+        {
+          "index": 73,
+          "isAnomaly": false,
+          "lower": 30.848865983490583,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.05885738443412
+        },
+        {
+          "index": 74,
+          "isAnomaly": false,
+          "lower": 30.127822715652933,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.907739744223285
+        },
+        {
+          "index": 75,
+          "isAnomaly": false,
+          "lower": 29.15950183513212,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.74150073048256
+        },
+        {
+          "index": 76,
+          "isAnomaly": false,
+          "lower": 29.694244426605536,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.00074777044958
+        },
+        {
+          "index": 77,
+          "isAnomaly": false,
+          "lower": 30.046361167420127,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.55865882411837
+        },
+        {
+          "index": 78,
+          "isAnomaly": false,
+          "lower": 30.45745660053064,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.78357357196838
+        },
+        {
+          "index": 79,
+          "isAnomaly": false,
+          "lower": 30.03734876207342,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.569336748436385
+        },
+        {
+          "index": 80,
+          "isAnomaly": false,
+          "lower": 30.261519213384876,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.23565616459457
+        },
+        {
+          "index": 81,
+          "isAnomaly": false,
+          "lower": 30.648983535771684,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.95946245833769
+        },
+        {
+          "index": 82,
+          "isAnomaly": false,
+          "lower": 30.230892746259165,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.262888042458904
+        },
+        {
+          "index": 83,
+          "isAnomaly": false,
+          "lower": 30.663007135073055,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.94729972196116
+        },
+        {
+          "index": 84,
+          "isAnomaly": false,
+          "lower": 30.225194071037905,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.26499857559058
+        },
+        {
+          "index": 85,
+          "isAnomaly": false,
+          "lower": 30.546714792312166,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.75503636274187
+        },
+        {
+          "index": 86,
+          "isAnomaly": false,
+          "lower": 30.84686415702413,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.25786558598112
+        },
+        {
+          "index": 87,
+          "isAnomaly": false,
+          "lower": 31.426001303760927,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.881750702242655
+        },
+        {
+          "index": 88,
+          "isAnomaly": false,
+          "lower": 31.10532777274241,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.40046530801399
+        },
+        {
+          "index": 89,
+          "isAnomaly": false,
+          "lower": 30.735089452267715,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.89393906013319
+        },
+        {
+          "index": 90,
+          "isAnomaly": false,
+          "lower": 30.360423560575256,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.14113195070519
+        },
+        {
+          "index": 91,
+          "isAnomaly": false,
+          "lower": 30.550360789380754,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.08099069505656
+        },
+        {
+          "index": 92,
+          "isAnomaly": false,
+          "lower": 30.122108517862884,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.374967806033354
+        },
+        {
+          "index": 93,
+          "isAnomaly": false,
+          "lower": 30.089218738186755,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.3099534253998
+        },
+        {
+          "index": 94,
+          "isAnomaly": false,
+          "lower": 30.361582632913965,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.14022827285443
+        },
+        {
+          "index": 95,
+          "isAnomaly": false,
+          "lower": 30.78123288205446,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.861075966176095
+        },
+        {
+          "index": 96,
+          "isAnomaly": false,
+          "lower": 31.740562788326308,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.25216720273135
+        },
+        {
+          "index": 97,
+          "isAnomaly": false,
+          "lower": 32.33520779651651,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.30350003451499
+        },
+        {
+          "index": 98,
+          "isAnomaly": false,
+          "lower": 32.19984865853956,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.281377350985586
+        },
+        {
+          "index": 99,
+          "isAnomaly": false,
+          "lower": 32.33682627082216,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.305871470573805
+        },
+        {
+          "index": 100,
+          "isAnomaly": false,
+          "lower": 32.49903265202807,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.51045637079309
+        },
+        {
+          "index": 101,
+          "isAnomaly": false,
+          "lower": 32.34194715888853,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.289589537194814
+        },
+        {
+          "index": 102,
+          "isAnomaly": false,
+          "lower": 32.570775574950744,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.442582031592636
+        },
+        {
+          "index": 103,
+          "isAnomaly": false,
+          "lower": 32.21632062860455,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.962190434268535
+        },
+        {
+          "index": 104,
+          "isAnomaly": false,
+          "lower": 33.06649313634262,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.442074450002785
+        },
+        {
+          "index": 105,
+          "isAnomaly": false,
+          "lower": 32.18191048965048,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.984356648394325
+        },
+        {
+          "index": 106,
+          "isAnomaly": false,
+          "lower": 32.534624623559296,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.46339744075448
+        },
+        {
+          "index": 107,
+          "isAnomaly": false,
+          "lower": 32.52665761527078,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.70670976522872
+        },
+        {
+          "index": 108,
+          "isAnomaly": false,
+          "lower": 33.04677252764754,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.48905973246843
+        },
+        {
+          "index": 109,
+          "isAnomaly": false,
+          "lower": 32.54829906148685,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.67299774866249
+        },
+        {
+          "index": 110,
+          "isAnomaly": false,
+          "lower": 32.86638875006891,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.06272528549006
+        },
+        {
+          "index": 111,
+          "isAnomaly": false,
+          "lower": 32.58769426605159,
+          "reason": "ok",
+          "scored": true,
+          "upper": 46.98861703109926
+        },
+        {
+          "index": 112,
+          "isAnomaly": false,
+          "lower": 31.984521545727876,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.39027051370974
+        },
+        {
+          "index": 113,
+          "isAnomaly": false,
+          "lower": 32.58212736579215,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.002703024496995
+        },
+        {
+          "index": 114,
+          "isAnomaly": false,
+          "lower": 32.71182418308276,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.28710185120023
+        },
+        {
+          "index": 115,
+          "isAnomaly": false,
+          "lower": 32.17931210625587,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.39757284126586
+        },
+        {
+          "index": 116,
+          "isAnomaly": false,
+          "lower": 31.942975385472074,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.416422799017134
+        },
+        {
+          "index": 117,
+          "isAnomaly": false,
+          "lower": 31.97430403302404,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.57114856810405
+        },
+        {
+          "index": 118,
+          "isAnomaly": false,
+          "lower": 31.910164254342245,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.42689761207769
+        },
+        {
+          "index": 119,
+          "isAnomaly": false,
+          "lower": 31.10300882399563,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.997898612819846
+        },
+        {
+          "index": 120,
+          "isAnomaly": false,
+          "lower": 30.993774663864368,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.34730525209987
+        },
+        {
+          "index": 121,
+          "isAnomaly": false,
+          "lower": 31.67184052759913,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.91377846056565
+        },
+        {
+          "index": 122,
+          "isAnomaly": false,
+          "lower": 32.56794307116985,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.50666352074114
+        },
+        {
+          "index": 123,
+          "isAnomaly": false,
+          "lower": 32.98432945751819,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.55167939489504
+        },
+        {
+          "index": 124,
+          "isAnomaly": false,
+          "lower": 32.635601084831464,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.42974284431078
+        },
+        {
+          "index": 125,
+          "isAnomaly": false,
+          "lower": 32.326171573270344,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.22116880615221
+        },
+        {
+          "index": 126,
+          "isAnomaly": false,
+          "lower": 31.644802967190888,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.62415732376681
+        },
+        {
+          "index": 127,
+          "isAnomaly": false,
+          "lower": 31.164894877011452,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.896443620421664
+        },
+        {
+          "index": 128,
+          "isAnomaly": false,
+          "lower": 31.78494637114779,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.53757726538627
+        },
+        {
+          "index": 129,
+          "isAnomaly": false,
+          "lower": 32.43056004200878,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.16908173634363
+        },
+        {
+          "index": 130,
+          "isAnomaly": false,
+          "lower": 32.21016687435373,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.18305125634568
+        },
+        {
+          "index": 131,
+          "isAnomaly": false,
+          "lower": 31.96248234643852,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.66387306285546
+        },
+        {
+          "index": 132,
+          "isAnomaly": false,
+          "lower": 32.21229857889405,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.16684169966484
+        },
+        {
+          "index": 133,
+          "isAnomaly": false,
+          "lower": 32.06641929028959,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.47290808672594
+        },
+        {
+          "index": 134,
+          "isAnomaly": false,
+          "lower": 32.14175999712826,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.03248583692147
+        },
+        {
+          "index": 135,
+          "isAnomaly": false,
+          "lower": 31.858546950840953,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.08582526625084
+        },
+        {
+          "index": 136,
+          "isAnomaly": false,
+          "lower": 31.557906263907874,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.629236200690464
+        },
+        {
+          "index": 137,
+          "isAnomaly": false,
+          "lower": 31.92173465600245,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.046743915124104
+        },
+        {
+          "index": 138,
+          "isAnomaly": false,
+          "lower": 32.16141618000935,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.09640354280446
+        },
+        {
+          "index": 139,
+          "isAnomaly": false,
+          "lower": 31.973824743697744,
+          "reason": "ok",
+          "scored": true,
+          "upper": 46.986937772796765
+        },
+        {
+          "index": 140,
+          "isAnomaly": false,
+          "lower": 32.26905690501141,
+          "reason": "ok",
+          "scored": true,
+          "upper": 46.94117895504449
+        },
+        {
+          "index": 141,
+          "isAnomaly": false,
+          "lower": 31.984825330282053,
+          "reason": "ok",
+          "scored": true,
+          "upper": 46.93365097947207
+        },
+        {
+          "index": 142,
+          "isAnomaly": false,
+          "lower": 32.66374353058198,
+          "reason": "ok",
+          "scored": true,
+          "upper": 46.561723155509
+        },
+        {
+          "index": 143,
+          "isAnomaly": false,
+          "lower": 31.966519127563412,
+          "reason": "ok",
+          "scored": true,
+          "upper": 46.98042660939956
+        },
+        {
+          "index": 144,
+          "isAnomaly": false,
+          "lower": 32.30319690334887,
+          "reason": "ok",
+          "scored": true,
+          "upper": 46.51534899846386
+        },
+        {
+          "index": 145,
+          "isAnomaly": false,
+          "lower": 31.96173366625577,
+          "reason": "ok",
+          "scored": true,
+          "upper": 46.993252603556286
+        },
+        {
+          "index": 146,
+          "isAnomaly": false,
+          "lower": 32.64734974838946,
+          "reason": "ok",
+          "scored": true,
+          "upper": 46.63654652875829
+        },
+        {
+          "index": 147,
+          "isAnomaly": false,
+          "lower": 32.79969773072468,
+          "reason": "ok",
+          "scored": true,
+          "upper": 46.146789550810176
+        },
+        {
+          "index": 148,
+          "isAnomaly": false,
+          "lower": 32.60139289416093,
+          "reason": "ok",
+          "scored": true,
+          "upper": 46.754004943004
+        },
+        {
+          "index": 149,
+          "isAnomaly": false,
+          "lower": 32.76997915809373,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.01264546291924
+        },
+        {
+          "index": 150,
+          "isAnomaly": false,
+          "lower": 32.5872092362422,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.38920277905238
+        },
+        {
+          "index": 151,
+          "isAnomaly": false,
+          "lower": 32.685708801754735,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.69225392986312
+        },
+        {
+          "index": 152,
+          "isAnomaly": false,
+          "lower": 32.863392005983265,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.6338511517524
+        },
+        {
+          "index": 153,
+          "isAnomaly": false,
+          "lower": 32.601102419793676,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.1110234845535
+        },
+        {
+          "index": 154,
+          "isAnomaly": false,
+          "lower": 33.10497025740312,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.630929478296885
+        },
+        {
+          "index": 155,
+          "isAnomaly": false,
+          "lower": 33.18434752816393,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.412467652925066
+        },
+        {
+          "index": 156,
+          "isAnomaly": false,
+          "lower": 32.85467543130278,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.63349890627093
+        },
+        {
+          "index": 157,
+          "isAnomaly": false,
+          "lower": 32.580440233775924,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.75422589752542
+        },
+        {
+          "index": 158,
+          "isAnomaly": false,
+          "lower": 32.24530404876579,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.66433880477368
+        },
+        {
+          "index": 159,
+          "isAnomaly": false,
+          "lower": 32.585426252712956,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.571795338012045
+        },
+        {
+          "index": 160,
+          "isAnomaly": false,
+          "lower": 32.89406221362726,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.603507203186915
+        },
+        {
+          "index": 161,
+          "isAnomaly": false,
+          "lower": 32.58772245909696,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.751957838993796
+        },
+        {
+          "index": 162,
+          "isAnomaly": false,
+          "lower": 31.955117656388524,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.88193111224673
+        },
+        {
+          "index": 163,
+          "isAnomaly": false,
+          "lower": 32.1292220969814,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.216456624814946
+        },
+        {
+          "index": 164,
+          "isAnomaly": false,
+          "lower": 32.10855931133452,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.78164929446679
+        },
+        {
+          "index": 165,
+          "isAnomaly": false,
+          "lower": 32.16079031153278,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.51547651325863
+        },
+        {
+          "index": 166,
+          "isAnomaly": false,
+          "lower": 31.99997734482958,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.49495324911262
+        },
+        {
+          "index": 167,
+          "isAnomaly": false,
+          "lower": 32.171981838329856,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.48114127170906
+        },
+        {
+          "index": 168,
+          "isAnomaly": false,
+          "lower": 32.8646326468191,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.051988187457425
+        },
+        {
+          "index": 169,
+          "isAnomaly": false,
+          "lower": 33.14381993475618,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.26065198815384
+        },
+        {
+          "index": 170,
+          "isAnomaly": false,
+          "lower": 33.476165572451954,
+          "reason": "ok",
+          "scored": true,
+          "upper": 46.9184089309779
+        },
+        {
+          "index": 171,
+          "isAnomaly": false,
+          "lower": 33.15786728403981,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.309251017351755
+        },
+        {
+          "index": 172,
+          "isAnomaly": false,
+          "lower": 33.476313441210536,
+          "reason": "ok",
+          "scored": true,
+          "upper": 46.91622157845843
+        },
+        {
+          "index": 173,
+          "isAnomaly": false,
+          "lower": 33.057053076289506,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.40314085794685
+        },
+        {
+          "index": 174,
+          "isAnomaly": false,
+          "lower": 32.72057630759817,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.66078175233314
+        },
+        {
+          "index": 175,
+          "isAnomaly": false,
+          "lower": 32.58603522359995,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.75480659127233
+        },
+        {
+          "index": 176,
+          "isAnomaly": false,
+          "lower": 32.35918263114051,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.03398967687214
+        },
+        {
+          "index": 177,
+          "isAnomaly": false,
+          "lower": 31.925133803914168,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.41996353377361
+        },
+        {
+          "index": 178,
+          "isAnomaly": false,
+          "lower": 31.619088911142512,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.630191864889596
+        },
+        {
+          "index": 179,
+          "isAnomaly": false,
+          "lower": 31.58330684464225,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.4388865313355
+        },
+        {
+          "index": 180,
+          "isAnomaly": false,
+          "lower": 30.936516795532654,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.31618565482914
+        },
+        {
+          "index": 181,
+          "isAnomaly": false,
+          "lower": 31.271956090791726,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.06470461226241
+        },
+        {
+          "index": 182,
+          "isAnomaly": false,
+          "lower": 30.59819339589455,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.8383460886466
+        },
+        {
+          "index": 183,
+          "isAnomaly": false,
+          "lower": 30.800140281279447,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.533653810115446
+        },
+        {
+          "index": 184,
+          "isAnomaly": false,
+          "lower": 30.722684514327945,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.51601108348151
+        },
+        {
+          "index": 185,
+          "isAnomaly": false,
+          "lower": 31.290559814900863,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.70170478662591
+        },
+        {
+          "index": 186,
+          "isAnomaly": false,
+          "lower": 31.36116319388964,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.26309387696739
+        },
+        {
+          "index": 187,
+          "isAnomaly": false,
+          "lower": 31.26128418925918,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.73816982443261
+        },
+        {
+          "index": 188,
+          "isAnomaly": false,
+          "lower": 31.194838167116856,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.360033841452704
+        },
+        {
+          "index": 189,
+          "isAnomaly": false,
+          "lower": 30.70616119844598,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.073979573158
+        },
+        {
+          "index": 190,
+          "isAnomaly": false,
+          "lower": 31.375750763561722,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.193626248507925
+        },
+        {
+          "index": 191,
+          "isAnomaly": false,
+          "lower": 30.862492529746408,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.9154589724446
+        },
+        {
+          "index": 192,
+          "isAnomaly": false,
+          "lower": 31.002416392389158,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.72060358219971
+        },
+        {
+          "index": 193,
+          "isAnomaly": false,
+          "lower": 30.86009116659953,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.91975256021125
+        },
+        {
+          "index": 194,
+          "isAnomaly": false,
+          "lower": 31.36707059132776,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.25961956043112
+        },
+        {
+          "index": 195,
+          "isAnomaly": false,
+          "lower": 30.620455973750648,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.445912439159116
+        },
+        {
+          "index": 196,
+          "isAnomaly": false,
+          "lower": 30.506503017947647,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.796187363530905
+        },
+        {
+          "index": 197,
+          "isAnomaly": false,
+          "lower": 30.524604332987458,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.532277593696755
+        },
+        {
+          "index": 198,
+          "isAnomaly": false,
+          "lower": 30.458503839260374,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.866713777527224
+        },
+        {
+          "index": 199,
+          "isAnomaly": false,
+          "lower": 30.570580376241907,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.89562346596726
+        },
+        {
+          "index": 200,
+          "isAnomaly": false,
+          "lower": 31.086851489601575,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.2145544330604
+        },
+        {
+          "index": 201,
+          "isAnomaly": false,
+          "lower": 30.503692270061336,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.96706895009649
+        },
+        {
+          "index": 202,
+          "isAnomaly": false,
+          "lower": 31.111685328282647,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.18486601440968
+        },
+        {
+          "index": 203,
+          "isAnomaly": false,
+          "lower": 31.023310465273518,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.431542736563166
+        },
+        {
+          "index": 204,
+          "isAnomaly": false,
+          "lower": 30.805882371607986,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.853385405604804
+        },
+        {
+          "index": 205,
+          "isAnomaly": false,
+          "lower": 31.847281628776365,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.603078720326174
+        },
+        {
+          "index": 206,
+          "isAnomaly": false,
+          "lower": 30.763806786233133,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.9026511211911
+        },
+        {
+          "index": 207,
+          "isAnomaly": false,
+          "lower": 30.761711878097543,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.02577313705905
+        },
+        {
+          "index": 208,
+          "isAnomaly": false,
+          "lower": 30.80828143904153,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.850576371035224
+        },
+        {
+          "index": 209,
+          "isAnomaly": false,
+          "lower": 31.876921016612478,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.55262121131434
+        },
+        {
+          "index": 210,
+          "isAnomaly": false,
+          "lower": 32.48424783998922,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.74946224080411
+        },
+        {
+          "index": 211,
+          "isAnomaly": false,
+          "lower": 31.972500064955845,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.90956620756675
+        },
+        {
+          "index": 212,
+          "isAnomaly": false,
+          "lower": 32.28478056633677,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.43819415606523
+        },
+        {
+          "index": 213,
+          "isAnomaly": false,
+          "lower": 31.44278482678281,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.84418575877126
+        },
+        {
+          "index": 214,
+          "isAnomaly": false,
+          "lower": 31.74267247141683,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.967779316278985
+        },
+        {
+          "index": 215,
+          "isAnomaly": false,
+          "lower": 31.95263738640849,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.95110934467731
+        },
+        {
+          "index": 216,
+          "isAnomaly": false,
+          "lower": 31.72063550357632,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.6013992434341
+        },
+        {
+          "index": 217,
+          "isAnomaly": false,
+          "lower": 31.96486735323215,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.93262763005953
+        },
+        {
+          "index": 218,
+          "isAnomaly": false,
+          "lower": 32.41038441574293,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.91921536479045
+        },
+        {
+          "index": 219,
+          "isAnomaly": false,
+          "lower": 32.871742896382656,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.047574485570834
+        },
+        {
+          "index": 220,
+          "isAnomaly": true,
+          "lower": 32.658955014677744,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.069943232045205
+        },
+        {
+          "index": 221,
+          "isAnomaly": true,
+          "lower": 32.80277447121381,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.093476241665826
+        },
+        {
+          "index": 222,
+          "isAnomaly": true,
+          "lower": 32.401401006947665,
+          "reason": "ok",
+          "scored": true,
+          "upper": 47.92281735888925
+        },
+        {
+          "index": 223,
+          "isAnomaly": true,
+          "lower": 31.92319829676358,
+          "reason": "ok",
+          "scored": true,
+          "upper": 48.731325076730876
+        },
+        {
+          "index": 224,
+          "isAnomaly": true,
+          "lower": 31.20874939889955,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.888756487593206
+        },
+        {
+          "index": 225,
+          "isAnomaly": true,
+          "lower": 30.820759628986785,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.57511677528726
+        },
+        {
+          "index": 226,
+          "isAnomaly": true,
+          "lower": 30.945892780185897,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.86051303257233
+        },
+        {
+          "index": 227,
+          "isAnomaly": true,
+          "lower": 30.86799685052508,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.99288339737807
+        },
+        {
+          "index": 228,
+          "isAnomaly": true,
+          "lower": 30.0675757134644,
+          "reason": "ok",
+          "scored": true,
+          "upper": 52.055187337971496
+        },
+        {
+          "index": 229,
+          "isAnomaly": true,
+          "lower": 29.421332988234322,
+          "reason": "ok",
+          "scored": true,
+          "upper": 53.27087148562141
+        },
+        {
+          "index": 230,
+          "isAnomaly": true,
+          "lower": 28.28571744918691,
+          "reason": "ok",
+          "scored": true,
+          "upper": 54.574290039068536
+        },
+        {
+          "index": 231,
+          "isAnomaly": true,
+          "lower": 28.04810962744324,
+          "reason": "ok",
+          "scored": true,
+          "upper": 54.81732857671271
+        },
+        {
+          "index": 232,
+          "isAnomaly": true,
+          "lower": 26.736550611300537,
+          "reason": "ok",
+          "scored": true,
+          "upper": 56.25437456926566
+        },
+        {
+          "index": 233,
+          "isAnomaly": true,
+          "lower": 26.294795657140092,
+          "reason": "ok",
+          "scored": true,
+          "upper": 56.827634928558986
+        },
+        {
+          "index": 234,
+          "isAnomaly": true,
+          "lower": 25.053800257286635,
+          "reason": "ok",
+          "scored": true,
+          "upper": 58.6445503265453
+        },
+        {
+          "index": 235,
+          "isAnomaly": true,
+          "lower": 24.283894015131974,
+          "reason": "ok",
+          "scored": true,
+          "upper": 60.10335065654526
+        },
+        {
+          "index": 236,
+          "isAnomaly": true,
+          "lower": 22.788948582729503,
+          "reason": "ok",
+          "scored": true,
+          "upper": 62.36206779850569
+        },
+        {
+          "index": 237,
+          "isAnomaly": true,
+          "lower": 23.03164403940319,
+          "reason": "ok",
+          "scored": true,
+          "upper": 62.728203936130896
+        },
+        {
+          "index": 238,
+          "isAnomaly": true,
+          "lower": 21.87953832587832,
+          "reason": "ok",
+          "scored": true,
+          "upper": 64.39037630691364
+        },
+        {
+          "index": 239,
+          "isAnomaly": true,
+          "lower": 20.65408479366769,
+          "reason": "ok",
+          "scored": true,
+          "upper": 65.84050646067185
+        },
+        {
+          "index": 240,
+          "isAnomaly": true,
+          "lower": 19.498671380978752,
+          "reason": "ok",
+          "scored": true,
+          "upper": 67.86090723468757
+        },
+        {
+          "index": 241,
+          "isAnomaly": true,
+          "lower": 16.737636528196372,
+          "reason": "ok",
+          "scored": true,
+          "upper": 73.98006112995951
+        },
+        {
+          "index": 242,
+          "isAnomaly": false,
+          "lower": 15.530364946217066,
+          "reason": "ok",
+          "scored": true,
+          "upper": 75.97840614236001
+        },
+        {
+          "index": 243,
+          "isAnomaly": false,
+          "lower": 12.694774523354006,
+          "reason": "ok",
+          "scored": true,
+          "upper": 80.71018581113307
+        },
+        {
+          "index": 244,
+          "isAnomaly": false,
+          "lower": 11.976741031850523,
+          "reason": "ok",
+          "scored": true,
+          "upper": 82.19515500485845
+        },
+        {
+          "index": 245,
+          "isAnomaly": false,
+          "lower": 9.875562023209653,
+          "reason": "ok",
+          "scored": true,
+          "upper": 85.43945929387046
+        },
+        {
+          "index": 246,
+          "isAnomaly": false,
+          "lower": 7.954424976062903,
+          "reason": "ok",
+          "scored": true,
+          "upper": 88.99094100958729
+        },
+        {
+          "index": 247,
+          "isAnomaly": false,
+          "lower": 5.749540210317328,
+          "reason": "ok",
+          "scored": true,
+          "upper": 93.28744681693476
+        },
+        {
+          "index": 248,
+          "isAnomaly": false,
+          "lower": 3.440763569675596,
+          "reason": "ok",
+          "scored": true,
+          "upper": 97.27033587938838
+        },
+        {
+          "index": 249,
+          "isAnomaly": false,
+          "lower": -0.09275370026587382,
+          "reason": "ok",
+          "scored": true,
+          "upper": 101.63118291173997
+        },
+        {
+          "index": 250,
+          "isAnomaly": false,
+          "lower": 0.32544026546424476,
+          "reason": "ok",
+          "scored": true,
+          "upper": 101.57563581763827
+        },
+        {
+          "index": 251,
+          "isAnomaly": false,
+          "lower": -0.14500933576783126,
+          "reason": "ok",
+          "scored": true,
+          "upper": 101.7374445801538
+        },
+        {
+          "index": 252,
+          "isAnomaly": false,
+          "lower": 0.24576534994952937,
+          "reason": "ok",
+          "scored": true,
+          "upper": 100.65638706770736
+        },
+        {
+          "index": 253,
+          "isAnomaly": false,
+          "lower": 3.0424388063694323,
+          "reason": "ok",
+          "scored": true,
+          "upper": 96.29380114515513
+        },
+        {
+          "index": 254,
+          "isAnomaly": false,
+          "lower": 6.407186917558171,
+          "reason": "ok",
+          "scored": true,
+          "upper": 90.6355175146818
+        },
+        {
+          "index": 255,
+          "isAnomaly": false,
+          "lower": 7.657185732158702,
+          "reason": "ok",
+          "scored": true,
+          "upper": 87.53662227297184
+        },
+        {
+          "index": 256,
+          "isAnomaly": false,
+          "lower": 7.765118963434787,
+          "reason": "ok",
+          "scored": true,
+          "upper": 86.39379141011801
+        },
+        {
+          "index": 257,
+          "isAnomaly": false,
+          "lower": 11.011070781550295,
+          "reason": "ok",
+          "scored": true,
+          "upper": 81.11106730483891
+        },
+        {
+          "index": 258,
+          "isAnomaly": false,
+          "lower": 13.249276852322005,
+          "reason": "ok",
+          "scored": true,
+          "upper": 77.59357302074048
+        },
+        {
+          "index": 259,
+          "isAnomaly": false,
+          "lower": 14.499586567119838,
+          "reason": "ok",
+          "scored": true,
+          "upper": 72.35649685383716
+        },
+        {
+          "index": 260,
+          "isAnomaly": false,
+          "lower": 13.513925714371808,
+          "reason": "ok",
+          "scored": true,
+          "upper": 72.71968353788982
+        },
+        {
+          "index": 261,
+          "isAnomaly": false,
+          "lower": 15.727640237406803,
+          "reason": "ok",
+          "scored": true,
+          "upper": 69.68438766861598
+        },
+        {
+          "index": 262,
+          "isAnomaly": false,
+          "lower": 17.55796862386458,
+          "reason": "ok",
+          "scored": true,
+          "upper": 67.65301109431243
+        },
+        {
+          "index": 263,
+          "isAnomaly": false,
+          "lower": 15.961044568370632,
+          "reason": "ok",
+          "scored": true,
+          "upper": 68.83088447608284
+        },
+        {
+          "index": 264,
+          "isAnomaly": false,
+          "lower": 17.599990166225865,
+          "reason": "ok",
+          "scored": true,
+          "upper": 66.63411292582062
+        },
+        {
+          "index": 265,
+          "isAnomaly": false,
+          "lower": 18.685390238353676,
+          "reason": "ok",
+          "scored": true,
+          "upper": 65.08892601026984
+        },
+        {
+          "index": 266,
+          "isAnomaly": false,
+          "lower": 19.921379987550697,
+          "reason": "ok",
+          "scored": true,
+          "upper": 63.03112818541075
+        },
+        {
+          "index": 267,
+          "isAnomaly": false,
+          "lower": 19.240146832567632,
+          "reason": "ok",
+          "scored": true,
+          "upper": 64.77342374843037
+        },
+        {
+          "index": 268,
+          "isAnomaly": false,
+          "lower": 21.384037968929636,
+          "reason": "ok",
+          "scored": true,
+          "upper": 61.56427095997796
+        },
+        {
+          "index": 269,
+          "isAnomaly": false,
+          "lower": 22.868799513950048,
+          "reason": "ok",
+          "scored": true,
+          "upper": 59.997204473405176
+        },
+        {
+          "index": 270,
+          "isAnomaly": false,
+          "lower": 23.688773769215278,
+          "reason": "ok",
+          "scored": true,
+          "upper": 59.26456565997685
+        },
+        {
+          "index": 271,
+          "isAnomaly": false,
+          "lower": 24.05509488216277,
+          "reason": "ok",
+          "scored": true,
+          "upper": 58.81086853054234
+        },
+        {
+          "index": 272,
+          "isAnomaly": false,
+          "lower": 24.798763816173977,
+          "reason": "ok",
+          "scored": true,
+          "upper": 58.05769919592507
+        },
+        {
+          "index": 273,
+          "isAnomaly": false,
+          "lower": 25.766775342651027,
+          "reason": "ok",
+          "scored": true,
+          "upper": 56.747868630413336
+        },
+        {
+          "index": 274,
+          "isAnomaly": false,
+          "lower": 25.350120080099547,
+          "reason": "ok",
+          "scored": true,
+          "upper": 57.50657775703746
+        },
+        {
+          "index": 275,
+          "isAnomaly": false,
+          "lower": 27.41314169685557,
+          "reason": "ok",
+          "scored": true,
+          "upper": 55.28891757738143
+        },
+        {
+          "index": 276,
+          "isAnomaly": false,
+          "lower": 27.88512149037443,
+          "reason": "ok",
+          "scored": true,
+          "upper": 53.529565955169744
+        },
+        {
+          "index": 277,
+          "isAnomaly": false,
+          "lower": 28.15319765877992,
+          "reason": "ok",
+          "scored": true,
+          "upper": 53.023024510215606
+        },
+        {
+          "index": 278,
+          "isAnomaly": false,
+          "lower": 29.082339192584534,
+          "reason": "ok",
+          "scored": true,
+          "upper": 52.02929293387013
+        },
+        {
+          "index": 279,
+          "isAnomaly": false,
+          "lower": 28.739502138339773,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.948799137561565
+        },
+        {
+          "index": 280,
+          "isAnomaly": false,
+          "lower": 29.13663483332783,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.976576039903634
+        },
+        {
+          "index": 281,
+          "isAnomaly": false,
+          "lower": 28.11082161208522,
+          "reason": "ok",
+          "scored": true,
+          "upper": 53.068329028515535
+        },
+        {
+          "index": 282,
+          "isAnomaly": false,
+          "lower": 29.18544544932282,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.91795983743368
+        },
+        {
+          "index": 283,
+          "isAnomaly": false,
+          "lower": 30.097714570964843,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.084775631672116
+        },
+        {
+          "index": 284,
+          "isAnomaly": false,
+          "lower": 30.282780610013333,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.02526977918366
+        },
+        {
+          "index": 285,
+          "isAnomaly": false,
+          "lower": 30.30736137389013,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.10024352637751
+        },
+        {
+          "index": 286,
+          "isAnomaly": false,
+          "lower": 30.264613710995032,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.05542150469637
+        },
+        {
+          "index": 287,
+          "isAnomaly": false,
+          "lower": 29.468085483595498,
+          "reason": "ok",
+          "scored": true,
+          "upper": 52.186850508324085
+        },
+        {
+          "index": 288,
+          "isAnomaly": false,
+          "lower": 29.458897225114658,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.85775315285551
+        },
+        {
+          "index": 289,
+          "isAnomaly": false,
+          "lower": 28.955505671151958,
+          "reason": "ok",
+          "scored": true,
+          "upper": 52.7771372974353
+        },
+        {
+          "index": 290,
+          "isAnomaly": false,
+          "lower": 28.72762889921748,
+          "reason": "ok",
+          "scored": true,
+          "upper": 53.44792667356096
+        },
+        {
+          "index": 291,
+          "isAnomaly": false,
+          "lower": 28.114652143444037,
+          "reason": "ok",
+          "scored": true,
+          "upper": 54.545253812649435
+        },
+        {
+          "index": 292,
+          "isAnomaly": false,
+          "lower": 28.476410968221074,
+          "reason": "ok",
+          "scored": true,
+          "upper": 54.387419676846136
+        },
+        {
+          "index": 293,
+          "isAnomaly": false,
+          "lower": 28.84406019937418,
+          "reason": "ok",
+          "scored": true,
+          "upper": 53.80417105107672
+        },
+        {
+          "index": 294,
+          "isAnomaly": false,
+          "lower": 28.91079526119985,
+          "reason": "ok",
+          "scored": true,
+          "upper": 53.19302085790804
+        },
+        {
+          "index": 295,
+          "isAnomaly": false,
+          "lower": 29.10751386300841,
+          "reason": "ok",
+          "scored": true,
+          "upper": 52.40804512904762
+        },
+        {
+          "index": 296,
+          "isAnomaly": false,
+          "lower": 28.150749067042376,
+          "reason": "ok",
+          "scored": true,
+          "upper": 53.098485764661966
+        },
+        {
+          "index": 297,
+          "isAnomaly": false,
+          "lower": 28.30559836973925,
+          "reason": "ok",
+          "scored": true,
+          "upper": 53.30696461515384
+        },
+        {
+          "index": 298,
+          "isAnomaly": false,
+          "lower": 27.34016075138815,
+          "reason": "ok",
+          "scored": true,
+          "upper": 53.90401225081301
+        },
+        {
+          "index": 299,
+          "isAnomaly": false,
+          "lower": 27.11408680838004,
+          "reason": "ok",
+          "scored": true,
+          "upper": 54.433167691171775
+        },
+        {
+          "index": 300,
+          "isAnomaly": false,
+          "lower": 28.78693237419366,
+          "reason": "ok",
+          "scored": true,
+          "upper": 53.543867747965656
+        },
+        {
+          "index": 301,
+          "isAnomaly": false,
+          "lower": 27.96723736698692,
+          "reason": "ok",
+          "scored": true,
+          "upper": 53.559112941076535
+        },
+        {
+          "index": 302,
+          "isAnomaly": false,
+          "lower": 28.913070278496,
+          "reason": "ok",
+          "scored": true,
+          "upper": 53.122206275070646
+        },
+        {
+          "index": 303,
+          "isAnomaly": false,
+          "lower": 27.725340096421853,
+          "reason": "ok",
+          "scored": true,
+          "upper": 53.77891410411505
+        },
+        {
+          "index": 304,
+          "isAnomaly": false,
+          "lower": 28.08326798933937,
+          "reason": "ok",
+          "scored": true,
+          "upper": 53.09890046188871
+        },
+        {
+          "index": 305,
+          "isAnomaly": false,
+          "lower": 28.144036239029077,
+          "reason": "ok",
+          "scored": true,
+          "upper": 52.54928750143341
+        },
+        {
+          "index": 306,
+          "isAnomaly": false,
+          "lower": 28.370878547123645,
+          "reason": "ok",
+          "scored": true,
+          "upper": 52.18115606029436
+        },
+        {
+          "index": 307,
+          "isAnomaly": false,
+          "lower": 29.019182251865953,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.48877557927064
+        },
+        {
+          "index": 308,
+          "isAnomaly": false,
+          "lower": 29.06013889732776,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.49597956141426
+        },
+        {
+          "index": 309,
+          "isAnomaly": false,
+          "lower": 29.151493855559735,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.360223380092165
+        },
+        {
+          "index": 310,
+          "isAnomaly": false,
+          "lower": 29.559698061087204,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.73870354309008
+        },
+        {
+          "index": 311,
+          "isAnomaly": false,
+          "lower": 29.747613892234845,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.435791040517294
+        },
+        {
+          "index": 312,
+          "isAnomaly": false,
+          "lower": 29.49515483999955,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.83917686114271
+        },
+        {
+          "index": 313,
+          "isAnomaly": false,
+          "lower": 29.26627567584842,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.26060372836882
+        },
+        {
+          "index": 314,
+          "isAnomaly": false,
+          "lower": 29.206898591361266,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.11634166030478
+        },
+        {
+          "index": 315,
+          "isAnomaly": false,
+          "lower": 29.115504445959033,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.406935129114274
+        },
+        {
+          "index": 316,
+          "isAnomaly": false,
+          "lower": 28.627438150712784,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.66508986552342
+        },
+        {
+          "index": 317,
+          "isAnomaly": false,
+          "lower": 28.69914656469846,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.45728750935583
+        },
+        {
+          "index": 318,
+          "isAnomaly": false,
+          "lower": 28.546300831034422,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.603986114541634
+        },
+        {
+          "index": 319,
+          "isAnomaly": false,
+          "lower": 28.63115631636903,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.494097748748615
+        },
+        {
+          "index": 320,
+          "isAnomaly": false,
+          "lower": 28.460776259875132,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.59627143434504
+        },
+        {
+          "index": 321,
+          "isAnomaly": false,
+          "lower": 28.189140324272824,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.93803128293307
+        },
+        {
+          "index": 322,
+          "isAnomaly": false,
+          "lower": 28.546804407827437,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.60350532108748
+        },
+        {
+          "index": 323,
+          "isAnomaly": false,
+          "lower": 28.802717883949207,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.37250117994848
+        },
+        {
+          "index": 324,
+          "isAnomaly": false,
+          "lower": 28.729051494352127,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.6040464081973
+        },
+        {
+          "index": 325,
+          "isAnomaly": false,
+          "lower": 29.112038544180862,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.35153519137755
+        },
+        {
+          "index": 326,
+          "isAnomaly": false,
+          "lower": 29.042717280650784,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.452794539253595
+        },
+        {
+          "index": 327,
+          "isAnomaly": false,
+          "lower": 29.10334266248571,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.33807106377291
+        },
+        {
+          "index": 328,
+          "isAnomaly": false,
+          "lower": 28.621512827674593,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.650744500611225
+        },
+        {
+          "index": 329,
+          "isAnomaly": false,
+          "lower": 29.05663318537212,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.09373494193227
+        },
+        {
+          "index": 330,
+          "isAnomaly": true,
+          "lower": 29.55473788984594,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.69754707531632
+        },
+        {
+          "index": 331,
+          "isAnomaly": false,
+          "lower": 29.094947155087652,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.05537681876979
+        },
+        {
+          "index": 332,
+          "isAnomaly": false,
+          "lower": 29.607568993080775,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.48868010094576
+        },
+        {
+          "index": 333,
+          "isAnomaly": false,
+          "lower": 29.11050732755887,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.733514134322284
+        },
+        {
+          "index": 334,
+          "isAnomaly": false,
+          "lower": 27.611376441170272,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.89866365462152
+        },
+        {
+          "index": 335,
+          "isAnomaly": false,
+          "lower": 28.060241147203634,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.73455121798249
+        },
+        {
+          "index": 336,
+          "isAnomaly": false,
+          "lower": 27.89596984307761,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.682721055822114
+        },
+        {
+          "index": 337,
+          "isAnomaly": false,
+          "lower": 28.1310324763062,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.67785590798967
+        },
+        {
+          "index": 338,
+          "isAnomaly": false,
+          "lower": 27.994206165144107,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.58267708286766
+        },
+        {
+          "index": 339,
+          "isAnomaly": false,
+          "lower": 27.59892380470518,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.964850853897914
+        },
+        {
+          "index": 340,
+          "isAnomaly": false,
+          "lower": 27.939889737579225,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.49704066867238
+        },
+        {
+          "index": 341,
+          "isAnomaly": false,
+          "lower": 27.61075370222241,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.94699932903886
+        },
+        {
+          "index": 342,
+          "isAnomaly": false,
+          "lower": 27.94030876701397,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.48066014080071
+        },
+        {
+          "index": 343,
+          "isAnomaly": false,
+          "lower": 28.730109705780094,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.607760990520845
+        },
+        {
+          "index": 344,
+          "isAnomaly": false,
+          "lower": 28.20246678772,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.937507947612076
+        },
+        {
+          "index": 345,
+          "isAnomaly": false,
+          "lower": 28.437602482024925,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.56187540746474
+        },
+        {
+          "index": 346,
+          "isAnomaly": false,
+          "lower": 29.460551929300774,
+          "reason": "ok",
+          "scored": true,
+          "upper": 49.41559813002026
+        },
+        {
+          "index": 347,
+          "isAnomaly": false,
+          "lower": 28.503107380328217,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.48484357112909
+        },
+        {
+          "index": 348,
+          "isAnomaly": false,
+          "lower": 28.280876107568243,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.82593751127527
+        },
+        {
+          "index": 349,
+          "isAnomaly": false,
+          "lower": 27.990425659231075,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.9783960063686
+        },
+        {
+          "index": 350,
+          "isAnomaly": false,
+          "lower": 28.098839194416442,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.98278685246609
+        },
+        {
+          "index": 351,
+          "isAnomaly": false,
+          "lower": 28.660397573307407,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.649404150457684
+        },
+        {
+          "index": 352,
+          "isAnomaly": false,
+          "lower": 28.194829188641414,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.8796832096856
+        },
+        {
+          "index": 353,
+          "isAnomaly": false,
+          "lower": 27.949013742242812,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.98791810823981
+        },
+        {
+          "index": 354,
+          "isAnomaly": false,
+          "lower": 28.234722175305933,
+          "reason": "ok",
+          "scored": true,
+          "upper": 50.551238443332466
+        },
+        {
+          "index": 355,
+          "isAnomaly": false,
+          "lower": 27.247230393080986,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.40146550898949
+        },
+        {
+          "index": 356,
+          "isAnomaly": false,
+          "lower": 27.476047017415482,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.332347091199026
+        },
+        {
+          "index": 357,
+          "isAnomaly": false,
+          "lower": 27.40948224365546,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.272753276271985
+        },
+        {
+          "index": 358,
+          "isAnomaly": false,
+          "lower": 27.445393161112257,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.34789747383679
+        },
+        {
+          "index": 359,
+          "isAnomaly": false,
+          "lower": 27.354718865921186,
+          "reason": "ok",
+          "scored": true,
+          "upper": 51.32537429524098
+        }
+      ],
+      "name": "mad_stabilization_exp_weight",
+      "params": {
+        "consecutiveAnomalies": 1,
+        "detrend": "none",
+        "direction": "any",
+        "halfLife": 25,
+        "inputType": "values",
+        "lowerBound": null,
+        "minSamples": 30,
+        "minSamplesPerGroup": 10,
+        "seasonalityComponents": null,
+        "smoothing": "none",
+        "smoothingAlpha": 0.3,
+        "smoothingWindow": 10,
+        "stabilization": "clamp",
+        "threshold": 3.0,
+        "type": "mad",
+        "upperBound": null,
+        "windowSize": 100,
+        "windowWeights": "exponential"
+      },
+      "series": {
+        "intervalSeconds": 600,
+        "timestamps": [
+          1767225600000,
+          1767226200000,
+          1767226800000,
+          1767227400000,
+          1767228000000,
+          1767228600000,
+          1767229200000,
+          1767229800000,
+          1767230400000,
+          1767231000000,
+          1767231600000,
+          1767232200000,
+          1767232800000,
+          1767233400000,
+          1767234000000,
+          1767234600000,
+          1767235200000,
+          1767235800000,
+          1767236400000,
+          1767237000000,
+          1767237600000,
+          1767238200000,
+          1767238800000,
+          1767239400000,
+          1767240000000,
+          1767240600000,
+          1767241200000,
+          1767241800000,
+          1767242400000,
+          1767243000000,
+          1767243600000,
+          1767244200000,
+          1767244800000,
+          1767245400000,
+          1767246000000,
+          1767246600000,
+          1767247200000,
+          1767247800000,
+          1767248400000,
+          1767249000000,
+          1767249600000,
+          1767250200000,
+          1767250800000,
+          1767251400000,
+          1767252000000,
+          1767252600000,
+          1767253200000,
+          1767253800000,
+          1767254400000,
+          1767255000000,
+          1767255600000,
+          1767256200000,
+          1767256800000,
+          1767257400000,
+          1767258000000,
+          1767258600000,
+          1767259200000,
+          1767259800000,
+          1767260400000,
+          1767261000000,
+          1767261600000,
+          1767262200000,
+          1767262800000,
+          1767263400000,
+          1767264000000,
+          1767264600000,
+          1767265200000,
+          1767265800000,
+          1767266400000,
+          1767267000000,
+          1767267600000,
+          1767268200000,
+          1767268800000,
+          1767269400000,
+          1767270000000,
+          1767270600000,
+          1767271200000,
+          1767271800000,
+          1767272400000,
+          1767273000000,
+          1767273600000,
+          1767274200000,
+          1767274800000,
+          1767275400000,
+          1767276000000,
+          1767276600000,
+          1767277200000,
+          1767277800000,
+          1767278400000,
+          1767279000000,
+          1767279600000,
+          1767280200000,
+          1767280800000,
+          1767281400000,
+          1767282000000,
+          1767282600000,
+          1767283200000,
+          1767283800000,
+          1767284400000,
+          1767285000000,
+          1767285600000,
+          1767286200000,
+          1767286800000,
+          1767287400000,
+          1767288000000,
+          1767288600000,
+          1767289200000,
+          1767289800000,
+          1767290400000,
+          1767291000000,
+          1767291600000,
+          1767292200000,
+          1767292800000,
+          1767293400000,
+          1767294000000,
+          1767294600000,
+          1767295200000,
+          1767295800000,
+          1767296400000,
+          1767297000000,
+          1767297600000,
+          1767298200000,
+          1767298800000,
+          1767299400000,
+          1767300000000,
+          1767300600000,
+          1767301200000,
+          1767301800000,
+          1767302400000,
+          1767303000000,
+          1767303600000,
+          1767304200000,
+          1767304800000,
+          1767305400000,
+          1767306000000,
+          1767306600000,
+          1767307200000,
+          1767307800000,
+          1767308400000,
+          1767309000000,
+          1767309600000,
+          1767310200000,
+          1767310800000,
+          1767311400000,
+          1767312000000,
+          1767312600000,
+          1767313200000,
+          1767313800000,
+          1767314400000,
+          1767315000000,
+          1767315600000,
+          1767316200000,
+          1767316800000,
+          1767317400000,
+          1767318000000,
+          1767318600000,
+          1767319200000,
+          1767319800000,
+          1767320400000,
+          1767321000000,
+          1767321600000,
+          1767322200000,
+          1767322800000,
+          1767323400000,
+          1767324000000,
+          1767324600000,
+          1767325200000,
+          1767325800000,
+          1767326400000,
+          1767327000000,
+          1767327600000,
+          1767328200000,
+          1767328800000,
+          1767329400000,
+          1767330000000,
+          1767330600000,
+          1767331200000,
+          1767331800000,
+          1767332400000,
+          1767333000000,
+          1767333600000,
+          1767334200000,
+          1767334800000,
+          1767335400000,
+          1767336000000,
+          1767336600000,
+          1767337200000,
+          1767337800000,
+          1767338400000,
+          1767339000000,
+          1767339600000,
+          1767340200000,
+          1767340800000,
+          1767341400000,
+          1767342000000,
+          1767342600000,
+          1767343200000,
+          1767343800000,
+          1767344400000,
+          1767345000000,
+          1767345600000,
+          1767346200000,
+          1767346800000,
+          1767347400000,
+          1767348000000,
+          1767348600000,
+          1767349200000,
+          1767349800000,
+          1767350400000,
+          1767351000000,
+          1767351600000,
+          1767352200000,
+          1767352800000,
+          1767353400000,
+          1767354000000,
+          1767354600000,
+          1767355200000,
+          1767355800000,
+          1767356400000,
+          1767357000000,
+          1767357600000,
+          1767358200000,
+          1767358800000,
+          1767359400000,
+          1767360000000,
+          1767360600000,
+          1767361200000,
+          1767361800000,
+          1767362400000,
+          1767363000000,
+          1767363600000,
+          1767364200000,
+          1767364800000,
+          1767365400000,
+          1767366000000,
+          1767366600000,
+          1767367200000,
+          1767367800000,
+          1767368400000,
+          1767369000000,
+          1767369600000,
+          1767370200000,
+          1767370800000,
+          1767371400000,
+          1767372000000,
+          1767372600000,
+          1767373200000,
+          1767373800000,
+          1767374400000,
+          1767375000000,
+          1767375600000,
+          1767376200000,
+          1767376800000,
+          1767377400000,
+          1767378000000,
+          1767378600000,
+          1767379200000,
+          1767379800000,
+          1767380400000,
+          1767381000000,
+          1767381600000,
+          1767382200000,
+          1767382800000,
+          1767383400000,
+          1767384000000,
+          1767384600000,
+          1767385200000,
+          1767385800000,
+          1767386400000,
+          1767387000000,
+          1767387600000,
+          1767388200000,
+          1767388800000,
+          1767389400000,
+          1767390000000,
+          1767390600000,
+          1767391200000,
+          1767391800000,
+          1767392400000,
+          1767393000000,
+          1767393600000,
+          1767394200000,
+          1767394800000,
+          1767395400000,
+          1767396000000,
+          1767396600000,
+          1767397200000,
+          1767397800000,
+          1767398400000,
+          1767399000000,
+          1767399600000,
+          1767400200000,
+          1767400800000,
+          1767401400000,
+          1767402000000,
+          1767402600000,
+          1767403200000,
+          1767403800000,
+          1767404400000,
+          1767405000000,
+          1767405600000,
+          1767406200000,
+          1767406800000,
+          1767407400000,
+          1767408000000,
+          1767408600000,
+          1767409200000,
+          1767409800000,
+          1767410400000,
+          1767411000000,
+          1767411600000,
+          1767412200000,
+          1767412800000,
+          1767413400000,
+          1767414000000,
+          1767414600000,
+          1767415200000,
+          1767415800000,
+          1767416400000,
+          1767417000000,
+          1767417600000,
+          1767418200000,
+          1767418800000,
+          1767419400000,
+          1767420000000,
+          1767420600000,
+          1767421200000,
+          1767421800000,
+          1767422400000,
+          1767423000000,
+          1767423600000,
+          1767424200000,
+          1767424800000,
+          1767425400000,
+          1767426000000,
+          1767426600000,
+          1767427200000,
+          1767427800000,
+          1767428400000,
+          1767429000000,
+          1767429600000,
+          1767430200000,
+          1767430800000,
+          1767431400000,
+          1767432000000,
+          1767432600000,
+          1767433200000,
+          1767433800000,
+          1767434400000,
+          1767435000000,
+          1767435600000,
+          1767436200000,
+          1767436800000,
+          1767437400000,
+          1767438000000,
+          1767438600000,
+          1767439200000,
+          1767439800000,
+          1767440400000,
+          1767441000000
+        ],
+        "values": [
+          42.212056219346216,
+          38.14810864779692,
+          41.38879108440857,
+          38.96742916026758,
+          42.93869056908612,
+          37.151073570575086,
+          37.53898934500224,
+          42.4517939010592,
+          39.52282646007378,
+          40.31299139218802,
+          39.335949736473665,
+          40.92181297620268,
+          38.67617920175225,
+          43.686782960239604,
+          34.555988764036705,
+          41.08583714859769,
+          40.042872701960405,
+          43.450113648987504,
+          37.10302942303376,
+          43.36648880523536,
+          37.64082717553158,
+          38.25000433373598,
+          43.467590914822374,
+          37.23159628540576,
+          39.79881237414575,
+          42.684176333254726,
+          39.03933632645888,
+          38.413999294025515,
+          39.87618629335538,
+          37.79322460514439,
+          41.506061921179025,
+          37.47229220243463,
+          41.44036346295583,
+          43.45414271544072,
+          43.08224931591486,
+          36.61009311384808,
+          38.36100504442342,
+          36.32809723850784,
+          43.36254679415909,
+          41.18470433967284,
+          42.806135623303234,
+          34.29283208767311,
+          37.1224420285854,
+          37.90497243384568,
+          40.034907236343436,
+          45.45807491637336,
+          38.6771140076741,
+          38.142155055714255,
+          41.91482526236407,
+          40.94827939285721,
+          38.79372509633282,
+          41.854970583963464,
+          39.82043708923428,
+          40.26790509834984,
+          44.908309736500705,
+          34.65278404935002,
+          36.334967322070476,
+          41.68078357957771,
+          40.39889347566303,
+          38.46982980397108,
+          33.93327989159605,
+          41.455990916602886,
+          39.99862034874487,
+          42.75768381339135,
+          34.28166014062681,
+          42.78421805047592,
+          43.141571471037395,
+          38.144973892279765,
+          36.25276333142933,
+          36.87476801434907,
+          36.017520660086944,
+          41.375270871241945,
+          40.268582691110815,
+          45.06813586897483,
+          33.44276309008067,
+          37.58425213039436,
+          39.55378711907088,
+          38.992779474303326,
+          42.092872971747596,
+          39.72731104092608,
+          40.169556897764004,
+          36.827634121243776,
+          40.39777756059708,
+          36.013126710932745,
+          39.29085301471775,
+          39.525760587322075,
+          40.618515364622134,
+          41.862903454929786,
+          43.512620263729445,
+          33.80582653986904,
+          44.19015777204332,
+          36.307657778501536,
+          39.66438942778307,
+          40.87028298237746,
+          41.399104581782574,
+          41.24709741062529,
+          38.639472748888764,
+          38.40784099722634,
+          41.87032107071419,
+          41.63835312340823,
+          39.010260369992636,
+          42.837418510399765,
+          42.00133991117242,
+          40.66381400692357,
+          37.59780878074587,
+          38.736860910292656,
+          40.467754449953986,
+          42.860428303453425,
+          38.430342903934786,
+          38.964372071656285,
+          38.92485600315514,
+          35.4114313794584,
+          40.37086432088634,
+          42.17264818676923,
+          37.02537655264853,
+          39.42503374810847,
+          42.83626728498339,
+          37.98435431265287,
+          36.643033409296905,
+          44.39724975525229,
+          41.42828270688725,
+          40.99262068476548,
+          40.43263041418463,
+          37.786819715443414,
+          38.291120647234976,
+          36.59168424623385,
+          37.34106591918971,
+          40.54443321745694,
+          40.58351571334695,
+          42.69660718492834,
+          42.83367314766485,
+          38.541263319503564,
+          38.06444464439428,
+          38.50652919835238,
+          34.74044778929828,
+          42.56714808965694,
+          38.322439311099664,
+          41.1671864364416,
+          39.32937166817491,
+          43.06443881770115,
+          39.38994242891564,
+          40.23785206613804,
+          36.14626451161096,
+          39.37172791715031,
+          41.71636600359416,
+          39.98110028655224,
+          39.35939898152968,
+          42.597615358775066,
+          41.5088553045426,
+          41.88160583092952,
+          42.80812764607454,
+          41.54540079823861,
+          44.813312936189746,
+          40.367011851648414,
+          38.70302675588733,
+          34.455686286467134,
+          35.35656779843149,
+          34.86454060181123,
+          40.32175935957767,
+          40.3349096079925,
+          35.70019254389456,
+          32.85182292696945,
+          42.73680235214495,
+          39.802741156722696,
+          38.93799066516011,
+          38.77115651225994,
+          41.563038051786926,
+          41.316238741416115,
+          45.71440702172653,
+          40.189370022397064,
+          43.355957491749734,
+          40.11860255256053,
+          45.17321035121616,
+          38.17223066371723,
+          37.66498252408472,
+          46.3204201643674,
+          37.47564501878472,
+          37.96968317991384,
+          36.210749910105726,
+          42.73226251148076,
+          41.34417908942868,
+          43.77807585044997,
+          38.06052610023015,
+          33.1848622864142,
+          38.398913323142125,
+          37.81155451877288,
+          40.715889360945916,
+          34.40715335506261,
+          37.095553204666786,
+          41.03362740100938,
+          38.15363726891005,
+          38.46088187300979,
+          43.03890623703044,
+          42.50839951514051,
+          45.86104876961961,
+          40.551138871235885,
+          35.917777906043234,
+          41.76014395533974,
+          40.93306983843679,
+          38.431661950564674,
+          43.59846196688073,
+          39.03982691132759,
+          41.500927451543554,
+          41.42940955234166,
+          38.866770239725774,
+          43.179857682675504,
+          43.14119045096409,
+          38.90816084714234,
+          38.66444840376286,
+          39.87746595969099,
+          37.44322537953708,
+          39.17251154282206,
+          34.81347407247868,
+          45.6289787960077,
+          40.916031797839764,
+          42.070487057435514,
+          39.36400104511497,
+          41.43279947951788,
+          39.81480985986562,
+          39.166680802306225,
+          68.13923784763978,
+          68.51251504417587,
+          69.53276478018357,
+          62.15019689791514,
+          72.15941458743721,
+          73.90738899349851,
+          67.08292398722867,
+          72.05750462337386,
+          72.57965868314041,
+          70.06924462019359,
+          68.46269760923175,
+          71.7914437293715,
+          69.40712731656353,
+          71.32183602580446,
+          70.58475038223104,
+          71.0737789922222,
+          69.6638614078924,
+          71.08130190196488,
+          70.29908042121582,
+          68.16004572748798,
+          71.5168612375495,
+          76.97670567173941,
+          64.5206380342656,
+          71.46545922522577,
+          62.29051520202644,
+          67.47517735085069,
+          67.63777133219656,
+          68.60776035451703,
+          65.75888552561987,
+          66.01477505724893,
+          41.42669349948185,
+          38.22121609353742,
+          41.43338402383019,
+          42.137240538053064,
+          36.62371221818409,
+          35.62897881492062,
+          42.631896623135326,
+          40.35504014469807,
+          39.522839186463386,
+          34.511485251546276,
+          39.50764626646553,
+          40.24994195312568,
+          35.5805195298476,
+          36.69228286962258,
+          38.37448397614739,
+          40.154357342295945,
+          43.445925199824764,
+          37.4815855067705,
+          39.04369555867778,
+          44.32282424446462,
+          39.933648832162625,
+          37.770719672088234,
+          38.7228046807105,
+          42.78166055145933,
+          39.11641423420844,
+          40.58169710377298,
+          38.51159917787042,
+          38.559481263696306,
+          36.72401559202886,
+          40.681914514671526,
+          47.072921660072545,
+          38.332342941241436,
+          41.522426012746664,
+          41.682451575508665,
+          41.20304658343644,
+          37.49048237943469,
+          44.53897274083559,
+          37.59499152232412,
+          44.76808200542283,
+          43.827045798211714,
+          43.38619132956804,
+          42.49772988280079,
+          39.68276634417879,
+          34.18744330498366,
+          38.515692416498986,
+          36.53010625472017,
+          45.65296148848912,
+          33.16962660791696,
+          43.91138812950365,
+          43.080838671353305,
+          40.026033217724475,
+          41.08656439224485,
+          35.915430107126404,
+          39.78153024386982,
+          40.27279926709237,
+          37.747016152842846,
+          39.53650756157853,
+          40.42035329567504,
+          37.97765107626868,
+          40.07508195100541,
+          40.075247998761284,
+          45.210681105374874,
+          42.73793347424183,
+          34.51945006239488,
+          45.28382859403569,
+          35.789739053746146,
+          39.628925065851064,
+          35.443010396748335,
+          38.37605766024268,
+          33.005388729338776,
+          45.01498895570288,
+          40.23194549543485,
+          42.04171955666097,
+          43.29518815687671,
+          42.34734767259334,
+          45.39162382246183,
+          38.23447016000472,
+          34.829828746591396,
+          39.71222854898515,
+          40.53551461769866,
+          12.445655986121707,
+          38.521038226782345,
+          36.3604100915768,
+          36.43316539737436,
+          42.59134666572004,
+          39.78954416792796,
+          47.17887065063136,
+          37.26568526665294,
+          37.01449535846987,
+          37.71153083955872,
+          43.86353670505103,
+          39.44981733556952,
+          37.98526147452106,
+          30.32309599943533,
+          38.857016702199026,
+          39.342877116052286,
+          42.111088478323076,
+          43.29712134536833,
+          35.52593421051201,
+          42.345883440642,
+          42.08639104008572,
+          37.75292837829902,
+          39.21278176461368,
+          37.63775293733154,
+          36.45662520512387,
+          43.057599714158954,
+          39.331190613954895,
+          42.239760996254084,
+          39.11174214933042,
+          45.30083603018738
         ]
       }
     },
@@ -34906,6 +42178,7 @@
         "smoothing": "none",
         "smoothingAlpha": 0.3,
         "smoothingWindow": 10,
+        "stabilization": "none",
         "threshold": 3.0,
         "type": "manual_bounds",
         "upperBound": 60.0,
@@ -38537,6 +45810,7 @@
         "smoothing": "none",
         "smoothingAlpha": 0.3,
         "smoothingWindow": 10,
+        "stabilization": "none",
         "threshold": 3.0,
         "type": "manual_bounds",
         "upperBound": 15.0,

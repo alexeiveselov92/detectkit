@@ -30,6 +30,7 @@ detectors:
       half_life: null          # exponential half-life: int points or "3d"/"12h"; default max(window_size/20, min_samples/2)
       weight_decay: null       # DEPRECATED alias for half_life
       detrend: null            # null | linear
+      stabilization: null      # null | clamp
 ```
 
 All parameters are validated when the detector is constructed at the start
@@ -200,6 +201,52 @@ detectors:
       detrend: linear
 ```
 
+## Stabilization
+
+`stabilization: clamp` prevents a sustained incident from poisoning its own
+baseline. Without it, once an incident starts, its anomalous points enter the
+trailing window like any other point — inflating the spread and dragging the
+center toward the incident — so the confidence interval widens and the
+detector stops flagging the incident's own tail (it becomes "the new
+normal"). With `stabilization: clamp`, once a point is flagged anomalous,
+subsequent windows see it **clamped** to the confidence bound it violated (a
+winsorized value) instead of its observed value. Only the statistics windows
+read the substituted history — the scored/persisted value and the anomaly
+flag are unchanged. Seasonality-group statistics read the same substituted
+history.
+
+```yaml
+detectors:
+  - type: mad
+    params:
+      window_size: 100
+      stabilization: clamp
+```
+
+**Why clamp, not substitute the band center**: replacing an anomalous point
+with the center feeds a zero-deviation point back into the spread statistics,
+which collapses the band after a long incident and cascades into false
+flags once the incident ends (measured: 34-44 false flags after the incident
+for MAD/IQR with center-substitution, vs 0 with clamping). Clamping bounds an
+anomaly's influence at exactly the threshold without destroying the spread
+estimate.
+
+**When to use it**: metrics with occasional sustained incidents (an
+elevated error rate that persists for tens of points, a stuck-high latency
+plateau). Z-Score (mean/std) benefits the most — on a synthetic 30-point
+incident inside a 100-point window it flags only ~10/30 points without
+stabilization and 30/30 with it. MAD/IQR are median/quartile-based and
+already resist short incidents, but a long incident still bends them (IQR:
+25/30 → 30/30 with clamping). It composes with `detrend`, `window_weights` /
+`half_life`, `smoothing`, `input_type` and seasonality groups — it matters
+most alongside recency weighting, since that weighting gives an ongoing
+incident's points *more* influence on the window. On a clean series with no
+sustained incidents, the effect is near-neutral.
+
+Enabling it adds one extra `window_size` of warm-up history to
+`get_context_size()`, so incremental batches reproduce the same substitution
+history a continuous run would have seen.
+
 ## Handling Metrics with Trends
 
 A metric with a gradual trend (e.g. slowly declining sessions) drifts out of
@@ -312,6 +359,7 @@ alerting:
 | `smoothing` / `smoothing_alpha` / `smoothing_window` | Yes | Yes | Yes | No (N/A) |
 | `window_weights` / `half_life` | Yes | Yes | Yes | No (N/A) |
 | `detrend` | Yes | Yes | Yes | No (N/A) |
+| `stabilization` | Yes | Yes | Yes | No (N/A) |
 | `seasonality_components` | Yes | Yes | Yes | No (N/A) |
 
 **Note**: Manual Bounds uses fixed thresholds with no historical window, so
@@ -357,7 +405,8 @@ detectors:
 
 Every parameter that affects detection results (threshold, window_size,
 min_samples, seasonality_components, min_samples_per_group, input_type,
-smoothing settings, window_weights, half_life/weight_decay, detrend) is
+smoothing settings, window_weights, half_life/weight_decay, detrend,
+stabilization) is
 hashed into the `detector_id` — only non-default values participate.
 
 Changing any of these parameters produces a new `detector_id`, and detections

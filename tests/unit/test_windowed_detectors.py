@@ -59,6 +59,11 @@ class TestValidation:
             cls(window_weights="quadratic")
 
     @pytest.mark.parametrize("cls", ALL_DETECTORS)
+    def test_bad_stabilization_fails_at_init(self, cls):
+        with pytest.raises(ValueError, match="stabilization"):
+            cls(stabilization="center")
+
+    @pytest.mark.parametrize("cls", ALL_DETECTORS)
     def test_bad_detrend_fails_at_init(self, cls):
         with pytest.raises(ValueError, match="detrend"):
             cls(detrend="quadratic")
@@ -88,6 +93,7 @@ class TestDetectorId:
             cls(window_size=500, min_samples=50, window_weights="exponential", half_life=100),
             cls(window_size=500, min_samples=50, window_weights="exponential", weight_decay=0.9),
             cls(window_size=500, min_samples=50, detrend="linear"),
+            cls(window_size=500, min_samples=50, stabilization="clamp"),
             cls(window_size=500, min_samples=50, smoothing="sma", smoothing_window=20),
             cls(window_size=500, min_samples=50, seasonality_components=["hour_of_day"]),
         ]
@@ -112,6 +118,12 @@ class TestContextSize:
     def test_changes_adds_one(self):
         det = MADDetector(window_size=100, min_samples=10, input_type="changes")
         assert det.get_context_size() == 101
+
+    def test_stabilization_adds_a_window(self):
+        # One extra window of warm-up so incremental batches reproduce the
+        # same substitution history as a continuous run.
+        det = MADDetector(window_size=100, min_samples=10, stabilization="clamp")
+        assert det.get_context_size() == 200
 
 
 class TestRecencyWeighting:
@@ -342,6 +354,111 @@ class TestSeasonalityRobustness:
         with caplog.at_level("WARNING"):
             det.detect(data)
         assert not [r for r in caplog.records if "seasonality" in r.getMessage().lower()]
+
+
+class TestStabilization:
+    """Anomaly-robust baseline (Yandex autoreg_stable-style stabilization):
+    flagged points enter subsequent windows clamped to the violated bound, so
+    a sustained incident cannot inflate the band and mask its own tail."""
+
+    @staticmethod
+    def _incident_series(n=300, level=100.0, sigma=5.0, start=180, length=30, shift=60.0):
+        rng = np.random.RandomState(7)
+        vals = level + rng.normal(0, sigma, n)
+        vals[start : start + length] += shift
+        return vals
+
+    @pytest.mark.parametrize("cls", ALL_DETECTORS)
+    def test_long_incident_stays_flagged(self, cls):
+        vals = self._incident_series()
+        data = make_data(vals)
+        base = cls(window_size=100, min_samples=30)
+        stab = cls(window_size=100, min_samples=30, stabilization="clamp")
+        rb = base.detect(data)
+        rs = stab.detect(data)
+        flagged_base = sum(r.is_anomaly for r in rb[180:210])
+        flagged_stab = sum(r.is_anomaly for r in rs[180:210])
+        # Stabilized detection must flag the WHOLE incident; the unstabilized
+        # z-score baseline notoriously adapts to it mid-incident.
+        assert flagged_stab == 30
+        assert flagged_stab >= flagged_base
+
+    @pytest.mark.parametrize("cls", ALL_DETECTORS)
+    def test_no_false_flag_cascade_after_incident(self, cls):
+        """Clamping (vs substituting the band center) must not collapse the
+        band after the incident ends and cascade into false flags."""
+        vals = self._incident_series()
+        data = make_data(vals)
+        stab = cls(window_size=100, min_samples=30, stabilization="clamp")
+        rs = stab.detect(data)
+        assert sum(r.is_anomaly for r in rs[210:]) == 0
+        assert sum(r.is_anomaly for r in rs[:180]) == 0
+
+    def test_default_off_is_byte_identical(self):
+        vals = self._incident_series()
+        data = make_data(vals)
+        for cls in ALL_DETECTORS:
+            plain = cls(window_size=100, min_samples=30).detect(data)
+            explicit = cls(window_size=100, min_samples=30, stabilization=None).detect(data)
+            assert [(r.is_anomaly, r.confidence_lower, r.confidence_upper) for r in plain] == [
+                (r.is_anomaly, r.confidence_lower, r.confidence_upper) for r in explicit
+            ]
+
+    def test_nan_gaps_are_never_substituted(self):
+        vals = self._incident_series()
+        vals[190:195] = np.nan  # gap inside the incident
+        data = make_data(vals)
+        det = MADDetector(window_size=100, min_samples=30, stabilization="clamp")
+        results = det.detect(data)
+        for r in results[190:195]:
+            assert not r.is_anomaly
+            assert r.detection_metadata.get("reason") == "missing_data"
+        # Points after the gap still detect against a finite band.
+        assert all(
+            np.isfinite(r.confidence_lower) for r in results[195:] if r.confidence_lower is not None
+        )
+
+    def test_stabilized_count_reported_in_metadata(self):
+        vals = self._incident_series()
+        data = make_data(vals)
+        det = ZScoreDetector(window_size=100, min_samples=30, stabilization="clamp")
+        results = det.detect(data)
+        # Mid-incident points must see substituted history in their window.
+        counts = [r.detection_metadata.get("stabilized_in_window", 0) for r in results[200:210]]
+        assert max(counts) > 0
+        # And the unstabilized run never reports the key.
+        base = ZScoreDetector(window_size=100, min_samples=30).detect(data)
+        assert all("stabilized_in_window" not in r.detection_metadata for r in base)
+
+    def test_batch_boundary_determinism(self):
+        """A split run (context reload, as the detect step batches) must
+        reproduce the continuous run over the persisted range."""
+        vals = self._incident_series(n=600, start=380, length=30)
+        data = make_data(vals)
+        det = ZScoreDetector(window_size=100, min_samples=30, stabilization="clamp")
+        full = det.detect(data)
+
+        # Simulate the detect step: score points [300:600] with the detector's
+        # own context (2 windows = 200 points) loaded before the batch.
+        context = det.get_context_size()
+        batch_start = 300
+        sliced = {
+            "timestamp": data["timestamp"][batch_start - context :],
+            "value": data["value"][batch_start - context :],
+            "seasonality_data": data["seasonality_data"],
+            "seasonality_columns": data["seasonality_columns"],
+        }
+        det2 = ZScoreDetector(window_size=100, min_samples=30, stabilization="clamp")
+        partial = det2.detect(sliced)
+        persisted = partial[context:]
+        expected = full[batch_start:]
+        assert [
+            (r.is_anomaly, round(r.confidence_lower, 9), round(r.confidence_upper, 9))
+            for r in persisted
+        ] == [
+            (r.is_anomaly, round(r.confidence_lower, 9), round(r.confidence_upper, 9))
+            for r in expected
+        ]
 
 
 class TestEmaNanHandling:

@@ -84,7 +84,7 @@ Full reference: `autotune.md`.
 The **manual, interactive** sibling of `dtk autotune`. Opens a localhost browser
 view of the metric's **real** persisted series and lets you turn the detector's
 knobs (type — including **Manual bounds** with lower/upper sliders — threshold,
-window, recency weighting + half-life, detrend, smoothing, **seasonality groups**,
+window, recency weighting + half-life, detrend, stabilization, smoothing, **seasonality groups**,
 **direction** (both/up/down), alert `consecutive_anomalies`) while the confidence
 band and flagged anomalies **recompute live**. The whole screen is a **chart-first
 cockpit**: ONE chart (the windshield) fills the view, the live metrics ride

@@ -130,6 +130,52 @@ def test_supervised_run_produces_valid_tuned_config(tmp_path):
     assert reparsed.detectors[0].params["start_time"] == reparsed.loading_start_time
 
 
+def test_grid_search_sweeps_stabilization_and_adopts_on_long_incidents():
+    """The stabilization axis is evaluated, and on labeled data with sustained
+    incidents (where the unstabilized band inflates and masks the incident
+    tail) the clamp candidate wins the coordinate sweep."""
+    from detectkit.autotune.autotuner import AutoTuner
+    from detectkit.autotune.crossval import build_cv_plan
+    from detectkit.autotune.grid_search import grid_search
+
+    rng = np.random.RandomState(11)
+    n = 720
+    ts = np.array(
+        [np.datetime64("2026-01-01T00:00:00", "ms") + np.timedelta64(i, "h") for i in range(n)],
+        dtype="datetime64[ms]",
+    )
+    vals = (100 + rng.normal(0, 5.0, n)).astype(np.float64)
+    incident_idxs: list[int] = []
+    for start, end in ((360, 390), (600, 630)):
+        vals[start:end] += 60.0
+        incident_idxs.extend(range(start, end))
+    data = {
+        "timestamp": ts,
+        "value": vals,
+        "seasonality_data": np.array([], dtype=object),
+        "seasonality_columns": [],
+    }
+    gt = _labels_for(ts, incident_idxs).to_ground_truth(ts, 3600)
+    settings = TuneSettings(metric=ScoringMetric.MCC)
+    tuner = AutoTuner(
+        metric_name="stab",
+        data=data,
+        ground_truth=gt,
+        interval_seconds=3600,
+        settings=settings,
+    )
+    tuner.cv_plan = build_cv_plan(n, 100, settings.fold_count)
+
+    best = grid_search(tuner, ["zscore"], None, [100])
+
+    evaluated = list(tuner._evaluated.values())
+    assert any(
+        ev.params.get("stabilization") == "clamp" for ev in evaluated
+    ), "grid search must sweep the stabilization axis"
+    assert best is not None
+    assert best.params.get("stabilization") == "clamp"
+
+
 def test_unsupervised_run_without_labels(tmp_path):
     data, ts = _seasonal_series()
     gt = IncidentLabels([], []).to_ground_truth(ts, 3600)

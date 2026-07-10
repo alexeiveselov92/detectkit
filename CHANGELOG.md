@@ -5,6 +5,48 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.51.0] - 2026-07-10
+
+### Added
+- **A new `stabilization: clamp` param on the windowed statistical detectors
+  (mad / zscore / iqr) stops a sustained incident from poisoning its own
+  baseline.** Without it, the anomalous points a long incident produces enter
+  the trailing window and inflate the spread while dragging the center toward
+  the incident, so the band widens and the detector stops flagging the
+  incident's own tail — "the incident becomes the new normal." Z-Score
+  (mean/std) is the most vulnerable: on a synthetic 30-point incident inside a
+  100-point window it flags only ~10/30 points without stabilization and
+  30/30 with it; MAD/IQR (median/quartile-based) resist short incidents but a
+  long one still bends them (IQR: 25/30 → 30/30). Enabling it makes a flagged
+  point's substitute in *later* windows a **clamp** to the confidence bound it
+  violated (a winsorized value) rather than the observed value — the scored
+  and persisted value is unchanged, only the statistics windows (global and
+  per-seasonality-group) read the substituted history. Clamping was chosen
+  over substituting the band center specifically because feeding
+  zero-deviation points back into the spread statistics collapses the band
+  after a long incident and cascades into false flags once the incident ends
+  (measured: 34-44 false flags for MAD/IQR with center-substitution vs. 0 with
+  clamp) — clamping bounds an anomaly's influence at exactly the threshold
+  without destroying the spread estimate. It composes with detrend, recency
+  weighting (`window_weights`/`half_life` — where it matters most, since
+  recency weighting gives an ongoing incident's points *more* weight),
+  smoothing, `input_type` and seasonality groups. The idea is adapted from
+  Yandex's production anomaly-detection write-up on Monium/Taxi
+  (`autoreg_stable`; see
+  https://habr.com/ru/companies/yandex/articles/1035520/). The param is
+  **opt-in and hashed into `detector_id` like every result-affecting param**,
+  so enabling it produces a new id and detections recompute under it on the
+  next run, while existing configs that don't set it keep their ids and
+  recompute nothing. `get_context_size()` adds one extra `window_size` of
+  warm-up history when it's enabled, so incremental batches reproduce the
+  same substitution history a continuous run would see. The `dtk tune`
+  cockpit gains a **Stabilization** control (none / clamp) alongside the
+  other windowed knobs, seeded from and written back to the metric YAML the
+  same way as every other detector param, backed by the parity-checked TS
+  detector port; `dtk autotune`'s grid search gained a stabilization axis,
+  swept after detrend and before window size and adopted only when it clears
+  the same score-margin bar as `window_weights`/detrend.
+
 ## [0.50.0] - 2026-07-09
 
 ### Added

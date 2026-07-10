@@ -13,13 +13,16 @@
 // When the payload carries a `save_url` (the localhost server), an "Apply to
 // metric" button POSTs the chosen config back; without it (a static preview) the
 // sliders still recompute but there is no write-back.
+//
+// The state-free helpers (types, DOM controls, formatters, styles, the worker
+// client, the quality metrics) live in ./tune/*; render() below stays the
+// composition root.
 
 import { createChart } from '../demo/chart';
 import type {
   AlertDirection,
   ChartAlert,
   ChartHandle,
-  ChartMode,
   Detrend,
   DetectorParams,
   DetectorType,
@@ -32,336 +35,21 @@ import type {
   ThresholdInfo,
   WindowWeights,
 } from '../demo/types';
+import { applyParams, configText } from './tune/config-text';
+import { ctlLabel, el, rangeControl, segControl } from './tune/controls';
+import type { SegSpec } from './tune/controls';
+import { fmtDur, fmtInterval, fmtNum, fmtTs } from './tune/format';
+import type { WorkerResult } from './tune/protocol';
+import { computeQuality, renderMetricsBar } from './tune/quality';
+import { injectStyle } from './tune/style';
+import { MIN_SAMPLES_PER_GROUP_DEFAULT, ROOT_CLASS, THRESHOLD_DEFAULT } from './tune/types';
+import type { AutotuneResult, DetectorEntry, DetectorSeed, TunePayload, UiMode } from './tune/types';
+import { createTuneWorkerClient } from './tune/worker-client';
 
 // The bundled detector worker source, injected as a string literal at build time
 // (see website/scripts/gen-tune-bundle.mjs). Instantiated from a Blob URL so the
 // report stays a single self-contained file with no external requests.
 declare const __DTK_WORKER_SRC__: string;
-
-/** Shape of the message the worker posts back after a `run`. */
-interface WorkerResult {
-  type: 'result';
-  id: number;
-  scored: ScoredPoint[];
-  fires: number[];
-  /** per-fire [startTs, endTs] of the whole grid-adjacent anomaly streak (ms). */
-  fireSpans: Array<[number, number]>;
-  eff: number;
-  /**
-   * UNCLAMPED warm-up requirement (eff is clamped to the shown length): when
-   * the whole view is warm-up, only this still says how many points the page
-   * must show for a band to appear.
-   */
-  need: number;
-  flagged: number;
-}
-
-// ---------------------------------------------------------------------------
-// Payload contract — kept in lockstep with detectkit/tuning/payload.py
-// ---------------------------------------------------------------------------
-
-/** The detector seed (camelCase DetectorParams minus the alert-only knobs). */
-type DetectorSeed = Omit<DetectorParams, 'consecutiveAnomalies' | 'direction'>;
-
-/** One of the metric's configured detectors (for the picker + preserve note). */
-interface DetectorEntry {
-  /** slot in the metric's YAML `detectors:` list (what Apply rewrites/preserves). */
-  index: number;
-  type: string;
-  /** true for mad/zscore/iqr/manual_bounds; false for prophet/timesfm (preserved, not tunable). */
-  tunable: boolean;
-  /** camelCase control seed for tunable detectors; null for non-tunable ones. */
-  seed: DetectorSeed | null;
-  /** compact one-line summary for display (e.g. `mad · threshold=3 · window=8640`). */
-  summary: string;
-}
-
-interface TunePoint {
-  t: number;
-  v: number | null;
-}
-
-interface TunePayload {
-  metric: string;
-  project: string | null;
-  description: string | null;
-  interval_seconds: number;
-  period: { start: number; end: number };
-  points: TunePoint[];
-  /** one seasonal-key map per point, aligned with `points` (empty when no seasonality). */
-  seasonality: Array<Record<string, number>>;
-  seasonality_columns: string[];
-  detector: DetectorSeed;
-  /** every configured detector, for the picker + the "preserved on Apply" note. */
-  detectors?: DetectorEntry[];
-  /** slot the cockpit opens on (first windowed, then first tunable); null = none tunable. */
-  detector_index?: number | null;
-  consecutive_anomalies: number;
-  /** fraction alert rule seeds (issue #101): the first alert config's
-   * anomaly_window pre-resolved to grid points + its share; null/absent = the
-   * legacy consecutive-only rule. Both-or-neither, like the config model. */
-  anomaly_window_points?: number | null;
-  min_anomaly_share?: number | null;
-  /** alert-layer direction the view filter seeds to ('any' = both). */
-  direction?: AlertDirection;
-  /** localhost POST endpoint for Apply; null = static read-only preview. */
-  save_url: string | null;
-  /** seeded incident spans ({start,end,label} naive-UTC strings) from incidents/<metric>/. */
-  incidents?: Array<{ start: string; end: string; label?: string }>;
-  /** seeded threshold-capture window(s) ({start,end} naive-UTC strings) — regime scope. */
-  capture_windows?: Array<{ start: string; end: string }>;
-  /** seeded per-alert review verdicts (span + 'valid'/'false') from the saved file. */
-  alert_reviews?: Array<{ start: string; end: string; verdict: string }>;
-  /** false-alert-rate (FDR) budget the quality bar flags when exceeded (fraction 0..1). */
-  false_alert_budget?: number | null;
-  /** localhost POST endpoint for Save labels; null = download instead (no server). */
-  labels_save_url?: string | null;
-  /** localhost POST endpoint for server-side Autotune; null = unavailable (static preview). */
-  autotune_url?: string | null;
-}
-
-/** The server-side autotune result (mirrors detectkit/tuning/server.py `_run_autotune`). */
-interface AutotuneResult {
-  detector: DetectorSeed;
-  consecutive_anomalies: number | null;
-  /** fraction rule the sweep adopted (points + share), null when not chosen. */
-  anomaly_window_points?: number | null;
-  min_anomaly_share?: number | null;
-  seasonality: string[][] | null;
-  score: number;
-  scoring_metric: string;
-  mode: string;
-  n_points: number;
-  n_candidates: number;
-  labels_summary: Record<string, number>;
-  cv_per_fold: number[];
-  decision_log: Array<{ stage: string; message: string; fields?: Record<string, unknown> }>;
-  winner: string;
-}
-
-/** UI mode: the chart's three layer-modes plus an Autotune panel (chart stays in 'tune'). */
-type UiMode = ChartMode | 'autotune';
-
-// Per-type interval-width default (mirrors the detector classes / the demo).
-// Partial: manual_bounds has no threshold / per-group default.
-const THRESHOLD_DEFAULT: Partial<Record<DetectorType, number>> = {
-  mad: 3.0,
-  zscore: 3.0,
-  iqr: 1.5,
-  autoreg: 3.0,
-};
-const MIN_SAMPLES_PER_GROUP_DEFAULT: Partial<Record<DetectorType, number>> = {
-  mad: 10,
-  zscore: 3,
-  iqr: 4,
-};
-
-const ROOT_CLASS = 'dtk-tune';
-
-// ---------------------------------------------------------------------------
-// Small DOM helpers
-// ---------------------------------------------------------------------------
-
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  cls?: string,
-  text?: string,
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (cls) node.className = cls;
-  if (text != null) node.textContent = text;
-  return node;
-}
-
-interface SegSpec {
-  label: string;
-  value: string;
-}
-
-/** A control label carrying an optional tooltip (native title + a faint ⓘ). */
-function ctlLabel(text: string, hint?: string): HTMLElement {
-  const lab = el('label', 'dtk-ctl-label', text);
-  if (hint) {
-    lab.title = hint;
-    const q = el('span', 'dtk-ctl-info', 'ⓘ');
-    q.title = hint;
-    lab.appendChild(document.createTextNode(' '));
-    lab.appendChild(q);
-  }
-  return lab;
-}
-
-/** A segmented button group. Returns the row element + a getter/setter. */
-function segControl(
-  label: string,
-  options: SegSpec[],
-  initial: string,
-  onChange: (v: string) => void,
-  hint?: string,
-): { row: HTMLElement; get: () => string; set: (v: string) => void } {
-  const row = el('div', 'dtk-ctl');
-  row.appendChild(ctlLabel(label, hint));
-  const group = el('div', 'dtk-seg');
-  let current = initial;
-  const buttons: HTMLButtonElement[] = [];
-  const paint = (): void => {
-    buttons.forEach((b) => b.classList.toggle('on', b.dataset.v === current));
-  };
-  options.forEach((opt) => {
-    const b = el('button', 'dtk-seg-btn', opt.label);
-    b.type = 'button';
-    b.dataset.v = opt.value;
-    b.onclick = (): void => {
-      current = opt.value;
-      paint();
-      onChange(current);
-    };
-    buttons.push(b);
-    group.appendChild(b);
-  });
-  paint();
-  row.appendChild(group);
-  return {
-    row,
-    get: () => current,
-    set: (v: string) => {
-      current = v;
-      paint();
-    },
-  };
-}
-
-/** A labeled range slider with a live value echo. */
-function rangeControl(
-  label: string,
-  opts: {
-    min: number;
-    max: number;
-    step: number;
-    value: number;
-    fmt?: (v: number) => string;
-    hint?: string;
-  },
-  onChange: (v: number) => void,
-): { row: HTMLElement; get: () => number; set: (v: number) => void; setMax: (m: number) => void } {
-  const row = el('div', 'dtk-ctl');
-  const head = el('div', 'dtk-ctl-head');
-  const lab = ctlLabel(label, opts.hint);
-  const out = el('span', 'dtk-ctl-val');
-  const fmt = opts.fmt ?? ((v: number): string => String(v));
-  head.appendChild(lab);
-  head.appendChild(out);
-  row.appendChild(head);
-  const input = el('input', 'dtk-range');
-  input.type = 'range';
-  input.min = String(opts.min);
-  input.max = String(opts.max);
-  input.step = String(opts.step);
-  input.value = String(opts.value);
-  out.textContent = fmt(opts.value);
-  // Live value echo WHILE dragging (cheap), but fire the (expensive) onChange only
-  // on `change` — i.e. when the drag is released — so pausing mid-drag with the
-  // button still held doesn't kick off a recompute. Keyboard arrows fire both.
-  input.oninput = (): void => {
-    out.textContent = fmt(Number(input.value));
-  };
-  input.onchange = (): void => {
-    const v = Number(input.value);
-    out.textContent = fmt(v);
-    onChange(v);
-  };
-  row.appendChild(input);
-  return {
-    row,
-    get: () => Number(input.value),
-    // Programmatic set (e.g. re-seeding from an autotune result). Updates the echo
-    // but, like a chart-driven change, does NOT fire onChange — the caller drives
-    // the recompute once after re-seeding every control.
-    set: (v: number) => {
-      input.value = String(v);
-      out.textContent = fmt(Number(input.value));
-    },
-    setMax: (m: number) => {
-      input.max = String(m);
-      if (Number(input.value) > m) {
-        input.value = String(m);
-        out.textContent = fmt(m);
-      }
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Effective-config readout + the snake_case apply body
-// ---------------------------------------------------------------------------
-
-/** Build the snake_case params written to YAML (omitting defaults/none). */
-function applyParams(p: DetectorParams): Record<string, unknown> {
-  if (p.type === 'manual_bounds') {
-    // Stateless thresholds — no window/threshold/weights/etc. Both bounds are
-    // always emitted by the tuner (the controls keep lower < upper).
-    const mb: Record<string, unknown> = {};
-    if (p.lowerBound != null) mb.lower_bound = p.lowerBound;
-    if (p.upperBound != null) mb.upper_bound = p.upperBound;
-    if (p.inputType !== 'values') mb.input_type = p.inputType;
-    return mb;
-  }
-  if (p.type === 'autoreg') {
-    // Prediction-based AR(p): its own param set — lags/threshold/window +
-    // min_samples (emitted explicitly, clamped valid: the Python constructor
-    // requires lags+2 <= min_samples <= window_size) + stabilization, which
-    // is DEFAULT-ON for autoreg, so turning it off must be written as null.
-    // Never seasonality/weights/detrend/smoothing (v1 has none; the detector
-    // rejects truthy seasonality_components).
-    const lags = Math.max(1, Math.round(p.lags ?? 5));
-    const ar: Record<string, unknown> = {
-      lags,
-      threshold: p.threshold,
-      window_size: p.windowSize,
-      min_samples: Math.min(Math.max(p.minSamples, lags + 2), p.windowSize),
-    };
-    if (p.stabilization !== 'clamp') ar.stabilization = null;
-    if (p.inputType !== 'values') ar.input_type = p.inputType;
-    return ar;
-  }
-  const out: Record<string, unknown> = {
-    threshold: p.threshold,
-    window_size: p.windowSize,
-  };
-  if (p.windowWeights !== 'none') {
-    out.window_weights = p.windowWeights;
-    if (p.windowWeights === 'exponential' && p.halfLife != null) out.half_life = p.halfLife;
-  }
-  if (p.detrend !== 'none') out.detrend = p.detrend;
-  if (p.stabilization && p.stabilization !== 'none') out.stabilization = p.stabilization;
-  if (p.smoothing !== 'none') out.smoothing = p.smoothing;
-  if (p.inputType !== 'values') out.input_type = p.inputType;
-  if (p.seasonalityComponents && p.seasonalityComponents.length) {
-    out.seasonality_components = p.seasonalityComponents;
-    out.min_samples_per_group = p.minSamplesPerGroup;
-  }
-  return out;
-}
-
-function configText(
-  p: DetectorParams,
-  consecutive: number,
-  windowPoints?: number | null,
-  share?: number | null,
-): string {
-  const ap = applyParams(p);
-  const parts = [`type: ${p.type}`];
-  for (const [k, v] of Object.entries(ap)) {
-    parts.push(`${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`);
-  }
-  if (p.direction && p.direction !== 'any') parts.push(`direction=${p.direction}`);
-  parts.push(`consecutive_anomalies=${consecutive}`);
-  if (windowPoints != null && share != null) {
-    parts.push(`anomaly_window=${windowPoints}p`);
-    parts.push(`min_anomaly_share=${share}`);
-  }
-  return parts.join('  ·  ');
-}
 
 // ---------------------------------------------------------------------------
 // Render
@@ -880,139 +568,21 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   };
 
   // ---- live alert-quality metrics ------------------------------------------
-  interface Quality {
-    realIncidents: number;
-    caught: number;
-    recall: number;
-    totalAlerts: number;
-    correctAlerts: number;
-    falseAlerts: number;
-    fdr: number;
-    /** alerts the user confirmed valid. */
-    validated: number;
-    /** alerts with any verdict (valid or false) — review progress. */
-    reviewed: number;
-  }
-  const computeQuality = (spans: Array<[number, number]>): Quality => {
-    const tol = spanTol(); // ±½ interval grid tolerance
-    // Only score incidents that overlap the active (possibly trimmed) series — an
-    // incident outside the loaded window can never be caught, so counting it would
-    // wrongly drag recall down. The list still shows every marked incident. The
-    // ground-truth set is the hand-marked incidents PLUS the confirmed-valid alert
-    // spans (a confirmed alert is the user asserting "a real incident happened
-    // here"), deduped by overlap so neither is double-counted.
-    const ts = series.timestamps;
-    const lo = (ts.length ? ts[0] : 0) - tol;
-    const hi = (ts.length ? ts[ts.length - 1] : 0) + tol;
-    const inWindow = (iv: { start: number; end: number }): boolean => iv.end >= lo && iv.start <= hi;
-    // Build the ground truth from the IN-WINDOW incidents, then dedup the confirmed
-    // spans against THOSE — not the full set. Deduping against an out-of-window manual
-    // incident (which is itself window-filtered away here) would drop an in-window
-    // confirmed span too, silently losing a real region from recall. (The list and
-    // Save keep the full-set dedup via groundTruth() — they show/save everything.)
-    const manualIn = incidents.filter(inWindow);
-    const validatedIn = validatedSpans()
-      .filter(inWindow)
-      .filter((v) => !manualIn.some((iv) => overlapIv(v, iv)));
-    const ivs = [...manualIn, ...validatedIn];
-    // An alert is "for" an incident when its anomaly STREAK overlaps the span (not
-    // just the fire point, which sits consecutive-1 intervals into the streak).
-    const overlaps = (sp: [number, number], iv: Incident): boolean =>
-      sp[1] >= iv.start - tol && sp[0] <= iv.end + tol;
-    let correct = 0;
-    let validated = 0;
-    let reviewed = 0;
-    for (const sp of spans) {
-      const v = reviewFor(sp[0], sp[1]);
-      if (v) reviewed++;
-      if (v === 'valid') validated++;
-      // 'false' stays a false alarm even if it grazes an incident; 'valid' is always
-      // correct (it overlaps its own virtual incident); else by incident overlap.
-      if (v === 'valid' || (v !== 'false' && ivs.some((iv) => overlaps(sp, iv)))) correct++;
-    }
-    let caught = 0;
-    for (const iv of ivs) if (spans.some((sp) => overlaps(sp, iv))) caught++;
-    const total = spans.length;
-    return {
-      realIncidents: ivs.length,
-      caught,
-      recall: ivs.length ? caught / ivs.length : NaN,
-      totalAlerts: total,
-      correctAlerts: correct,
-      falseAlerts: total - correct,
-      fdr: total ? (total - correct) / total : NaN,
-      validated,
-      reviewed,
-    };
-  };
-  const pctOrDash = (v: number): string => (Number.isFinite(v) ? `${Math.round(v * 100)}%` : '—');
   // The false-alert-rate budget the quality bar flags when exceeded (a fraction in
   // (0, 1]); resolved metric → project → built-in default by the payload builder.
   const budget =
     typeof payload.false_alert_budget === 'number' && payload.false_alert_budget > 0
       ? payload.false_alert_budget
       : null;
-  const metricChip = (
-    value: string,
-    label: string,
-    sub: string,
-    color: string,
-    opts?: { cls?: string; title?: string },
-  ): string =>
-    `<span class="dtk-m-chip${opts?.cls ? ' ' + opts.cls : ''}"${opts?.title ? ` title="${opts.title}"` : ''}>` +
-    `<span class="dtk-m-dot" style="background:${color}"></span>` +
-    `<span class="dtk-m-v">${value}</span><span class="dtk-m-l">${label}</span>` +
-    (sub ? `<span class="dtk-m-sub">${sub}</span>` : '') +
-    `</span>`;
   function renderMetrics(): void {
-    const q = computeQuality(lastFireSpans);
-    // Without any marked incidents there is no ground truth, so catch-rate and
-    // false-alert rate are undefined (not "100% false") — prompt to mark some.
-    const haveTruth = q.realIncidents > 0;
-    // Over budget = we have ground truth, alerts fired, and the false-alert rate
-    // exceeds the configured budget. A gentle, optional signal — it only colours an
-    // already-computed number; labeling and tuning are never blocked by it.
-    const budgetPct = budget != null ? `${Math.round(budget * 100)}%` : '';
-    const overBudget =
-      haveTruth && q.totalAlerts > 0 && budget != null && Number.isFinite(q.fdr) && q.fdr > budget;
-    let falseSub: string;
-    if (!haveTruth) falseSub = 'mark incidents to measure';
-    else if (q.totalAlerts === 0) falseSub = 'no alerts';
-    else if (q.falseAlerts === 0) falseSub = `${pctOrDash(q.fdr)} · all correct`;
-    else {
-      // "≈1 in N false": N = alerts / false-alerts (≥1). Keep a decimal below 10 so
-      // a 73%-false rate reads "≈1 in 1.4 false", not a misleading round-down to 1.
-      const ratio = q.totalAlerts / q.falseAlerts;
-      const nStr = ratio >= 9.5 ? String(Math.round(ratio)) : String(Math.round(ratio * 10) / 10);
-      falseSub = `${pctOrDash(q.fdr)} · ≈1 in ${nStr} false`;
-    }
-    // Append the budget verdict (non-intrusive: only flag when over).
-    if (overBudget) falseSub += ` · ▲ over ${budgetPct} budget`;
-    // Review progress: how many fired alerts you've confirmed/dismissed, and how
-    // many you confirmed valid (the green markers).
-    const reviewSub =
-      q.totalAlerts === 0
-        ? 'no alerts'
-        : `${q.validated} valid${q.totalAlerts > q.reviewed ? ` · ${q.totalAlerts - q.reviewed} left` : ' · all reviewed'}`;
-    const falseTitle = budget
-      ? `Budget: at most ${budgetPct} of fired alerts false (false-alert rate / FDR). ` +
-        'Set per metric or project via false_alert_budget. Labeling is optional — this just ' +
-        'flags when you exceed the budget.'
-      : '';
-    metricsBar.innerHTML =
-      metricChip(String(q.realIncidents), 'real incidents', '', 'var(--c)') +
-      metricChip(
-        haveTruth ? `${q.caught}/${q.realIncidents}` : '—',
-        'caught',
-        haveTruth ? `recall ${pctOrDash(q.recall)}` : 'mark or confirm',
-        'var(--green)',
-      ) +
-      metricChip(String(q.totalAlerts), 'alerts', '', 'var(--c)') +
-      metricChip(haveTruth ? String(q.falseAlerts) : '—', 'false alerts', falseSub, 'var(--anom)', {
-        cls: overBudget ? 'over' : '',
-        title: falseTitle,
-      }) +
-      metricChip(`${q.reviewed}/${q.totalAlerts}`, 'reviewed', reviewSub, 'var(--green)');
+    const q = computeQuality(lastFireSpans, {
+      timestamps: series.timestamps,
+      tol: spanTol(),
+      incidents,
+      validatedSpans: validatedSpans(),
+      reviewFor,
+    });
+    renderMetricsBar(metricsBar, q, budget);
   }
 
   // Filled once the capture toolbars are built (the chart pushes preview state here
@@ -1286,83 +856,51 @@ function render(payload: TunePayload, mount: HTMLElement): void {
 
   // ---- detector worker + debounced recompute --------------------------------
   // runDetector is O(points x window) and re-runs from scratch on every change;
-  // running it in a Worker keeps the UI responsive no matter the size. Post the
-  // (large) series once, then only params per recompute. Stale results (an older
-  // id) are dropped so only the latest knob state paints. Debounce so a slider
-  // DRAG fires one recompute when it settles, not one per frame.
-  // One blob URL, reused across (re)spawns — no per-spawn leak.
-  const workerUrl = URL.createObjectURL(
-    new Blob([__DTK_WORKER_SRC__], { type: 'text/javascript' }),
-  );
-  let worker: Worker;
-  let reqId = 0;
-  let inFlight = false;
+  // running it in a Worker keeps the UI responsive no matter the size. The
+  // worker-client module (worker-client.ts) owns the worker lifecycle (spawn /
+  // kill-in-flight / debounce); this closure only supplies what changes per
+  // recompute (params/share) and reacts to results (repaint the chart, refresh
+  // the stat line + metrics).
+  // Root-side mirror of the last dispatched params — repaintAlerts() re-renders
+  // the chart with them between worker results.
   let lastParams: DetectorParams | null = null;
-  const onWorkerMessage = (e: MessageEvent): void => {
-    const res = e.data as WorkerResult;
-    // Only the CURRENT request clears the in-flight flag. A stale message (an old
-    // worker's result that slipped through before terminate, or an out-of-order id)
-    // must NOT clear it — the live compute is still running, and clearing it here
-    // would let the next knob-change queue behind that compute instead of killing it.
-    if (res.type !== 'result' || res.id !== reqId || !lastParams) return; // ignore stale
-    inFlight = false;
-    spinner.classList.remove('on');
-    const params = lastParams;
-    lastScored = res.scored;
-    lastFireTs = res.fires.map((i) => series.timestamps[i]);
-    lastFireSpans = res.fireSpans;
-    // Re-bind each fired alert to its stored review verdict (by streak-span overlap)
-    // so a recompute that moves the alerts keeps the greens/slates it earned.
-    lastAlerts = buildAlerts();
-    chart.render({ series, scored: res.scored, params, alerts: lastAlerts, incidents });
-    renderMetrics();
-    statBar.textContent =
-      `${res.flagged} flagged · ${res.fires.length} alert${res.fires.length === 1 ? '' : 's'} · ` +
-      // The TRUE requirement, not the shown-length-clamped eff — so "warm-up
-      // 405 pts" reads honestly even when only 200 points are shown.
-      `warm-up ${res.need} pts`;
-    updateSeasonWarn(params);
-    updateWarmupWarn(res.need, params);
-    configEcho.textContent = configText(params, consecutive, shareWindowPoints(), shareValue());
-  };
-  const onWorkerError = (): void => {
-    inFlight = false;
-    spinner.classList.remove('on');
-    statBar.textContent = 'recompute failed — see the browser console';
-  };
-  function spawnWorker(): void {
-    worker = new Worker(workerUrl);
-    worker.onmessage = onWorkerMessage;
-    worker.onerror = onWorkerError;
-    worker.postMessage({ type: 'series', series });
-  }
-  spawnWorker();
-  const runRecompute = (): void => {
-    lastParams = readParams();
-    // Remember the active detector's live params so switching detectors (and Apply)
-    // can write back every slot the user tuned, not just the one on screen.
-    if (activeIndex != null) editedParams.set(activeIndex, lastParams);
-    reqId += 1;
-    // Kill an in-flight compute instead of queuing behind it: the worker is
-    // single-threaded and would otherwise run the now-stale config to completion
-    // (O(points × window) — seconds on a large window) before starting this one.
-    // Terminate + respawn re-posts the (bounded) series, which is cheap by comparison.
-    if (inFlight) {
-      worker.terminate();
-      spawnWorker();
-    }
-    inFlight = true;
-    spinner.classList.add('on');
-    worker.postMessage({
-      type: 'run',
-      id: reqId,
-      params: lastParams,
-      // Fraction alert rule — top-level (never DetectorParams: it changes which
-      // alerts fire, not the band). null when off ⇒ legacy consecutive-only.
-      anomalyWindowPoints: shareWindowPoints(),
-      minAnomalyShare: shareValue(),
-    });
-  };
+  const workerClient = createTuneWorkerClient({
+    src: __DTK_WORKER_SRC__,
+    series,
+    getParams: readParams,
+    getShare: () => ({ windowPoints: shareWindowPoints(), share: shareValue() }),
+    onDispatch: (params): void => {
+      lastParams = params;
+      // Remember the active detector's live params so switching detectors (and Apply)
+      // can write back every slot the user tuned, not just the one on screen.
+      if (activeIndex != null) editedParams.set(activeIndex, params);
+      spinner.classList.add('on');
+    },
+    onResult: (res: WorkerResult, params: DetectorParams): void => {
+      spinner.classList.remove('on');
+      lastScored = res.scored;
+      lastFireTs = res.fires.map((i) => series.timestamps[i]);
+      lastFireSpans = res.fireSpans;
+      // Re-bind each fired alert to its stored review verdict (by streak-span overlap)
+      // so a recompute that moves the alerts keeps the greens/slates it earned.
+      lastAlerts = buildAlerts();
+      chart.render({ series, scored: res.scored, params, alerts: lastAlerts, incidents });
+      renderMetrics();
+      statBar.textContent =
+        `${res.flagged} flagged · ${res.fires.length} alert${res.fires.length === 1 ? '' : 's'} · ` +
+        // The TRUE requirement, not the shown-length-clamped eff — so "warm-up
+        // 405 pts" reads honestly even when only 200 points are shown.
+        `warm-up ${res.need} pts`;
+      updateSeasonWarn(params);
+      updateWarmupWarn(res.need, params);
+      configEcho.textContent = configText(params, consecutive, shareWindowPoints(), shareValue());
+    },
+    onError: (): void => {
+      spinner.classList.remove('on');
+      statBar.textContent = 'recompute failed — see the browser console';
+    },
+  });
+  const recompute = workerClient.recompute;
 
   // ---- trim: re-slice the active series, re-post, recompute -----------------
   const trimSpan = (count: number): string =>
@@ -1374,7 +912,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   setTrimEcho(n);
   function setActivePoints(count: number): void {
     series = sliceSeries(count);
-    worker.postMessage({ type: 'series', series });
+    workerClient.postSeries(series);
     updateWindowReach();
     recompute();
   }
@@ -1385,11 +923,6 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   };
   trimInput.onchange = (): void => {
     setActivePoints(Number(trimInput.value));
-  };
-  let debounce = 0;
-  const recompute = (): void => {
-    if (debounce) window.clearTimeout(debounce);
-    debounce = window.setTimeout(runRecompute, 130);
   };
   // A detector knob changed (as opposed to an alert-layer/view control): mark the
   // active detector dirty so Apply writes it back, then recompute. Programmatic
@@ -2391,7 +1924,7 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   // ---- first paint + resize -------------------------------------------------
   setUiMode('tune');
   refreshIncidentList();
-  runRecompute();
+  workerClient.runNow();
   renderMetrics();
   // Re-fit the chart whenever its box changes — window resize, font reflow, AND the
   // rail collapsing/expanding (which widens/narrows the windshield without a window
@@ -2406,235 +1939,6 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   } else {
     window.addEventListener('resize', refit);
   }
-}
-
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
-
-function fmtNum(v: number): string {
-  if (!Number.isFinite(v)) return '—';
-  const a = Math.abs(v);
-  if (a !== 0 && (a < 0.01 || a >= 1e6)) return v.toExponential(2);
-  return Number(v.toFixed(a < 1 ? 4 : 2)).toString();
-}
-
-function fmtTs(ms: number): string {
-  return new Date(ms).toISOString().slice(0, 16).replace('T', ' ');
-}
-
-function fmtDur(ms: number): string {
-  const m = Math.round(ms / 60000);
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  const d = Math.floor(h / 24);
-  const hh = h % 24;
-  return hh ? `${d}d ${hh}h` : `${d}d`;
-}
-
-function fmtInterval(seconds: number): string {
-  if (seconds % 86400 === 0) return `${seconds / 86400}d`;
-  if (seconds % 3600 === 0) return `${seconds / 3600}h`;
-  if (seconds % 60 === 0) return `${seconds / 60}min`;
-  return `${seconds}s`;
-}
-
-// ---------------------------------------------------------------------------
-// Styles (brand tokens; injected once)
-// ---------------------------------------------------------------------------
-
-let styled = false;
-function injectStyle(): void {
-  if (styled) return;
-  styled = true;
-  const css = `
-.dtk-tune{--c:#d15b36;--c7:#b4471f;--ink:#1b1916;--muted:#6e675b;--faint:#9a9384;
-  --paper:#f5f1e8;--surface:#fbf9f3;--border:#e6e0d4;--green:#2e9e73;--anom:#d63232;
-  --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
-  --sans:'Schibsted Grotesk',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}
-.dtk-tune-root{max-width:1680px;margin:0 auto;padding:12px 16px;font-family:var(--sans);color:var(--ink);
-  height:100dvh;display:flex;flex-direction:column;gap:10px;overflow:hidden;}
-.dtk-tune-header{flex:0 0 auto;}
-.dtk-tune-titlerow{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
-.dtk-tune-title{font-size:19px;margin:0;font-weight:700;}
-.dtk-tune-badge{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;
-  color:#fff;background:var(--c);border-radius:999px;padding:3px 9px;}
-.dtk-tune-sub{color:var(--muted);font-size:12px;margin-top:2px;font-family:var(--mono);}
-.dtk-tune-desc{color:var(--muted);font-size:12px;margin-top:3px;white-space:pre-wrap;max-height:2.6em;overflow:auto;}
-/* cockpit: chart-windshield (stage) + always-visible mode-aware control rail */
-.dtk-tune-cockpit{display:flex;gap:12px;flex:1;min-height:0;}
-.dtk-tune-stage{position:relative;display:flex;flex-direction:column;gap:8px;flex:1;min-width:0;min-height:0;}
-.dtk-tune-hud{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;flex:0 0 auto;}
-.dtk-tune-stagefoot{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;}
-.dtk-tune-rail{flex:0 0 340px;display:flex;flex-direction:column;min-height:0;background:var(--surface);
-  border:1px solid var(--border);border-radius:12px;overflow:hidden;}
-.dtk-tune-railhead{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;
-  padding:9px 12px;border-bottom:1px solid var(--border);}
-.dtk-rail-title{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;
-  letter-spacing:.06em;flex:1 1 auto;}
-.dtk-tune-railfoot{flex:0 0 auto;display:flex;flex-direction:column;gap:8px;padding:11px 12px;
-  border-top:1px solid var(--border);background:var(--paper);}
-.dtk-rail-open{position:absolute;top:50%;right:6px;transform:translateY(-50%);z-index:6;
-  border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:8px;
-  padding:13px 7px;font-size:15px;cursor:pointer;box-shadow:0 1px 6px rgba(27,25,22,.14);}
-.dtk-rail-open:hover{border-color:var(--c);color:var(--c7);}
-.dtk-dock-toggle{flex:0 0 auto;border:1px solid var(--border);background:var(--surface);color:var(--muted);
-  border-radius:7px;padding:4px 10px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;line-height:1;}
-.dtk-dock-toggle:hover{border-color:var(--c);color:var(--c7);}
-.dtk-tune-controls{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:14px;}
-.dtk-rail-group{display:flex;flex-direction:column;gap:14px;}
-.dtk-ctl{display:flex;flex-direction:column;gap:6px;}
-.dtk-ctl-head{display:flex;justify-content:space-between;align-items:baseline;}
-.dtk-ctl-label{font-size:12px;font-weight:600;color:var(--ink);}
-.dtk-ctl-val{font-family:var(--mono);font-size:12px;color:var(--c7);}
-.dtk-seg{display:flex;gap:4px;background:var(--paper);border:1px solid var(--border);border-radius:8px;padding:3px;}
-.dtk-seg.dtk-wrap{flex-wrap:wrap;}
-.dtk-seg-btn{flex:1 1 auto;border:0;background:transparent;color:var(--muted);font-family:var(--sans);
-  font-size:12px;padding:5px 8px;border-radius:6px;cursor:pointer;white-space:nowrap;}
-.dtk-seg-btn:hover{color:var(--ink);}
-.dtk-seg-btn.on{background:var(--c);color:#fff;font-weight:600;}
-.dtk-range{width:100%;accent-color:var(--c);cursor:pointer;}
-.dtk-check{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:2px;cursor:pointer;}
-.dtk-tune-chart{position:relative;width:100%;flex:1;min-height:220px;background:var(--surface);
-  border:1px solid var(--border);border-radius:12px;overflow:hidden;}
-.dtk-tune-chart canvas{width:100%;height:100%;display:block;}
-.dtk-tune-readout{font-family:var(--mono);font-size:12px;color:var(--muted);min-height:18px;}
-.dtk-tune-stat{font-family:var(--mono);font-size:12px;color:var(--ink);}
-.dtk-tune-warn{font-family:var(--mono);font-size:12px;line-height:1.5;color:var(--c7);
-  background:rgba(240,173,78,0.13);border:1px solid rgba(240,173,78,0.5);border-radius:8px;padding:8px 11px;}
-.dtk-tune-cfg{background:var(--ink);color:#c9c2b4;border-radius:8px;padding:8px 11px;font-family:var(--mono);
-  font-size:12px;overflow-x:auto;}
-.dtk-tune-cfg-k{display:flex;width:100%;border:0;background:transparent;color:var(--faint);
-  font-family:var(--mono);font-size:11.5px;cursor:pointer;padding:0;text-align:left;}
-.dtk-tune-cfg-k:hover{color:#e6e0d4;}
-.dtk-tune-cfg-v{display:block;color:#e6e0d4;white-space:pre-wrap;word-break:break-word;margin-top:6px;}
-.dtk-tune-apply{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-.dtk-apply-btn{background:var(--c);color:#fff;border:0;border-radius:8px;padding:10px 18px;font-family:var(--sans);
-  font-size:14px;font-weight:600;cursor:pointer;}
-.dtk-apply-btn:hover{background:var(--c7);}
-.dtk-apply-btn:disabled{opacity:.55;cursor:default;}
-.dtk-apply-msg{font-size:13px;}
-.dtk-apply-msg.ok{color:var(--green);}
-.dtk-apply-msg.err{color:var(--anom);}
-.dtk-apply-msg.info{color:var(--muted);}
-.dtk-tune-note{font-size:13px;color:var(--muted);background:var(--surface);border:1px dashed var(--border);
-  border-radius:8px;padding:10px 12px;}
-.dtk-ctl-info{color:var(--faint);font-size:10px;cursor:help;vertical-align:super;}
-.dtk-tune-trim{display:flex;flex-direction:column;gap:6px;background:var(--surface);
-  border:1px solid var(--border);border-radius:10px;padding:9px 12px;}
-.dtk-tune-trim-head{display:flex;justify-content:space-between;align-items:baseline;}
-.dtk-tune-trim-val{font-family:var(--mono);font-size:12px;color:var(--c7);}
-.dtk-tune-spin{position:absolute;top:10px;right:12px;display:none;align-items:center;gap:7px;
-  background:rgba(27,25,22,0.78);color:#e6e0d4;border:1px solid #332f29;border-radius:999px;
-  padding:4px 11px 4px 8px;font-family:var(--mono);font-size:11px;pointer-events:none;}
-.dtk-tune-spin.on{display:inline-flex;}
-.dtk-spin-ring{width:12px;height:12px;border-radius:50%;border:2px solid rgba(245,241,232,0.25);
-  border-top-color:var(--c);animation:dtk-spin .7s linear infinite;}
-@keyframes dtk-spin{to{transform:rotate(360deg);}}
-.dtk-tune-legend{flex:0 0 auto;display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;font-size:12px;
-  color:var(--muted);padding:6px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px;}
-.dtk-leg-item{display:inline-flex;align-items:center;gap:6px;cursor:help;}
-.dtk-leg-sw{display:inline-block;flex:0 0 auto;}
-.dtk-leg-sw.line{width:16px;height:3px;background:var(--c);border-radius:2px;}
-.dtk-leg-sw.band{width:16px;height:11px;background:rgba(209,91,54,0.18);
-  border:1px solid rgba(209,91,54,0.5);border-radius:2px;}
-.dtk-leg-sw.center{width:16px;height:2px;
-  background:repeating-linear-gradient(90deg,var(--faint) 0 4px,transparent 4px 7px);}
-.dtk-leg-sw.dot{width:9px;height:9px;border-radius:50%;background:var(--anom);}
-.dtk-leg-sw.alert{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;
-  border-top:7px solid var(--anom);}
-.dtk-leg-sw.alert-ok{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;
-  border-top:7px solid var(--green);}
-.dtk-leg-sw.alert-no{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;
-  border-top:7px solid #5a7a8c;}
-.dtk-leg-txt{white-space:nowrap;}
-.dtk-season-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.dtk-season-col{font-family:var(--mono);font-size:11.5px;color:var(--muted);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.dtk-season-seg{flex:0 0 auto;padding:2px;}
-.dtk-season-seg .dtk-seg-btn{flex:0 0 auto;padding:3px 7px;font-family:var(--mono);font-size:11px;}
-.dtk-tune-metrics{display:flex;flex-wrap:wrap;gap:8px;margin:0;flex:0 1 auto;}
-.dtk-m-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;background:var(--surface);
-  border:1px solid var(--border);border-radius:10px;font-size:13px;}
-.dtk-m-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
-.dtk-m-v{font-family:var(--mono);font-weight:700;font-size:15px;color:var(--ink);}
-.dtk-m-l{color:var(--faint);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
-.dtk-m-sub{color:var(--muted);font-family:var(--mono);font-size:11.5px;}
-.dtk-m-chip.over{border-color:var(--anom);box-shadow:inset 0 0 0 1px rgba(214,50,50,.5);}
-.dtk-m-chip.over .dtk-m-sub{color:var(--anom);font-weight:600;}
-.dtk-tune-modes{display:inline-flex;gap:4px;background:var(--ink);border-radius:9px;padding:4px;margin:0;flex:0 0 auto;}
-.dtk-mode-btn{border:0;background:transparent;color:#c9c2b4;font-family:var(--sans);font-size:13px;font-weight:600;
-  padding:7px 16px;border-radius:6px;cursor:pointer;transition:background .12s,color .12s;}
-.dtk-mode-btn:hover{color:#fff;}
-.dtk-mode-btn.on{background:var(--c);color:#fff;}
-.dtk-tune-reviewbar{align-items:center;}
-.dtk-tune-reviewbar .dtk-apply-btn{background:var(--green);}
-.dtk-tune-reviewbar .dtk-apply-btn:hover{background:#27815d;}
-.dtk-at-result{display:flex;flex-direction:column;gap:7px;background:var(--surface);
-  border:1px solid var(--border);border-radius:10px;padding:11px 13px;}
-.dtk-at-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px;}
-.dtk-at-winner{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--ink);}
-.dtk-at-score{font-family:var(--mono);font-size:11.5px;color:var(--c7);}
-.dtk-at-meta{font-family:var(--mono);font-size:11px;color:var(--muted);word-break:break-word;}
-.dtk-at-log{display:flex;flex-direction:column;gap:5px;max-height:240px;overflow:auto;margin-top:4px;}
-.dtk-at-logline{display:flex;gap:8px;align-items:baseline;}
-.dtk-at-stage{flex:0 0 auto;font-family:var(--mono);font-size:9.5px;text-transform:uppercase;
-  letter-spacing:.05em;color:#fff;background:var(--c);border-radius:4px;padding:1px 6px;}
-.dtk-at-msg{font-family:var(--mono);font-size:11px;color:var(--ink);}
-.dtk-th{display:flex;flex-direction:column;gap:8px;margin:2px 0 6px;}
-.dtk-th-toggles{display:flex;gap:8px;flex-wrap:wrap;}
-.dtk-th-toggle{align-self:flex-start;border:1px solid var(--border);background:var(--surface);
-  color:var(--muted);border-radius:8px;padding:6px 12px;font-family:var(--sans);font-size:12.5px;cursor:pointer;}
-.dtk-th-toggle:hover{border-color:var(--c);color:var(--c7);}
-.dtk-th-toggle.on{background:var(--c);border-color:var(--c);color:#fff;}
-.dtk-th-bar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 14px;padding:11px 13px;
-  background:var(--surface);border:1px solid var(--border);border-radius:10px;}
-.dtk-th-grp{display:flex;flex-direction:column;gap:3px;}
-.dtk-th-lbl{font-family:var(--mono);font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;}
-.dtk-th-num,.dtk-th-sel{background:var(--paper);color:var(--ink);border:1px solid var(--border);
-  border-radius:6px;padding:5px 8px;font-family:var(--mono);font-size:12px;}
-.dtk-th-num{width:96px;}
-.dtk-th-num:focus,.dtk-th-sel:focus{outline:none;border-color:var(--c);}
-.dtk-th-scope{font-family:var(--mono);font-size:11px;color:var(--muted);align-self:center;flex:1 1 160px;}
-.dtk-th-add{padding:7px 14px;}
-.dtk-th-add:disabled{opacity:.5;cursor:default;}
-.dtk-incidents{gap:8px;}
-.dtk-inc-list{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto;}
-.dtk-inc-empty{font-size:12px;color:var(--faint);font-style:italic;}
-.dtk-inc-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:var(--paper);
-  border:1px solid var(--border);border-radius:7px;padding:6px 8px;}
-.dtk-inc-span{font-family:var(--mono);font-size:10.5px;color:var(--ink);}
-.dtk-inc-dur{font-family:var(--mono);font-size:10.5px;color:var(--muted);}
-.dtk-inc-label{flex:1 1 90px;min-width:70px;background:var(--surface);color:var(--ink);
-  border:1px solid var(--border);border-radius:5px;padding:4px 7px;font-family:var(--sans);font-size:11.5px;}
-.dtk-inc-label:focus{outline:none;border-color:var(--c);}
-.dtk-inc-btn{border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:6px;
-  padding:3px 8px;font-size:11px;cursor:pointer;font-family:var(--sans);}
-.dtk-inc-btn:hover{border-color:var(--c);color:var(--c7);}
-.dtk-inc-del{color:var(--anom);}
-.dtk-inc-fromalert{border-color:rgba(46,158,115,.5);background:rgba(46,158,115,.08);}
-.dtk-inc-badge{flex:1 1 90px;min-width:70px;font-family:var(--mono);font-size:10.5px;color:var(--green);
-  display:inline-flex;align-items:center;font-weight:600;}
-.dtk-setname{background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:8px;
-  padding:9px 11px;font-family:var(--sans);font-size:13px;min-width:180px;}
-.dtk-setname::placeholder{color:var(--faint);}
-.dtk-setname:focus{outline:none;border-color:var(--c);}
-.dtk-labels-btn{background:var(--surface);color:var(--ink);border:1px solid var(--border);}
-.dtk-labels-btn:hover{background:var(--paper);border-color:var(--c);color:var(--c7);}
-/* Narrow viewports: drop the cockpit to a scrolling stack (chart over rail). */
-@media (max-width:900px){
-  .dtk-tune-root{height:auto;overflow:visible;}
-  .dtk-tune-cockpit{flex-direction:column;}
-  .dtk-tune-rail{flex:0 0 auto;width:100%;}
-  .dtk-tune-controls{overflow:visible;}
-  .dtk-tune-chart{flex:0 0 auto;height:54vh;min-height:320px;}
-  .dtk-rail-open{display:none!important;}
-}
-`;
-  const style = document.createElement('style');
-  style.textContent = css;
-  document.head.appendChild(style);
 }
 
 // Expose the global the inlined HTML bootstrap calls (mirrors __DTK_REPORT__).

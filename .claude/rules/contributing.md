@@ -195,8 +195,9 @@ pick accents with `status_color(alert_data)` so status reads from color.
    or anything they pull in), rebuild the committed bundle with
    `node website/scripts/gen-report-bundle.mjs` (esbuild) so
    `detectkit/reporting/assets/report.js` matches the source. If you changed the
-   interactive tuning renderer (`website/src/scripts/report/tune.ts` or the shared
-   `demo/` detector/chart it reuses), also rebuild
+   interactive tuning renderer (`website/src/scripts/report/tune.ts`, its
+   `report/tune/` modules, or the shared `demo/` detector/chart they reuse), also
+   rebuild
    `node website/scripts/gen-tune-bundle.mjs` so
    `detectkit/tuning/assets/tune.js` matches. If you changed the project-UI
    cockpit renderer (`website/src/scripts/ui/*.ts`), rebuild

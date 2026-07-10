@@ -14,30 +14,13 @@
 
 import { runDetector, warmupRequirement } from '../demo/detector';
 import type { DetectorParams, ScoredPoint, Series } from '../demo/types';
+import type { RunMsg, SeriesMsg, WorkerResult } from './tune/protocol';
 
 // Minimal worker-global typing (avoids pulling in the DOM/webworker lib).
 declare const self: {
   onmessage: ((e: { data: unknown }) => void) | null;
   postMessage: (message: unknown) => void;
 };
-
-interface RunMsg {
-  type: 'run';
-  id: number;
-  params: DetectorParams;
-  /**
-   * Fraction alert rule (issue #101), OR-ed with the consecutive rule exactly
-   * like the pipeline. Top-level fields, NOT DetectorParams: they change which
-   * alerts fire, never the band, so they must not join the detector-param
-   * identity. Both-or-neither (mirrors the AlertConfig validator).
-   */
-  anomalyWindowPoints?: number | null;
-  minAnomalyShare?: number | null;
-}
-interface SeriesMsg {
-  type: 'series';
-  series: Series;
-}
 
 /** A firing alert: the fire index + the ms-span of the anomaly streak that fired. */
 interface FireRun {
@@ -188,6 +171,7 @@ self.onmessage = (e: { data: unknown }): void => {
     const eff = Math.min(need, series.timestamps.length);
     let flagged = 0;
     for (const s of scored) if (s.scored && s.isAnomaly) flagged++;
-    self.postMessage({ type: 'result', id: msg.id, scored, fires, fireSpans, eff, need, flagged });
+    const result: WorkerResult = { type: 'result', id: msg.id, scored, fires, fireSpans, eff, need, flagged };
+    self.postMessage(result);
   }
 };

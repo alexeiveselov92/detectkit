@@ -151,6 +151,13 @@ detectors:
       stabilization: null  # disable (not recommended)
 ```
 
+**Numerical notes** (v0.53.0, `ALGORITHM_VERSION` 2): each fit window is
+centered and scaled before the normal equations are solved, and the clamp
+substitution above is capped to the observed window range — both close out
+edge-case numerical instability without changing behavior on typical series.
+The version bump means Autoreg's `detector_id` changes and detections
+recompute on the next run.
+
 ### Execution Parameters
 
 `start_time` and `batch_size` control how detection runs without affecting
@@ -279,7 +286,7 @@ MAD/Z-Score/IQR.
 | Seasonality support | No (v1) | Yes | Yes | Yes |
 | Robust to outliers | Via stabilization (default on) | Very | No | Very |
 | Detects "right level, wrong dynamics" | Yes | No | No | No |
-| `dtk autotune` support | No (Phase 2) | Yes | Yes | Yes |
+| `dtk autotune` support | Yes | Yes | Yes | Yes |
 
 ## See Also
 

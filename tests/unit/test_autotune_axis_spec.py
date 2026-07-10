@@ -149,9 +149,7 @@ class TestAutoregEngineRun:
             data=data,
             ground_truth=gt,
             interval_seconds=HOUR,
-            settings=TuneSettings(
-                metric=ScoringMetric.MCC, allowed_detector_types=["autoreg"]
-            ),
+            settings=TuneSettings(metric=ScoringMetric.MCC, allowed_detector_types=["autoreg"]),
         )
 
         assert result.chosen_detector_type == "autoreg"

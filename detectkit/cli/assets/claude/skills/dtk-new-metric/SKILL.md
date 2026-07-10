@@ -80,10 +80,11 @@ Pick with the user (see `detectors.md` for the decision table):
 - **Clean & normally distributed** → `zscore`. **Skewed / percentiles** → `iqr`.
 - **Fast-moving, non-seasonal, "unusual dynamics" not just unusual level**
   (queue depth, request rate, in-flight count) → `autoreg` (`lags`,
-  `window_size`, `threshold`; `stabilization: clamp` on by default). Not yet
-  autotune-eligible (Phase 1) and rides read-only in `dtk tune` — a solid
-  choice to pair with a level detector (`mad`/`zscore`/`iqr`) via
-  `min_detectors`, not usually the first/only detector for a new metric.
+  `window_size`, `threshold`; `stabilization: clamp` on by default).
+  Autotune-eligible and tunable in the `dtk tune` cockpit (its own axis set /
+  a **Lags** knob) — a solid choice to pair with a level detector
+  (`mad`/`zscore`/`iqr`) via `min_detectors`, not usually the first/only
+  detector for a new metric.
 - **Unsure** → `mad` (robust default), `threshold: 3.0`.
 
 If you don't yet know the right detector or parameters, scaffold a robust starter

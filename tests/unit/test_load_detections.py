@@ -200,9 +200,7 @@ class TestQueryConstruction:
         frm = datetime(2024, 1, 1)
         to = datetime(2024, 1, 2)
 
-        it.load_detections(
-            "cpu_usage", detector_id="mad_abc", from_timestamp=frm, to_timestamp=to
-        )
+        it.load_detections("cpu_usage", detector_id="mad_abc", from_timestamp=frm, to_timestamp=to)
 
         assert mgr.last_params == {
             "metric_name": "cpu_usage",

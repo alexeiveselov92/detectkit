@@ -118,9 +118,12 @@ fire and recovery always name one rule; a scattered share-fired incident's
 Reports and `dtk ui`'s overview pick up share-fired
 alerts automatically via the shared replay seam.
 
-Not yet tunable: `dtk tune`'s cockpit and `dtk autotune`'s alert-window sweep
-still only search `consecutive_anomalies` (fraction-rule support is a
-follow-up) — set `anomaly_window` / `min_anomaly_share` by hand in the YAML.
+Both paths tune this pair now: supervised `dtk autotune` runs a 2-D sweep of
+`anomaly_window` × `min_anomaly_share` OR-ed with the chosen
+`consecutive_anomalies` rule, adopted only on a strictly greater score (a tie
+keeps the consecutive-only rule); `dtk tune`'s cockpit has always-visible
+anomaly-window / min-share rail controls with live replay of the same OR-ed
+rule, and Apply writes the pair back (or removes both when off).
 
 ## Cooldown (spam control) — **set it in production**
 

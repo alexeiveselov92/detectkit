@@ -127,7 +127,9 @@ class TestAlertRuleSweep:
         ts, values, spans = _diffuse_scenario()
         tuner = _tuner(ts, values, spans)
 
-        choice = tuner._select_alert_window("manual_bounds", {"lower_bound": -50.0, "upper_bound": 50.0})
+        choice = tuner._select_alert_window(
+            "manual_bounds", {"lower_bound": -50.0, "upper_bound": 50.0}
+        )
 
         assert choice is not None
         assert choice.consecutive_anomalies == 2  # k=2 suppresses the isolated noise
@@ -147,7 +149,9 @@ class TestAlertRuleSweep:
         values[100:106] = 100.0
         tuner = _tuner(ts, values, [(100, 105)])
 
-        choice = tuner._select_alert_window("manual_bounds", {"lower_bound": -50.0, "upper_bound": 50.0})
+        choice = tuner._select_alert_window(
+            "manual_bounds", {"lower_bound": -50.0, "upper_bound": 50.0}
+        )
 
         assert choice is not None
         assert choice.consecutive_anomalies == 1
@@ -167,7 +171,10 @@ class TestAlertRuleSweep:
             interval_seconds=HOUR,
             settings=TuneSettings(),
         )
-        assert tuner._select_alert_window("manual_bounds", {"lower_bound": -50.0, "upper_bound": 50.0}) is None
+        assert (
+            tuner._select_alert_window("manual_bounds", {"lower_bound": -50.0, "upper_bound": 50.0})
+            is None
+        )
 
 
 # ── result plumbing + emission ───────────────────────────────────────────────

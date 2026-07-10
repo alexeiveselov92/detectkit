@@ -793,13 +793,15 @@ Profile override (default: from the project config).
 
 #### What you can tune
 
-Detector **type** (MAD / Z-Score / IQR / Manual bounds), **threshold**, **window
-size**, recency **weighting** + **half-life**, **detrend**, **stabilization**,
-**smoothing**,
-**seasonality conditioning** (per available seasonality column, optionally conjoined
-into one group), **direction** (both/up/down) and the alert
-**`consecutive_anomalies`** window. The "effective config" readout shows exactly
-what will be written. A **y = 0 line** toggle shows the metric relative to zero.
+Detector **type** (MAD / Z-Score / IQR / Manual bounds / Autoreg), **threshold**,
+**window size**, recency **weighting** + **half-life**, **detrend**,
+**stabilization**, **smoothing**, **seasonality conditioning** (per available
+seasonality column, optionally conjoined into one group) — these windowed-only
+knobs hide when Autoreg is selected, which instead exposes **lags** (AR order) —
+**direction** (both/up/down) and the alert window: **`consecutive_anomalies`**
+plus the fraction-window pair, **anomaly window (points)** and **min share in
+window**. The "effective config" readout shows exactly what will be written. A
+**y = 0 line** toggle shows the metric relative to zero.
 
 #### Chart-first cockpit: modes, alert review & metrics
 
@@ -810,9 +812,9 @@ effective-config readout + Apply in Tune, verdict actions in Review, capture too
 Save in Label, the search button + winner in Autotune) and collapses to give the
 chart the whole width. The controls that
 aren't detector-specific — the **Points shown** data window, the alert rule
-(**direction** + **consecutive anomalies**) and the **y = 0** toggle — stay visible
-in every mode. A **mode switch** picks the job and dims the layers that don't matter
-to it:
+(**direction** + **consecutive anomalies** + the **anomaly-window/min-share**
+pair) and the **y = 0** toggle — stay visible in every mode. A **mode switch**
+picks the job and dims the layers that don't matter to it:
 
 - **Tune** — steer the band (corridor leads; incidents are read-only context; hover
   a point for its window).
@@ -844,8 +846,9 @@ to it:
   — it computes + re-seeds only and writes nothing until you **Apply** (no run record
   / `__tuned_<id>.yml` / persisted detections, so `dtk tune` stays lock-free). It
   honours the metric's `autotune:` block, runs **supervised** when incidents are
-  marked (also choosing `consecutive_anomalies`) else **unsupervised**, and needs the
-  live server (unavailable under `--no-serve`).
+  marked (also sweeping the alert window — `consecutive_anomalies` then the 2-D
+  `anomaly_window` × `min_anomaly_share` pair) else **unsupervised**, and needs
+  the live server (unavailable under `--no-serve`).
 
 As you tune, a metrics bar shows **incident catch rate (recall)** — the share of
 ground-truth incidents (marked + confirmed-valid alerts) caught by an alert (caught
@@ -873,10 +876,12 @@ config is rejected and nothing is written — then archives the current YAML
 verbatim to `metrics/.history/<metric>/<metric>-<timestamp>.yml` and re-emits the
 metric in place, **merging** the tuned detector(s) back in: only the detector(s)
 you tuned are rewritten and every **other** detector (a `manual_bounds` floor, a
-`prophet`/`timesfm`/`autoreg` detector, another windowed one) is preserved
+`prophet`/`timesfm` detector, another windowed one) is preserved
 **verbatim** — so a `min_detectors: 2` alert isn't silently broken by a retune. The first `alerting`
-block's `consecutive_anomalies` is updated if present, and the re-emitted header
-names what was updated vs preserved. For a metric with more than one detector, a
+block's `consecutive_anomalies` and the `anomaly_window`/`min_anomaly_share`
+pair are updated if present (the pair is removed together when turned off —
+never a half-pair), and the re-emitted header names what was updated vs
+preserved. For a metric with more than one detector, a
 **Tuning detector** picker chooses which one to tune. The archive keeps a trackable
 history of chosen parameters, is **excluded from metric discovery** (so a tuned
 metric never collides with its own snapshots as a duplicate name), and the original

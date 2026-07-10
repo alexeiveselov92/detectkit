@@ -296,7 +296,10 @@ range but breaks its usual short-range dynamics (a sudden jump, a reversal).
 **Disadvantages**:
 - No seasonality support in v1 (rejected at construction)
 - No smoothing, recency weighting or detrending
-- Not yet supported by `dtk autotune` (Phase 2)
+
+`dtk autotune` sweeps threshold, lags, stabilization and window size for
+Autoreg (its own axis set — no weighting/detrend/seasonality), and it's
+tunable in the `dtk tune` cockpit too.
 
 **Configuration**:
 ```yaml

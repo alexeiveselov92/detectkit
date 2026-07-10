@@ -362,9 +362,7 @@ class AutoregDetector(BaseDetector):
             coef = self._fit_ar(design, y_scaled)
 
             residuals = y_scaled - design @ coef
-            sigma = (
-                float(np.sqrt(np.sum(residuals**2) / max(n_valid - (lags + 1), 1))) * scale
-            )
+            sigma = float(np.sqrt(np.sum(residuals**2) / max(n_valid - (lags + 1), 1))) * scale
 
             pred_features = np.concatenate([[1.0], (lag_vec - center) / scale])
             pred = float(pred_features @ coef) * scale + center

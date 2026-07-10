@@ -435,8 +435,13 @@ def test_apply_autoreg_stabilization_off_written_as_null(tmp_path):
         project_root=tmp_path,
         detectors=_one(
             "autoreg",
-            {"lags": 5, "threshold": 3.0, "window_size": 100, "min_samples": 20,
-             "stabilization": None},
+            {
+                "lags": 5,
+                "threshold": 3.0,
+                "window_size": 100,
+                "min_samples": 20,
+                "stabilization": None,
+            },
         ),
         now=_FIXED,
     )

@@ -212,10 +212,12 @@ zero, so a real, ongoing incident can go unreported indefinitely.
 > resolved onset. Similarly, the recovery message's "Incident lasted …" line
 > reconstructs a *contiguous* anomalous run, so a scattered (flapping)
 > incident that fired by share may report a shorter duration than the
-> incident's full extent, or omit it. Neither the [`dtk tune`](tuning.md)
-> cockpit nor [`dtk autotune`](autotuning.md)'s alert-window sweep tunes
-> `anomaly_window` / `min_anomaly_share` yet — both still search only
-> `consecutive_anomalies` (tracked as a follow-up).
+> incident's full extent, or omit it. Both [`dtk tune`](tuning.md)'s cockpit
+> and [`dtk autotune`](autotuning.md) now tune this pair: supervised autotune
+> runs a 2-D sweep of `anomaly_window` × `min_anomaly_share` OR-ed with the
+> chosen `consecutive_anomalies` rule, adopted only on a strictly better
+> score, and the cockpit has always-visible anomaly-window / min-share rail
+> controls with live replay of the same OR-ed rule.
 
 ### Direction Policy
 

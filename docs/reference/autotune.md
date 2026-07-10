@@ -40,10 +40,14 @@ The search runs as a sequence of stages, each recorded in the
    metrics.) `force_seasonality` pins the grouping and skips this stage;
    `seasonality_candidates` restricts which columns it may use.
 2. **Detector ordering** — a distribution-suitability vote orders the candidate
-   detector types most-promising-first. The vote is **advisory only**: it never
-   excludes a type. The grid search evaluates **all** windowed statistical
-   detectors (`mad` / `zscore` / `iqr`) and cross-validation picks the winner, so
-   a heuristic can no longer drop the detector that would have scored best.
+   detector types most-promising-first, including a mildly conservative entry
+   for `autoreg` that favors clean/normal data. The vote is **advisory only**:
+   it never excludes a type. The grid search evaluates **all** four types
+   (`mad` / `zscore` / `iqr` / `autoreg`) and cross-validation picks the
+   winner, so a heuristic can no longer drop the detector that would have
+   scored best. `autoreg` is swept via its own axis set — threshold, `lags`,
+   stabilization and window size only, with no recency weighting, detrend or
+   seasonality (v1 rejects `seasonality_components`) — not the windowed one.
 3. **Grid search** — a bounded coordinate sweep per detector type
    (threshold → recency weighting, and when it's adopted a **half-life sweep** →
    detrend, gated by a trend test → **stabilization** → window size),
@@ -63,7 +67,11 @@ The search runs as a sequence of stages, each recorded in the
    **larger** window ("more history is better"); under a detected trend / regime
    shift it prefers the **smaller** window (a fresher baseline that tracks the
    current level instead of averaging in stale history). Supervised runs also
-   sweep `consecutive_anomalies` for the alert window.
+   sweep the alert window: first `consecutive_anomalies` alone (1-D), then a
+   2-D sweep of `anomaly_window` × `min_anomaly_share` OR-ed with that chosen
+   consecutive rule, adopted only on a strictly greater score (a tie keeps the
+   consecutive-only rule, so existing tunes stay byte-stable). An adopted pair
+   is emitted as an exact-seconds `anomaly_window` + `min_anomaly_share`.
 
 Cross-validation is walk-forward (expanding-window) throughout; because the
 windowed detector is causal, `detect()` runs once per candidate and each fold is
@@ -332,7 +340,7 @@ autotune:
 | Field | Type | Meaning |
 |---|---|---|
 | `enabled` | bool | Whether autotune is enabled for this metric |
-| `detector_types` | list | Restrict candidate detectors to a subset of `mad` / `zscore` / `iqr` |
+| `detector_types` | list | Restrict candidate detectors to a subset of `mad` / `zscore` / `iqr` / `autoreg` |
 | `scoring_metric` | string | Default optimization target (see [Scoring metrics](#scoring-metrics)); overridden by `--scoring` |
 | `beta` | float | The β for `scoring_metric: f_beta` (β > 1 favors recall, β < 1 favors precision) |
 | `labels_file` | string | Path to a default [labels file](#labels-file-format); overridden by `--incidents`. Mutually exclusive with `incidents` |
@@ -462,7 +470,7 @@ Primary key: `(metric_name, run_id)`.
 | `scoring_metric` | String | The metric that was maximized |
 | `score` | Nullable(Float64) | The winning cross-validated score (null on a failed run) |
 | `chosen_seasonality_json` | String (JSON) | The chosen `seasonality_components` grouping |
-| `chosen_detector_type` | Nullable(String) | The chosen detector type (`mad` / `zscore` / `iqr`; null on a failed run) |
+| `chosen_detector_type` | Nullable(String) | The chosen detector type (`mad` / `zscore` / `iqr` / `autoreg`; null on a failed run) |
 | `chosen_detector_params_json` | String (JSON) | The chosen detector parameters |
 | `winning_detector_id` | Nullable(String) | The `detector_id` of the chosen detector (null on a failed run) |
 | `candidate_detector_ids_json` | String (JSON) | The detector ids evaluated during the search |

@@ -5,6 +5,75 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.53.0] - 2026-07-10
+
+### Added
+- **`autoreg` joins `dtk autotune` — per-type axis-spec seam (issue #97
+  Phase 2).** The grid search no longer hardcodes the windowed detectors'
+  axes: a small `AxisSpec` keyed by detector type
+  (`detectkit/autotune/axis_spec.py`) declares which axes apply — the
+  windowed types keep exactly the previous sweep (behavior-identical), while
+  `autoreg` sweeps threshold / **lags** (new `TuneSettings.lags_grid`,
+  default `(2, 3, 5, 8)`) / stabilization / window only, never receives
+  `seasonality_components` (v1 rejects them), and its `min_samples` floor
+  tracks `lags + 2`. `detector_select` now ranks `autoreg` too (an advisory
+  suitability vote — ordering only, never exclusion), so a supervised or
+  unsupervised tune can genuinely pick the prediction-based detector when
+  cross-validation says it wins.
+- **`autoreg` is tunable in the `dtk tune` cockpit (issue #97 Phase 3).**
+  The parity-checked TS detector port gains a `runAutoreg` branch —
+  centered/scaled AR fit, strict NaN lag policy, default-on clamp
+  stabilization with the same capped substitution as the Python detector —
+  so the cockpit recomputes the autoreg band live. The picker offers
+  **Autoreg** with a **Lags** knob (windowed-only knobs hide; seasonality /
+  weighting / detrend / smoothing don't apply), Apply writes a valid autoreg
+  block back (explicit `min_samples`; turning stabilization off lands as an
+  explicit `null` — an absent key means default-on), and the server-side
+  Autotune mode re-seeds the autoreg knobs like any other winner. Golden
+  parity fixtures cover base / NaN-gap / changes-input / ~1e9-magnitude
+  autoreg runs.
+- **Fraction alert window in autotune + the tune cockpit (issue #101, the
+  v0.52.0 follow-up).** Supervised `dtk autotune` now runs a 2-D
+  (window × share) sweep of the fraction rule **OR-ed with the chosen
+  consecutive rule** — scoring exactly the composite the pipeline deploys —
+  and adopts the pair only on a strictly greater score, so existing tunes
+  are byte-stable when the fraction rule doesn't help. The tuned config
+  emits `anomaly_window` as an exact-seconds duration (lossless grid-points
+  round-trip) + `min_anomaly_share`; both ride the decision log, the RESULT
+  echo and the cockpit reseed. The `dtk tune` cockpit gains always-visible
+  **Alert: anomaly window** / **min share** rail controls (off state = the
+  legacy consecutive-only rule): the worker replays the share rule with
+  pipeline semantics (latest-point gate, missing slots in the denominator
+  only, fires OR-merged with the consecutive rule and deduped per point),
+  the recall/FDR bar scores the merged fires, and Apply writes the pair into
+  the first alerting block (or removes both — never a half-pair). A new
+  `npm run check:tune-worker` behavior gate locks the worker semantics.
+- **First published NAB numbers in `benchmarks/README.md`** (58 series,
+  event_f1_best): `zscore+clamp 0.244 > autoreg 0.235 > mad+clamp 0.234 >
+  iqr+clamp 0.224` — stabilization improves every windowed detector on real
+  data, and the hardened autoreg (below) is the best single un-stabilized
+  detector.
+
+### Fixed
+- **`autoreg` numerical hardening (issue #97 Phase 0; measured on NAB).**
+  On large-valued real series (~1e9) the AR normal equations mixed an
+  intercept column of ones with lag columns of ~1e18 — a conditioning gap
+  beyond float64 — producing garbage fits that the stabilization clamp then
+  amplified into `inf`. Each fit window is now **centered/scaled** before
+  the normal equations (affine-equivariant: same model, fixed conditioning)
+  and the clamp substitution is **capped to the observed window range**, so
+  a degenerate fit can never write an astronomic value into later history.
+  `ALGORITHM_VERSION` bumps to 2 — autoreg detector ids change and
+  detections recompute on the next run. Detection flags are now invariant
+  under affine rescaling of the series (regression-tested), and the fix
+  lifts autoreg's NAB event_f1_best from 0.203 to 0.235.
+- **Autotune CV folds no longer under-reserve context.** The CV plan
+  reserved only the raw max window; a stabilized detector needs an extra
+  window of warm-up and autoreg needs `+ lags`, so folds silently scored
+  points where `detect()` returns `insufficient_data`/`missing_lags`
+  (degrading the CV signal without erroring). The plan now reserves the
+  true worst-case context across every candidate type the search can build.
+
 ## [0.52.1] - 2026-07-10
 
 ### Fixed

@@ -401,7 +401,9 @@ export function openMetricEditor(
       }
     } else if (yamlDirtySinceSync && form) {
       // YAML → Builder: the YAML edits must parse before the form can adopt
-      // them; on failure stay on the YAML tab with the error visible.
+      // them. On failure, offer to return anyway (discarding the YAML edits) —
+      // a hard block would trap the user whenever the YAML tab holds an
+      // invalid draft, with the Builder tab apparently dead.
       hideError();
       try {
         const res = await postMetricParse(textarea.value);
@@ -409,8 +411,19 @@ export function openMetricEditor(
         yamlDirtySinceSync = false;
         formDirtySinceSync = false;
       } catch (e) {
-        showError(`Fix the YAML before switching to Builder:\n${(e as Error).message}`);
-        return;
+        const back = window.confirm(
+          `The YAML doesn't validate:\n${(e as Error).message}\n\n` +
+            'Return to the Builder anyway? Your YAML edits will be discarded ' +
+            '(the Builder keeps its own last state).',
+        );
+        if (!back) {
+          showError(`Fix the YAML (or discard it via the Builder tab):\n${(e as Error).message}`);
+          return;
+        }
+        // The form is the truth again: drop the YAML edits and make sure the
+        // next Builder→YAML switch re-emits over the abandoned text.
+        yamlDirtySinceSync = false;
+        formDirtySinceSync = true;
       }
     }
     hideError();

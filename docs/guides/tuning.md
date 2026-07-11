@@ -83,6 +83,15 @@ In the browser you can adjust:
   correction. This is the full `seasonality_components` grouping — you can mix one
   conjunctive group with other standalone columns, not just "all-separate" or
   "all-in-one".
+- **Min samples per group** (`min_samples_per_group`, shown only for a metric that
+  has seasonality columns) — how many same-key points the window must hold before a
+  seasonal group earns its **own** band; below it the group falls back to the global
+  band and the seasonality has **no effect**. A group needs roughly
+  `min_samples_per_group × distinct keys` of history, so **shrinking the window (or
+  Points shown) can silently switch seasonality off** — the band widens for a reason
+  that isn't the smaller window itself. Lower this knob to keep seasonality active on
+  a smaller window (the under-window warning names it), or raise it for steadier
+  per-key statistics. Defaults per detector: MAD 10, Z-Score 3, IQR 4 (IQR's floor).
 - **Direction** — **both / up / down**: which anomalies are shown and counted
   toward alerts. Pick *up* to focus on spikes above the band, *down* for drops
   below it. It is a preview filter mirroring the alert `direction` policy (seeded

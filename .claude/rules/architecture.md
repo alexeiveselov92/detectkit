@@ -727,7 +727,19 @@ points and re-posts to the worker, so recompute — cost ∝ points × window �
 up; view-only, never written), a **legend**, per-control **ⓘ tooltips**, a
 recompute **spinner**, and a **per-column seasonality group** selector that emits
 the full `seasonality_components` `string[][]` (columns in one group are conjoined,
-separate groups apply independent corrections). The detector picker also offers
+separate groups apply independent corrections). Beside it (only when the metric
+has seasonality columns) a **`min_samples_per_group`** knob controls how many
+same-key points the window must hold before a group earns its own band — seeded
+from the config (honoring a non-default value, no longer pinned to the per-type
+default), clamped to the active detector's floor (IQR 4), and reset to the type
+default on a detector switch like the threshold knob. It exists because shrinking
+**Points shown** / **Window size** can silently drop a group below the fill
+threshold (`window_size < min_samples_per_group × distinct_keys`), so the band
+falls back to global and widens for a reason that isn't the window itself; the
+under-window warning (`updateSeasonWarn`) now names lowering this knob as the
+alternative to widening the window. It is a manual lever only — `dtk autotune`
+still holds `min_samples_per_group` at the class default and steers group-fill
+through `window_size` / `seasonal_fill_window`. The detector picker also offers
 **Manual** (`manual_bounds`): selecting it swaps the windowed knobs for **lower /
 upper bound** sliders ranged over the real value domain (seeded from the metric's
 bounds, else the data p5/p95), recomputed by the same parity-checked detector port

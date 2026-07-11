@@ -83,7 +83,13 @@ export function rangeControl(
     hint?: string;
   },
   onChange: (v: number) => void,
-): { row: HTMLElement; get: () => number; set: (v: number) => void; setMax: (m: number) => void } {
+): {
+  row: HTMLElement;
+  get: () => number;
+  set: (v: number) => void;
+  setMax: (m: number) => void;
+  setMin: (m: number) => void;
+} {
   const row = el('div', 'dtk-ctl');
   const head = el('div', 'dtk-ctl-head');
   const lab = ctlLabel(label, opts.hint);
@@ -124,6 +130,17 @@ export function rangeControl(
     setMax: (m: number) => {
       input.max = String(m);
       if (Number(input.value) > m) {
+        input.value = String(m);
+        out.textContent = fmt(m);
+      }
+    },
+    // Raise the slider floor (e.g. IQR's min_samples_per_group floor of 4).
+    // Nudges the value up if it now sits below the new min, but — like a
+    // chart-driven change — does NOT fire onChange; the caller drives one
+    // recompute after re-seeding.
+    setMin: (m: number) => {
+      input.min = String(m);
+      if (Number(input.value) < m) {
         input.value = String(m);
         out.textContent = fmt(m);
       }

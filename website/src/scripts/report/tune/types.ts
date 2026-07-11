@@ -99,5 +99,14 @@ export const MIN_SAMPLES_PER_GROUP_DEFAULT: Partial<Record<DetectorType, number>
   zscore: 3,
   iqr: 4,
 };
+// Per-type min_samples_per_group floor (mirrors the detector classes'
+// MIN_SAMPLES_PER_GROUP_FLOOR: mad/zscore 1, iqr 4). The tune knob clamps its
+// slider min to this so Apply can never post a value the Python constructor
+// rejects at build time (_windowed.py:_validate_params).
+export const MIN_SAMPLES_PER_GROUP_FLOOR: Partial<Record<DetectorType, number>> = {
+  mad: 1,
+  zscore: 1,
+  iqr: 4,
+};
 
 export const ROOT_CLASS = 'dtk-tune';

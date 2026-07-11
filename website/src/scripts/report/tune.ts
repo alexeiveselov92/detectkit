@@ -42,7 +42,12 @@ import { fmtDur, fmtInterval, fmtNum, fmtTs } from './tune/format';
 import type { WorkerResult } from './tune/protocol';
 import { computeQuality, renderMetricsBar } from './tune/quality';
 import { injectStyle } from './tune/style';
-import { MIN_SAMPLES_PER_GROUP_DEFAULT, ROOT_CLASS, THRESHOLD_DEFAULT } from './tune/types';
+import {
+  MIN_SAMPLES_PER_GROUP_DEFAULT,
+  MIN_SAMPLES_PER_GROUP_FLOOR,
+  ROOT_CLASS,
+  THRESHOLD_DEFAULT,
+} from './tune/types';
 import type { AutotuneResult, DetectorEntry, DetectorSeed, TunePayload, UiMode } from './tune/types';
 import { createTuneWorkerClient } from './tune/worker-client';
 
@@ -202,8 +207,17 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   // ---- mutable parameter state, seeded from the metric's current config -----
   // `seed` is the ACTIVE detector's seed — the picker (a multi-detector metric)
   // re-seeds it when you switch which detector you're tuning. readParams() reads
-  // the passthrough knobs (minSamples/inputType/smoothing*/minSamplesPerGroup) off it.
+  // the passthrough knobs (minSamples/inputType/smoothing*) off it.
   let seed = payload.detector;
+
+  // The Min-samples-per-group knob (below) only exists when the metric has
+  // seasonality columns — the parameter is inert without seasonality — so it is
+  // declared here (null until created) and readParams() honors the seed value
+  // when it is absent. Per-type default/floor helpers keep it in step with the
+  // Threshold knob (both reset to the new type's default on a detector switch).
+  let minSamplesPerGroupCtl: ReturnType<typeof rangeControl> | null = null;
+  const mspgDefault = (t: DetectorType): number => MIN_SAMPLES_PER_GROUP_DEFAULT[t] ?? 10;
+  const mspgFloor = (t: DetectorType): number => MIN_SAMPLES_PER_GROUP_FLOOR[t] ?? 1;
   let consecutive = payload.consecutive_anomalies;
   // Fraction alert rule (issue #101): OR-ed with the consecutive rule, exactly
   // like the pipeline. 0/absent window ⇒ off (legacy consecutive-only); the
@@ -304,8 +318,12 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     detrend: detrendCtl.get() as Detrend,
     stabilization: stabilizationCtl.get() as Stabilization,
     seasonalityComponents: buildSeasonality(),
-    minSamplesPerGroup:
-      MIN_SAMPLES_PER_GROUP_DEFAULT[detectorCtl.get() as DetectorType] ?? seed.minSamplesPerGroup,
+    // Read the live knob when it exists (seasonal metrics), else honor the
+    // seeded config value — NOT the per-type default: the old default-first
+    // read silently discarded a metric's configured min_samples_per_group.
+    minSamplesPerGroup: minSamplesPerGroupCtl
+      ? Math.round(minSamplesPerGroupCtl.get())
+      : seed.minSamplesPerGroup ?? mspgDefault(detectorCtl.get() as DetectorType),
     consecutiveAnomalies: consecutive,
     direction: directionCtl.get() as AlertDirection,
     // Read from the bound sliders regardless of type; the windowed detectors
@@ -517,7 +535,9 @@ function render(payload: TunePayload, mount: HTMLElement): void {
         `⚠ Seasonality inactive at this window: ${params.windowSize} < ${needed} ` +
         `(min_samples_per_group ${params.minSamplesPerGroup} × ${card} key${card === 1 ? '' : 's'}). ` +
         `Each point keeps only ~${Math.floor(params.windowSize / card)} same-key point(s), so the ` +
-        `band falls back to global statistics (seasonality has no effect). Raise the window to ≥ ${needed}.`;
+        `band falls back to global statistics (seasonality has no effect) — this, not the smaller ` +
+        `window itself, is why the band widened. Raise the window to ≥ ${needed}, or lower ` +
+        `“Min samples per group”.`;
       seasonWarn.style.display = '';
     } else {
       seasonWarn.style.display = 'none';
@@ -996,8 +1016,14 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     ],
     seed.type,
     (v) => {
-      // reset threshold to the new type's default for a sane starting point
+      // reset threshold + min-samples-per-group to the new type's defaults for a
+      // sane starting point (IQR's group floor is 4, so raise the slider min first).
       thresholdCtl_setDefault(THRESHOLD_DEFAULT[v as DetectorType] ?? 3.0);
+      if (minSamplesPerGroupCtl) {
+        const nt = v as DetectorType;
+        minSamplesPerGroupCtl.setMin(mspgFloor(nt));
+        minSamplesPerGroupCtl.set(mspgDefault(nt));
+      }
       markActiveDirty();
       refreshVisibility();
       updateWindowReach();
@@ -1288,6 +1314,34 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       groups.forEach((grp, gi) => grp.forEach((c) => colGroup.set(c, gi + 1)));
       seasonPaints.forEach((p) => p());
     };
+
+    // Min samples per seasonal group — how many same-key points the window must
+    // hold before a seasonal group earns its OWN band (below it, the group falls
+    // back to the global band). Sits right under the grouping it governs, and
+    // ONLY exists for a seasonal metric (the parameter is inert without
+    // seasonality). Exposing it here is the point of the whole knob: shrinking
+    // Points shown / Window size can silently push a group under this threshold —
+    // making the band look worse for a reason that isn't the window itself — so
+    // lowering this is the recourse the under-fill warning now names, instead of
+    // the user having no lever but "widen the window". Hidden for autoreg/manual
+    // via windowedOnlyRows.
+    minSamplesPerGroupCtl = rangeControl(
+      'Min samples per group',
+      {
+        min: mspgFloor(seed.type),
+        max: Math.max(50, seed.minSamplesPerGroup),
+        step: 1,
+        value: Math.max(mspgFloor(seed.type), seed.minSamplesPerGroup),
+        fmt: (v) => String(v),
+        hint:
+          'Per-seasonal-key minimum: a seasonality group only gets its own band once the ' +
+          'window holds this many points sharing the current key — below it the group falls ' +
+          'back to the global band (the seasonality has no effect). Lower it to keep seasonality ' +
+          'active on a smaller window; raise it for steadier per-key statistics.',
+      },
+      detectorChanged,
+    );
+    tuneGroup.appendChild(minSamplesPerGroupCtl.row);
   }
 
   // Direction filter (alert-layer / view): which anomalies show + count as alerts.
@@ -1487,6 +1541,9 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   const bandRows = [thresholdCtl.row, windowCtl.row, stabilizationCtl.row];
   const windowedOnlyRows = [weightsCtl.row, detrendCtl.row, smoothingCtl.row];
   if (seasonalityRow) windowedOnlyRows.push(seasonalityRow);
+  // The min-samples-per-group knob only exists for a seasonal metric; when it
+  // does, it hides alongside the other windowed-only knobs for autoreg/manual.
+  if (minSamplesPerGroupCtl) windowedOnlyRows.push(minSamplesPerGroupCtl.row);
   function refreshVisibility(): void {
     const t = detectorCtl.get() as DetectorType;
     const manual = t === 'manual_bounds';
@@ -1521,6 +1578,16 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     stabilizationCtl.set(s.stabilization ?? 'none');
     smoothingCtl.set(s.smoothing);
     setSeasonalityGroups(s.seasonalityComponents || []);
+    if (minSamplesPerGroupCtl) {
+      // Raise the floor (IQR floor 4) AND the reach before .set(), so a detector
+      // configured above the slider's original max (fixed at creation from the
+      // FIRST-opened detector's seed) isn't silently clamped down — which would
+      // corrupt what Apply writes. Mirrors the window/half-life setMax-before-set
+      // just above; the get() term keeps the current explore headroom.
+      minSamplesPerGroupCtl.setMin(mspgFloor(s.type));
+      minSamplesPerGroupCtl.setMax(Math.max(50, s.minSamplesPerGroup, minSamplesPerGroupCtl.get()));
+      minSamplesPerGroupCtl.set(Math.max(mspgFloor(s.type), s.minSamplesPerGroup));
+    }
     if (s.lowerBound != null) lowerBoundCtl.set(s.lowerBound);
     if (s.upperBound != null) upperBoundCtl.set(s.upperBound);
     if (s.lags != null || s.type === 'autoreg') {

@@ -114,9 +114,12 @@ Walk the user to the mode that fits what they want to do:
   Z-Score / IQR, **Autoreg** = predicts each point from its previous values
   (**Lags** knob; the windowed-only knobs hide), or **Manual** = fixed
   lower/upper bounds), **threshold**, **window size**, **recency weighting +
-  half-life**, **detrend**, **smoothing**, and **seasonality groups**; the band
-  + anomalies + would-fire alerts recompute on every change. The window-size /
-  half-life readouts show the equivalent wall-clock span. **Stabilization**
+  half-life**, **detrend**, **smoothing**, **seasonality groups**, and (for a
+  seasonal metric) **min samples per group** — how many same-key points the
+  window needs before a seasonal group gets its own band; lowering it keeps
+  seasonality active on a smaller window instead of silently falling back to the
+  global band. The band + anomalies + would-fire alerts recompute on every
+  change. The window-size / half-life readouts show the equivalent wall-clock span. **Stabilization**
   (none / clamp) clamps a flagged point to
   the bound it violated in later windows' statistics — try it when a sustained
   incident visibly balloons the band mid-incident and the detector stops

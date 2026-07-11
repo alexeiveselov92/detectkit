@@ -919,7 +919,8 @@ overlay), a pipeline panel that drives `dtk run` / `dtk autotune` /
 `dtk unlock` as subprocesses — plus a **Tune** action that launches
 [`dtk tune`](#dtk-tune) for a metric in a new tab — and **New metric** /
 **Edit** actions that create, edit, and delete metric YAML files straight from
-the browser (see [Managing metrics](#managing-metrics) below). Like
+the browser, through a structured **Builder** form or the raw **YAML** (see
+[Managing metrics](#managing-metrics) below). Like
 `dtk tune`, it is a *superstructure* over the existing commands and files: the
 server never runs the pipeline in-process, takes **no pipeline lock**, and
 never touches the database — every pipeline action it drives is the same
@@ -1027,20 +1028,44 @@ path — they never touch the database.)
 #### Managing metrics
 
 The header's **New metric** button and each metric row's **Edit** action open
-a full-screen editor over the metric's raw YAML — a text-in, text-out model
-that mirrors `dtk tune`'s config write-back, extended to the whole file:
+a full-screen editor with two tabs sharing one draft — **Builder**, a
+structured form over the whole config, and **YAML**, the raw text (kept for
+experts who paste whole configs) — mirroring `dtk tune`'s config write-back,
+extended to the whole file:
 
-- **New metric** opens the editor seeded with a starter YAML template plus an
-  optional folder field. **Create metric** validates server-side and writes
-  `metrics/[<folder>/]<name>.yml` (the filename is derived from the metric's
-  `name:`). The new metric joins the current session immediately, even if it
-  wouldn't match the `--select` the server was started with.
-- **Edit** opens a metric's existing YAML verbatim in the same editor.
-  **Save changes** validates, then **archives the previous file verbatim** to
+- **Builder** renders every parameter as a form control: basics, schedule &
+  loading (with `loading_delay` / `loading_batch_size` / `query_columns`
+  under an advanced fold), seasonality checkboxes, minimal detector rows
+  (type + 1-2 key params — fine-tuning belongs in `dtk tune`), alerting (a
+  channel multi-select seeded from `profiles.yml` — channel **names and
+  types only**, never configs or secrets), and `ai_context`. SQL is edited
+  in a syntax-highlighted code pane (`query_file` paths show read-only), and
+  a **From OSI** sub-tab compiles a pasted OSI semantic-model metric through
+  the same code path as [`dtk osi import`](#dtk-osi-import). Keys the form
+  doesn't model (`autotune:`, custom templates, unknown detector
+  types/params, a multi-entry alerting list) round-trip verbatim and are
+  listed under "Preserved fields". The last-edited tab wins: leaving an
+  edited YAML tab validates server-side first (`POST /api/metric-parse`) and
+  blocks the switch on error; leaving an edited Builder re-emits the YAML. A
+  debounced live-validation chip re-checks the draft while typing.
+- **New metric** opens the Builder seeded with defaults (the YAML tab holds
+  the equivalent starter template) plus an optional folder field. **Create
+  metric** validates server-side and writes `metrics/[<folder>/]<name>.yml`
+  (the filename is derived from the metric's `name:`). The new metric joins
+  the current session immediately, even if it wouldn't match the `--select`
+  the server was started with. After a create, a **next-steps strip** offers
+  **Load & detect** (spawns `dtk run --steps load,detect` for just that
+  metric — no alert step, so an untuned config can't spam a channel) and,
+  once that job succeeds, **Open tune** for the loaded series.
+- **Edit** opens on the Builder when the file parses (else YAML-only, with
+  the parse error on the disabled Builder tab). **Save changes** validates,
+  then **archives the previous file verbatim** to
   `metrics/.history/<metric>/<metric>-<stamp>.yml` — the same archive
-  `dtk tune`'s Apply uses, excluded from metric discovery — and overwrites the
-  file in place: the text you typed lands on disk, comments intact (no
-  re-emit; the only normalization is ensuring a trailing newline). A save is
+  `dtk tune`'s Apply uses, excluded from metric discovery — and overwrites
+  the file in place. A YAML-tab save writes the text you typed, comments
+  intact (the only normalization is ensuring a trailing newline); a Builder
+  save **re-emits the YAML deterministically, dropping hand-written
+  comments** (the archive keeps the previous file). A save is
   refused if the file changed on disk after the editor was opened (a
   `dtk tune` Apply or another editor session landed first) — reopen the
   metric instead of silently overwriting the newer version. Renaming a metric

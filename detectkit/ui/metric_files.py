@@ -23,6 +23,7 @@ import hashlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -83,6 +84,20 @@ def parse_metric_text(text: str) -> MetricConfig:
         raise ValueError(f"invalid metric config: {exc}") from exc
     _validate_detector_params(config)
     return config
+
+
+def parse_metric_mapping(text: str) -> tuple[MetricConfig, dict[str, Any]]:
+    """:func:`parse_metric_text` plus the raw (unwrapped) mapping the text sets.
+
+    The raw mapping is what seeds the ``dtk ui`` Builder form: unlike the
+    validated :class:`MetricConfig` it contains only the keys the file actually
+    sets (no pydantic defaults) plus any unmodeled extra keys, which the form
+    preserves verbatim. Raises exactly like :func:`parse_metric_text`.
+    """
+    config = parse_metric_text(text)
+    raw = yaml.safe_load(text)
+    data = unwrap_metric_mapping(raw) if isinstance(raw, dict) else {}
+    return config, data
 
 
 def _validate_detector_params(config: MetricConfig) -> None:

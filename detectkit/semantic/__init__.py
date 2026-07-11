@@ -24,6 +24,7 @@ from detectkit.semantic.osi_model import (
     DETECTKIT_VENDOR,
     OsiSemanticModel,
     load_osi_models,
+    parse_osi_models,
 )
 
 __all__ = [
@@ -38,4 +39,5 @@ __all__ = [
     "export_models",
     "import_osi_metric",
     "load_osi_models",
+    "parse_osi_models",
 ]

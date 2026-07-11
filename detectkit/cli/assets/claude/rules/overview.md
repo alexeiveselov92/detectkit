@@ -106,7 +106,9 @@ same reports in a browser overlay plus an overview table (alert frequency,
 freshness — netting out any configured `loading_delay` so a deliberately
 delayed metric doesn't read as stale — quality when incidents are labeled), a
 panel that drives `dtk run` / `dtk autotune` / `dtk unlock`, and an in-browser
-editor to create, edit and delete metric YAML files. See `cli.md`.
+editor to create, edit and delete metric YAML files — a structured **Builder**
+form (with OSI import and a post-create load-then-tune flow) next to a raw
+**YAML** tab. See `cli.md`.
 
 ## Glossary
 

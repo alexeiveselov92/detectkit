@@ -171,21 +171,25 @@ def normalize_ai_context(raw: Any) -> dict[str, Any] | None:
     return None
 
 
-def load_osi_models(path: Path) -> list[OsiSemanticModel]:
-    """Parse an OSI YAML file into a list of :class:`OsiSemanticModel`.
+def parse_osi_models(text: str, *, source: str = "<input>") -> list[OsiSemanticModel]:
+    """Parse OSI YAML *text* into a list of :class:`OsiSemanticModel`.
 
-    Accepts the canonical ``semantic_model:`` root (a list, per the OSI examples)
-    as well as a single mapping or a bare list, for robustness. Raises
-    :class:`OsiParseError` on a missing/empty/malformed file.
+    The text seam behind :func:`load_osi_models`: it takes the raw YAML string
+    directly, so a caller with no file on disk — e.g. the ``dtk ui`` Builder's
+    "From OSI" paste box, which hands the browser's textarea contents straight
+    to the server — can parse a model without writing a temp file first.
+    Accepts the canonical ``semantic_model:`` root (a list, per the OSI
+    examples) as well as a single mapping or a bare list, for robustness.
+    Raises :class:`OsiParseError` on empty/malformed text; *source* names the
+    origin (a file path, or a caller-chosen marker like ``"<pasted OSI
+    model>"``) so error messages stay actionable without a real path.
     """
-    if not path.exists():
-        raise OsiParseError(f"OSI model file not found: {path}")
     try:
-        raw = yaml.safe_load(path.read_text())
+        raw = yaml.safe_load(text)
     except yaml.YAMLError as exc:
-        raise OsiParseError(f"invalid YAML in {path}: {exc}") from exc
+        raise OsiParseError(f"invalid YAML in {source}: {exc}") from exc
     if not raw:
-        raise OsiParseError(f"empty OSI model file: {path}")
+        raise OsiParseError(f"empty OSI model file: {source}")
 
     node: Any = raw.get("semantic_model", raw) if isinstance(raw, dict) else raw
     items = node if isinstance(node, list) else [node]
@@ -196,10 +200,22 @@ def load_osi_models(path: Path) -> list[OsiSemanticModel]:
         try:
             models.append(OsiSemanticModel.model_validate(item))
         except Exception as exc:  # pydantic ValidationError, etc.
-            raise OsiParseError(f"could not parse a semantic_model in {path}: {exc}") from exc
+            raise OsiParseError(f"could not parse a semantic_model in {source}: {exc}") from exc
     if not models:
-        raise OsiParseError(f"no semantic_model found in {path}")
+        raise OsiParseError(f"no semantic_model found in {source}")
     return models
+
+
+def load_osi_models(path: Path) -> list[OsiSemanticModel]:
+    """Parse an OSI YAML file into a list of :class:`OsiSemanticModel`.
+
+    Existence-checks *path*, reads it, then delegates to :func:`parse_osi_models`
+    with ``source=str(path)`` — the same parsing/error-message behavior as
+    before the text/path split, just re-homed onto the text seam.
+    """
+    if not path.exists():
+        raise OsiParseError(f"OSI model file not found: {path}")
+    return parse_osi_models(path.read_text(), source=str(path))
 
 
 def find_metric(

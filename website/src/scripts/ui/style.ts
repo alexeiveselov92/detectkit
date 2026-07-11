@@ -193,7 +193,10 @@ export function injectStyle(): void {
    Reuses .dtk-ui-overlay (backdrop) / .dtk-ui-overlay-modal (sizing/chrome) from
    the detail overlay above; everything inside gets its own dtk-ui-editor-*
    classes since the body is a form + textarea rather than a report iframe. */
-.dtk-ui-overlay-modal.dtk-ui-editor-modal{max-width:920px;}
+.dtk-ui-overlay-modal.dtk-ui-editor-modal{max-width:1360px;}
+.dtk-ui-editor-panes{flex:1;min-height:0;display:flex;flex-direction:column;}
+.dtk-ui-editor-panes > .dtk-ui-form{flex:1;min-height:0;}
+.dtk-ui-editor-note{font-size:11px;color:var(--faint);font-style:italic;flex:0 0 auto;}
 .dtk-ui-editor-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:11px 16px;border-bottom:1px solid var(--border);background:var(--surface-2);flex:0 0 auto;}
 .dtk-ui-editor-titlewrap{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;min-width:0;}
@@ -298,7 +301,172 @@ export function injectStyle(): void {
 .dtk-toast-out{opacity:0;transform:translateY(6px);transition:opacity 0.2s,transform 0.2s;}
 @keyframes dtk-ui-toast-in{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
 
+/* --- editor tabs (Builder | YAML) -------------------------------------------
+   Sits in the metric editor's .dtk-ui-editor-head, next to the title. */
+.dtk-ui-edtabs{display:flex;gap:4px;}
+.dtk-ui-edtab{border:1px solid var(--border);background:var(--surface);color:var(--faint);
+  font-family:var(--mono);font-size:11.5px;padding:5px 12px;border-radius:7px;cursor:pointer;}
+.dtk-ui-edtab:hover{color:var(--text);}
+.dtk-ui-edtab.on{background:var(--clay);color:#fff;border-color:var(--clay);font-weight:600;}
+.dtk-ui-edtab:disabled{opacity:0.4;cursor:not-allowed;}
+
+/* --- live validation chip (editor footer) ------------------------------------ */
+.dtk-ui-validchip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);
+  font-size:11px;color:var(--faint);cursor:help;}
+.dtk-ui-validchip-dot{width:7px;height:7px;border-radius:50%;background:var(--faint);flex:0 0 auto;}
+.dtk-ui-validchip.checking .dtk-ui-validchip-dot{animation:dtk-ui-pulse 1.2s ease-in-out infinite;}
+.dtk-ui-validchip.ok{color:var(--st-recovery);}
+.dtk-ui-validchip.ok .dtk-ui-validchip-dot{background:var(--st-recovery);}
+.dtk-ui-validchip.warn{color:var(--st-nodata);}
+.dtk-ui-validchip.warn .dtk-ui-validchip-dot{background:var(--st-nodata);}
+.dtk-ui-validchip.err{color:var(--st-anomaly);}
+.dtk-ui-validchip.err .dtk-ui-validchip-dot{background:var(--st-anomaly);}
+
+/* --- next-steps strip (after a create save) --------------------------------- */
+.dtk-ui-nextsteps{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  flex-wrap:wrap;background:rgba(46,158,115,0.1);border:1px solid rgba(46,158,115,0.35);
+  border-radius:10px;padding:11px 14px;}
+.dtk-ui-nextsteps.failed{background:rgba(214,50,50,0.08);border-color:rgba(214,50,50,0.35);}
+.dtk-ui-nextsteps-text{font-size:13px;color:var(--text);}
+.dtk-ui-nextsteps-text b{color:var(--text-strong);}
+.dtk-ui-nextsteps-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.dtk-ui-nextsteps-close{border:0;background:transparent;color:var(--faint);cursor:pointer;
+  font-size:14px;padding:2px 6px;line-height:1;}
+.dtk-ui-nextsteps-close:hover{color:var(--text);}
+.dtk-ui-nextsteps-link{color:var(--clay);text-decoration:underline;cursor:pointer;}
+.dtk-ui-nextsteps-spin{width:7px;height:7px;border-radius:50%;background:var(--clay);
+  animation:dtk-ui-pulse 1.2s ease-in-out infinite;flex:0 0 auto;}
+/* an empty strip host must not eat a flex-gap slot in the root column */
+.dtk-ui-nextsteps-box:empty{display:none;}
+
+/* --- metric builder form: grid + rail ---------------------------------------
+   Two columns: a scrollable parameter rail (~380px) + the query pane filling
+   the rest. The shell gives .dtk-ui-form a flex-fill container (it lives
+   inside .dtk-ui-editor-body in Builder mode), so it grows to fill the modal. */
+.dtk-ui-form{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:16px;
+  flex:1;min-height:0;}
+.dtk-ui-form-rail{overflow-y:auto;display:flex;flex-direction:column;gap:12px;
+  padding-right:4px;min-height:0;}
+.dtk-ui-form-main{display:flex;flex-direction:column;min-height:0;gap:10px;}
+.dtk-ui-form-query{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;}
+
+/* --- form sections ------------------------------------------------------------ */
+.dtk-ui-form-sec{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;
+  padding:12px 13px;display:flex;flex-direction:column;gap:10px;flex:0 0 auto;}
+.dtk-ui-form-sec-head{display:flex;align-items:center;justify-content:space-between;}
+.dtk-ui-form-sec-title{font-family:var(--sans);font-size:12.5px;font-weight:700;
+  color:var(--text-strong);text-transform:uppercase;letter-spacing:0.03em;}
+.dtk-ui-form-sec-body{display:flex;flex-direction:column;gap:10px;}
+
+/* --- collapsible "advanced" chunks (native <details>/<summary>) -------------- */
+.dtk-ui-form-adv{border-top:1px dashed var(--border);padding-top:8px;margin-top:2px;}
+.dtk-ui-form-adv-summary{cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--faint);
+  text-transform:uppercase;letter-spacing:0.04em;user-select:none;}
+.dtk-ui-form-adv-summary:hover{color:var(--text);}
+.dtk-ui-form-adv[open] > .dtk-ui-form-adv-summary{color:var(--clay);}
+.dtk-ui-form-adv-body{display:flex;flex-direction:column;gap:10px;margin-top:8px;}
+
+/* --- inline validation / warnings / status text ------------------------------ */
+.dtk-ui-form-err-inline{font-size:11px;color:var(--st-anomaly);min-height:14px;}
+.dtk-ui-form-err{font-size:12px;color:var(--st-anomaly);}
+.dtk-ui-form-err:empty{display:none;}
+.dtk-ui-form-warn{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--st-nodata);}
+.dtk-ui-form-warn:empty{display:none;}
+.dtk-ui-form-hint-status{font-size:11px;color:var(--faint);font-style:italic;}
+.dtk-ui-form-hint-status:empty{display:none;}
+
+/* --- textareas (description / instructions / OSI paste) ---------------------- */
+.dtk-ui-textarea{resize:vertical;min-height:56px;line-height:1.45;}
+
+/* --- chip inputs (tags / mentions / synonyms / examples / custom channels) --- */
+.dtk-ui-chipinput{display:flex;flex-direction:column;gap:6px;}
+.dtk-ui-chipinput-chips{display:flex;flex-wrap:wrap;gap:5px;}
+.dtk-ui-chipinput-chips:empty{display:none;}
+.dtk-ui-chip{display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);
+  border:1px solid var(--border);border-radius:999px;padding:3px 5px 3px 10px;
+  font-size:11.5px;color:var(--text);font-family:var(--mono);}
+.dtk-ui-chip-x{border:0;background:transparent;color:var(--faint);cursor:pointer;
+  font-size:11px;line-height:1;padding:2px 5px;border-radius:50%;}
+.dtk-ui-chip-x:hover{color:var(--st-anomaly);background:rgba(214,50,50,0.12);}
+.dtk-ui-chipinput-field{background:var(--bg);color:var(--text);border:1px solid var(--border);
+  border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px;width:100%;}
+.dtk-ui-chipinput-field:focus{outline:none;border-color:var(--clay);}
+.dtk-ui-chipinput-field::placeholder{color:var(--faint);}
+
+/* --- preserved-field chips (passthrough, read-only) -------------------------- */
+.dtk-ui-preschips{display:flex;flex-wrap:wrap;gap:5px;}
+.dtk-ui-preschip{display:inline-block;background:var(--surface-2);border:1px dashed var(--border);
+  border-radius:999px;padding:3px 10px;font-size:11px;color:var(--faint);font-family:var(--mono);}
+
+/* --- interval preset chips ----------------------------------------------------- */
+.dtk-ui-chip-presets{display:flex;gap:6px;margin-top:4px;}
+.dtk-ui-chip-preset{border:1px solid var(--border);background:var(--surface-2);color:var(--muted);
+  font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:6px;cursor:pointer;}
+.dtk-ui-chip-preset:hover{border-color:var(--clay);color:var(--text);}
+
+/* --- detector rows ------------------------------------------------------------- */
+.dtk-ui-detrows{display:flex;flex-direction:column;gap:8px;}
+.dtk-ui-detrow{background:var(--surface);border:1px solid var(--border);border-radius:9px;
+  padding:10px 11px;display:flex;flex-direction:column;gap:8px;}
+.dtk-ui-detrow-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.dtk-ui-detrow-head .dtk-ui-select{flex:1;}
+.dtk-ui-detrow-readonly{font-size:11.5px;color:var(--faint);font-style:italic;flex:1;}
+.dtk-ui-detrow-fields{display:flex;flex-wrap:wrap;gap:8px;}
+.dtk-ui-detrow-fields .dtk-ui-field{flex:1 1 100px;min-width:90px;}
+.dtk-ui-detrow-remove{border:1px solid var(--border);background:transparent;color:var(--muted);
+  border-radius:6px;width:24px;height:24px;flex:0 0 auto;cursor:pointer;font-size:11px;
+  line-height:1;}
+.dtk-ui-detrow-remove:hover{border-color:var(--st-anomaly);color:var(--st-anomaly);}
+
+/* --- alerting rail fields + channel checkbox type suffix ---------------------- */
+.dtk-ui-alerting-fields{display:flex;flex-direction:column;gap:10px;}
+.dtk-ui-check-type{color:var(--faint);font-family:var(--mono);font-size:10.5px;}
+
+/* --- sub-tabs (query pane: SQL | From OSI) ------------------------------------- */
+.dtk-ui-subtabs{display:flex;gap:4px;border-bottom:1px solid var(--border);padding-bottom:8px;
+  flex:0 0 auto;}
+.dtk-ui-subtab{border:1px solid transparent;background:transparent;color:var(--faint);
+  font-family:var(--sans);font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:7px;
+  cursor:pointer;}
+.dtk-ui-subtab:hover{color:var(--text);}
+.dtk-ui-subtab.on{background:var(--clay);color:#fff;}
+.dtk-ui-subtab-panes{flex:1;min-height:0;display:flex;flex-direction:column;}
+.dtk-ui-subtab-pane{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;
+  overflow-y:auto;padding-top:10px;}
+
+/* --- SQL editor (sql-editor.ts): a highlighted <pre> underneath a transparent
+   <textarea>, perfectly overlapping — identical font/size/line-height/padding
+   on both layers is what makes the illusion work. --------------------------- */
+.dtk-ui-sqled{position:relative;flex:1;min-height:280px;border:1px solid var(--term-border);
+  border-radius:9px;overflow:hidden;background:var(--term-bg);}
+.dtk-ui-sqled-hl,.dtk-ui-sqled-ta{position:absolute;inset:0;margin:0;padding:12px 14px;
+  font-family:var(--mono);font-size:12.5px;line-height:1.55;white-space:pre;tab-size:2;
+  overflow:auto;border:0;}
+.dtk-ui-sqled-hl{color:var(--term-text);pointer-events:none;}
+.dtk-ui-sqled-hl code{white-space:pre;font-family:inherit;}
+.dtk-ui-sqled-ta{background:transparent;color:transparent;caret-color:var(--term-text);
+  resize:none;z-index:1;}
+.dtk-ui-sqled-ta:focus{outline:none;}
+.dtk-ui-sqled-ta:disabled{cursor:not-allowed;}
+.dtk-ui-sqled-note{position:absolute;inset:0;z-index:2;display:flex;align-items:center;
+  justify-content:center;text-align:center;padding:20px;background:rgba(33,30,26,0.9);
+  color:var(--term-text);font-family:var(--sans);font-size:12.5px;line-height:1.5;}
+
+/* SQL token colors — kw/str/cmt/jinja reuse existing brand tokens; num is the
+   one new hardcoded shade the spec calls for (a muted syntax-highlight blue,
+   not a brand color). */
+.dtk-sql-kw{color:var(--clay);}
+.dtk-sql-fn{color:var(--term-text);font-weight:700;}
+.dtk-sql-str{color:var(--accent-green);}
+.dtk-sql-num{color:#7ba5c9;}
+.dtk-sql-cmt{color:var(--faint);font-style:italic;}
+.dtk-sql-jinja{color:var(--st-nodata);}
+
 /* --- responsive ------------------------------------------------------------- */
+@media (max-width:980px){
+  .dtk-ui-form{grid-template-columns:1fr;}
+  .dtk-ui-form-rail{max-height:44vh;}
+}
 @media (max-width:860px){
   .dtk-ui-drawer{width:100vw;}
   .dtk-ui-row2{grid-template-columns:1fr;}

@@ -982,7 +982,8 @@ by `metrics/` subfolder, filterable by tag), a per-metric **detail** view (the
 existing HTML report in an overlay), and a **pipeline panel** that drives
 `dtk run` / `dtk autotune` / `dtk unlock` as subprocesses (plus `dtk tune`,
 launched per metric in a new tab), plus **metric management** — creating,
-editing and deleting metric YAML files from the browser. Invoked by `dtk ui
+editing and deleting metric YAML files from the browser, through a structured
+**Builder** form or the raw **YAML** tab. Invoked by `dtk ui
 [-s/--select "*"] [--window 30d] [--profile] [--no-open]`
 (`cli/commands/ui.py`), which mirrors
 `run_command`'s build order (find_project_root → `ProjectConfig.from_yaml_file`
@@ -1014,9 +1015,16 @@ programmatic use), `GET /metric/<name>?window=` (the detail overlay),
 streaming), and `POST /api/run` / `/api/autotune` / `/api/unlock` /
 `/api/tune` / `/api/job/<id>/stop` — plus the metric-management routes:
 `GET /api/metrics` (the refreshed boot-shaped session list),
-`GET /api/metric-source/<name>` (raw YAML text for the editor), and
-`POST /api/metric-create` / `/api/metric/<name>/update` /
-`/api/metric/<name>/delete`.
+`GET /api/metric-source/<name>` (raw YAML text for the editor, plus the
+parsed mapping `data` / `parse_error` that seed the Builder tab — a broken
+file degrades to `data: null` + the message, so the editor opens YAML-only
+with the Builder tab disabled), `POST /api/metric-parse` (validate draft text
+→ parsed mapping; powers the Builder⇄YAML tab sync and the live-validation
+chip — pure CPU, **no `db_lock`**, no filesystem), `POST /api/osi-inspect` /
+`/api/osi-import` (the Builder's "From OSI" sub-tab: summarize a pasted OSI
+model, then compile one metric via the **same** `import_osi_metric` path as
+`dtk osi import`), and `POST /api/metric-create` / `/api/metric/<name>/update`
+/ `/api/metric/<name>/delete`.
 
 **Metric management is file-only and mirrors `dtk tune`'s write discipline.**
 `metric_files.py` is the mutation seam: every mutation validates the **raw
@@ -1025,14 +1033,39 @@ YAML text** through `MetricConfig` **plus** a deep detector-params check
 save, not at the next run) *before touching the filesystem*; update/delete
 first **archive the previous file verbatim** under
 `metrics/.history/<metric>/` (`…-<stamp>.yml` / `…-<stamp>-deleted.yml` — the
-same discovery-excluded archive `dtk tune`'s Apply writes). Unlike
-`config_writer.py` there is **no re-emit**: the user edits raw YAML in a
-browser editor overlay (header **New metric** button; per-row **Edit**) and
-that text lands on disk, comments intact (normalized only to end with a
-newline). Saves carry an optimistic-concurrency `digest` (from
-`GET /api/metric-source`, `text_digest`): a stale editor — opened before a
-`dtk tune` Apply or another tab's save — is refused instead of silently
-clobbering the newer config. Name uniqueness is enforced
+same discovery-excluded archive `dtk tune`'s Apply writes). The editor is
+**two tabs over one draft**: a **Builder** form (`metric-form.ts`) and the
+raw **YAML** textarea (kept for experts who paste whole configs). The server
+side stays text-in: whatever text the active tab holds is what gets posted
+and validated; a YAML-tab save lands on disk verbatim, comments intact
+(normalized only to end with a newline), while a Builder save posts a
+**deterministic client-side re-emit** (`yaml-emit.ts`, a minimal
+provably-round-trip-safe emitter — no YAML lib in the bundle) that **drops
+hand-written comments** (the archive keeps the previous file; the editor
+warns when the source has any). The Builder's invariant is
+**modeled-fields-plus-verbatim-passthrough**: it renders the config's main
+knobs as controls (basics, schedule/loading, seasonality, minimal detector
+rows — type + 1–2 key params, fine-tuning deferred to `dtk tune` —,
+alerting, `ai_context`; SQL in a hand-rolled syntax-highlighted pane,
+`sql-editor.ts`; `query_file` shown read-only, never inlined) and carries
+every unmodeled key (`autotune:`, `tables:`, unknown detector types/params,
+a >1-entry alerting list) through untouched, surfaced in a "Preserved
+fields" list. Tab sync goes through the server-side parse seam
+`metric_files.parse_metric_mapping` (validated config **plus** the raw
+unwrapped mapping — only the keys the file sets, no pydantic defaults) via
+`POST /api/metric-parse`: leaving an edited YAML tab must parse (blocked on
+error), leaving an edited Builder re-emits; the same route backs the
+debounced live-validation chip. The Builder's channel/profile pickers are
+seeded from the boot payload's `form_meta` (`build_form_meta(profiles_config)`
+in `server.py` — channel **names + types and profile names only, never
+channel configs/secrets**). After a create, a **next-steps strip** closes the
+loop: **Load & detect** spawns `dtk run --steps load,detect` for just that
+metric (deliberately no alert step, so an untuned config can't spam a
+channel); when the job succeeds, **Open tune** unlocks and opens the tune
+cockpit on the loaded series. Saves carry an optimistic-concurrency `digest`
+(from `GET /api/metric-source`, `text_digest`): a stale editor — opened
+before a `dtk tune` Apply or another tab's save — is refused instead of
+silently clobbering the newer config. Name uniqueness is enforced
 against the **whole** `metrics/` tree (not just the session's selector), a
 created metric joins the session list even when it wouldn't match the boot
 `--select`, delete requires the client to **echo the metric name**
@@ -1111,9 +1144,9 @@ self-contained like `report.ts`/`tune.ts`: no ESM exports, assigns
 renderer TS changes — the same generated-asset discipline as
 `report.js`/`tune.js`. `html.py` (`render_ui_html`) mirrors `tuning/html.py`:
 it inlines the bundle plus a small boot payload (project name, initial
-window, the metric list) into one page — the overview/detail/job data itself
-is fetched by the page over the routes above, not baked in (unlike
-`dtk tune`'s payload, which bakes the whole series so the client can
+window, the metric list, `form_meta`) into one page — the overview/detail/job
+data itself is fetched by the page over the routes above, not baked in
+(unlike `dtk tune`'s payload, which bakes the whole series so the client can
 recompute with no round trip).
 
 ## Semantic interop — OSI (`dtk osi`)
@@ -1133,6 +1166,12 @@ so detectkit does *not* build a live OSI→SQL runtime — it converts at the ed
   string). `extra="ignore"` everywhere so an evolving draft spec can't break
   parsing. ClickHouse is **not** an OSI dialect (enum: ANSI_SQL/SNOWFLAKE/MDX/
   TABLEAU/DATABRICKS/MAQL); there is no grain field and no ratio metric *type*.
+  `parse_osi_models(text, source=...)` is the **text seam** behind
+  `load_osi_models(path)` (which just existence-checks + reads + delegates):
+  the `dtk ui` Builder's "From OSI" paste box consumes it via the server's
+  `/api/osi-inspect` / `/api/osi-import` handlers — imported **inside the
+  handlers**, never at `ui/server.py` module level, so the
+  pipeline-never-imports-OSI isolation property holds.
 - `query_gen.py` — compiles an OSI metric to a detectkit series query satisfying
   the loader contract (`timestamp` + `value`, one value per bucket, Jinja
   `{{ dtk_start_time }}`/`{{ dtk_end_time }}` left for the loader). Two targets:

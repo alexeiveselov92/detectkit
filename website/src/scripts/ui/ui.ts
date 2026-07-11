@@ -37,10 +37,13 @@ import { buildJobsDrawer } from './jobs-drawer';
 import type { JobsDrawerHandle } from './jobs-drawer';
 import { NEW_METRIC_TEMPLATE, openMetricEditor } from './metric-editor';
 import type { EditorMode, MetricEditorHandle } from './metric-editor';
+import { renderNextSteps } from './next-steps';
+import type { NextStepsState } from './next-steps';
 import type {
   BootMetric,
   BootPayload,
   DtkUiGlobal,
+  FormMeta,
   JobKind,
   JobSnapshot,
   MetricMutationResponse,
@@ -73,6 +76,8 @@ interface State {
   followOffset: number;
   tagFilter: string | null;
   sort: SortState;
+  /** Post-create guided flow (load data → tune), one metric at a time. */
+  nextSteps: NextStepsState | null;
 }
 
 function render(boot: BootPayload, mount: HTMLElement): void {
@@ -89,6 +94,10 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   // static `boot.metrics` now reads this instead.
   let metricsList: BootMetric[] = boot.metrics;
 
+  // Alert-channel/profile names for the metric Builder's pickers (older
+  // payloads may omit it — the editor degrades to free-text inputs).
+  const formMeta: FormMeta = boot.form_meta ?? { channels: [], profiles: [], default_profile: null };
+
   const state: State = {
     windowPreset: boot.initial_window || '30d',
     metrics: metricsList.map(buildPendingRow),
@@ -97,6 +106,7 @@ function render(boot: BootPayload, mount: HTMLElement): void {
     followOffset: 0,
     tagFilter: null,
     sort: { key: 'alerts', dir: DEFAULT_SORT_DIR.alerts },
+    nextSteps: null,
   };
 
   let detailHandle: DetailHandle | null = null;
@@ -214,6 +224,58 @@ function render(boot: BootPayload, mount: HTMLElement): void {
     jobsChip.title = running ? `Started ${new Date(running.started_at).toLocaleString()}` : 'No jobs running';
   }
 
+  // ---- next-steps strip (post-create guided flow), between header and content --
+  const nextStepsBox = document.createElement('div');
+  nextStepsBox.className = 'dtk-ui-nextsteps-box';
+  root.appendChild(nextStepsBox);
+
+  function paintNextSteps(): void {
+    renderNextSteps(nextStepsBox, state.nextSteps, {
+      onLoad: (metric) => void submitNextStepsLoad(metric),
+      onTune: (metric) => void submitTune(metric),
+      onFollow: (jobId) => followJob(jobId),
+      onDismiss: (): void => {
+        state.nextSteps = null;
+        paintNextSteps();
+      },
+    });
+  }
+
+  /** Spawn `run --steps load,detect` for the freshly created metric (never alert). */
+  async function submitNextStepsLoad(metric: string): Promise<void> {
+    if (pipelineSubmitPending) return;
+    pipelineSubmitPending = true;
+    try {
+      const res = await postRun({
+        select: metric,
+        steps: ['load', 'detect'],
+        from: null,
+        to: null,
+        full_refresh: false,
+        force: false,
+      });
+      trackSpawnedJob('run', `run --select ${metric}`, res.job_id, null);
+      if (state.nextSteps && state.nextSteps.metric === metric) {
+        state.nextSteps = { metric, jobId: res.job_id, phase: 'running' };
+        paintNextSteps();
+      }
+    } catch (e) {
+      toast(root, 'error', (e as Error).message);
+    } finally {
+      pipelineSubmitPending = false;
+    }
+  }
+
+  /** Reflect the tracked load job's outcome into the strip on every jobs tick. */
+  function syncNextStepsFromJobs(): void {
+    const st = state.nextSteps;
+    if (!st || !st.jobId || st.phase !== 'running') return;
+    const job = state.jobs.find((j) => j.id === st.jobId);
+    if (!job || job.status === 'running') return;
+    state.nextSteps = { ...st, phase: job.status === 'done' ? 'done' : 'failed' };
+    paintNextSteps();
+  }
+
   // ---- content (tiles / tags / table), rebuilt on every state change --------
   const content = document.createElement('div');
   content.className = 'dtk-ui-content';
@@ -317,7 +379,7 @@ function render(boot: BootPayload, mount: HTMLElement): void {
     }
     editorHandle = openMetricEditor(
       root,
-      { mode: 'create', text: NEW_METRIC_TEMPLATE },
+      { mode: 'create', text: NEW_METRIC_TEMPLATE, meta: formMeta },
       {
         onSaved: (res, mode) => onEditorSaved(res, mode),
         onDeleted: () => {}, // unreachable in create mode (no delete button)
@@ -347,7 +409,16 @@ function render(boot: BootPayload, mount: HTMLElement): void {
     }
     editorHandle = openMetricEditor(
       root,
-      { mode: 'edit', name: src.name, file: src.file, text: src.text, digest: src.digest },
+      {
+        mode: 'edit',
+        name: src.name,
+        file: src.file,
+        text: src.text,
+        digest: src.digest,
+        data: src.data ?? null,
+        parseError: src.parse_error ?? null,
+        meta: formMeta,
+      },
       {
         onSaved: (res, mode) => onEditorSaved(res, mode),
         onDeleted: (res) => onEditorDeleted(res),
@@ -361,6 +432,11 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   function onEditorSaved(res: MetricMutationResponse, mode: EditorMode): void {
     toast(root, 'info', `Metric '${res.name}' ${mode === 'create' ? 'created' : 'saved'}.`);
     if (res.note) toast(root, 'info', res.note);
+    if (mode === 'create') {
+      // Kick off the guided tail of the flow: load real data, then tune on it.
+      state.nextSteps = { metric: res.name, jobId: null, phase: 'idle' };
+      paintNextSteps();
+    }
     // A plain edit changes at most its own row — refresh just that one instead
     // of flashing the whole table back to pending and re-fetching every
     // metric's stats. Create/rename/delete change the list's shape, so they
@@ -552,6 +628,7 @@ function render(boot: BootPayload, mount: HTMLElement): void {
     updateJobsChip();
     jobsDrawer.render(state.jobs, Date.now(), state.followedJobId);
     runPanel.refreshBusyState();
+    syncNextStepsFromJobs();
   }
 
   async function refreshJobs(): Promise<void> {

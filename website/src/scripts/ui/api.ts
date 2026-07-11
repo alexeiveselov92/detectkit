@@ -13,10 +13,14 @@ import type {
   JobsListResponse,
   MetricCreateRequest,
   MetricMutationResponse,
+  MetricParseResponse,
   MetricSourceResponse,
   MetricsListResponse,
   MetricUpdateRequest,
   OkResponse,
+  OsiImportRequest,
+  OsiImportResponse,
+  OsiInspectResponse,
   OverviewMetric,
   RunRequest,
   TuneRequest,
@@ -125,4 +129,21 @@ export function postMetricDelete(name: string): Promise<MetricMutationResponse> 
   return apiPost<MetricMutationResponse>(`/api/metric/${encodeURIComponent(name)}/delete`, {
     confirm: name,
   });
+}
+
+// ---- metric-builder helpers: raw-text validation + OSI import (see metric_files.py / detectkit/semantic/) ----
+
+/** Validate raw metric YAML text and get back its parsed mapping (the Builder tab's seed). */
+export function postMetricParse(text: string): Promise<MetricParseResponse> {
+  return apiPost<MetricParseResponse>('/api/metric-parse', { text });
+}
+
+/** Inspect a pasted OSI semantic model document: models -> their metric/dataset names. */
+export function postOsiInspect(text: string): Promise<OsiInspectResponse> {
+  return apiPost<OsiInspectResponse>('/api/osi-inspect', { text });
+}
+
+/** Compile one OSI model metric into a native metric scaffold (query + seeded fields). */
+export function postOsiImport(req: OsiImportRequest): Promise<OsiImportResponse> {
+  return apiPost<OsiImportResponse>('/api/osi-import', req);
 }

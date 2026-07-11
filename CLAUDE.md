@@ -131,7 +131,14 @@ rendered on the docs site under **For developers**). Read the relevant one:
   detector-params), a verbatim archive to `metrics/.history/<metric>/` before
   every overwrite/delete (same discovery-excluded archive as `dtk tune`), a
   name-echo confirmation on delete, and a refusal while a tune session for
-  that metric runs. Takes no pipeline lock; the CRUD routes never touch the
+  that metric runs. The editor is two tabs over one draft: a **Builder** form
+  (modeled fields + verbatim passthrough of everything unmodeled, listed as
+  "Preserved fields"; a highlighted SQL pane; a "From OSI" sub-tab compiling
+  via the same path as `dtk osi import`; Builder saves re-emit the YAML,
+  dropping comments — the archive keeps the old file) and the raw **YAML**
+  tab (verbatim writes, for experts); after a create, a next-steps strip runs
+  `dtk run --steps load,detect` (no alert step) and then opens the tune
+  cockpit. Takes no pipeline lock; the CRUD routes never touch the
   database (orphaned `_dtk_*` rows wait for `dtk clean`). Committed bundle
   `assets/ui.js` (built by
   `website/scripts/gen-ui-bundle.mjs`) ships in the wheel — keep it and the

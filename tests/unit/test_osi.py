@@ -19,6 +19,7 @@ from detectkit.semantic import (
     export_models,
     import_osi_metric,
     load_osi_models,
+    parse_osi_models,
 )
 from detectkit.semantic.errors import OsiParseError, OsiUnsupportedMetric
 from detectkit.semantic.osi_model import (
@@ -117,6 +118,33 @@ class TestModel:
         assert normalize_ai_context("  meaning ") == {"instructions": "meaning"}
         assert normalize_ai_context({"synonyms": ["a", " ", "b"]}) == {"synonyms": ["a", "b"]}
         assert normalize_ai_context({"instructions": "  "}) is None
+
+
+# --------------------------------------------------------------------------
+# osi_model — parse_osi_models, the text seam behind load_osi_models (powers
+# the `dtk ui` Builder's "From OSI" paste box, which has no file on disk)
+# --------------------------------------------------------------------------
+class TestParseOsiModelsText:
+    def test_parses_same_as_the_file_variant(self, model_file: Path):
+        models = parse_osi_models(OSI_TEXT)
+        assert len(models) == 1
+        model, metric = find_metric(models, "total_sales")
+        assert model.name == "ecommerce"
+        assert metric.description == "Total sales revenue"
+        # same content the path variant reads from disk
+        assert [m.name for m in models] == [m.name for m in load_osi_models(model_file)]
+
+    def test_error_message_carries_the_source_marker_not_a_path(self):
+        with pytest.raises(OsiParseError, match=r"<pasted OSI model>"):
+            parse_osi_models("not: [valid : yaml", source="<pasted OSI model>")
+
+    def test_empty_text_raises_with_default_source(self):
+        with pytest.raises(OsiParseError, match=r"<input>"):
+            parse_osi_models("")
+
+    def test_no_semantic_model_found_names_source(self):
+        with pytest.raises(OsiParseError, match=r"no semantic_model found in <pasted OSI model>"):
+            parse_osi_models("just_a_string", source="<pasted OSI model>")
 
 
 # --------------------------------------------------------------------------

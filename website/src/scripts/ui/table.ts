@@ -38,6 +38,7 @@ export function buildPendingRow(bm: BootMetric): OverviewMetric {
     points: 0,
     flagged: 0,
     anomaly_rate: null,
+    stale_detectors: null,
     alerts: { anomaly: 0, recovery: 0, no_data: 0, per_day: null, last_ts: null },
     quality: null,
     budget: 0,
@@ -160,8 +161,14 @@ function buildRow(
   const errBadge = m.error
     ? `<span class="dtk-ui-err-badge" title="${esc(m.error)}">!</span>`
     : '';
+  const staleN = m.stale_detectors ?? 0;
+  const staleChip =
+    staleN > 0
+      ? `<span class="dtk-ui-stalechip" title="${staleN} superseded detector generation(s) still ` +
+        `stored for this metric — Open it and use 'Clean stale' to prune them">${staleN} stale</span>`
+      : '';
   tdName.title = nameTitle(m);
-  tdName.innerHTML = `<span class="dtk-ui-name">${esc(m.name)}</span>${errBadge}${tagChips(m.tags)}`;
+  tdName.innerHTML = `<span class="dtk-ui-name">${esc(m.name)}</span>${errBadge}${staleChip}${tagChips(m.tags)}`;
   tr.appendChild(tdName);
 
   const tdInterval = document.createElement('td');

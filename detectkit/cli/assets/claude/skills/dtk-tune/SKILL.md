@@ -33,8 +33,10 @@ for me, I won't look").
 
 Your job is to **set up the sandbox, open it, and guide the user through it** —
 they drive the chart; you prepare it, explain each control in plain language, and
-handle the follow-up (`dtk run` / `dtk clean`). This skill is the procedure; for
-field detail read the matching file under `.claude/rules/detectkit/` (`cli.md`
+handle the follow-up (`dtk run` / `dtk clean`, or point at `dtk ui`'s per-metric
+**Clean stale** button as the interactive equivalent). This skill is the
+procedure; for field detail read the matching file under
+`.claude/rules/detectkit/` (`cli.md`
 has the full `dtk tune` reference, plus `detectors.md`, `autotune.md`,
 `alerting.md`).
 
@@ -194,6 +196,10 @@ dtk clean --select <name> --execute        # prune the orphaned old detector row
 dtk test-alert <name>                      # if alerting is configured
 ```
 
+(`dtk ui`'s metric detail overlay has the same cleanup as a **Clean stale**
+button, if the user is already there and would rather not switch to a
+terminal.)
+
 ## When to hand off instead
 
 - **Fully automatic, no browser** (CI, "just pick one for me") → the
@@ -211,4 +217,5 @@ dtk test-alert <name>                      # if alerting is configured
 - [ ] You explained the relevant mode(s) — including that **Autotune is built in**
       and runs over the window shown — and which controls stay visible everywhere.
 - [ ] After **Apply**, you ran `dtk run` to recompute and `dtk clean --execute`
-      to prune the orphaned old detector rows (and `dtk test-alert` if alerting).
+      (or `dtk ui`'s **Clean stale** button) to prune the orphaned old detector
+      rows (and `dtk test-alert` if alerting).

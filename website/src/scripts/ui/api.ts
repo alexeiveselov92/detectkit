@@ -8,6 +8,8 @@
 
 import type {
   AutotuneRequest,
+  CleanPreviewResponse,
+  CleanRequest,
   JobDetail,
   JobIdResponse,
   JobsListResponse,
@@ -98,6 +100,16 @@ export function postUnlock(req: UnlockRequest): Promise<JobIdResponse> {
 
 export function postTune(req: TuneRequest): Promise<TuneResponse> {
   return apiPost<TuneResponse>('/api/tune', req);
+}
+
+/** What `dtk clean --select <name>` would delete — the read-only dry-run behind the confirm step. */
+export function fetchCleanPreview(name: string): Promise<CleanPreviewResponse> {
+  return apiGet<CleanPreviewResponse>(`/api/clean-preview/${encodeURIComponent(name)}`);
+}
+
+/** Spawn the real `dtk clean --select <metric> --execute` as a pipeline job. */
+export function postClean(req: CleanRequest): Promise<JobIdResponse> {
+  return apiPost<JobIdResponse>('/api/clean', req);
 }
 
 export function postStopJob(id: string): Promise<OkResponse> {

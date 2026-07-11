@@ -5,6 +5,37 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.56.0] - 2026-07-11
+
+### Added
+- **`dtk ui`: clean stale detector data from the cockpit.** Every retune /
+  autotune / detector-param edit changes the `detector_id`, and the superseded
+  generation's rows stay in `_dtk_detections` forever — visible in the metric
+  detail (which deliberately shows *what actually ran*) but mixed in with the
+  current config's series, with no way to prune them short of leaving for a
+  terminal. The detail overlay now carries a **Clean stale** action: a
+  read-only preview (`GET /api/clean-preview/<name>` — the `dtk clean` dry-run
+  as JSON: exact superseded detector ids, row counts, stale alert states, and
+  the CLI's "config defines no detectors" warning) feeds an inline confirm
+  strip, and confirming spawns the real `dtk clean --select <metric>
+  --execute` as a pipeline job (`POST /api/clean`, a new `clean` job kind
+  sharing run/autotune/unlock's one-at-a-time gate) — the UI stays a
+  superstructure over the CLI, no new mutation path. Both the preview and the
+  execute refuse while a `dtk tune` session for that metric is open (its Apply
+  rewrites the YAML the spawned `dtk clean` re-reads), the same guard metric
+  edit/delete carry. On success the report reloads showing only the current
+  config's detectors and the metric's stats row refreshes.
+- **`dtk ui`: stale-generation count on the overview row.** Each metric's row
+  now carries `stale_detectors` (stored detector ids the current config no
+  longer produces; `null` when unknown) and the table shows an amber `N stale`
+  chip next to the metric name, so leftover generations are visible before
+  opening the detail. Underivable configs stay `null` — never presented as
+  "everything is stale".
+- **`DetectorFactory.detector_id_for_config`** — the one shared derivation of
+  a configured detector's `detector_id` (params + seasonality → factory →
+  hash), now used by the overview's current-config filter, `dtk clean`'s
+  drift diff and the new clean preview instead of three private copies.
+
 ## [0.55.2] - 2026-07-11
 
 ### Fixed

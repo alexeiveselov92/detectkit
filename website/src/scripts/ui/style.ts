@@ -138,6 +138,9 @@ export function injectStyle(): void {
 .dtk-ui-namecell{min-width:170px;}
 .dtk-ui-name{font-weight:600;color:var(--text-strong);}
 .dtk-ui-err-badge{color:var(--st-anomaly);margin-left:6px;cursor:help;font-weight:700;}
+.dtk-ui-stalechip{font-family:var(--mono);font-size:9.5px;color:var(--st-nodata);
+  border:1px solid var(--st-nodata);border-radius:5px;padding:1px 5px;margin-left:6px;
+  cursor:help;white-space:nowrap;vertical-align:1px;}
 .dtk-ui-tagchips{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;}
 .dtk-ui-tagchip{font-family:var(--mono);font-size:9.5px;color:var(--faint);
   background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:1px 5px;}
@@ -180,6 +183,16 @@ export function injectStyle(): void {
 .dtk-ui-overlay-close{border:1px solid var(--border);background:transparent;color:var(--muted);
   border-radius:7px;width:30px;height:30px;cursor:pointer;font-size:14px;}
 .dtk-ui-overlay-close:hover{border-color:var(--st-anomaly);color:var(--st-anomaly);}
+/* confirm strip for the detail overlay's "Clean stale" action — sits between
+   the overlay head and the report iframe, amber like the other warning surfaces */
+.dtk-ui-cleanstrip{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border);
+  background:rgba(240,173,78,0.08);flex:0 0 auto;}
+.dtk-ui-cleanstrip-text{font-size:12.5px;color:var(--text);max-width:900px;}
+.dtk-ui-cleanstrip-text b{color:var(--st-nodata);}
+.dtk-ui-cleanstrip-warn{color:var(--st-nodata);font-size:11.5px;margin-top:3px;}
+.dtk-ui-cleanstrip-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto;}
+.dtk-ui-cleanstrip .dtk-ui-btn{flex:0 0 auto;padding:6px 12px;font-size:12px;}
 .dtk-ui-overlay-body{flex:1;min-height:0;position:relative;background:var(--term-bg);}
 .dtk-ui-overlay-body iframe{width:100%;height:100%;border:0;display:block;background:#fff;}
 .dtk-ui-overlay-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;

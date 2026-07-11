@@ -118,14 +118,7 @@ def _configured_detector_ids(config: MetricConfig) -> list[str]:
     ids: list[str] = []
     for detector_config in config.detectors:
         try:
-            params = detector_config.get_algorithm_params()
-            seasonality = detector_config.get_seasonality_components()
-            if seasonality is not None:
-                params["seasonality_components"] = seasonality
-            detector = DetectorFactory.create_from_config(
-                {"type": detector_config.type, "params": params}
-            )
-            ids.append(detector.get_detector_id())
+            ids.append(DetectorFactory.detector_id_for_config(detector_config))
         except Exception:  # noqa: BLE001 — fall back to unfiltered on any bad config
             return []
     return ids
@@ -316,6 +309,7 @@ def _empty_row(name: str) -> dict[str, Any]:
         "points": 0,
         "flagged": 0,
         "anomaly_rate": None,
+        "stale_detectors": None,
         "alerts": {"anomaly": 0, "recovery": 0, "no_data": 0, "per_day": None, "last_ts": None},
         "quality": None,
         "budget": DEFAULT_FALSE_ALERT_BUDGET,
@@ -396,10 +390,19 @@ def _fill_stats(
     row["points"] = n_points
     row["first_point_in_window"] = _ms(ts_arr[0]) if n_points else None
 
-    det_rows = _load_window_detections(
-        internal, name, _configured_detector_ids(config), start, to_exclusive
-    )
+    configured_ids = _configured_detector_ids(config)
+    det_rows = _load_window_detections(internal, name, configured_ids, start, to_exclusive)
     det_rows = [r for r in det_rows if _ms(r["timestamp"]) <= end_ms]
+
+    # Superseded detector generations still stored for this metric — every
+    # retune/autotune changes the detector_id and the old rows stay behind.
+    # Surfaced so the stale state is visible before opening the detail (the
+    # detail's "Clean stale" action removes them); stays None (unknown) when
+    # the current config's ids can't be derived, so an underivable config is
+    # never presented as "everything stale".
+    if configured_ids:
+        stored_ids = internal.list_detector_ids(name)
+        row["stale_detectors"] = sum(1 for d in stored_ids if d not in set(configured_ids))
 
     anomalous_timestamps: set[int] = set()
     for r in det_rows:

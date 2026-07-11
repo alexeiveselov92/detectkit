@@ -104,6 +104,14 @@ export interface OverviewMetric {
   points: number;
   flagged: number;
   anomaly_rate: number | null;
+  /**
+   * Superseded detector generations still stored in `_dtk_detections` for
+   * this metric (stored detector_ids the CURRENT config no longer produces —
+   * every retune/autotune leaves the old generation's rows behind). `null`
+   * when unknown (older server, no datapoints yet, or a config whose ids
+   * can't be derived). The detail overlay's "Clean stale" action prunes them.
+   */
+  stale_detectors?: number | null;
   alerts: AlertsSummary;
   quality: QualitySummary | null;
   budget: number;
@@ -138,7 +146,7 @@ export interface OverviewPayload {
 // Jobs
 // ----------------------------------------------------------------------------
 
-export type JobKind = 'run' | 'autotune' | 'unlock' | 'tune';
+export type JobKind = 'run' | 'autotune' | 'unlock' | 'clean' | 'tune';
 export type JobStatus = 'running' | 'done' | 'failed' | 'stopped';
 
 /** Job metadata without the (potentially large) line buffer. */
@@ -196,6 +204,29 @@ export interface UnlockRequest {
 
 export interface TuneRequest {
   metric: string;
+}
+
+/** POST /api/clean body — per-metric by design (the button lives on the metric detail). */
+export interface CleanRequest {
+  metric: string;
+}
+
+/** One superseded detector generation `dtk clean` would prune. */
+export interface CleanStaleDetector {
+  detector_id: string;
+  rows: number;
+}
+
+/**
+ * GET /api/clean-preview/<name> response: what `dtk clean --select <name>`
+ * would delete (its dry-run, as JSON) — the confirm step's exact counts.
+ */
+export interface CleanPreviewResponse {
+  name: string;
+  stale_detectors: CleanStaleDetector[];
+  stale_alert_states: string[];
+  configured_detectors: number;
+  warnings: string[];
 }
 
 export interface JobIdResponse {

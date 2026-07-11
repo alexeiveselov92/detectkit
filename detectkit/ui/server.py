@@ -8,12 +8,12 @@ POST), since this page stays open and polls in the background rather than
 ending after one write.
 
 The server itself never runs the pipeline in-process and takes no pipeline
-lock: ``POST /api/run`` / ``/api/autotune`` / ``/api/unlock`` spawn the real
-``dtk`` CLI as a subprocess (tracked by :class:`detectkit.ui.jobs.JobManager`),
-exactly as if typed at a terminal — spawned processes take their own lock. A
-single ``db_lock`` serializes every DB-touching route (the DB manager holds one
-connection, same reason the tune server serializes ``/autotune``); it is never
-held while a subprocess runs.
+lock: ``POST /api/run`` / ``/api/autotune`` / ``/api/unlock`` / ``/api/clean``
+spawn the real ``dtk`` CLI as a subprocess (tracked by
+:class:`detectkit.ui.jobs.JobManager`), exactly as if typed at a terminal —
+spawned processes take their own lock. A single ``db_lock`` serializes every
+DB-touching route (the DB manager holds one connection, same reason the tune
+server serializes ``/autotune``); it is never held while a subprocess runs.
 """
 
 from __future__ import annotations
@@ -34,6 +34,8 @@ from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import parse_qs, unquote, urlparse
 
 from detectkit import __version__
+from detectkit.detectors.factory import DetectorFactory
+from detectkit.orchestration.task_manager._types import make_alert_config_id
 from detectkit.reporting import build_report_payload, render_report_html
 from detectkit.ui.html import render_ui_html
 from detectkit.ui.jobs import JobManager
@@ -199,6 +201,14 @@ def _unlock_argv(*, select: str, profile: str | None) -> list[str]:
     return argv
 
 
+def _clean_argv(*, select: str, profile: str | None) -> list[str]:
+    """``dtk clean --select … --execute`` argv. Module-level so tests can monkeypatch it."""
+    argv = [sys.executable, "-m", "detectkit.cli.main", "clean", "--select", select, "--execute"]
+    if profile:
+        argv += ["--profile", profile]
+    return argv
+
+
 def _tune_argv(*, metric: str, profile: str | None) -> list[str]:
     """``dtk tune`` argv (server mode, no browser). Module-level so tests can monkeypatch it."""
     argv = [sys.executable, "-m", "detectkit.cli.main", "tune", "--select", metric, "--no-open"]
@@ -322,6 +332,10 @@ class _Handler(BaseHTTPRequestHandler):
             name = unquote(path[len("/api/metric-source/") :])
             self._handle_metric_source(srv, name)
             return
+        if path.startswith("/api/clean-preview/"):
+            name = unquote(path[len("/api/clean-preview/") :])
+            self._handle_clean_preview(srv, name)
+            return
         self._reply_error(404, "not found")
 
     def _route_post(self, srv: _UiServer, body: bytes) -> None:
@@ -332,6 +346,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._handle_autotune(srv, body)
         elif path == "/api/unlock":
             self._handle_unlock(srv, body)
+        elif path == "/api/clean":
+            self._handle_clean(srv, body)
         elif path == "/api/tune":
             self._handle_tune(srv, body)
         elif path.startswith("/api/job/") and path.endswith("/stop"):
@@ -629,6 +645,95 @@ class _Handler(BaseHTTPRequestHandler):
         argv = _unlock_argv(select=select, profile=srv.profile)
         job = srv.jobs.spawn_pipeline(
             "unlock", f"unlock --select {select}", argv, cwd=srv.project_root, env=_subprocess_env()
+        )
+        if job is None:
+            self._reply_error(400, "a pipeline job is already running")
+            return
+        self._reply_json({"job_id": job.id})
+
+    def _handle_clean_preview(self, srv: _UiServer, name: str) -> None:
+        """What ``dtk clean --select <name>`` would delete — the dry-run, as JSON.
+
+        Read-only: diffs the stored ``detector_id``s / ``alert_config_id``s
+        against the ids the CURRENT config produces (the same derivation the
+        detect step and ``dtk clean`` use), so the page can show exact counts
+        in its confirm step instead of spawning a throwaway dry-run subprocess
+        and scraping its log. The actual delete goes through ``POST
+        /api/clean`` — the real CLI, never this route.
+        """
+        config = _find_metric(srv.metrics, name)
+        if config is None:
+            self._reply_error(404, f"unknown metric: {name}")
+            return
+        # A live tuner for this metric can Apply mid-flow (rewriting the YAML
+        # on disk while ``srv.metrics`` stays on its startup snapshot), so the
+        # preview would diff against a config the executed ``dtk clean`` — which
+        # re-reads disk — no longer sees. Refuse while one is open, exactly as
+        # the metric update/delete routes do (see ``_handle_metric_update``).
+        if srv.jobs.running_tune_for(name) is not None:
+            self._reply_error(400, f"a tuner for {name} is running — close it before cleaning")
+            return
+        assert srv.internal_manager is not None
+        # Derive STRICTLY (no fall-back-to-[] like the overview): presenting an
+        # underivable config as "every stored row is stale" would offer a full
+        # wipe by mistake — a 400 with the factory's message is the safe answer.
+        valid_ids = {DetectorFactory.detector_id_for_config(dc) for dc in config.detectors or []}
+        valid_alerts = {make_alert_config_id(c) for c in (config.alerting or [])}
+        with srv.db_lock:
+            stored_ids = srv.internal_manager.list_detector_ids(name)
+            stored_alerts = srv.internal_manager.list_alert_config_ids(name)
+        stale_detectors = [
+            {"detector_id": det_id, "rows": count}
+            for det_id, count in sorted(stored_ids.items())
+            if det_id not in valid_ids
+        ]
+        stale_alerts = sorted(a for a in stored_alerts if a not in valid_alerts)
+        # Mirror the CLI dry-run's loud flag: an empty valid set usually means a
+        # config mid-edit, not an intent to wipe the metric's whole history.
+        warnings = []
+        if stale_detectors and not valid_ids:
+            warnings.append("config defines no detectors — ALL stored detections would be removed")
+        if stale_alerts and not valid_alerts:
+            warnings.append("config defines no alerting — ALL alert states would be removed")
+        self._reply_json(
+            {
+                "name": name,
+                "stale_detectors": stale_detectors,
+                "stale_alert_states": stale_alerts,
+                "configured_detectors": len(valid_ids),
+                "warnings": warnings,
+            }
+        )
+
+    def _handle_clean(self, srv: _UiServer, body: bytes) -> None:
+        """Spawn ``dtk clean --select <metric> --execute`` as a pipeline job.
+
+        Per-metric by design (the button lives on the metric detail), so the
+        name is validated against the session's metrics up front like
+        ``/api/tune`` — a selector-typo path doesn't exist here. Goes through
+        ``spawn_pipeline``: the delete mutates the same ``_dtk_*`` tables the
+        pipeline writes, so it shares run/autotune/unlock's one-at-a-time gate.
+        """
+        payload = _load_json(body)
+        metric = payload.get("metric")
+        if not isinstance(metric, str) or not metric.strip():
+            self._reply_error(400, "'metric' must be a non-empty string")
+            return
+        if _find_metric(srv.metrics, metric) is None:
+            self._reply_error(400, f"unknown metric: {metric}")
+            return
+        # Refuse while a tuner for this metric is open: its Apply rewrites the
+        # metric YAML, and the spawned ``dtk clean`` re-reads that YAML from
+        # disk — so a clean racing an Apply could delete the generation the
+        # Apply just superseded, which the confirm strip never showed. This is
+        # the same guard the metric update/delete routes carry, and it closes
+        # the only in-session source of preview↔execute config drift.
+        if srv.jobs.running_tune_for(metric) is not None:
+            self._reply_error(400, f"a tuner for {metric} is running — close it before cleaning")
+            return
+        argv = _clean_argv(select=metric, profile=srv.profile)
+        job = srv.jobs.spawn_pipeline(
+            "clean", f"clean --select {metric}", argv, cwd=srv.project_root, env=_subprocess_env()
         )
         if job is None:
             self._reply_error(400, "a pipeline job is already running")

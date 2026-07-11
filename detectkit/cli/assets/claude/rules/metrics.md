@@ -149,7 +149,8 @@ columns and bakes the best grouping into the tuned config (see `autotune.md`).
   `detector_id` and recomputes that detector's detections; the old rows are
   orphaned in `_dtk_detections`. **Changing/removing an alerting block** orphans
   its `_dtk_alert_states` row. Prune both with `dtk clean --select <m>`
-  (preview, then `--execute`).
+  (preview, then `--execute`) — or, from `dtk ui`, the metric's detail view's
+  **Clean stale** button.
 - **Renaming/deleting a metric** orphans all its rows under the old name; purge
   with `dtk clean --orphaned-metrics`.
 - Datapoints are keyed only by `(metric, timestamp)` — a parameter edit never

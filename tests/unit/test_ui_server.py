@@ -29,8 +29,10 @@ from click.testing import CliRunner
 import detectkit.ui.jobs as ui_jobs
 import detectkit.ui.server as ui_server
 from detectkit.cli.main import cli
-from detectkit.config.metric_config import AlertConfig, MetricConfig
+from detectkit.config.metric_config import AlertConfig, DetectorConfig, MetricConfig
 from detectkit.config.project_config import ProjectConfig
+from detectkit.detectors.factory import DetectorFactory
+from detectkit.orchestration.task_manager._types import make_alert_config_id
 from detectkit.ui.jobs import JobManager
 from detectkit.ui.server import build_ui_server
 
@@ -50,6 +52,10 @@ class _StubManager:
         self._times = [base + timedelta(hours=i) for i in range(n)]
         self._ts = np.array([np.datetime64(t, "ms") for t in self._times])
         self._val = np.full(n, 10.0)
+        # Configurable id inventories for the clean-preview route (and the
+        # overview's stale-generation count when a config has real detectors).
+        self.detector_ids: dict[str, int] = {}
+        self.alert_config_ids: list[str] = []
         self._det_rows = [
             {
                 "timestamp": t,
@@ -99,6 +105,12 @@ class _StubManager:
             out.append(r)
         return out
 
+    def list_detector_ids(self, metric_name):  # noqa: ARG002
+        return dict(self.detector_ids)
+
+    def list_alert_config_ids(self, metric_name):  # noqa: ARG002
+        return list(self.alert_config_ids)
+
 
 def _metrics(names: list[str]) -> list[tuple[Path, MetricConfig]]:
     return [
@@ -138,13 +150,13 @@ def _real_metrics(tmp_path: Path, names: list[str]) -> list[tuple[Path, MetricCo
     ]
 
 
-def _build(tmp_path: Path, *, project_name: str = "proj", metrics=None, **kwargs):
+def _build(tmp_path: Path, *, project_name: str = "proj", metrics=None, internal=None, **kwargs):
     project_config = ProjectConfig(name=project_name, default_profile="p")
     return build_ui_server(
         project_config=project_config,
         project_root=tmp_path,
         metrics=metrics if metrics is not None else _metrics(["orders"]),
-        internal_manager=_StubManager(),
+        internal_manager=internal if internal is not None else _StubManager(),
         initial_window="7d",
         echo=lambda *_a: None,
         **kwargs,
@@ -1097,6 +1109,163 @@ def test_metric_create_rejects_non_string_falsy_folder(tmp_path):
         assert not (tmp_path / "metrics" / "signups.yml").exists()
     finally:
         _teardown(server)
+
+
+# ── GET /api/clean-preview/<name> + POST /api/clean ──────────────────────────
+
+
+def _detector_metrics(names: list[str]) -> list[tuple[Path, MetricConfig]]:
+    """Metrics with a real detector, so the current config's ids derive."""
+    return [
+        (
+            Path("metrics") / f"{name}.yml",
+            MetricConfig(
+                name=name,
+                interval="1h",
+                query="SELECT 1",
+                detectors=[DetectorConfig(type="mad")],
+                alerting=[AlertConfig(channels=["slack"], consecutive_anomalies=1)],
+            ),
+        )
+        for name in names
+    ]
+
+
+def test_clean_preview_reports_only_stale_generations(tmp_path):
+    metrics = _detector_metrics(["orders"])
+    config = metrics[0][1]
+    valid_id = DetectorFactory.detector_id_for_config(config.detectors[0])
+    valid_alert = make_alert_config_id(config.alerting[0])
+    stub = _StubManager()
+    stub.detector_ids = {valid_id: 5, "deadbeefdeadbeef": 7}
+    stub.alert_config_ids = [valid_alert, "stalealert0000"]
+
+    server, url = _build(tmp_path, metrics=metrics, internal=stub)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        preview = json.loads(_get(f"{base}/api/clean-preview/orders?token={token}").read())
+        assert preview["name"] == "orders"
+        assert preview["stale_detectors"] == [{"detector_id": "deadbeefdeadbeef", "rows": 7}]
+        assert preview["stale_alert_states"] == ["stalealert0000"]
+        assert preview["configured_detectors"] == 1
+        assert preview["warnings"] == []
+
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _get(f"{base}/api/clean-preview/nope?token={token}")
+        assert ei.value.code == 404
+    finally:
+        _teardown(server)
+
+
+def test_clean_preview_flags_config_with_no_detectors(tmp_path):
+    """An empty valid set (config mid-edit) must arrive flagged, never as a
+    quiet everything-is-stale preview."""
+    stub = _StubManager()
+    stub.detector_ids = {"olddet00": 3}
+    server, url = _build(tmp_path, internal=stub)  # default _metrics: no detectors
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        preview = json.loads(_get(f"{base}/api/clean-preview/orders?token={token}").read())
+        assert preview["stale_detectors"] == [{"detector_id": "olddet00", "rows": 3}]
+        assert preview["configured_detectors"] == 0
+        assert any("no detectors" in w for w in preview["warnings"])
+    finally:
+        _teardown(server)
+
+
+def test_clean_job_lifecycle_and_unknown_metric(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        ui_server,
+        "_clean_argv",
+        lambda **kw: [sys.executable, "-c", "print('cleaned')"],  # noqa: ARG005
+    )
+    server, url = _build(tmp_path)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        r = _post(f"{base}/api/clean?token={token}", {"metric": "orders"})
+        job_id = json.loads(r.read())["job_id"]
+
+        def _snap() -> dict:
+            return json.loads(_get(f"{base}/api/job/{job_id}?token={token}").read())
+
+        assert _wait_until(lambda: _snap()["status"] != "running")
+        snap = _snap()
+        assert snap["status"] == "done"
+        assert snap["kind"] == "clean"
+        assert "cleaned" in snap["lines"]
+
+        # The clean route validates the metric name up front, like /api/tune.
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(f"{base}/api/clean?token={token}", {"metric": "nope"})
+        assert ei.value.code == 400
+        assert "unknown metric" in ei.value.read().decode()
+    finally:
+        _teardown(server)
+
+
+def test_clean_and_preview_refused_while_a_tuner_for_the_metric_runs(tmp_path, monkeypatch):
+    """A tuner's Apply rewrites the metric YAML the spawned clean re-reads, so
+    both the preview and the execute must refuse while one is open (the same
+    guard metric update/delete carry)."""
+    metrics = _detector_metrics(["orders"])
+    stub = _StubManager()
+    stub.detector_ids = {"deadbeefdeadbeef": 3}
+    server, url = _build(tmp_path, metrics=metrics, internal=stub)
+    # A tuner is "running" for orders but not for anything else.
+    monkeypatch.setattr(
+        server.jobs, "running_tune_for", lambda m: object() if m == "orders" else None
+    )
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _get(f"{base}/api/clean-preview/orders?token={token}")
+        assert ei.value.code == 400
+        assert "tuner for orders is running" in ei.value.read().decode()
+
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(f"{base}/api/clean?token={token}", {"metric": "orders"})
+        assert ei.value.code == 400
+        assert "tuner for orders is running" in ei.value.read().decode()
+    finally:
+        _teardown(server)
+
+
+def test_clean_shares_the_single_pipeline_job_gate(tmp_path, monkeypatch):
+    """A clean mutates the same _dtk_* tables the pipeline writes — it must be
+    refused while a run job is active (and vice versa), exactly like autotune."""
+    monkeypatch.setattr(
+        ui_server,
+        "_pipeline_argv",
+        lambda **kw: [sys.executable, "-c", "import time; time.sleep(3)"],  # noqa: ARG005
+    )
+    server, url = _build(tmp_path)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        r1 = _post(f"{base}/api/run?token={token}", {"select": "*", "steps": ["load"]})
+        assert r1.status == 200
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(f"{base}/api/clean?token={token}", {"metric": "orders"})
+        assert ei.value.code == 400
+        assert "already running" in ei.value.read().decode()
+    finally:
+        _teardown(server)
+
+
+def test_clean_argv_builds_the_execute_command():
+    argv = ui_server._clean_argv(select="orders", profile="prod")
+    assert argv[:3] == [sys.executable, "-m", "detectkit.cli.main"]
+    assert argv[3:] == ["clean", "--select", "orders", "--execute", "--profile", "prod"]
+    assert ui_server._clean_argv(select="orders", profile=None)[3:] == [
+        "clean",
+        "--select",
+        "orders",
+        "--execute",
+    ]
 
 
 if __name__ == "__main__":

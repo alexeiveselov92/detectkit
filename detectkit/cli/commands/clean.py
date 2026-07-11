@@ -42,7 +42,7 @@ def run_clean(
     execute: bool,
     yes: bool,
     profile: str | None,
-):
+) -> int:
     """Prune stale internal data that no longer matches the project configs.
 
     Args:
@@ -51,6 +51,10 @@ def run_clean(
         execute: Actually delete (default: dry-run, only report).
         yes: Skip the confirmation prompt in GC mode.
         profile: Profile name to use (defaults to project's default_profile).
+
+    Returns:
+        0 on success, 1 on a startup/inspection/deletion failure, 2 on a
+        usage error (both or neither of --select/--orphaned-metrics given).
     """
     if bool(select) == bool(orphaned_metrics):
         click.echo(
@@ -60,19 +64,19 @@ def run_clean(
                 bold=True,
             )
         )
-        return
+        return 2
 
     project_root = find_project_root()
     if not project_root:
         click.echo(click.style("Error: Not in a detectkit project directory!", fg="red", bold=True))
         click.echo("Run 'dtk init <project_name>' to create a new project.")
-        return
+        return 1
 
     click.echo(f"Project root: {project_root}")
 
     internal_manager = _create_internal_manager(project_root, profile)
     if internal_manager is None:
-        return
+        return 1
 
     if not execute:
         click.echo(
@@ -81,9 +85,8 @@ def run_clean(
     click.echo()
 
     if select:
-        _clean_drift(internal_manager, select, project_root, execute)
-    else:
-        _clean_orphaned_metrics(internal_manager, project_root, execute, yes)
+        return _clean_drift(internal_manager, select, project_root, execute)
+    return _clean_orphaned_metrics(internal_manager, project_root, execute, yes)
 
 
 # ── modes ──────────────────────────────────────────────────────────────────
@@ -94,23 +97,24 @@ def _clean_drift(
     select: str,
     project_root: Path,
     execute: bool,
-) -> None:
+) -> int:
     """Prune detector/alert data whose hash is no longer produced by the config."""
     try:
         metrics = select_metrics(select, project_root)
     except ValueError as e:
         click.echo(click.style(f"Error: {e}", fg="red", bold=True))
-        return
+        return 1
 
     if not metrics:
         click.echo(click.style(f"No metrics found matching selector: {select}", fg="yellow"))
-        return
+        return 1
 
     click.echo(f"Found {len(metrics)} metric(s) to inspect")
     click.echo()
 
     total_det_groups = 0
     total_alert_rows = 0
+    had_error = False
 
     verb = "deleting" if execute else "would delete"
 
@@ -123,6 +127,7 @@ def _clean_drift(
             db_alerts = internal_manager.list_alert_config_ids(metric_name)
         except Exception as e:
             echo_error(metric_name, f"error inspecting: {e}")
+            had_error = True
             continue
 
         orphan_detectors = {
@@ -171,13 +176,15 @@ def _clean_drift(
     if not execute and (total_det_groups or total_alert_rows):
         click.echo("Re-run with --execute to apply.")
 
+    return 1 if had_error else 0
+
 
 def _clean_orphaned_metrics(
     internal_manager: InternalTablesManager,
     project_root: Path,
     execute: bool,
     yes: bool,
-) -> None:
+) -> int:
     """Purge all data for metrics present in the DB but absent from the project."""
     try:
         project_metrics = validate_project_metrics(project_root)
@@ -196,22 +203,24 @@ def _clean_orphaned_metrics(
                 bold=True,
             )
         )
-        return
+        return 1
 
     db_names = internal_manager.list_known_metric_names()
     orphans = sorted(db_names - project_names)
 
     if not orphans:
         click.echo(click.style("No orphaned metrics — database matches the project.", fg="green"))
-        return
+        return 0
 
     click.echo(f"Found {len(orphans)} metric(s) in the database with no YAML in the project:")
     click.echo()
+    had_error = False
     for name in orphans:
         try:
             counts = internal_manager.count_metric_rows(name)
         except Exception as e:
             echo_error(name, f"error counting rows: {e}")
+            had_error = True
             continue
         children = [f"{table}: {count:,} row(s)" for table, count in counts.items() if count]
         echo_tree(name, children or ["(no rows)"])
@@ -219,7 +228,7 @@ def _clean_orphaned_metrics(
     if not execute:
         click.echo()
         click.echo("Re-run with --execute to purge these metrics.")
-        return
+        return 1 if had_error else 0
 
     # Guard: an empty project set means --execute would wipe EVERYTHING. Almost
     # always a wrong directory / empty project, so demand explicit --yes.
@@ -233,7 +242,7 @@ def _clean_orphaned_metrics(
                 bold=True,
             )
         )
-        return
+        return 1
 
     if not yes:
         click.echo()
@@ -241,7 +250,7 @@ def _clean_orphaned_metrics(
             click.style(f"Permanently delete all data for {len(orphans)} metric(s)?", fg="yellow")
         ):
             click.echo("Aborted.")
-            return
+            return 0
 
     purged = 0
     for name in orphans:
@@ -250,8 +259,10 @@ def _clean_orphaned_metrics(
             purged += 1
         except Exception as e:
             echo_error(name, f"error purging: {e}")
+            had_error = True
 
     echo_done(f"Purged {purged} of {len(orphans)} orphaned metric(s).")
+    return 1 if had_error else 0
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────

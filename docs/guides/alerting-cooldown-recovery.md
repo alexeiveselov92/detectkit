@@ -382,6 +382,10 @@ alerting:
 4. **Adjust for interval**: Faster intervals need longer cooldowns
 5. **Monitor alert frequency**: Track via `_dtk_alert_states.alert_count` in database
 6. **Use strict mode sparingly**: Only for very noisy experimental metrics
+7. **Gate the scheduler on the exit code**: cooldown controls alert *spam*, not
+   pipeline *health* — have cron/CI fail on `dtk run`'s non-zero exit (see
+   [Exit Codes](../reference/cli.md#exit-codes)) so a crashed run is caught
+   even while cooldown is quietly suppressing the alert side
 
 > **Note**: Alert state (last alert/recovery timestamps, alert counter)
 > lives in the `_dtk_alert_states` table, keyed by metric and alert

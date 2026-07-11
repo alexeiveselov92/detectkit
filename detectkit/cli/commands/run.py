@@ -4,8 +4,12 @@ Implementation of 'dtk run' command.
 Executes metric processing pipeline.
 """
 
+import contextlib
+import json
+import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -19,7 +23,11 @@ from detectkit.config.validator import (
 )
 from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.orchestration.error_dispatch import dispatch_project_error_alert
-from detectkit.orchestration.task_manager import PipelineStep, TaskManager
+from detectkit.orchestration.task_manager import PipelineStep, TaskManager, TaskStatus
+from detectkit.utils.datetime_utils import now_utc_naive
+
+# Wall-clock format for the --json summary's started_at/finished_at fields.
+_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 def run_command(
@@ -32,7 +40,8 @@ def run_command(
     force: bool,
     profile: str | None,
     report_path: str | None = None,
-):
+    json_output: bool = False,
+) -> int:
     """
     Execute metric processing pipeline.
 
@@ -48,14 +57,165 @@ def run_command(
         report_path: When not None, emit an HTML report per metric after its
             run. "" → default location (reports/<metric>.html); a directory →
             <dir>/<metric>.html; a .html path → that file.
-    """
-    # Parse steps
-    step_list = parse_steps(steps)
+        json_output: When True, emit a machine-readable JSON run summary on
+            the real stdout and reroute every human-readable line (this
+            command's own plus everything the pipeline echoes downstream) to
+            stderr instead.
 
-    # Parse dates
+    Returns:
+        The process exit code: 0 on success, 1 if a startup step failed, the
+        selector matched no metrics, any metric failed, or the run aborted.
+    """
+    # Parsing failures raise click.BadParameter (a usage error) regardless of
+    # --json — they happen before there is a run to summarize.
+    step_list = parse_steps(steps)
     from_dt = parse_date(from_date) if from_date else None
     to_dt = parse_date(to_date) if to_date else None
 
+    started_at = now_utc_naive()
+    summary = _new_summary(select, exclude, step_list, started_at)
+
+    if not json_output:
+        rc = _run_impl(
+            select=select,
+            exclude=exclude,
+            step_list=step_list,
+            from_dt=from_dt,
+            to_dt=to_dt,
+            full_refresh=full_refresh,
+            force=force,
+            profile=profile,
+            report_path=report_path,
+            summary=summary,
+        )
+        _finish_summary(summary, started_at, rc)
+        return rc
+
+    # click.echo resolves sys.stdout dynamically (it looks it up on every
+    # call), so redirecting stdout to stderr for the duration of the run
+    # reroutes every click.echo the pipeline makes — not just this module's —
+    # leaving the real stdout free for the one JSON document below.
+    rc = 1
+    caught: BaseException | None = None
+    with contextlib.redirect_stdout(sys.stderr):
+        try:
+            rc = _run_impl(
+                select=select,
+                exclude=exclude,
+                step_list=step_list,
+                from_dt=from_dt,
+                to_dt=to_dt,
+                full_refresh=full_refresh,
+                force=force,
+                profile=profile,
+                report_path=report_path,
+                summary=summary,
+            )
+        except BaseException as exc:
+            # A consumer parsing stdout must get the one JSON document even
+            # when the run dies unexpectedly (including Ctrl+C) — emit it
+            # first, then let the exception propagate for the usual traceback.
+            caught = exc
+            if not summary["error"]:
+                summary["error"] = f"{type(exc).__name__}: {exc}"
+    _finish_summary(summary, started_at, rc)
+    click.echo(json.dumps(summary))
+    if caught is not None:
+        raise caught
+    return rc
+
+
+def _new_summary(
+    select: str,
+    exclude: str | None,
+    step_list: list[PipelineStep],
+    started_at: datetime,
+) -> dict[str, Any]:
+    """The mutable JSON-summary collector, seeded with the run's static inputs."""
+    return {
+        "schema_version": 1,
+        "command": "run",
+        "project": None,
+        "selector": select,
+        "exclude": exclude,
+        "steps": [s.value for s in step_list],
+        "started_at": started_at.strftime(_TIMESTAMP_FORMAT),
+        "finished_at": None,
+        "duration_seconds": None,
+        "status": "success",
+        "error": None,
+        "aborted": False,
+        "metrics": [],
+        "totals": {
+            "metrics": 0,
+            "succeeded": 0,
+            "failed": 0,
+            "skipped": 0,
+            "datapoints_loaded": 0,
+            "anomalies_detected": 0,
+            "alerts_sent": 0,
+        },
+        "exit_code": 0,
+    }
+
+
+def _status_str(status: Any) -> str:
+    """Normalize a ``TaskStatus`` (or an already-plain string) to its plain string value.
+
+    ``TaskManager.run_metric`` reports status via the ``TaskStatus`` str-enum;
+    ``process_metric``'s own synthesized failure dict uses a plain string. Both
+    must render identically in the JSON summary.
+    """
+    return status.value if isinstance(status, TaskStatus) else str(status)
+
+
+def _finish_summary(summary: dict[str, Any], started_at: datetime, rc: int) -> None:
+    """Fill in totals, timing and the final status, keyed off the per-metric entries."""
+    finished_at = now_utc_naive()
+    summary["finished_at"] = finished_at.strftime(_TIMESTAMP_FORMAT)
+    summary["duration_seconds"] = round((finished_at - started_at).total_seconds(), 1)
+
+    metrics = summary["metrics"]
+    totals = summary["totals"]
+    totals["metrics"] = len(metrics)
+    totals["succeeded"] = sum(1 for m in metrics if m["status"] == "success")
+    totals["failed"] = sum(1 for m in metrics if m["status"] == "failed")
+    totals["skipped"] = sum(1 for m in metrics if m["status"] == "skipped")
+    totals["datapoints_loaded"] = sum(m["datapoints_loaded"] for m in metrics)
+    totals["anomalies_detected"] = sum(m["anomalies_detected"] for m in metrics)
+    totals["alerts_sent"] = sum(m["alerts_sent"] for m in metrics)
+
+    if summary["error"] is not None and not metrics:
+        # Died before/at startup — no metric was ever processed.
+        summary["status"] = "error"
+    elif summary["aborted"] or totals["failed"] or summary["error"] is not None:
+        # An error recorded mid-run (e.g. an exception after some metrics
+        # already succeeded) is a failed run, never a "success" with an error.
+        summary["status"] = "failed"
+    else:
+        summary["status"] = "success"
+    summary["exit_code"] = rc
+
+
+def _run_impl(
+    *,
+    select: str,
+    exclude: str | None,
+    step_list: list[PipelineStep],
+    from_dt: datetime | None,
+    to_dt: datetime | None,
+    full_refresh: bool,
+    force: bool,
+    profile: str | None,
+    report_path: str | None,
+    summary: dict[str, Any],
+) -> int:
+    """Run the pipeline for the selected metrics, mutating *summary* as it goes.
+
+    Returns the process exit code (0 success, 1 failure) — the actual work
+    behind :func:`run_command`, factored out so the JSON-summary wrapper can
+    redirect stdout around exactly this call.
+    """
     # Find project root and load config
     project_root = find_project_root()
     if not project_root:
@@ -67,7 +227,8 @@ def run_command(
             )
         )
         click.echo("Run 'dtk init <project_name>' to create a new project.")
-        return
+        summary["error"] = "Not in a detectkit project directory"
+        return 1
 
     click.echo(f"Project root: {project_root}")
 
@@ -83,7 +244,10 @@ def run_command(
                 bold=True,
             )
         )
-        return
+        summary["error"] = f"Error loading detectkit_project.yml: {e}"
+        return 1
+
+    summary["project"] = getattr(project_config, "name", None)
 
     # Select metrics based on selector
     # Returns list of (path, config) tuples with uniqueness validation
@@ -97,7 +261,8 @@ def run_command(
                 bold=True,
             )
         )
-        return
+        summary["error"] = f"Error: {e}"
+        return 1
 
     # Exclude metrics if specified
     if exclude:
@@ -118,7 +283,8 @@ def run_command(
                     bold=True,
                 )
             )
-            return
+            summary["error"] = f"Error in exclusion selector: {e}"
+            return 1
 
     if not metrics:
         click.echo(
@@ -127,7 +293,8 @@ def run_command(
                 fg="yellow",
             )
         )
-        return
+        summary["error"] = f"No metrics found matching selector: {select}"
+        return 1
 
     click.echo(f"Found {len(metrics)} metric(s) to process")
     click.echo()
@@ -143,7 +310,8 @@ def run_command(
             )
         )
         click.echo(f"Expected at: {profiles_path}")
-        return
+        summary["error"] = "profiles.yml not found"
+        return 1
 
     try:
         profiles_config = ProfilesConfig.from_yaml(profiles_path)
@@ -155,7 +323,8 @@ def run_command(
                 bold=True,
             )
         )
-        return
+        summary["error"] = f"Error loading profiles.yml: {e}"
+        return 1
 
     # Create database manager
     try:
@@ -177,7 +346,8 @@ def run_command(
             metric_name="<startup>",
             exc=e,
         )
-        return
+        summary["error"] = f"Error creating database manager: {e}"
+        return 1
 
     # Create internal tables manager
     internal_manager = InternalTablesManager(db_manager)
@@ -199,7 +369,8 @@ def run_command(
             metric_name="<startup>",
             exc=e,
         )
-        return
+        summary["error"] = f"Error initializing internal tables: {e}"
+        return 1
 
     # Create task manager
     task_manager = TaskManager(
@@ -210,7 +381,7 @@ def run_command(
     )
 
     # Process each metric
-    for metric_path, config in metrics:
+    for index, (metric_path, config) in enumerate(metrics):
         result = process_metric(
             metric_path=metric_path,
             config=config,
@@ -222,10 +393,22 @@ def run_command(
             full_refresh=full_refresh,
             force=force,
         )
+        summary["metrics"].append(
+            {
+                "name": config.name,
+                "status": _status_str(result["status"]),
+                "steps_completed": [s.value for s in result["steps_completed"]],
+                "datapoints_loaded": result["datapoints_loaded"],
+                "anomalies_detected": result["anomalies_detected"],
+                "alerts_sent": result["alerts_sent"],
+                "error": result["error"],
+            }
+        )
+
         # Project-level error alert was dispatched — stop processing the
         # rest of the metrics. The DB / source is presumed unreachable;
         # subsequent metrics would all fail with the same error.
-        if result and result.get("abort_run"):
+        if result.get("abort_run"):
             click.echo(
                 click.style(
                     "✗ Aborting run after project error alert. " "Remaining metrics skipped.",
@@ -233,6 +416,19 @@ def run_command(
                     bold=True,
                 )
             )
+            summary["aborted"] = True
+            for _, skipped_config in metrics[index + 1 :]:
+                summary["metrics"].append(
+                    {
+                        "name": skipped_config.name,
+                        "status": "skipped",
+                        "steps_completed": [],
+                        "datapoints_loaded": 0,
+                        "anomalies_detected": 0,
+                        "alerts_sent": 0,
+                        "error": None,
+                    }
+                )
             break
 
         # Optional: emit a self-contained HTML report from the freshly-persisted
@@ -251,6 +447,9 @@ def run_command(
                 )
             except Exception as report_error:  # never fail the run on a report
                 click.echo(click.style(f"  │ Report skipped: {report_error}", fg="yellow"))
+
+    failed = any(m["status"] == "failed" for m in summary["metrics"])
+    return 1 if (failed or summary["aborted"]) else 0
 
 
 def _resolve_report_path(report_path: str, project_root: Path, metric_name: str) -> Path:
@@ -559,7 +758,7 @@ def process_metric(
     to_date: datetime | None,
     full_refresh: bool,
     force: bool,
-) -> dict | None:
+) -> dict[str, Any]:
     """
     Process a single metric.
 
@@ -573,6 +772,12 @@ def process_metric(
         to_date: End date
         full_refresh: Full refresh flag
         force: Force flag
+
+    Returns:
+        A result dict shaped like ``TaskManager.run_metric``'s (``status``,
+        ``error``, ``steps_completed``, ``datapoints_loaded``,
+        ``anomalies_detected``, ``alerts_sent``, ``abort_run``) — always
+        populated, even when the call raises before returning one.
     """
     # Use config.name (not metric_path.stem) for consistency
     metric_name = config.name
@@ -593,7 +798,6 @@ def process_metric(
     click.echo()
 
     # Run pipeline
-    result = None
     try:
         # Log step headers
         if PipelineStep.LOAD in steps:
@@ -634,6 +838,19 @@ def process_metric(
         import traceback
 
         click.echo(traceback.format_exc())
+        # run_metric normally always returns a result dict (it catches its own
+        # exceptions internally); this branch only guards against something
+        # raising before that call returns — e.g. building the pipeline lock
+        # request — so `result` is never left unbound.
+        result = {
+            "status": "failed",
+            "error": f"{type(e).__name__}: {e}",
+            "steps_completed": [],
+            "datapoints_loaded": 0,
+            "anomalies_detected": 0,
+            "alerts_sent": 0,
+            "abort_run": False,
+        }
 
     click.echo()
     return result

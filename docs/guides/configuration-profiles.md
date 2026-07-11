@@ -26,10 +26,14 @@ alert_channels:
 
 ### Database Profiles
 
-ClickHouse, PostgreSQL and MySQL are all fully supported. The connection fields
-differ per backend (ClickHouse/MySQL use **databases**; PostgreSQL connects to a
-`database` and uses **schemas**). See the per-backend
-[Databases guide](databases.md) for a focused walkthrough of each.
+ClickHouse, PostgreSQL, MySQL, and MariaDB are all fully supported. The
+connection fields differ per backend (ClickHouse/MySQL/MariaDB use
+**databases**; PostgreSQL connects to a `database` and uses **schemas**). See
+the per-backend [Databases guide](databases.md) for a focused walkthrough of
+each. MariaDB uses the MySQL backend — set `type: mariadb` (an alias with
+identical fields) or keep `type: mysql` against a MariaDB server; either way
+the vendor is auto-detected at connect. See the [MySQL
+guide](databases-mysql.md#mariadb) for the MariaDB-specific notes.
 
 #### ClickHouse Profile
 
@@ -100,7 +104,12 @@ profiles:
 
 #### MySQL Profile
 
-MySQL (8.0+) uses **databases** (no separate schema concept).
+MySQL (8.0+) uses **databases** (no separate schema concept). MariaDB is
+fully supported through this same backend — `type: mariadb` is an identical
+alias, and `type: mysql` against a MariaDB server also works (the driver
+detects the actual vendor at connect time, not from `type`). See the [MySQL
+guide → MariaDB](databases-mysql.md#mariadb) for version support and the
+`detectkit[mariadb]` install extra.
 
 ```yaml
 profiles:
@@ -241,6 +250,8 @@ alert_channels:
   custom_hook:
     type: webhook
     webhook_url: "https://custom.example.com/webhook"
+    format: attachments            # attachments (default) | json | alertmanager
+    secret: "{{ env_var('WEBHOOK_SECRET') }}"  # optional HMAC signing secret
     channel: "#alerts"            # Target channel (optional, Slack/Mattermost)
     timeout: 10                    # Request timeout in seconds (default: 10)
     extra_headers:                 # Additional HTTP headers (optional)
@@ -254,9 +265,21 @@ alert_channels:
 - `webhook_url`: Endpoint URL to POST the JSON payload to
 
 **Optional fields**:
+- `format` (default: `"attachments"`) - Payload shape: `attachments` (today's
+  Mattermost/Slack-compatible payload), `json` (a flat, stable machine-readable
+  payload), or `alertmanager` (the Prometheus Alertmanager webhook-receiver
+  payload) — `json`/`alertmanager` also ignore a custom `template`. `type:
+  slack`/`type: mattermost` always send `attachments` regardless of this field
+- `secret` (optional) - HMAC signing secret (env-interpolatable); when set,
+  every request carries an `X-Detectkit-Signature-256` header, whatever the
+  `format`
 - `username` (default: `"detectkit"`) - Bot display name
 - `icon_url` (default: detectkit brand avatar) - Bot avatar image URL
 - `icon_emoji` (optional) - Emoji icon, used instead of an avatar image
 - `channel` - Override the receiver's default channel
 - `timeout` (default: `10`) - HTTP request timeout
 - `extra_headers`: Dict of additional HTTP headers to send
+
+See the [Channels guide → Generic
+Webhook](alerting-channels.md#generic-webhook) for the full payload examples
+of each format and the HMAC verification snippet.

@@ -37,11 +37,26 @@ Used by `run`, `unlock`, and `clean` (drift mode). Three forms:
 (`--select "*" --exclude "metrics/staging/*"`). Metric names must be unique
 across the project; duplicates raise an error listing the conflicting files.
 
+## Exit codes
+
+`dtk run`, `dtk autotune`, and `dtk clean` return a process exit code meant for
+schedulers and CI to gate on:
+
+| Code | Meaning |
+|---|---|
+| `0` | Success — every metric completed the requested steps. |
+| `1` | Failure — any metric failed, the run aborted early, a startup/config/DB error occurred, or the selector matched no metrics. |
+| `2` | Usage error — bad CLI arguments. |
+
+On `dtk autotune`, a metric that's disabled in its config counts as **skipped**,
+not failed, and doesn't turn the exit code non-zero by itself. Other commands
+keep Click's default behavior (0 on success, non-zero on any exception).
+
 ## `dtk run`
 
 ```bash
 dtk run --select <sel> [--steps load,detect,alert] [--from DATE] [--to DATE] \
-        [--full-refresh] [--force] [--profile NAME] [--report [PATH]]
+        [--full-refresh] [--force] [--profile NAME] [--report [PATH]] [--json]
 ```
 
 - `--steps` — which of `load`, `detect`, `alert` to run (default all); they always
@@ -66,6 +81,12 @@ dtk run --select <sel> [--steps load,detect,alert] [--from DATE] [--to DATE] \
   tables, so even a `--steps load` run can produce one. Dual-mode: bare `--report`
   → `reports/<metric>.html`; `--report <dir>` → `<dir>/<metric>.html`;
   `--report file.html` → that file.
+- `--json` — human-readable progress still goes to **stderr**; **stdout** gets
+  exactly one JSON summary line for scripting/CI:
+  `{schema_version: 1, command, project, selector, steps, started_at,
+  finished_at, status: success|failed|error, metrics: [{name, status,
+  steps_completed, datapoints_loaded, anomalies_detected, alerts_sent, error}],
+  totals: {metrics, succeeded, failed, skipped, ...}, exit_code}`.
 
 ## `dtk autotune --select <sel>`
 
@@ -395,6 +416,12 @@ timers / Windows Task Scheduler. Always `cd` into the project first:
 
 Pair scheduling with `error_alerting` (in `detectkit_project.yml`) so in-process
 failures page someone; cron monitoring covers `dtk run` not running at all.
+
+Beyond cron, orchestrators can gate directly on the process instead of parsing
+logs: an Airflow `BashOperator`, a Dagster op, a Prefect task, or a CI job all
+fail their step when `dtk run` / `dtk autotune` / `dtk clean` exits non-zero
+(see "Exit codes" above), and can additionally parse `dtk run --json`'s stdout
+summary for per-metric detail.
 
 ## Troubleshooting
 

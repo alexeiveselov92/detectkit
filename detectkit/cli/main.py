@@ -38,7 +38,7 @@ def cli():
 )
 @click.option(
     "--db-type",
-    type=click.Choice(["clickhouse", "postgres", "mysql"]),
+    type=click.Choice(["clickhouse", "postgres", "mysql", "mariadb"]),
     default="clickhouse",
     show_default=True,
     help="Database backend to scaffold the dev/prod profiles and example query for.",
@@ -148,6 +148,12 @@ def init_claude(target_dir: str):
         "an output file or directory; defaults to reports/<metric>.html."
     ),
 )
+@click.option(
+    "--json",
+    "json_output",
+    is_flag=True,
+    help="Emit a machine-readable JSON run summary on stdout (all human output moves to stderr).",
+)
 def run(
     select: str,
     exclude: str,
@@ -158,6 +164,7 @@ def run(
     force: bool,
     profile: str,
     report_path: str,
+    json_output: bool,
 ):
     """
     Run metric processing pipeline.
@@ -190,7 +197,7 @@ def run(
     """
     from detectkit.cli.commands.run import run_command
 
-    run_command(
+    rc = run_command(
         select=select,
         exclude=exclude,
         steps=steps,
@@ -200,7 +207,10 @@ def run(
         force=force,
         profile=profile,
         report_path=report_path,
+        json_output=json_output,
     )
+    if rc:
+        raise SystemExit(rc)
 
 
 @cli.command()
@@ -295,7 +305,7 @@ def autotune(
     """
     from detectkit.cli.commands.autotune import run_autotune
 
-    run_autotune(
+    rc = run_autotune(
         select=select,
         incidents_path=incidents_path,
         scoring_override=scoring_override,
@@ -306,6 +316,8 @@ def autotune(
         dry_run=dry_run,
         report_path=report_path,
     )
+    if rc:
+        raise SystemExit(rc)
 
 
 @cli.command()
@@ -561,13 +573,15 @@ def clean(select: str, orphaned_metrics: bool, execute: bool, yes: bool, profile
     """
     from detectkit.cli.commands.clean import run_clean
 
-    run_clean(
+    rc = run_clean(
         select=select,
         orphaned_metrics=orphaned_metrics,
         execute=execute,
         yes=yes,
         profile=profile,
     )
+    if rc:
+        raise SystemExit(rc)
 
 
 # OSI (Open Semantic Interchange) interop — a self-contained command group

@@ -14,7 +14,7 @@ conventions.
 **Database access for _you_ (recommended, not required).** detectkit itself
 connects to the database directly via its drivers — it **never** needs an MCP to
 run. But you assist far better with **read access to the same database** (e.g. a
-database MCP for the project's ClickHouse / PostgreSQL / MySQL): you can inspect
+database MCP for the project's ClickHouse / PostgreSQL / MySQL / MariaDB): you can inspect
 a metric's series, find real incidents to label for `dtk autotune`, sanity-check
 a metric query before running it, and confirm detections — instead of asking the
 user to run every query by hand. Without it, fall back to marking incidents

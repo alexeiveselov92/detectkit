@@ -195,6 +195,8 @@ Works with your existing data warehouse — all three backends are first-class:
 - **ClickHouse** - native protocol, `detectkit[clickhouse]`
 - **PostgreSQL** - 12+, `detectkit[postgres]`
 - **MySQL** - 8.0+, `detectkit[mysql]`
+- **MariaDB** - 10.4+, `detectkit[mariadb]` (rides the MySQL backend; `type:
+  mariadb` alias, vendor auto-detected at connect)
 
 Only the connection and the SQL dialect of your metric queries differ; detectors,
 alerting and the CLI are identical. See the [Databases guide](guides/databases.md)

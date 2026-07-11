@@ -107,8 +107,8 @@ profiles:
 > `data_database`, or the run fails with `internal_database must be set for
 > ClickHouse`.)
 
-> **Tip:** `dtk init --db-type postgres` (or `mysql`) scaffolds `profiles.yml`
-> with the right fields for that backend from the start.
+> **Tip:** `dtk init --db-type postgres` (or `mysql`, `mariadb`) scaffolds
+> `profiles.yml` with the right fields for that backend from the start.
 
 ### PostgreSQL Example
 

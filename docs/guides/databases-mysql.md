@@ -47,6 +47,48 @@ profiles:
 > Requires **MySQL 8.0+**. detectkit deduplicates internal state with the row
 > alias form `INSERT ... AS new ON DUPLICATE KEY UPDATE`, introduced in 8.0.19.
 
+## MariaDB
+
+MariaDB is **fully supported** through this same MySQL backend — same driver
+(`pymysql`), same connection fields, same table/DDL layout. The one internal
+difference: the row-alias upsert form above (`INSERT ... AS new ON DUPLICATE
+KEY UPDATE`) isn't available on MariaDB, so detectkit **auto-detects the
+server vendor** at connect (`SELECT VERSION()`) and falls back to the classic
+`VALUES(col)` form there instead:
+
+```sql
+INSERT INTO t (...) VALUES (...)
+ON DUPLICATE KEY UPDATE col = VALUES(col), ...
+```
+
+You don't configure this — it's picked automatically per connection.
+
+Use the `type: mariadb` alias for clarity (identical semantics to
+`type: mysql`):
+
+```yaml
+profiles:
+  prod:
+    type: mariadb
+    host: "{{ env_var('MARIADB_HOST') }}"
+    port: 3306
+    user: "{{ env_var('MARIADB_USER') }}"
+    password: "{{ env_var('MARIADB_PASSWORD') }}"
+    internal_database: detectkit
+    data_database: analytics
+```
+
+`type: mysql` against a MariaDB server works too — vendor detection is by the
+live server, not the profile `type`.
+
+```bash
+pip install "detectkit[mariadb]"   # same pymysql driver as detectkit[mysql]
+```
+
+`dtk init --db-type mariadb` scaffolds a project with a `type: mariadb`
+profile. Tested against **MariaDB 11.x** in the integration matrix; MariaDB
+10.4+ is expected to work.
+
 ## Metric query dialect
 
 Use MySQL SQL. The equivalent of a bucketed aggregate:

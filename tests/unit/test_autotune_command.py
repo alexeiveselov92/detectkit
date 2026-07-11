@@ -100,7 +100,7 @@ def test_tune_one_writes_config_and_persists(tmp_path, monkeypatch):
         force=False,
         dry_run=False,
     )
-    assert ok is True
+    assert ok == "ok"
     # a tuned config was written
     tuned = list((tmp_path / "metrics").glob("demo__tuned_*.yml"))
     assert len(tuned) == 1
@@ -131,7 +131,7 @@ def test_tune_one_dry_run_writes_nothing(tmp_path, monkeypatch):
         force=False,
         dry_run=True,
     )
-    assert ok is True
+    assert ok == "ok"
     assert list((tmp_path / "metrics").glob("demo__tuned_*.yml")) == []
     assert fake.runs == []
     assert fake.saved_detections == []
@@ -158,7 +158,7 @@ def test_tune_one_supervised_with_incidents_file(tmp_path, monkeypatch):
         force=False,
         dry_run=False,
     )
-    assert ok is True
+    assert ok == "ok"
     assert fake.runs[0]["mode"] == "supervised"
 
 
@@ -192,7 +192,7 @@ def test_tune_one_supervised_with_inline_incidents(tmp_path, monkeypatch):
         force=False,
         dry_run=False,
     )
-    assert ok is True
+    assert ok == "ok"
     assert fake.runs[0]["mode"] == "supervised"
 
 
@@ -220,7 +220,7 @@ def test_tune_one_auto_discovers_incidents_dir(tmp_path, monkeypatch):
         force=False,
         dry_run=False,
     )
-    assert ok is True
+    assert ok == "ok"
     assert fake.runs[0]["mode"] == "supervised"
 
 
@@ -357,5 +357,5 @@ def test_tune_one_no_datapoints_skips(tmp_path, monkeypatch):
         force=False,
         dry_run=False,
     )
-    assert ok is False
+    assert ok == "failed"
     assert fake.runs == []

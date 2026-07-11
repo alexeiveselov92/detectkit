@@ -151,7 +151,10 @@ error_alerting:
 - **No persistent cooldown** between separate `dtk run` invocations.
   Storing state in the DB doesn't help when the DB itself is down, and
   a local file would break the dbt-style stateless model. Use cron
-  schedule cadence to space out repeated alerts.
+  schedule cadence to space out repeated alerts — and note that `dtk run`
+  itself exits `1` on this failure (see [Exit
+  Codes](../reference/cli.md#exit-codes)), so a scheduler can gate on that
+  directly rather than relying on `error_alerting` reaching a channel.
 - A flaky channel cannot crash the run — dispatch is wrapped in its
   own `try/except`.
 

@@ -116,9 +116,10 @@ alert_channels:
 
 ### Database profiles
 
-> ClickHouse, PostgreSQL and MySQL are all fully supported. ClickHouse/MySQL use
-> two *databases*; PostgreSQL connects to one `database` and uses two *schemas*.
-> `dtk init --db-type {clickhouse,postgres,mysql}` scaffolds the right shape.
+> ClickHouse, PostgreSQL, MySQL and MariaDB are all fully supported.
+> ClickHouse/MySQL/MariaDB use two *databases*; PostgreSQL connects to one
+> `database` and uses two *schemas*.
+> `dtk init --db-type {clickhouse,postgres,mysql,mariadb}` scaffolds the right shape.
 
 **ClickHouse**:
 ```yaml
@@ -165,6 +166,12 @@ profiles:
     database: analytics            # optional — default db for the connection
     settings: {}                   # optional — extra pymysql.connect kwargs
 ```
+
+**MariaDB**: identical fields to the MySQL block above — just spell `type:
+mariadb` instead of `type: mysql`. The vendor (MySQL vs MariaDB) is
+auto-detected at connect (`SELECT VERSION()`), so MariaDB gets its own
+`VALUES()`-form upsert instead of MySQL 8.0.19's row-alias form.
+`pip install 'detectkit[mariadb]'`.
 
 ### Alert channels
 
@@ -228,9 +235,22 @@ alert_channels:
   webhook_alerts:
     type: webhook
     webhook_url: "{{ env_var('WEBHOOK_URL') }}"   # required
+    format: attachments                           # optional: attachments (default) | json | alertmanager
+    secret: "{{ env_var('WEBHOOK_SECRET') }}"      # optional — HMAC-SHA256-signs the request body
     extra_headers:                                # optional
       Authorization: "Bearer {{ env_var('WEBHOOK_TOKEN') }}"
 ```
+> `format` — `attachments` (default) renders the same platform-style card as
+> Mattermost/Slack; `json` sends a versioned structured event
+> (`schema_version: 1`; fields like `kind`/`status`/`project`/`metric`/
+> `timestamp`/`value`/`expected`/`severity`/`direction`/`detector`/`rule`/
+> `quorum`/`incident`/`links`/`display`); `alertmanager` sends a Prometheus
+> Alertmanager webhook-receiver payload (v4) — a trigger/resolve pair sharing
+> identical labels/fingerprint, `severity: critical` for anomaly/error and
+> `warning` for no-data (no-data never auto-resolves). `json`/`alertmanager`
+> ignore a custom `template` and add an `X-Detectkit-Event` header.
+> `secret` — signs the raw request body as HMAC-SHA256 into
+> `X-Detectkit-Signature-256: sha256=<hex>`, for any `format`.
 
 ## Notes
 

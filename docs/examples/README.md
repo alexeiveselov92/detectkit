@@ -693,9 +693,10 @@ error_alerting:
 - Run aborts after the first error alert — no point loading the rest
   if the source is dead
 - Channels reuse `profiles.yml` — no config duplication
-- Pair with cron exit-code monitoring: `error_alerting` covers
-  in-process crashes, cron monitoring covers `dtk run` not running
-  at all
+- Pair with your scheduler's exit-code gate: `dtk run` returns `1` on any
+  pipeline failure (see [Exit Codes](../reference/cli.md#exit-codes)) —
+  `error_alerting` covers in-process crashes via the channel, the scheduler's
+  gate covers `dtk run` not running (or exiting non-zero) at all
 
 ### Channel Config (in profiles.yml)
 

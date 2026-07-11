@@ -1,5 +1,6 @@
 """Tests for alert channels."""
 
+import json
 from datetime import datetime
 from unittest.mock import Mock, patch
 
@@ -353,9 +354,11 @@ class TestMattermostChannel:
 
         assert success is True
         assert mock_post.called
-        # Check payload structure (attachments format)
+        # Check payload structure (attachments format). send() now serializes
+        # the body itself (so an HMAC signature could cover the exact bytes),
+        # posting via ``data=`` instead of ``json=``.
         call_args = mock_post.call_args
-        payload = call_args[1]["json"]
+        payload = json.loads(call_args[1]["data"])
         assert "attachments" in payload
         # One colored card whose long body folds behind "Show more".
         assert len(payload["attachments"]) == 1
@@ -394,7 +397,7 @@ class TestMattermostChannel:
         success = channel.send(alert, template=template)
 
         assert success is True
-        payload = mock_post.call_args[1]["json"]
+        payload = json.loads(mock_post.call_args[1]["data"])
         assert "CUSTOM: cpu_usage = 95.0" in payload["attachments"][0]["text"]
 
     @patch("detectkit.alerting.channels.webhook.requests.post")
@@ -484,7 +487,7 @@ def _anomaly_alert():
 
 
 def _sent_payload(mock_post):
-    return mock_post.call_args[1]["json"]
+    return json.loads(mock_post.call_args[1]["data"])
 
 
 class TestBrandAvatar:

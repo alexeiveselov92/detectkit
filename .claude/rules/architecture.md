@@ -16,7 +16,10 @@ type hints throughout).
 manager, ensures internal tables exist, then runs each metric through the
 pipeline. `--steps load,detect,alert` (default: all three) restricts which
 stages run. Each stage is idempotent and reads/writes the internal `_dtk_*`
-tables described below.
+tables described below. `run`/`autotune`/`clean` exit non-zero on any metric
+failure (or a matching-nothing selector), so schedulers/CI can gate on the
+process exit code; `dtk run --json` additionally emits one machine-readable
+run summary on stdout while human logs go to stderr.
 
 - **load** (`detectkit/orchestration/task_manager/_load_step.py` →
   `detectkit/loaders/metric_loader.py`): renders the metric's SQL with Jinja2
@@ -158,7 +161,11 @@ Three backends implement this interface:
 - `mysql_manager.py` (`MySQLDatabaseManager`, pymysql, MySQL 8.0+) — uses
   **databases** (`CREATE DATABASE IF NOT EXISTS`); dedup via `INSERT … ON
   DUPLICATE KEY UPDATE` (row-alias form). PK `String` columns render as
-  `VARCHAR(255)` (TEXT can't be PK-indexed).
+  `VARCHAR(255)` (TEXT can't be PK-indexed). **MariaDB** is supported through
+  this same manager: the vendor is sniffed at connect (`SELECT VERSION()`), and
+  a detected MariaDB server falls back to the pre-8.0.19 `VALUES()` upsert form
+  (the row-alias form is MySQL-only); `type: mariadb` is an identical profile
+  alias for clarity.
 
 `ProfileConfig.create_manager()` (`detectkit/config/profile.py`) builds the right
 backend from `type`; PostgreSQL additionally requires a `database` connect-target.
@@ -456,7 +463,14 @@ with the brand name (`detectkit · <project>`). Direct-API callers leave it
   `@mentions` ride in the **top-level** message text so they notify on Slack. A
   custom `template` still renders as a single plain text-only attachment (the raw
   template replaces the structured lead/Value/tail sections; color/title/branding
-  kept).
+  kept). The generic webhook channel (`type: webhook` only) additionally takes a
+  `format` knob — `attachments` (default, the rendering above, unchanged) /
+  `json` (a versioned structured event, `schema_version: 1`) /
+  `alertmanager` (a Prometheus Alertmanager webhook-receiver payload, v4 —
+  trigger/resolve pairs sharing identical labels/fingerprint) — and an optional
+  `secret` that HMAC-SHA256-signs the raw request body into
+  `X-Detectkit-Signature-256`; `json`/`alertmanager` bypass the attachment
+  rendering entirely and ignore a custom `template`.
 - **Telegram** defaults to `parse_mode: HTML` (was Markdown). The default
   message is structured and HTML-escaped: a colored status dot (red anomaly /
   green recovery / yellow no-data / blue error), a bold headline, the lead +

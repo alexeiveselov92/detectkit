@@ -52,6 +52,29 @@ class TestProfileConfig:
                 port=9000,
             )
 
+    def test_invalid_type_message_lists_mariadb(self):
+        """The allowed-types list in the error message includes mariadb."""
+        with pytest.raises(ValueError, match="mariadb"):
+            ProfileConfig(
+                type="invalid",
+                host="localhost",
+                port=9000,
+            )
+
+    def test_mariadb_profile(self):
+        """MariaDB is a first-class alias of the MySQL profile shape."""
+        profile = ProfileConfig(
+            type="mariadb",
+            host="localhost",
+            port=3306,
+            internal_database="detectk",
+            data_database="analytics",
+        )
+
+        assert profile.type == "mariadb"
+        assert profile.get_internal_location() == "detectk"
+        assert profile.get_data_location() == "analytics"
+
     def test_invalid_port(self):
         """Test error on invalid port."""
         with pytest.raises(ValueError, match="Port must be between"):
@@ -158,6 +181,55 @@ class TestProfileConfig:
             pytest.skip("pymysql not installed")
         except Exception as exc:
             pytest.skip(f"MySQL server not reachable: {exc}")
+
+    def test_mariadb_create_manager(self):
+        """A ``type: mariadb`` profile dispatches to MySQLDatabaseManager too."""
+        profile = ProfileConfig(
+            type="mariadb",
+            host="localhost",
+            port=3306,
+            internal_database="detectk",
+            data_database="analytics",
+        )
+
+        try:
+            manager = profile.create_manager()
+            assert manager is not None
+            assert type(manager).__name__ == "MySQLDatabaseManager"
+            manager.close()
+        except ImportError:
+            pytest.skip("pymysql not installed")
+        except Exception as exc:
+            pytest.skip(f"MySQL server not reachable: {exc}")
+
+    def test_mariadb_create_manager_dispatch_is_mocked(self, monkeypatch):
+        """``create_manager()`` dispatches "mariadb" to MySQLDatabaseManager.
+
+        Deterministic version of the test above: the manager class itself is
+        mocked so this asserts the dispatch (no real driver / server needed).
+        """
+        import detectkit.database.mysql_manager as mysql_mod
+
+        captured: dict = {}
+
+        class FakeMySQLDatabaseManager:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        monkeypatch.setattr(mysql_mod, "MySQLDatabaseManager", FakeMySQLDatabaseManager)
+
+        profile = ProfileConfig(
+            type="mariadb",
+            host="localhost",
+            port=3306,
+            internal_database="detectk",
+            data_database="analytics",
+        )
+        manager = profile.create_manager()
+
+        assert isinstance(manager, FakeMySQLDatabaseManager)
+        assert captured["internal_database"] == "detectk"
+        assert captured["data_database"] == "analytics"
 
 
 class TestProfilesConfig:

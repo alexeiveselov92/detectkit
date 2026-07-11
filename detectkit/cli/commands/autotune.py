@@ -239,14 +239,19 @@ def run_autotune(
     force: bool,
     dry_run: bool,
     report_path: str | None = None,
-) -> None:
-    """Auto-tune each selected metric's detector configuration."""
+) -> int:
+    """Auto-tune each selected metric's detector configuration.
+
+    Returns:
+        0 if every metric tuned or was explicitly skipped, 1 if any startup
+        step failed or any metric's tuning attempt failed.
+    """
     from_dt = parse_date(from_date) if from_date else None
     to_dt = parse_date(to_date) if to_date else None
 
     loaded = _load_project(profile)
     if loaded is None:
-        return
+        return 1
     project_root, _project_config, internal_manager, _db_manager = loaded
     project_name = getattr(_project_config, "name", None)
 
@@ -254,15 +259,17 @@ def run_autotune(
         metrics = select_metrics(select, project_root)
     except ValueError as exc:
         click.echo(click.style(f"Error: {exc}", fg="red", bold=True))
-        return
+        return 1
     if not metrics:
         click.echo(click.style(f"No metrics found matching selector: {select}", fg="yellow"))
-        return
+        return 1
 
     click.echo(f"Found {len(metrics)} metric(s) to tune")
-    succeeded = 0
+    ok_count = 0
+    skipped_count = 0
+    failed_count = 0
     for metric_path, config in metrics:
-        ok = _tune_one(
+        status = _tune_one(
             metric_path=metric_path,
             config=config,
             project_root=project_root,
@@ -277,10 +284,20 @@ def run_autotune(
             project_name=project_name,
             project_loading_delay=getattr(_project_config, "loading_delay", None),
         )
-        if ok:
-            succeeded += 1
+        if status == "ok":
+            ok_count += 1
+        elif status == "skipped":
+            skipped_count += 1
+        else:
+            failed_count += 1
 
-    echo_done(f"Tuned {len(metrics)} metric(s), {succeeded} succeeded.")
+    parts = [f"{ok_count} succeeded"]
+    if skipped_count:
+        parts.append(f"{skipped_count} skipped")
+    if failed_count:
+        parts.append(f"{failed_count} failed")
+    echo_done(f"Tuned {len(metrics)} metric(s), {', '.join(parts)}.")
+    return 1 if failed_count else 0
 
 
 def _tune_one(
@@ -298,13 +315,19 @@ def _tune_one(
     report_path: str | None = None,
     project_name: str | None = None,
     project_loading_delay: str | int | None = None,
-) -> bool:
-    """Tune one metric end to end; return True on success."""
+) -> str:
+    """Tune one metric end to end.
+
+    Returns:
+        ``"ok"`` on success, ``"skipped"`` when autotune is disabled for this
+        metric (an explicit config choice, not a failure), or ``"failed"``
+        (no datapoints, a validation/engine error, or an unexpected exception).
+    """
     name = config.name
     autotune_cfg = config.autotune or AutoTuneConfig()
     if not autotune_cfg.enabled:
         echo_noop(name, "autotune disabled in config")
-        return False
+        return "skipped"
 
     interval_seconds = config.get_interval().seconds
 
@@ -312,14 +335,14 @@ def _tune_one(
     data = internal_manager.load_datapoints(name, from_timestamp=from_dt, to_timestamp=to_dt)
     if len(data["timestamp"]) == 0:
         echo_noop(name, "no datapoints — run `dtk run --select " + name + " --steps load` first")
-        return False
+        return "failed"
 
     click.echo(click.style(f"Tuning metric: {name}", fg="cyan", bold=True))
     click.echo(f"  Config file: {metric_path.relative_to(project_root)}")
 
     if not force and not internal_manager.acquire_lock(name, "pipeline", "pipeline"):
         echo_error(name, "locked by another run (use --force or `dtk unlock`)")
-        return False
+        return "failed"
 
     try:
         data = cap_history(data, autotune_cfg.max_history)
@@ -375,7 +398,7 @@ def _tune_one(
             project_loading_delay=project_loading_delay,
         )
         internal_manager.release_lock(name, "pipeline", "pipeline", status="completed")
-        return True
+        return "ok"
 
     except (AutoTuneError, ValueError, FileNotFoundError) as exc:
         internal_manager.release_lock(
@@ -384,13 +407,13 @@ def _tune_one(
         if not dry_run:
             _save_failed_run(internal_manager, name, interval_seconds, scoring_override, str(exc))
         echo_error(name, str(exc))
-        return False
+        return "failed"
     except Exception as exc:  # noqa: BLE001 — never leave a held lock behind
         internal_manager.release_lock(
             name, "pipeline", "pipeline", status="failed", error_message=str(exc)
         )
         echo_error(name, f"unexpected error: {exc}")
-        return False
+        return "failed"
 
 
 def _finalize(

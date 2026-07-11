@@ -994,11 +994,42 @@ for the selected window:
   overlap** exactly like the `dtk tune` cockpit's metrics bar. Without labels,
   a metric still shows its frequency stats — labeling is optional grounding,
   never a requirement.
+- **A `N stale` chip** next to the metric's name — an amber badge that appears
+  when the current config no longer produces one or more `detector_id`s that
+  are still stored (e.g. after a retune or autotune run changed a detector's
+  parameters). Hidden when there's nothing stale. It's a shortcut to that
+  metric's **Clean stale** action (see below).
 
 Metrics are grouped by their `metrics/` subfolder and filterable by tag.
 Opening a metric shows the **existing self-contained HTML report** — the same
 one `dtk run --report` writes — in an overlay; nothing is regenerated, it
 reads the same persisted rows the overview did.
+
+#### Clean stale
+
+The detail overlay's header has a **Clean stale** button next to **Tune**. It
+first fetches a read-only preview — `GET /api/clean-preview/<name>`, the same
+computation as `dtk clean --select <name>` (dry-run) — listing the superseded
+detector generations (stored `detector_id`s the current config no longer
+produces) with their row counts, plus any stale alert-state ids. If nothing is
+stale, a toast says so and nothing further happens.
+
+Otherwise an amber confirmation strip appears between the overlay header and
+the report — "Permanently delete N superseded detector generation(s) — X
+detection row(s) … ?" with **Cancel** / **Delete stale data** — carrying the
+same loud warning the CLI dry-run prints when the metric's config defines no
+detectors/alerting at all (so *every* stored row would be removed — usually a
+config mid-edit). Confirming spawns the **real** `dtk clean --select <name>
+--execute` as a subprocess job (a new `clean` job kind), visible in the jobs
+drawer next to `run`/`autotune`/`unlock` and sharing their
+one-pipeline-job-at-a-time gate. On success the report reloads (only the
+current config's detectors remain) and the metric's overview row refreshes,
+so the stale chip clears.
+
+This is drift-mode cleanup for **one** metric, reachable without leaving the
+page. `dtk clean --orphaned-metrics` (garbage-collecting renamed/deleted
+metrics) stays CLI-only — deleting a metric from this UI still leaves its old
+rows for `dtk clean --orphaned-metrics` to prune.
 
 #### Pipeline panel
 
@@ -1264,6 +1295,12 @@ Remove internal data that no longer matches the project's YAML configs.
 Editing metrics over time leaves stale rows behind in the internal tables.
 `dtk clean` finds and removes that drift. **Both modes default to a dry-run**
 that only reports what would be deleted; pass `--execute` to actually delete.
+
+Drift mode (`--select`) is also available interactively, one metric at a
+time, from [`dtk ui`](#dtk-ui)'s metric detail overlay — the **Clean stale**
+button next to Tune runs the same dry-run as a preview, then the same
+`--execute` as a subprocess job on confirmation. `--orphaned-metrics` stays
+CLI-only.
 
 #### Syntax
 

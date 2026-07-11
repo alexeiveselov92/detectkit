@@ -979,9 +979,10 @@ run is the source of truth).
 `detectkit/ui/` is a **project-wide** cockpit over the same persisted `_dtk_*`
 tables: one **overview** of every selected metric's alerting behavior (grouped
 by `metrics/` subfolder, filterable by tag), a per-metric **detail** view (the
-existing HTML report in an overlay), and a **pipeline panel** that drives
-`dtk run` / `dtk autotune` / `dtk unlock` as subprocesses (plus `dtk tune`,
-launched per metric in a new tab), plus **metric management** — creating,
+existing HTML report in an overlay, with a **Clean stale** action pruning
+superseded detector generations), and a **pipeline panel** that drives
+`dtk run` / `dtk autotune` / `dtk unlock` / `dtk clean` as subprocesses (plus
+`dtk tune`, launched per metric in a new tab), plus **metric management** — creating,
 editing and deleting metric YAML files from the browser, through a structured
 **Builder** form or the raw **YAML** tab. Invoked by `dtk ui
 [-s/--select "*"] [--window 30d] [--profile] [--no-open]`
@@ -1012,7 +1013,16 @@ Routes (all token-guarded): `GET /` (shell HTML), `GET /api/stats/<name>?window=
 programmatic use), `GET /metric/<name>?window=` (the detail overlay),
 `GET /api/jobs` / `GET /api/job/<id>?offset=` (job listing + paged,
 **absolute-offset** log lines — a job more verbose than the line cap keeps
-streaming), and `POST /api/run` / `/api/autotune` / `/api/unlock` /
+streaming), `GET /api/clean-preview/<name>` (**read-only** — what `dtk clean
+--select <name>` would delete: the CLI dry-run's diff of stored
+`detector_id`s / `alert_config_id`s against the ids the current config
+produces, as structured JSON for the confirm strip; derives **strictly**, so
+an underivable config 400s instead of presenting everything as stale), and
+`POST /api/run` / `/api/autotune` / `/api/unlock` / `/api/clean` (spawns the
+real `dtk clean --select <metric> --execute`; per-metric, name validated
+against the session like `/api/tune`; both `/api/clean` and the preview refuse
+while a tuner for that metric is open — its Apply rewrites the YAML the
+spawned clean re-reads — the same guard metric update/delete carry) /
 `/api/tune` / `/api/job/<id>/stop` — plus the metric-management routes:
 `GET /api/metrics` (the refreshed boot-shaped session list),
 `GET /api/metric-source/<name>` (raw YAML text for the editor, plus the
@@ -1098,17 +1108,27 @@ historical config — N× the transfer volume *and* replayed quorums mixing live
 and dead configs (inflating alert counts a real run would never produce). No
 derivable ids (no detectors configured / factory rejects one) → unfiltered
 fallback. This is a deliberate semantic difference from the report, which
-shows *what actually ran* (every stored detector id in its window).
+shows *what actually ran* (every stored detector id in its window). The same
+derivation (now the shared `DetectorFactory.detector_id_for_config`, also
+behind `dtk clean`'s drift diff) feeds each row's **`stale_detectors`** count
+(stored ids the current config no longer produces — an amber `N stale` chip
+next to the metric name; `null` when underivable, never "all stale"), so the
+leftover generations are visible before opening the detail. The detail
+overlay's **Clean stale** button closes the loop: `GET /api/clean-preview`
+counts → an inline confirm strip → `POST /api/clean` spawns the real
+`dtk clean --select <metric> --execute` as a `clean` pipeline job → on
+success the report iframe reloads (only current-config series remain) and the
+row's stats re-fetch drops the chip.
 
 **Pipeline actions are real subprocesses.** `jobs.py` (`JobManager`/`Job`)
 spawns `[sys.executable, "-m", "detectkit.cli.main", "run", ...]` (and
-`autotune`/`unlock`/`tune`) — never an in-process call — pumping merged
+`autotune`/`unlock`/`clean`/`tune`) — never an in-process call — pumping merged
 stdout/stderr into a capped per-job line buffer a client pages through. Each
 spawned command takes its **own** pipeline lock exactly as if typed into a
 terminal; `dtk ui` adds no new locking or mutation path, only a UI over the
 existing one. `--profile`, when given to `dtk ui`, is forwarded to every
-spawned command. **Only one `run`/`autotune`/`unlock` job runs at a time**
-(`JobManager.pipeline_active()`, checked before spawning), since a live
+spawned command. **Only one `run`/`autotune`/`unlock`/`clean` job runs at a
+time** (`JobManager.pipeline_active()`, checked before spawning), since a live
 pipeline lock and DB connection already make a second one fail loudly;
 **`dtk tune` jobs are the deliberate exception** — several run concurrently
 (one per metric being tuned), since each opens its own isolated, lock-free

@@ -12,7 +12,7 @@ Run all commands from a project directory (the one containing
 | `dtk run --select <sel>` | Run the load → detect → alert pipeline |
 | `dtk autotune --select <sel>` | Auto-configure a metric's detector (see `autotune.md`) |
 | `dtk tune --select <sel>` | Interactively tune a detector on real data, write it back in place |
-| `dtk ui` | Project-wide live overview + browser pipeline control panel + create/edit/delete metric YAMLs |
+| `dtk ui` | Project-wide live overview + browser pipeline control panel + create/edit/delete metric YAMLs + per-metric Clean stale |
 | `dtk test-alert <metric>` | Send a mock alert to the metric's channels |
 | `dtk unlock --select <sel>` | Clear a stuck pipeline lock |
 | `dtk clean --select <sel>` | Prune internal data that no longer matches the config |
@@ -211,13 +211,21 @@ dtk ui [-s/--select "*"] [--window 24h|7d|30d|90d|all] [--profile NAME] [--no-op
 - `--no-open` — print the URL instead of opening a browser tab.
 
 Clicking a metric's **Open** shows the existing self-contained HTML report
-(the same one `--report` writes) in an overlay. A **pipeline panel** drives
+(the same one `--report` writes) in an overlay, whose header also has a
+**Clean stale** button next to **Tune**: it previews a `dtk clean --select
+<metric>` dry-run (superseded detector generations + row counts, stale
+alert-state ids), and — if anything is stale — an amber confirm strip offers
+**Delete stale data**, which spawns the real `dtk clean --select <metric>
+--execute` as a job (`clean` kind) sharing the run/autotune/unlock gate below;
+on success the report reloads and the overview's stale chip clears. This is
+the drift-mode `dtk clean --select` from inside the UI; `--orphaned-metrics`
+(renamed/deleted metrics) stays CLI-only. A **pipeline panel** drives
 the real CLI as subprocesses — `dtk run` (select/steps/from/to/force/
 full-refresh), `dtk autotune`, `dtk unlock` — streaming their terminal
-output live; **only one of these three runs at a time** (they'd contend for
-the same pipeline lock anyway). **Tune** launches `dtk tune --select
+output live; **only one `run`/`autotune`/`unlock`/`clean` job runs at a
+time** (they'd contend for the same pipeline lock anyway). **Tune** launches `dtk tune --select
 <metric>` for a metric and opens its cockpit in a new tab — unlike
-run/autotune/unlock, **multiple tune jobs run concurrently**, since each is
+run/autotune/unlock/clean, **multiple tune jobs run concurrently**, since each is
 its own isolated, lock-free session. The `dtk ui` server itself takes **no
 pipeline lock** and never mutates anything — every spawned command behaves
 exactly as if typed into a terminal.
@@ -290,7 +298,9 @@ the next normal run recovers on its own.)
 
 Editing metrics over time leaves stale rows in the internal tables. `dtk clean`
 removes that drift. **Both modes dry-run by default** — pass `--execute` to
-actually delete.
+actually delete. Drift mode is also one click away, per metric, from `dtk
+ui`'s detail overlay (**Clean stale**, next to Tune); `--orphaned-metrics`
+stays CLI-only.
 
 - **Drift mode** — `dtk clean --select <sel>`: for each still-existing metric,
   deletes `_dtk_detections` rows for `detector_id`s the config no longer

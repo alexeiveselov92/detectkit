@@ -2,12 +2,17 @@
 Detector factory for creating detector instances from configuration.
 """
 
+from typing import TYPE_CHECKING
+
 from detectkit.detectors.base import BaseDetector
 from detectkit.detectors.statistical.autoreg import AutoregDetector
 from detectkit.detectors.statistical.iqr import IQRDetector
 from detectkit.detectors.statistical.mad import MADDetector
 from detectkit.detectors.statistical.manual_bounds import ManualBoundsDetector
 from detectkit.detectors.statistical.zscore import ZScoreDetector
+
+if TYPE_CHECKING:
+    from detectkit.config.metric_config import DetectorConfig
 
 
 class DetectorFactory:
@@ -118,6 +123,24 @@ class DetectorFactory:
             detector = cls.create_from_config(config)
             detectors.append(detector)
         return detectors
+
+    @classmethod
+    def detector_id_for_config(cls, detector_config: "DetectorConfig") -> str:
+        """The ``detector_id`` the detect step would run this configured detector under.
+
+        Mirrors the DETECT step's derivation exactly (``get_algorithm_params``
+        + the same seasonality injection → :meth:`create_from_config` →
+        ``get_detector_id``), so callers that only need the id — the overview's
+        current-config filter, ``dtk clean``'s drift diff, the UI's stale-data
+        preview — all agree with what the pipeline writes. Raises (like
+        :meth:`create`) on a config the factory rejects.
+        """
+        params = detector_config.get_algorithm_params()
+        seasonality_components = detector_config.get_seasonality_components()
+        if seasonality_components is not None:
+            params["seasonality_components"] = seasonality_components
+        detector = cls.create_from_config({"type": detector_config.type, "params": params})
+        return detector.get_detector_id()
 
     @classmethod
     def list_available_types(cls) -> list[str]:

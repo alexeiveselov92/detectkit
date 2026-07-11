@@ -124,8 +124,15 @@ rendered on the docs site under **For developers**). Read the relevant one:
   project-wide localhost cockpit — an overview of every metric's alert
   frequency/freshness (replayed via the same seam as `dtk run --report`;
   quality chips when `incidents/` labels exist) plus a pipeline panel that
-  drives `dtk run` / `dtk autotune` / `dtk unlock` as real subprocesses and
-  launches `dtk tune` per metric — and **metric management**: create / edit /
+  drives `dtk run` / `dtk autotune` / `dtk unlock` / `dtk clean` as real
+  subprocesses and launches `dtk tune` per metric — a per-metric **Clean
+  stale** action on the detail overlay prunes superseded detector generations
+  (read-only `GET /api/clean-preview/<name>` dry-run counts → confirm strip →
+  `POST /api/clean` spawning the real `dtk clean --select <metric> --execute`
+  as a `clean` pipeline job; the overview row's `stale_detectors` count shows
+  an amber `N stale` chip, `null`/no-chip when the config's ids can't be
+  derived, so an underivable config is never presented as all-stale) — and
+  **metric management**: create / edit /
   delete metric YAMLs from a browser editor (`ui/metric_files.py`, the
   mutation seam) with validate-before-write (full `MetricConfig` + deep
   detector-params), a verbatim archive to `metrics/.history/<metric>/` before

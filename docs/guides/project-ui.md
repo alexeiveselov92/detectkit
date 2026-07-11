@@ -98,6 +98,11 @@ config once flag".
 - **Sparkline** — a compact chart of the window's values with anomalous
   points marked, so you can eyeball the shape without opening the detail
   view.
+- **Stale chip** — an amber `N stale` badge next to the metric's name when
+  older, superseded detector generations are still stored (typically after a
+  retune or an autotune run changed a detector's parameters). Hidden when
+  there's nothing stale. It's a preview of what **Clean stale**, in that
+  metric's detail view, would remove (see below).
 
 ### Quality chips (only with labels)
 
@@ -165,6 +170,37 @@ ready — you get the full interactive tuning experience described in the
 terminal. Unlike `run` / `autotune` / `unlock`, **tune jobs are not mutually
 exclusive** — you can tune several metrics side by side, since each opens its
 own isolated tuning server and none of them touch the pipeline lock.
+
+## Cleaning stale detector data
+
+Retuning a metric (by hand in `dtk tune`, via `dtk autotune`, or by editing a
+detector's parameters here) changes that detector's identity, so its old
+detections keep accumulating in the internal tables under the superseded
+`detector_id` — the same drift `dtk clean --select <metric>` is for. The
+overview's **stale chip** flags it; to act on it, open the metric and use the
+**Clean stale** button next to **Tune** in the detail overlay's header:
+
+1. It fetches a read-only preview — the same dry-run `dtk clean --select
+   <metric>` prints — listing the superseded detector generations (with row
+   counts) and any stale alert-state ids. Nothing stale → a toast says so and
+   stops there.
+2. Otherwise an amber confirmation strip appears above the report: "Permanently
+   delete N superseded detector generation(s) — X detection row(s) … ?" with
+   **Cancel** / **Delete stale data**. If the metric's config currently defines
+   no detectors or alerting at all, the strip carries the same loud warning the
+   CLI prints in that case (usually a sign the config is mid-edit).
+3. Confirming spawns the **real** `dtk clean --select <metric> --execute` as a
+   subprocess job — visible in the jobs drawer like `run`/`autotune`/`unlock`,
+   sharing their one-pipeline-job-at-a-time gate. No new mutation path is
+   added; it's the same command you'd type in a terminal.
+4. On success, the report reloads (only the current config's detectors remain)
+   and the metric's overview row refreshes, clearing the stale chip.
+
+This covers **drift** for one metric at a time, without leaving the page. The
+other `dtk clean` mode — `--orphaned-metrics`, garbage-collecting metrics
+that were renamed or deleted — stays CLI-only: deleting or renaming a metric
+in this UI still leaves its old rows waiting for `dtk clean --orphaned-metrics`
+(see [Creating, editing, deleting](#creating-editing-deleting) below).
 
 ## Managing metrics
 

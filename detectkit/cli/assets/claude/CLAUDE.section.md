@@ -84,7 +84,8 @@ version — **read the relevant one on demand** instead of guessing:
   database key, not the filename. Keep filename and `name` in sync.
 - **Changing a detector parameter changes the detector's identity** and
   recomputes its detections from scratch; the old rows are orphaned. After
-  retuning a live metric, run `dtk clean --select <metric>` to prune them.
+  retuning a live metric, run `dtk clean --select <metric>` to prune them (or,
+  from `dtk ui`, open the metric and click **Clean stale** in its detail view).
 - **`alert_cooldown` defaults to `null`** = a persisting anomaly re-alerts on
   *every* `dtk run`. Always set a cooldown for production metrics.
 - The pipeline is **idempotent**: it resumes from the last saved timestamp.

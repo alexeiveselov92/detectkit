@@ -1,8 +1,9 @@
 """Subprocess registry + output pumping for the ``dtk ui`` control panel.
 
 The server never runs the pipeline in-process — every ``Run`` / ``Autotune`` /
-``Unlock`` / ``Tune`` click spawns the real ``dtk`` CLI as a subprocess (``python
--m detectkit.cli.main ...``), exactly as if typed at a terminal. This module only
+``Unlock`` / ``Clean`` / ``Tune`` click spawns the real ``dtk`` CLI as a
+subprocess (``python -m detectkit.cli.main ...``), exactly as if typed at a
+terminal. This module only
 tracks those subprocesses: pumping their merged stdout/stderr into an in-memory
 line buffer the page polls, and reporting status/return code.
 """
@@ -42,7 +43,7 @@ class Job:
     """
 
     id: str
-    kind: str  # "run" | "autotune" | "unlock" | "tune"
+    kind: str  # "run" | "autotune" | "unlock" | "clean" | "tune"
     label: str
     argv: list[str]
     proc: subprocess.Popen[str]
@@ -242,11 +243,11 @@ class JobManager:
         return None
 
     def pipeline_active(self) -> bool:
-        """True when a non-``tune`` job (run/autotune/unlock) is still running.
+        """True when a non-``tune`` job (run/autotune/unlock/clean) is still running.
 
         Tune jobs are excluded: multiple concurrent tuners are fine (each
         tunes a different metric, no pipeline lock involved), but Run/Autotune/
-        Unlock all touch the same DB-level pipeline lock, so the panel only
+        Unlock/Clean all mutate the same DB-level state, so the panel only
         ever lets one of those run at a time.
         """
         with self._lock:

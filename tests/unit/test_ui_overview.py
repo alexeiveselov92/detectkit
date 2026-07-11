@@ -158,6 +158,12 @@ class _StubManager:
             "seasonality_columns": data["seasonality_columns"],
         }
 
+    def list_detector_ids(self, metric_name: str) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for r in self._detections.get(metric_name, []):
+            counts[r["detector_id"]] = counts.get(r["detector_id"], 0) + 1
+        return counts
+
     def load_detections(
         self,
         metric_name: str,
@@ -251,6 +257,7 @@ def test_a_alert_counts_per_day_spark_union_flagged(tmp_path):
     assert row["lag_seconds"] == 0.0
     assert row["locked"] is False
     assert row["quality"] is None
+    assert row["stale_detectors"] == 0  # both stored generations are configured
 
 
 def test_stale_detector_generations_are_excluded(tmp_path):
@@ -296,6 +303,9 @@ def test_stale_detector_generations_are_excluded(tmp_path):
     assert row["flagged"] == 1  # only the live generation's anomaly
     assert row["alerts"]["anomaly"] == 1
     assert row["spark_anoms"] == [_ms(times[10])]
+    # …but the dead generation is surfaced as a stale count, so the UI can
+    # offer its "Clean stale" action before the user even opens the detail.
+    assert row["stale_detectors"] == 1
 
     # No configured detectors -> unfiltered fallback still sees stored rows.
     bare = MetricConfig(
@@ -316,7 +326,10 @@ def test_stale_detector_generations_are_excluded(tmp_path):
         window_preset="24h",
         now=now,
     )
-    assert payload["metrics"][0]["flagged"] == n  # stale rows visible again
+    row = payload["metrics"][0]
+    assert row["flagged"] == n  # stale rows visible again
+    # No derivable ids -> the stale count stays None (unknown), never "all stale".
+    assert row["stale_detectors"] is None
 
 
 # ── (b) no-data events when no_data_alert is on and values are missing ───────

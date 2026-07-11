@@ -13,11 +13,13 @@
 
 import { esc } from './format';
 import {
+  fetchCleanPreview,
   fetchJobDetail,
   fetchJobs,
   fetchMetricSource,
   fetchMetricStats,
   postAutotune,
+  postClean,
   postRun,
   postStopJob,
   postTune,
@@ -42,6 +44,7 @@ import type { NextStepsState } from './next-steps';
 import type {
   BootMetric,
   BootPayload,
+  CleanPreviewResponse,
   DtkUiGlobal,
   FormMeta,
   JobKind,
@@ -110,6 +113,10 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   };
 
   let detailHandle: DetailHandle | null = null;
+  // The metric the detail overlay is currently open on — so a clean that
+  // finishes after the user closed and re-opened the overlay reloads the LIVE
+  // one, not a detached iframe captured when the clean started.
+  let detailMetric: string | null = null;
   let editorHandle: MetricEditorHandle | null = null;
   let jobsPollHandle: number | undefined;
   let jobDetailHandle: number | undefined;
@@ -351,11 +358,15 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   function openDetail(name: string): void {
     if (!closeEditorIfAllowed()) return; // dirty editor: user chose to keep editing
     if (detailHandle) detailHandle.close();
+    detailMetric = name;
     detailHandle = openDetailOverlay(root, name, state.windowPreset, {
       onTune: (n) => void submitTune(n),
       onClose: () => {
         detailHandle = null;
+        detailMetric = null;
       },
+      onCleanPreview: (n) => cleanPreview(n),
+      onCleanExecute: (n) => cleanExecute(n),
     });
   }
 
@@ -602,6 +613,93 @@ function render(boot: BootPayload, mount: HTMLElement): void {
       toast(root, 'error', (e as Error).message);
     } finally {
       pendingTunes.delete(metric);
+    }
+  }
+
+  /**
+   * The confirm-strip seed for the detail overlay's "Clean stale" action.
+   * Resolves `null` (after toasting why) when there is nothing to confirm:
+   * nothing stale, a pipeline job already running, or a fetch error.
+   */
+  async function cleanPreview(metric: string): Promise<CleanPreviewResponse | null> {
+    const busy = pipelineBusy();
+    if (busy.busy) {
+      toast(root, 'error', busy.reason);
+      return null;
+    }
+    try {
+      const p = await fetchCleanPreview(metric);
+      if (p.stale_detectors.length === 0 && p.stale_alert_states.length === 0) {
+        toast(root, 'info', `Nothing stale for '${metric}' — stored data matches the current config.`);
+        return null;
+      }
+      return p;
+    } catch (e) {
+      toast(root, 'error', (e as Error).message);
+      return null;
+    }
+  }
+
+  /** Poll a freshly spawned job until it leaves 'running'; true = exit 0. */
+  async function waitForJob(jobId: string, timeoutMs = 300_000): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      let detail;
+      try {
+        detail = await fetchJobDetail(jobId, 0);
+      } catch {
+        // A transient poll failure must not read as job failure — the job may
+        // well succeed. Keep retrying until the deadline.
+        if (Date.now() >= deadline) {
+          throw new Error('lost track of the job — follow it in the jobs drawer');
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        continue;
+      }
+      if (detail.status !== 'running') return detail.status === 'done';
+      if (Date.now() >= deadline) {
+        throw new Error('the job is still running — follow it in the jobs drawer');
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+    }
+  }
+
+  /**
+   * Spawn `dtk clean --select <metric> --execute` and wait for it (the delete
+   * is seconds, not a pipeline run) so the detail overlay can reload its
+   * report right after; the row's stats re-fetch drops the stale chip.
+   */
+  async function cleanExecute(metric: string): Promise<boolean> {
+    if (pipelineSubmitPending) return false;
+    pipelineSubmitPending = true;
+    let jobId: string;
+    try {
+      const res = await postClean({ metric });
+      jobId = res.job_id;
+      trackSpawnedJob('clean', `clean --select ${metric}`, jobId, null);
+    } catch (e) {
+      toast(root, 'error', (e as Error).message);
+      return false;
+    } finally {
+      pipelineSubmitPending = false;
+    }
+    try {
+      const ok = await waitForJob(jobId);
+      if (ok) {
+        toast(root, 'info', `Stale data for '${metric}' removed.`);
+        // Reload the LIVE detail overlay (if still open for this metric, even
+        // after a close/re-open) so only current-config series remain, and
+        // refresh the row so its stale chip clears.
+        if (detailHandle && detailMetric === metric) detailHandle.reload();
+        refreshMetricRow(metric, metricsList);
+      } else {
+        toast(root, 'error', `clean --select ${metric} failed — see the jobs drawer for the log.`);
+      }
+      void refreshJobs();
+      return ok;
+    } catch (e) {
+      toast(root, 'error', (e as Error).message);
+      return false;
     }
   }
 

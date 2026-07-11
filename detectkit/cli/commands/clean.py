@@ -264,17 +264,10 @@ def _valid_detector_ids(config: MetricConfig) -> set[str]:
     injection) so the computed ``detector_id`` matches what the pipeline
     writes — anything in the DB not in this set is stale.
     """
-    ids: set[str] = set()
-    for detector_config in config.detectors or []:
-        params = detector_config.get_algorithm_params()
-        seasonality_components = detector_config.get_seasonality_components()
-        if seasonality_components is not None:
-            params["seasonality_components"] = seasonality_components
-        detector = DetectorFactory.create_from_config(
-            {"type": detector_config.type, "params": params}
-        )
-        ids.add(detector.get_detector_id())
-    return ids
+    return {
+        DetectorFactory.detector_id_for_config(detector_config)
+        for detector_config in config.detectors or []
+    }
 
 
 def _valid_alert_config_ids(config: MetricConfig) -> set[str]:

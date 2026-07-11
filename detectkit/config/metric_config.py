@@ -4,6 +4,7 @@ Metric configuration models.
 Defines configuration structure for individual metrics loaded from YAML files.
 """
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -696,6 +697,23 @@ class MetricConfig(BaseModel):
         default_factory=list, description="Seasonality features to extract"
     )
     loading_batch_size: int = Field(default=10000, description="Batch size for loading")
+    # Data-maturity delay: how long after an interval closes the upstream source
+    # (e.g. a dbt model) needs before its data for that interval is complete.
+    # The loader treats [t, t+interval) as loadable only once
+    # now >= t + interval + loading_delay, and the no-data alert expectation
+    # shifts in lockstep — so a run scheduled right after the interval boundary
+    # never persists a partially-written bucket (which would otherwise stay
+    # wrong forever and skew trailing windows). Overrides the project-wide
+    # ``loading_delay``; an explicit 0 opts a metric out of the project default.
+    loading_delay: str | int | None = Field(
+        default=None,
+        description=(
+            "Data-maturity delay before the newest interval is trusted as "
+            "complete (duration string like '10min' or seconds). Use when the "
+            "upstream table finishes writing after the interval closes; "
+            "overrides the project-wide loading_delay, 0 opts out."
+        ),
+    )
     detectors: list[DetectorConfig] = Field(
         default_factory=list, description="Detector configurations"
     )
@@ -845,6 +863,12 @@ class MetricConfig(BaseModel):
 
         return v
 
+    @field_validator("loading_delay")
+    @classmethod
+    def validate_loading_delay(cls, v: str | int | None) -> str | int | None:
+        """A delay, if set, must parse as a duration (any zero form = opt out)."""
+        return validate_loading_delay_value(v)
+
     @field_validator("loading_batch_size")
     @classmethod
     def validate_batch_size(cls, v: int) -> int:
@@ -976,3 +1000,54 @@ class MetricConfig(BaseModel):
         data = unwrap_metric_mapping(data)
 
         return cls.model_validate(data)
+
+
+def loading_delay_to_seconds(value: str | int) -> int:
+    """Seconds for one ``loading_delay`` value.
+
+    Any zero-valued form — ``0``, ``"0"``, ``"0s"``, ``"0min"`` — means
+    "no delay" (the explicit opt-out from a project-wide default).
+    ``Interval`` itself rejects zero, so the zero forms are special-cased
+    before parsing; everything else must parse as a positive duration.
+    """
+    if isinstance(value, int):
+        return 0 if value == 0 else Interval(value).seconds
+    if re.fullmatch(r"0+\s*[A-Za-z]*", str(value).strip()):
+        return 0
+    return Interval(value).seconds
+
+
+def validate_loading_delay_value(v: str | int | None) -> str | int | None:
+    """Shared ``loading_delay`` field-validator body (MetricConfig + ProjectConfig).
+
+    One implementation so the accepted grammar and the error message can't
+    drift between the metric-level and project-level fields.
+    """
+    if v is None:
+        return v
+    try:
+        loading_delay_to_seconds(v)
+    except (ValueError, TypeError) as exc:
+        raise ValueError(
+            f"loading_delay must be a duration string ('10min', '1h') or "
+            f"seconds (0 opts out of a project-level delay): {exc}"
+        ) from exc
+    return v
+
+
+def resolve_loading_delay_seconds(
+    metric_delay: str | int | None, project_delay: str | int | None
+) -> int:
+    """Resolve the effective data-maturity delay: metric → project → 0.
+
+    The first configured value wins, so a per-metric ``loading_delay: 0``
+    (or ``"0"`` / ``"0min"``) explicitly opts that metric out of a
+    project-wide delay. Shared by the load step, the alert step (no-data
+    expectation), alert replay and the ``dtk ui`` overview so every consumer
+    agrees on the same maturity cut-off.
+    """
+    for value in (metric_delay, project_delay):
+        if value is None:
+            continue
+        return loading_delay_to_seconds(value)
+    return 0

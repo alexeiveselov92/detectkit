@@ -2,7 +2,7 @@
 // Mirrors the "dataviz-tile" look used across the report/tune pages: a big
 // JetBrains Mono number, a muted label, on a thin-bordered dark surface card.
 
-import { esc, fmtInt, fmtLag, fmtPct, fmtPerDay } from './format';
+import { effectiveLagSeconds, esc, fmtInt, fmtLag, fmtPct, fmtPerDay } from './format';
 import type { OverviewMetric } from './payload';
 
 function tile(value: string, label: string, sub?: string, opts?: { warn?: boolean; err?: boolean }): string {
@@ -52,7 +52,9 @@ export function buildTiles(rows: OverviewMetric[]): HTMLElement {
 
   // Stale = enabled metric whose freshness reads amber/red (lag > 2x interval,
   // or no datapoint at all yet). Disabled metrics are intentionally quiet and
-  // don't count.
+  // don't count. The configured data-maturity delay (`loading_delay`) is
+  // netted out first — the loader holds the newest interval back on purpose,
+  // so only lag beyond the delay signals staleness (mirrors table.ts).
   const stale: Array<{ m: OverviewMetric; lag: number }> = [];
   for (const m of landed) {
     if (!m.enabled) continue;
@@ -60,8 +62,9 @@ export function buildTiles(rows: OverviewMetric[]): HTMLElement {
       stale.push({ m, lag: Infinity });
       continue;
     }
-    if (m.lag_seconds !== null && m.interval_seconds > 0 && m.lag_seconds > 2 * m.interval_seconds) {
-      stale.push({ m, lag: m.lag_seconds });
+    const effLag = effectiveLagSeconds(m.lag_seconds, m.loading_delay_seconds);
+    if (effLag !== null && m.interval_seconds > 0 && effLag > 2 * m.interval_seconds) {
+      stale.push({ m, lag: effLag });
     }
   }
   stale.sort((a, b) => b.lag - a.lag);

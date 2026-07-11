@@ -7,6 +7,7 @@ from datetime import datetime
 from detectkit.alerting.channels.base import BaseAlertChannel
 from detectkit.alerting.channels.factory import AlertChannelFactory
 from detectkit.alerting.orchestrator import DetectionRecord, hydrate_detection_records
+from detectkit.config.metric_config import MetricConfig, resolve_loading_delay_seconds
 from detectkit.database.internal_tables import InternalTablesManager
 
 
@@ -27,6 +28,17 @@ class _TaskManagerBase:
         # In-process flag: dispatch project-level error alert at most once
         # per run. Abort propagation is signalled via result["abort_run"].
         self._error_alert_sent_in_run = False
+
+    def _loading_delay_seconds(self, config: MetricConfig) -> int:
+        """Effective data-maturity delay for *config* (metric → project → 0).
+
+        One resolution seam for the load step's end bound and the alert
+        step's no-data expectation, so the two can't drift apart.
+        """
+        return resolve_loading_delay_seconds(
+            config.loading_delay,
+            getattr(self.project_config, "loading_delay", None),
+        )
 
     def _load_recent_detections(
         self,

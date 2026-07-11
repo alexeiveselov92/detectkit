@@ -38,6 +38,7 @@ query_columns:                 # optional — map query columns to internal name
 
 loading_start_time: "2024-01-01 00:00:00"   # optional — initial load start (UTC)
 loading_batch_size: 2160       # optional — points per load batch
+loading_delay: "10min"         # optional — data-maturity delay (see below)
 
 seasonality_columns: [hour, day_of_week]    # optional — auto-extracted features
 
@@ -129,6 +130,16 @@ columns and bakes the best grouping into the tuned config (see `autotune.md`).
   saved timestamp and this is ignored.
 - `loading_batch_size` is the number of points loaded per batch (rule of thumb:
   7–30 days of points). E.g. 10-min interval → `2160` ≈ 15 days.
+- `loading_delay` (duration string or seconds) withholds the newest interval
+  until `now >= interval_end + loading_delay`, so a source that finishes
+  writing *after* the interval closes (a dbt model, say) never gets a
+  partial bucket persisted forever (load only resumes forward). The no-data
+  alert expectation shifts back in lockstep. Resolves **metric → project →
+  0** (`project.md`); `loading_delay: 0` on the metric opts out of a
+  project-wide default. Only affects the implicit "now" bound — an explicit
+  `--to` bypasses it. Trade-off: every second of delay adds the same to
+  real-outage detection time, and it reduces but doesn't eliminate the race
+  (repair a bucket that slipped through with `dtk run --from <date>`).
 
 ## Editing a metric that already has data
 

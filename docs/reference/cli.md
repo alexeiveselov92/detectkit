@@ -306,6 +306,11 @@ dtk run --select cpu_usage --from "2024-01-01" --to "2024-02-01"
 - Defaults to current time if not specified
 - Only affects `load` step
 - Timestamps are in UTC
+- An explicit `--to` is trusted verbatim — it bypasses a configured
+  [`loading_delay`](../guides/configuration-metrics.md#loading_delay-string-or-int-optional)
+  (which only shifts the implicit "now" bound). If a bucket was already
+  persisted before `loading_delay` was configured, `dtk run --from <date
+  before that bucket>` reloads and overwrites it.
 
 ##### `--full-refresh` (flag)
 

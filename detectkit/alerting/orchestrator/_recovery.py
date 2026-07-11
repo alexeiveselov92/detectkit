@@ -234,6 +234,7 @@ class _RecoveryMixin(_OrchestratorBase):
             interval_seconds=self.interval.seconds,
             onset_timestamp=onset_ts,
             streak_capped=capped,
+            loading_delay_seconds=self.loading_delay_seconds or None,
         )
 
     def _resolve_incident(

@@ -121,6 +121,13 @@ class AlertData:
     window_matched: int | None = None
     min_anomaly_share: float | None = None
     fired_by_share: bool = False
+    # Data-maturity delay (``loading_delay``, resolved metric → project). Exposed
+    # to message templates as the OPT-IN ``{data_delay_display}`` /
+    # ``{data_delay_line}`` variables only — the default rendering deliberately
+    # does NOT show it, so existing alerts stay byte-identical. Lets a custom
+    # template disclose that every timestamp in the message deliberately trails
+    # wall-clock by the configured delay. ``None``/0 renders unchanged.
+    loading_delay_seconds: int | None = None
 
 
 def format_rule_display(
@@ -463,8 +470,10 @@ class BaseAlertChannel(ABC):
         # "Alert fired" — the on-grid moment the rule's consecutive threshold was
         # first met: onset + (consecutive_required - 1) * interval. Recovery
         # messages render it as the middle of the "anomaly began → alert fired →
-        # recovered" timeline so a stakeholder can tell the onset apart from when
-        # detectkit actually notified. Skipped when the run is capped (onset is
+        # recovered" timeline so a stakeholder can tell the onset apart from the
+        # moment the rule tripped. It is a data-grid instant, not a dispatch
+        # timestamp: with a ``loading_delay`` (and run cadence) the actual
+        # notification goes out later. Skipped when the run is capped (onset is
         # only a lower bound, so the fire time is unknown) or timing isn't wired
         # in (direct-API callers). The firing message doesn't show it: there it
         # coincides with the latest point the alert is firing on.
@@ -519,6 +528,20 @@ class BaseAlertChannel(ABC):
         # template can drop ``{synonyms_line}`` in to show "Also known as: …".
         synonyms = ", ".join(alert_data.ai_synonyms) if alert_data.ai_synonyms else ""
         synonyms_line = f"Also known as: {synonyms}\n" if synonyms else ""
+
+        # Data-maturity delay (``loading_delay``) — OPT-IN template variables
+        # only (``{data_delay_display}`` / ``{data_delay_line}``), same contract
+        # as ``{synonyms_line}``: the default templates never reference them, so
+        # every existing alert renders byte-identical. A custom template can
+        # disclose that the message's timestamps deliberately trail wall-clock.
+        delay_seconds = alert_data.loading_delay_seconds or 0
+        data_delay_display = format_duration(delay_seconds) if delay_seconds else ""
+        data_delay_line = (
+            f"Data maturity delay: {data_delay_display} "
+            "(timestamps intentionally trail real time)\n"
+            if delay_seconds
+            else ""
+        )
 
         # Format mentions
         mentions_str = self.format_mentions(alert_data.mentions)
@@ -605,6 +628,8 @@ class BaseAlertChannel(ABC):
             "description_line": description_line,
             "synonyms": synonyms,
             "synonyms_line": synonyms_line,
+            "data_delay_display": data_delay_display,
+            "data_delay_line": data_delay_line,
             "dashboard_url": dashboard_url,
             "dashboard_line": dashboard_line,
             "help_url": help_url,

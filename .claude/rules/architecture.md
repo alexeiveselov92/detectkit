@@ -25,7 +25,10 @@ tables described below.
   time grid (missing points become NaN/NULL), and writes `_dtk_datapoints`.
   Resumes from the last datapoint timestamp (or `loading_start_time` on first
   run); batches by `loading_batch_size`; snaps the end to the last complete
-  interval boundary.
+  interval boundary. An optional `loading_delay` (metric → project → 0) shifts
+  that "now" bound back first, so an interval isn't loaded until the upstream
+  source has had time to finish writing it — an explicit `--to` bypasses this
+  and is trusted verbatim.
 - **detect** (`detectkit/orchestration/task_manager/_detect_step.py`): for each
   configured detector, builds the detector, computes its `detector_id`, resumes
   after the last persisted detection, loads datapoints **plus a historical
@@ -374,8 +377,11 @@ Other behaviors: **cooldown** (`_cooldown.py`) suppresses repeat alerts within
 `alert_cooldown`, optionally reset on recovery; **recovery** (`_recovery.py`)
 sends a direction-aware all-clear once per incident when `notify_on_recovery`;
 **no-data** alerts fire when the latest expected datapoint is missing/NULL
-(independent of quorum). State (last alert / recovery, counts) is keyed by
-`alert_config_id` in `_dtk_alert_states`.
+(independent of quorum) — `get_last_complete_point` is `loading_delay`-aware
+(the resolved delay rides as constructor state on the orchestrator, so every
+call site, including the recovery mixin, agrees on the same shifted boundary
+and a deliberately-withheld newest interval never false-fires). State (last
+alert / recovery, counts) is keyed by `alert_config_id` in `_dtk_alert_states`.
 
 Channels live in `detectkit/alerting/channels/` behind `BaseAlertChannel`;
 `AlertChannelFactory` builds them with env-var interpolation. Implemented:
@@ -1088,7 +1094,10 @@ rate / reviewed) stays **labels-optional**: populated only when
 `incidents/<metric>/` has a labels file (the same `autotune/labels.py`
 helpers `dtk tune` uses), matched on alert-streak-span overlap exactly like
 the `dtk tune` cockpit's metrics bar — a metric with no labels just omits the
-field. Window presets (`24h`/`7d`/`30d`/`90d`) map to `now - N days`; `all`
+field. Each row also carries the resolved `loading_delay_seconds` (metric →
+project → 0); the frontend nets it out of `lag_seconds` before judging
+freshness, so a metric with a deliberately configured `loading_delay` doesn't
+read as perpetually stale. Window presets (`24h`/`7d`/`30d`/`90d`) map to `now - N days`; `all`
 bounds each metric to its most recent `MAX_STAT_POINTS` (20,000) points so a
 years-long, fine-grained metric can't melt the browser or the database.
 `GET /metric/<name>` reuses `build_report_payload` / `render_report_html`

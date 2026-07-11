@@ -5,7 +5,7 @@
 // `paint()` you must call once it's attached to the live DOM (fills in the
 // per-row sparklines — see spark.ts for why that's a separate step).
 
-import { esc, fmtAgo, fmtInterval, fmtLag, fmtPct, fmtPerDay, fmtStamp, groupBy } from './format';
+import { effectiveLagSeconds, esc, fmtAgo, fmtInterval, fmtLag, fmtPct, fmtPerDay, fmtStamp, groupBy } from './format';
 import { paintSpark } from './spark';
 import type { BootMetric, OverviewMetric } from './payload';
 
@@ -28,6 +28,7 @@ export function buildPendingRow(bm: BootMetric): OverviewMetric {
     tags: bm.tags,
     enabled: bm.enabled,
     interval_seconds: bm.interval_seconds,
+    loading_delay_seconds: 0,
     detectors: [],
     alert_rule: null,
     last_point: null,
@@ -85,9 +86,14 @@ function freshness(m: OverviewMetric): Freshness {
   if (m.last_point === null) {
     return { color: 'var(--st-anomaly)', title: 'no datapoints loaded yet', rank: Infinity };
   }
-  const lag = m.lag_seconds ?? 0;
+  // Net the configured data-maturity delay out of the raw lag: the loader
+  // deliberately holds the newest interval back by `loading_delay`, so only
+  // the lag BEYOND that delay signals actual staleness.
+  const delay = m.loading_delay_seconds ?? 0;
+  const lag = effectiveLagSeconds(m.lag_seconds, m.loading_delay_seconds) ?? 0;
   const ratio = m.interval_seconds > 0 ? lag / m.interval_seconds : 0;
-  const title = `lag ${fmtLag(Math.max(0, lag))} (${ratio.toFixed(1)}× interval) · last point ${fmtStamp(m.last_point)} UTC`;
+  const delayNote = delay > 0 ? ` · maturity delay ${fmtLag(delay)} excluded` : '';
+  const title = `lag ${fmtLag(lag)} (${ratio.toFixed(1)}× interval)${delayNote} · last point ${fmtStamp(m.last_point)} UTC`;
   if (ratio < 2) return { color: 'var(--st-recovery)', title, rank: lag };
   if (ratio < 6) return { color: 'var(--st-nodata)', title, rank: lag };
   return { color: 'var(--st-anomaly)', title, rank: lag };

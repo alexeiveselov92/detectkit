@@ -15,7 +15,12 @@
 // as plain-text bodies and are shown verbatim in a monospace error pane — the
 // editor stays open so the user can fix and retry. A debounced validation chip
 // runs the same parse endpoint while editing, so most errors surface before
-// Save is ever clicked.
+// Save is ever clicked. While the YAML tab still holds the form's own
+// representation (nothing hand-edited since the views last agreed), the chip
+// reuses the Builder's client-side issues — the same "name is required" in
+// both tabs, instead of a raw pydantic wall that "disappears" on switching
+// back. Genuinely hand-edited YAML gets the server verdict, summarized to one
+// readable field — reason line (full text in the tooltip).
 
 import { esc } from './format';
 import {
@@ -106,6 +111,37 @@ export interface MetricEditorHandle {
 }
 
 const EMPTY_META: FormMeta = { channels: [], profiles: [], default_profile: null };
+
+/**
+ * Collapse a server parse error into one readable line for the validation chip.
+ * Pydantic's text arrives as `invalid metric config: N validation error(s) for
+ * MetricConfig` followed by `field` / indented-reason line pairs; the first
+ * line alone ("… 1 validation error for MetricConfig") says nothing without
+ * hovering the tooltip. Anything not matching that shape falls back to the
+ * first line unchanged (e.g. `invalid YAML: …` syntax errors).
+ */
+export function summarizeParseError(msg: string): string {
+  const lines = msg.split('\n');
+  const head = lines[0] ?? msg;
+  const m = head.match(/^(.*?)(\d+) validation errors? for \S+$/);
+  if (!m) return head;
+  const rest = Number(m[2]) - 1;
+  const suffix = rest > 0 ? ` (+${rest} more)` : '';
+  const cleanReason = (s: string): string =>
+    s
+      .trim()
+      .replace(/\s*\[type=.*$/, '')
+      .replace(/^(Value|Assertion) error, /, '');
+  const second = lines[1];
+  if (!second?.trim()) return head;
+  // A root model_validator error has no field line — pydantic goes straight
+  // to the indented reason ("  Value error, … [type=value_error, …]"), while
+  // a field path line is never indented and never carries a [type=] tail.
+  if (/^\s/.test(second) || second.includes('[type=')) return `${m[1]}${cleanReason(second)}${suffix}`;
+  const reason = lines[2] ? cleanReason(lines[2]) : '';
+  if (!reason) return head;
+  return `${m[1]}${second.trim()} — ${reason}${suffix}`;
+}
 
 /** Open the full-screen metric editor overlay, appended under `root`. */
 export function openMetricEditor(
@@ -341,17 +377,19 @@ export function openMetricEditor(
 
   async function runValidate(): Promise<void> {
     const generation = ++validateGeneration;
-    let text: string;
-    if (tab === 'builder' && form) {
+    // While the draft is still the form's own representation — the Builder tab,
+    // or a YAML tab nothing was typed into since the two views last agreed —
+    // the Builder's client checks describe it accurately, so both tabs show
+    // the same friendly warn ("name is required") instead of the YAML tab
+    // 400-ing on a doomed parse of its own re-emit.
+    if (form && (tab === 'builder' || !yamlDirtySinceSync)) {
       const issues = form.clientIssues();
       if (issues.length > 0) {
         setChip('warn', issues[0], issues.join('\n'));
         return;
       }
-      text = form.toYaml();
-    } else {
-      text = textarea.value;
     }
+    const text = tab === 'builder' && form ? form.toYaml() : textarea.value;
     setChip('checking', 'checking…');
     try {
       await postMetricParse(text);
@@ -360,7 +398,7 @@ export function openMetricEditor(
     } catch (e) {
       if (generation !== validateGeneration) return;
       const msg = (e as Error).message;
-      setChip('err', msg.split('\n')[0], msg);
+      setChip('err', summarizeParseError(msg), msg);
     }
   }
 
@@ -489,7 +527,10 @@ export function openMetricEditor(
   async function save(): Promise<void> {
     if (saving) return;
     hideError();
-    if (tab === 'builder' && form) {
+    // Same "form still speaks for the draft" rule as runValidate: a YAML tab
+    // holding an un-edited re-emit gets the friendly issue list, not the
+    // server's raw pydantic text.
+    if (form && (tab === 'builder' || !yamlDirtySinceSync)) {
       const issues = form.clientIssues();
       if (issues.length > 0) {
         showError(`Fix before saving:\n- ${issues.join('\n- ')}`);

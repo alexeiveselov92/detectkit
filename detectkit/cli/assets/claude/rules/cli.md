@@ -236,7 +236,9 @@ path as `dtk osi import`) — and **YAML**, the raw text, kept for whole-config
 pastes. The last-edited tab wins, never silently: leaving an edited YAML tab
 validates server-side first and blocks the switch on error; leaving an
 edited Builder re-emits the YAML. A debounced live-validation chip re-checks
-the draft while typing. Keys the form doesn't model (`autotune:`, custom
+the draft while typing — showing the Builder's friendly checks while the
+YAML tab still mirrors the form, and a one-line `field — reason` summary of
+server errors otherwise. Keys the form doesn't model (`autotune:`, custom
 templates, unknown detector types/params, a multi-entry alerting list)
 round-trip verbatim, listed under "Preserved fields". Create writes
 `metrics/[<folder>/]<name>.yml`; after a create, a **next-steps strip**

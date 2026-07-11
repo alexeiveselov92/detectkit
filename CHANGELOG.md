@@ -5,6 +5,27 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.55.2] - 2026-07-11
+
+### Fixed
+- **`dtk ui`: a blank metric name no longer surfaces as a raw pydantic error on
+  the YAML tab.** In the create editor, clearing the starter name and touching
+  any Builder control (e.g. picking another detector type), then switching to
+  the YAML tab, re-emitted a config with no `name:` — the live-validation chip
+  showed the server's truncated `invalid metric config: 1 validation error for
+  MetricConfig`, which then "disappeared" back on the Builder tab (it showed
+  its own soft "name is required" instead), reading as a tab-sync bug. Now,
+  while the YAML tab still holds the form's own re-emit (nothing hand-typed
+  since the two views last agreed), the chip **and** Save reuse the Builder's
+  friendly client-side checks — the same "name is required" warn in both tabs,
+  with no doomed parse round-trip. Genuinely hand-edited YAML still gets the
+  server verdict, now summarized to one readable `field — reason` line
+  (`invalid metric config: name — Field required`) with the full error text in
+  the chip's tooltip. The Builder's client-side name check now mirrors the
+  server rule exactly (unicode-aware `isalnum` plus `_`/`-`; it was
+  ASCII-only), so the client checks can never block a config the server would
+  accept.
+
 ## [0.55.1] - 2026-07-11
 
 ### Fixed

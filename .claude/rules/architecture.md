@@ -1055,7 +1055,13 @@ fields" list. Tab sync goes through the server-side parse seam
 unwrapped mapping — only the keys the file sets, no pydantic defaults) via
 `POST /api/metric-parse`: leaving an edited YAML tab must parse (blocked on
 error), leaving an edited Builder re-emits; the same route backs the
-debounced live-validation chip. The Builder's channel/profile pickers are
+debounced live-validation chip. While the YAML tab still holds the form's
+own representation (nothing hand-typed since the views last agreed), the
+chip and Save reuse the Builder's client-side issue list — the same friendly
+"name is required" in both tabs instead of a raw pydantic 400 on the form's
+own re-emit; genuinely hand-edited YAML gets the server verdict, collapsed
+to one `field — reason` line (`summarizeParseError`, full text in the
+tooltip). The Builder's channel/profile pickers are
 seeded from the boot payload's `form_meta` (`build_form_meta(profiles_config)`
 in `server.py` — channel **names + types and profile names only, never
 channel configs/secrets**). After a create, a **next-steps strip** closes the

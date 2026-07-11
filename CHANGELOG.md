@@ -5,6 +5,70 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.58.0] - 2026-07-11
+
+### Added
+- **`dtk run --json` — a machine-readable run summary.** One JSON document
+  (`schema_version: 1`) on stdout with per-metric status/steps/counters,
+  run-level totals, timing, and the exit code; every human-readable line
+  (including the pipeline's own progress tree) moves to stderr, so stdout can
+  be piped straight into `jq` or a file. The document is emitted even when the
+  run dies unexpectedly (status `error`/`failed` with the error message), so a
+  consumer parsing stdout never sees an empty stream.
+- **Webhook payload formats: `format: json` and `format: alertmanager`.** The
+  generic `type: webhook` channel (Slack/Mattermost are unaffected) can now
+  post, instead of the chat-style attachment card: a **versioned structured
+  event** (`format: json`, `schema_version: 1` — kind/status, raw
+  value/expected bounds, the resolved alert rule and quorum, incident
+  onset/streak/duration, links, and the same display strings the human
+  channels render), or a **Prometheus Alertmanager webhook-receiver payload**
+  (`format: alertmanager`, version `"4"`), so any tool that already ingests
+  Alertmanager webhooks can take detectkit alerts with no new integration — a
+  recovery reuses the firing alert's labels and `fingerprint` (anomaly
+  `direction` deliberately rides as an annotation, since a recovery carries no
+  direction and a direction label would break trigger/resolve pairing). Both
+  structured formats add an `X-Detectkit-Event` header and ignore a custom
+  `template`.
+- **Webhook HMAC signing (`secret`).** When set on a webhook channel, every
+  request (any format) carries a GitHub-style
+  `X-Detectkit-Signature-256: sha256=<hex>` header — HMAC-SHA256 over the
+  exact request body bytes — so a receiver can verify the payload really came
+  from detectkit before acting on it.
+- **MariaDB support.** The MySQL backend now detects the server vendor at
+  connect time (`SELECT VERSION()`) and, on MariaDB, renders upserts in the
+  classic `VALUES()` form — the MySQL 8.0.19+ row-alias form the backend uses
+  on stock MySQL was never adopted by MariaDB, so dedup/last-writer-wins now
+  works there instead of failing with a syntax error. `type: mariadb` is a new
+  profile alias (identical fields; plain `type: mysql` against a MariaDB
+  server also works — detection is by the live server, not the profile),
+  `pip install detectkit[mariadb]` names the extra, `dtk init --db-type
+  mariadb` scaffolds it, and the Docker integration matrix now runs MariaDB
+  11.x alongside ClickHouse/PostgreSQL/MySQL.
+- **Orchestrator recipes.** The CLI reference's Scheduling section gains an
+  "Orchestrators & CI" part with Airflow (`BashOperator`), Dagster, Prefect,
+  and GitHub Actions recipes, all gating on the new exit codes and `--json`.
+
+### Changed
+- **`dtk run`, `dtk autotune`, and `dtk clean` now exit non-zero on failure.**
+  Previously every failure — a failed metric, a dead database, a missing
+  `profiles.yml`, a selector matching nothing — printed an error and exited
+  `0`, so cron/Airflow/CI gates never saw it (the docs told you not to trust
+  the exit code). Now: `0` success, `1` failure (any metric failed, the run
+  aborted after a project error alert, a startup/config/DB error, or the
+  selector matched no metrics — a typo'd selector in cron must not look
+  healthy), `2` usage error (for `dtk clean`, that includes being called with
+  both or neither of `--select`/`--orphaned-metrics`). `dtk autotune` counts a
+  metric with autotuning disabled as skipped (not failed); answering "no" to
+  `dtk clean`'s confirmation prompt stays `0`. `dtk ui`'s job panel picks the
+  codes up automatically — a failed spawned run now shows as failed instead of
+  done.
+- **Webhook channels serialize the request body themselves.** The payload is
+  now `json.dumps`-ed in the channel (UTF-8, `ensure_ascii=False`) and posted
+  as raw bytes so the HMAC signature covers the exact bytes sent. The only
+  receiver-visible difference from the previous `requests` behavior: non-ASCII
+  text (e.g. a metric description in Russian) arrives as raw UTF-8 instead of
+  `\uXXXX` escapes — byte-identical JSON semantics either way.
+
 ## [0.57.0] - 2026-07-11
 
 ### Added

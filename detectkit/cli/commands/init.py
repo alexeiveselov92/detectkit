@@ -82,6 +82,15 @@ _ACTIVE_PROFILES = {
 """,
 }
 
+# MariaDB reuses the MySQL scaffold verbatim (same manager, same DATABASES
+# model) — only the `type:`/prose need to change, so derive it by a couple of
+# trivial, case-sensitive substitutions rather than duplicating the block.
+_ACTIVE_PROFILES["mariadb"] = (
+    _ACTIVE_PROFILES["mysql"]
+    .replace("local MySQL (8.0+). MySQL uses DATABASES:", "local MariaDB. MariaDB uses DATABASES:")
+    .replace("type: mysql", "type: mariadb")
+)
+
 # Commented single-profile examples for the backends that are NOT active.
 _COMMENTED_EXAMPLES = {
     "clickhouse": """  # Example ClickHouse profile (needs internal_database + data_database)
@@ -129,6 +138,8 @@ _BUCKET_SQL = {
         " * {{ interval_seconds }})"
     ),
 }
+# MariaDB accepts the same FROM_UNIXTIME/UNIX_TIMESTAMP bucketing as MySQL.
+_BUCKET_SQL["mariadb"] = _BUCKET_SQL["mysql"]
 
 # Example incidents (labels) file for supervised `dtk autotune`. Lives in
 # incidents/ beside metrics/; pointed at via `--incidents` or a metric's

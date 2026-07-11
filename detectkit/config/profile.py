@@ -23,7 +23,7 @@ class ProfileConfig(BaseModel):
     environment (dev, prod, etc.).
 
     Attributes:
-        type: Database type ("clickhouse", "postgres", "mysql")
+        type: Database type ("clickhouse", "postgres", "mysql", "mariadb")
         host: Database host
         port: Database port
         user: Database user
@@ -43,14 +43,14 @@ class ProfileConfig(BaseModel):
 
     # Connection-target database. Required for PostgreSQL (the database to
     # connect to, inside which internal_schema/data_schema live); optional for
-    # MySQL; unused for ClickHouse.
+    # MySQL/MariaDB; unused for ClickHouse.
     database: str | None = Field(
-        default=None, description="Database to connect to (PostgreSQL/MySQL)"
+        default=None, description="Database to connect to (PostgreSQL/MySQL/MariaDB)"
     )
 
     # Internal location for _dtk_* tables
     internal_database: str | None = Field(
-        default=None, description="Database for internal tables (ClickHouse/MySQL)"
+        default=None, description="Database for internal tables (ClickHouse/MySQL/MariaDB)"
     )
     internal_schema: str | None = Field(
         default=None, description="Schema for internal tables (PostgreSQL)"
@@ -58,7 +58,7 @@ class ProfileConfig(BaseModel):
 
     # Data location for user tables
     data_database: str | None = Field(
-        default=None, description="Database for user data tables (ClickHouse/MySQL)"
+        default=None, description="Database for user data tables (ClickHouse/MySQL/MariaDB)"
     )
     data_schema: str | None = Field(default=None, description="Schema for user data (PostgreSQL)")
 
@@ -70,7 +70,7 @@ class ProfileConfig(BaseModel):
     @classmethod
     def validate_type(cls, v: str) -> str:
         """Validate database type."""
-        allowed_types = {"clickhouse", "postgres", "mysql"}
+        allowed_types = {"clickhouse", "postgres", "mysql", "mariadb"}
         if v not in allowed_types:
             raise ValueError(
                 f"Invalid database type: {v}. " f"Allowed types: {', '.join(allowed_types)}"
@@ -103,9 +103,9 @@ class ProfileConfig(BaseModel):
             if not self.internal_schema:
                 raise ValueError("internal_schema must be set for PostgreSQL")
             return self.internal_schema
-        elif self.type == "mysql":
+        elif self.type in ("mysql", "mariadb"):
             if not self.internal_database:
-                raise ValueError("internal_database must be set for MySQL")
+                raise ValueError("internal_database must be set for MySQL/MariaDB")
             return self.internal_database
         else:
             raise ValueError(f"Unsupported database type: {self.type}")
@@ -128,9 +128,9 @@ class ProfileConfig(BaseModel):
             if not self.data_schema:
                 raise ValueError("data_schema must be set for PostgreSQL")
             return self.data_schema
-        elif self.type == "mysql":
+        elif self.type in ("mysql", "mariadb"):
             if not self.data_database:
-                raise ValueError("data_database must be set for MySQL")
+                raise ValueError("data_database must be set for MySQL/MariaDB")
             return self.data_database
         else:
             raise ValueError(f"Unsupported database type: {self.type}")
@@ -175,7 +175,9 @@ class ProfileConfig(BaseModel):
                 data_schema=self.get_data_location(),
                 settings=self.settings,
             )
-        elif self.type == "mysql":
+        elif self.type in ("mysql", "mariadb"):
+            # MariaDB is served by the same manager; it detects the vendor at
+            # connect time and adjusts the upsert SQL it generates accordingly.
             from detectkit.database.mysql_manager import MySQLDatabaseManager
 
             return MySQLDatabaseManager(

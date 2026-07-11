@@ -91,14 +91,18 @@ def _make_manager(backend: str, monkeypatch):
             database="db", internal_schema="dtk", data_schema="public"
         )
     else:
+        # "mariadb" is the same MySQLDatabaseManager with vendor detection
+        # forced on, since _connect (where detection normally runs) is stubbed.
         monkeypatch.setattr(mysql_mod, "PYMYSQL_AVAILABLE", True)
         monkeypatch.setattr(mysql_mod.MySQLDatabaseManager, "_connect", lambda self: conn)
         monkeypatch.setattr(mysql_mod.MySQLDatabaseManager, "_ensure_locations", lambda self: None)
         mgr = mysql_mod.MySQLDatabaseManager(internal_database="dtk", data_database="analytics")
+        if backend == "mariadb":
+            mgr._is_mariadb = True
     return mgr, conn
 
 
-@pytest.fixture(params=["postgres", "mysql"])
+@pytest.fixture(params=["postgres", "mysql", "mariadb"])
 def backend(request):
     return request.param
 
@@ -182,6 +186,12 @@ class TestInsertConflict:
         if backend == "postgres":
             assert f"ON CONFLICT ({q}metric_name{q}, {q}timestamp{q}) DO UPDATE SET" in sql
             assert f"WHERE _dtk_datapoints.{q}created_at{q} <= EXCLUDED.{q}created_at{q}" in sql
+        elif backend == "mariadb":
+            # MariaDB has no row-alias upsert: no "AS new", VALUES() instead.
+            assert "ON DUPLICATE KEY UPDATE" in sql
+            assert "AS new" not in sql
+            assert f"VALUES({q}created_at{q})" in sql
+            assert f"IF(VALUES({q}created_at{q}) >= {q}_dtk_datapoints{q}.{q}created_at{q}" in sql
         else:
             assert "AS new ON DUPLICATE KEY UPDATE" in sql
             assert f"IF(new.{q}created_at{q} >= {q}_dtk_datapoints{q}.{q}created_at{q}" in sql
@@ -255,3 +265,50 @@ class TestCoerce:
         assert mgr._coerce(np.float64("nan")) is None
         assert mgr._coerce(None) is None
         assert mgr._coerce("text") == "text"
+
+
+class _VersionFakeCursor:
+    """Answers ``SELECT VERSION()`` with a fixed row, for `_detect_mariadb`."""
+
+    def __init__(self, version_row: tuple | None) -> None:
+        self._version_row = version_row
+
+    def __enter__(self) -> _VersionFakeCursor:
+        return self
+
+    def __exit__(self, *exc: object) -> bool:
+        return False
+
+    def execute(self, sql: str, params=None) -> None:
+        pass
+
+    def fetchone(self):
+        return self._version_row
+
+
+class _VersionFakeConn:
+    def __init__(self, version_row: tuple | None) -> None:
+        self._version_row = version_row
+
+    def cursor(self) -> _VersionFakeCursor:
+        return _VersionFakeCursor(self._version_row)
+
+
+class _RaisingConn:
+    """A connection whose ``cursor()`` blows up, exercising the fallback path."""
+
+    def cursor(self):
+        raise RuntimeError("connection lost")
+
+
+class TestMariaDbDetection:
+    def test_mariadb_version_string_detected(self):
+        conn = _VersionFakeConn(("11.4.2-MariaDB-log",))
+        assert mysql_mod.MySQLDatabaseManager._detect_mariadb(conn) is True
+
+    def test_stock_mysql_version_string_is_not_mariadb(self):
+        conn = _VersionFakeConn(("8.0.36",))
+        assert mysql_mod.MySQLDatabaseManager._detect_mariadb(conn) is False
+
+    def test_query_failure_defaults_to_false(self):
+        assert mysql_mod.MySQLDatabaseManager._detect_mariadb(_RaisingConn()) is False

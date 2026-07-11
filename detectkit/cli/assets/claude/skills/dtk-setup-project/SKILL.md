@@ -50,17 +50,19 @@ side by side, ask which one to set up.
 
 ## Step 1 — Pick the database backend
 
-**ClickHouse, PostgreSQL and MySQL are all fully supported.** Ask which one the
-project uses (default to ClickHouse if unsure). `dtk init --db-type
-{clickhouse,postgres,mysql}` scaffolds `profiles.yml` for the chosen backend.
-The location fields differ:
-- **ClickHouse** / **MySQL** — two *databases*: `internal_database` / `data_database`.
+**ClickHouse, PostgreSQL, MySQL and MariaDB are all fully supported.** Ask
+which one the project uses (default to ClickHouse if unsure). `dtk init
+--db-type {clickhouse,postgres,mysql,mariadb}` scaffolds `profiles.yml` for the
+chosen backend. The location fields differ:
+- **ClickHouse** / **MySQL** / **MariaDB** — two *databases*: `internal_database` / `data_database`.
 - **PostgreSQL** — connect to a `database` (must already exist), then two
   *schemas*: `internal_schema` / `data_schema`.
 
-The metric query SQL dialect also differs (e.g. `toStartOfInterval` on
-ClickHouse vs `date_trunc`/`to_timestamp` on Postgres vs `FROM_UNIXTIME` on
-MySQL). Everything else — detectors, alerting, the CLI — is identical.
+`type: mariadb` is an identical profile alias to `type: mysql` (same location
+fields; the vendor is auto-detected at connect). The metric query SQL dialect
+also differs (e.g. `toStartOfInterval` on ClickHouse vs `date_trunc`/
+`to_timestamp` on Postgres vs `FROM_UNIXTIME` on MySQL/MariaDB). Everything
+else — detectors, alerting, the CLI — is identical.
 
 ## Step 2 — Connection details (gather, don't guess)
 
@@ -136,9 +138,11 @@ identity fields below are optional overrides.
 - **email** — `smtp_host`, `smtp_port`, `from_email`, `to_emails` (list);
   optional `from_name` (From display name, default `detectkit`);
   `smtp_username` / `smtp_password` via env_var.
-- **webhook** — generic `webhook_url` (required) + optional `extra_headers`
-  (also accepts `username` / `icon_url` / `icon_emoji` / `channel`). There is
-  no `url`, `method` or `headers` field.
+- **webhook** — generic `webhook_url` (required) + optional `format`
+  (`attachments` default / `json` / `alertmanager`), `secret` (HMAC-SHA256-signs
+  the request body into `X-Detectkit-Signature-256`), and `extra_headers` (also
+  accepts `username` / `icon_url` / `icon_emoji` / `channel`). There is no
+  `url`, `method` or `headers` field.
 
 ```yaml
 # at the end of profiles.yml

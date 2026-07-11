@@ -304,12 +304,202 @@ alerting:
 
 **Parameters**:
 - `webhook_url` (required) - Target webhook URL
+- `format` (default: `"attachments"`) - Payload shape: `attachments`, `json`,
+  or `alertmanager` — see [Webhook payload formats](#webhook-payload-formats)
+- `secret` (optional) - HMAC signing secret (env-interpolatable) — see
+  [Request signing](#request-signing-secret)
 - `username` (default: `"detectkit"`) - Bot display name
 - `icon_url` (default: detectkit brand avatar) - Bot avatar image URL
 - `icon_emoji` (optional) - Emoji icon, used instead of an avatar image
 - `channel` (optional) - Target channel (Slack/Mattermost)
 - `timeout` (default: `10`) - HTTP timeout in seconds
 - `extra_headers` (optional) - Additional HTTP headers for custom auth
+
+#### Webhook payload formats
+
+`format` is **generic `type: webhook` only** — Slack and Mattermost channels
+always send the attachments payload described at the top of this page,
+regardless of this setting.
+
+**`attachments`** (default) — today's Mattermost/Slack-compatible attachment
+payload, unchanged.
+
+**`json`** — a flat, stable, machine-readable payload for receivers that speak
+their own wire protocol instead of Slack's. Formats `json` and `alertmanager`
+both ignore a custom `template` (there's no text to template) and send an
+`X-Detectkit-Event: anomaly|recovery|no_data|error` header alongside the body:
+
+```yaml
+alert_channels:
+  ingestor:
+    type: webhook
+    webhook_url: "https://ingest.example.com/detectkit"
+    format: json
+    secret: "{{ env_var('DETECTKIT_WEBHOOK_SECRET') }}"
+```
+
+Example payload (an anomaly alert):
+
+```json
+{
+  "schema_version": 1,
+  "source": "detectkit",
+  "kind": "anomaly",
+  "status": "firing",
+  "project": "my_project",
+  "metric": "checkout_errors",
+  "description": "Checkout error rate",
+  "timestamp": "2026-07-11T10:30:00Z",
+  "value": 42.5,
+  "expected": { "lower": 10.0, "upper": 30.0 },
+  "severity": 4.2,
+  "direction": "up",
+  "detector": {
+    "name": "mad",
+    "params": { "threshold": 3.0, "window_size": 100 }
+  },
+  "rule": {
+    "min_detectors": 1,
+    "direction": "any",
+    "consecutive": 3,
+    "window_points": null,
+    "min_anomaly_share": null,
+    "fired_by_share": false,
+    "display": "min_detectors=1 · direction=any · consecutive=3"
+  },
+  "quorum": { "detector_count": 1, "min_detectors": 1 },
+  "incident": {
+    "onset": "2026-07-11T10:00:00Z",
+    "streak": 3,
+    "capped": false,
+    "interval_seconds": 600,
+    "duration_seconds": 1800
+  },
+  "links": {
+    "dashboard": "https://grafana.example.com/d/abc",
+    "help": "https://dtk.pipelab.dev/guides/reading-alerts/",
+    "extra": {}
+  },
+  "mentions": [],
+  "synonyms": [],
+  "error": null,
+  "display": {
+    "title": "...",
+    "lead": "...",
+    "value": "42.50",
+    "expected_range": "[10.00, 30.00]",
+    "timestamp": "2026-07-11 10:30:00 (UTC)"
+  }
+}
+```
+
+- `kind: "recovery"` → `status: "resolved"`.
+- `kind: "no_data"` / `"error"` → `status: "firing"` with `value`/`expected`
+  both `null` (there's no anomaly value); an `error` kind also fills `error`
+  as `{"type": "...", "message": "..."}` instead of `null`.
+- `synonyms` mirrors the metric's OSI `ai_context.synonyms`, empty when unset.
+- `display` carries the same rendered strings the other channels show, for a
+  receiver that wants to log or forward something human-readable without
+  reimplementing the formatting.
+
+**`alertmanager`** — the [Prometheus Alertmanager webhook-receiver
+payload](https://prometheus.io/docs/alerting/latest/configuration/#webhook_config)
+(version `"4"`), so any tool that already ingests Alertmanager webhooks (a
+different on-call router, a NOC dashboard, a custom receiver) can take
+detectkit alerts with no new integration:
+
+```yaml
+alert_channels:
+  alertmanager_bridge:
+    type: webhook
+    webhook_url: "https://oncall.example.com/webhook/detectkit"
+    format: alertmanager
+```
+
+```json
+{
+  "version": "4",
+  "groupKey": "detectkit/my_project/checkout_errors",
+  "truncatedAlerts": 0,
+  "status": "firing",
+  "receiver": "detectkit",
+  "groupLabels": { "alertname": "checkout_errors" },
+  "commonLabels": {
+    "alertname": "checkout_errors",
+    "metric": "checkout_errors",
+    "kind": "anomaly",
+    "severity": "critical",
+    "source": "detectkit",
+    "project": "my_project"
+  },
+  "commonAnnotations": {
+    "summary": "...",
+    "description": "...",
+    "value": "42.50",
+    "expected": "[10.00, 30.00]",
+    "direction": "up"
+  },
+  "externalURL": "",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "checkout_errors",
+        "metric": "checkout_errors",
+        "kind": "anomaly",
+        "severity": "critical",
+        "source": "detectkit",
+        "project": "my_project"
+      },
+      "annotations": {
+        "summary": "...",
+        "description": "...",
+        "value": "42.50",
+        "expected": "[10.00, 30.00]",
+        "direction": "up"
+      },
+      "startsAt": "2026-07-11T10:00:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "https://grafana.example.com/d/abc",
+      "fingerprint": "..."
+    }
+  ]
+}
+```
+
+`severity` label is `critical` for `anomaly`/`error`, `warning` for `no_data`.
+The anomaly `direction` is deliberately an **annotation**, not a label — a
+recovery reports no direction, and a direction label would change the label
+set (and the `fingerprint`) between the trigger and the resolve.
+A **recovery** sends `status: "resolved"` reusing the **same** `labels` and
+`fingerprint` as the anomaly it resolves (`kind` stays `"anomaly"`) with
+`endsAt` set — so Alertmanager-style receivers pair the trigger and the
+resolve into one incident. No-data alerts don't have a matching resolution,
+so they never auto-resolve.
+
+#### Request signing (`secret`)
+
+Set `secret` (a plain string or an env-interpolated one) to sign every
+request, regardless of `format`, with a GitHub-style HMAC header:
+
+```
+X-Detectkit-Signature-256: sha256=<hex HMAC-SHA256 of the raw request body, key = secret>
+```
+
+Verify it on the receiving end before trusting the payload:
+
+```python
+import hashlib
+import hmac
+
+def verify_detectkit_signature(secret: str, body: bytes, header_value: str) -> bool:
+    expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, header_value)
+```
+
+Compute the HMAC over the **raw** request body (bytes, before any JSON
+re-parsing) — re-serializing the payload can reorder keys or change
+whitespace and break the signature.
 
 ### Multiple Channels
 

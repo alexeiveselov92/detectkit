@@ -232,6 +232,18 @@ If receiving too many alerts:
 
 Aim for: **< 5 alerts per day per team**
 
+### 6. Gate Your Scheduler on the Exit Code
+
+Alert tuning (this whole guide) is about *which* anomalies notify — it says
+nothing about whether the pipeline itself ran. `dtk run` returns a reliable
+exit code (`0` success, `1` failure, `2` usage error — see [Exit
+Codes](../reference/cli.md#exit-codes)), so have cron/CI fail the job when it
+does, independent of `error_alerting`:
+
+```bash
+dtk run --select "*" || alert-oncall "detectkit run failed"
+```
+
 ## See Also
 
 - [Configuration Guide](configuration.md) - Alert configuration options

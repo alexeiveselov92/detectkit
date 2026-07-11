@@ -3,7 +3,7 @@
 **detectkit** is a Python library + CLI (`dtk`) for monitoring time-series
 metrics with anomaly detection and multi-channel alerting. It is dbt-like:
 metrics are YAML + SQL run through a `load → detect → alert` pipeline.
-numpy-first (no pandas in core logic), ClickHouse / PostgreSQL / MySQL backends, Python 3.10+.
+numpy-first (no pandas in core logic), ClickHouse / PostgreSQL / MySQL / MariaDB backends, Python 3.10+.
 
 > **Using detectkit, not hacking on it?** See the [README](README.md), the
 > [docs](docs/), and `dtk init-claude` (which sets up assistant context inside
@@ -23,6 +23,16 @@ rendered on the docs site under **For developers**). Read the relevant one:
 
 - **Tests:** `python3 -m pytest tests/unit` — **lint/format/types:** `pre-commit run --all-files`
 - `__version__` lives in `detectkit/__init__.py`; **`CHANGELOG.md` is authoritative** for behavior changes.
+- **Automation contract:** `dtk run`/`autotune`/`clean` exit non-zero on failure
+  (0 success / 1 failure — including a selector matching nothing / 2 usage error);
+  `dtk run --json` emits one machine-readable summary on stdout (`schema_version: 1`,
+  human logs move to stderr) — schedulers/CI gate on these. The generic webhook
+  channel takes `format: attachments|json|alertmanager` (versioned event schema /
+  Alertmanager receiver payload v4 whose trigger↔resolve fingerprints pair —
+  direction is an annotation, never a label) plus an HMAC-SHA256 `secret`
+  (`X-Detectkit-Signature-256` over the raw body). **MariaDB** is a first-class
+  backend through the MySQL manager (vendor sniff at connect → `VALUES()` upsert
+  fallback; `type: mariadb` profile alias; in the integration test matrix).
 - User-facing docs are in `docs/`. The context that `dtk init-claude` ships to
   users lives in `detectkit/cli/assets/claude/` — **keep both in sync on every
   release** (see the contributing rule's release checklist).

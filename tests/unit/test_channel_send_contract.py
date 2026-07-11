@@ -6,10 +6,12 @@ could never deliver a single alert through the orchestrator."""
 from unittest.mock import Mock, patch
 
 import numpy as np
+import pytest
 
 from detectkit.alerting.channels.base import AlertData
 from detectkit.alerting.channels.email import EmailChannel
 from detectkit.alerting.channels.telegram import TelegramChannel
+from detectkit.alerting.channels.webhook import WebhookChannel
 from detectkit.alerting.orchestrator._dispatch import _DispatchMixin
 
 
@@ -59,6 +61,27 @@ class TestEmailSendContract:
         channel = EmailChannel(smtp_host="h", smtp_port=587, from_email="f@x", to_emails=["t@x"])
         results = _DispatchMixin._dispatch([channel], make_alert_data(), None, "alert")
         assert results == {"EmailChannel": True}
+
+
+class TestWebhookSendContract:
+    """Every ``format`` (attachments/json/alertmanager) must round-trip
+    through the same send()/dispatch contract as every other channel."""
+
+    @pytest.mark.parametrize("fmt", ["attachments", "json", "alertmanager"])
+    @patch("detectkit.alerting.channels.webhook.requests.post")
+    def test_send_accepts_template_and_returns_true(self, mock_post, fmt):
+        mock_post.return_value = Mock(raise_for_status=Mock())
+        channel = WebhookChannel(webhook_url="https://example.com/hooks/x", format=fmt)
+        assert channel.send(make_alert_data(), template="custom {metric_name}") is True
+        assert mock_post.called
+
+    @pytest.mark.parametrize("fmt", ["attachments", "json", "alertmanager"])
+    @patch("detectkit.alerting.channels.webhook.requests.post")
+    def test_dispatch_records_success(self, mock_post, fmt):
+        mock_post.return_value = Mock(raise_for_status=Mock())
+        channel = WebhookChannel(webhook_url="https://example.com/hooks/x", format=fmt)
+        results = _DispatchMixin._dispatch([channel], make_alert_data(), None, "alert")
+        assert results == {"WebhookChannel": True}
 
 
 class TestDispatchCollisionSafety:

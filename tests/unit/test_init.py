@@ -6,7 +6,7 @@ from detectkit.cli.commands.init import run_init
 from detectkit.config.metric_config import MetricConfig
 
 
-@pytest.mark.parametrize("db_type", ["clickhouse", "postgres", "mysql"])
+@pytest.mark.parametrize("db_type", ["clickhouse", "postgres", "mysql", "mariadb"])
 def test_init_scaffolds_expected_tree(tmp_path, db_type):
     run_init("demo", str(tmp_path), db_type=db_type)
     root = tmp_path / "demo"
@@ -19,6 +19,22 @@ def test_init_scaffolds_expected_tree(tmp_path, db_type):
     # incidents/ is scaffolded with an example labels file
     assert (root / "incidents").is_dir()
     assert (root / "incidents" / "example_cpu_usage.yml").is_file()
+
+
+def test_init_mariadb_profile_validates_and_uses_mysql_shape(tmp_path):
+    """MariaDB reuses the MySQL profile shape, just with ``type: mariadb``."""
+    from detectkit.config.profile import ProfilesConfig
+
+    run_init("demo", str(tmp_path), db_type="mariadb")
+    profiles_path = tmp_path / "demo" / "profiles.yml"
+    text = profiles_path.read_text()
+    assert "type: mariadb" in text
+
+    config = ProfilesConfig.from_yaml(profiles_path)
+    dev = config.get_profile("dev")
+    assert dev.type == "mariadb"
+    assert dev.get_internal_location() == "detectkit"
+    assert dev.get_data_location() == "analytics"
 
 
 def test_init_example_metric_is_valid(tmp_path):

@@ -6,7 +6,7 @@ This guide covers installing detectkit and its dependencies.
 
 - **Python**: 3.10 or higher
 - **pip**: Latest version recommended
-- **Database**: ClickHouse (20.3+), PostgreSQL (12+), or MySQL (8.0+) — all fully supported
+- **Database**: ClickHouse (20.3+), PostgreSQL (12+), MySQL (8.0+), or MariaDB (10.4+) — all fully supported
 
 ## Basic Installation
 
@@ -70,12 +70,31 @@ pip install pymysql
 **Supported versions**: MySQL 8.0+. See the
 [MySQL guide](../guides/databases-mysql.md) for the profile shape.
 
+### MariaDB
+
+MariaDB runs through the same MySQL backend and driver:
+
+```bash
+pip install detectkit[mariadb]
+```
+
+Or install the driver manually:
+
+```bash
+pip install pymysql
+```
+
+**Supported versions**: MariaDB 10.4+ (tested against 11.x). Use `type:
+mariadb` in `profiles.yml` (an alias for `type: mysql` — the actual vendor is
+auto-detected at connect). See the [MySQL guide →
+MariaDB](../guides/databases-mysql.md#mariadb).
+
 ### Multiple Databases
 
 Install drivers for all databases you'll use:
 
 ```bash
-pip install detectkit[clickhouse,postgres,mysql]
+pip install detectkit[clickhouse,postgres,mysql,mariadb]
 # or the shorthand:
 pip install detectkit[all-db]
 ```

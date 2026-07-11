@@ -405,6 +405,75 @@ dtk run --select cpu_usage --report cpu.html
 > differ slightly from the replay, which evaluates every grid point causally.
 > The anomalies, bands, and which incidents fired are unaffected.
 
+##### `--json` (flag)
+
+Emit **one JSON document to stdout** instead of the human-readable
+load → detect → alert tree. All human-facing output (the tree, warnings)
+moves to **stderr**, so stdout is safe to pipe straight into `jq` or a file —
+nothing else is written there.
+
+```bash
+dtk run --select "tag:critical" --json > summary.json
+```
+
+**Shape** (`schema_version: 1`):
+
+```json
+{
+  "schema_version": 1,
+  "command": "run",
+  "project": "my_project",
+  "selector": "tag:critical",
+  "exclude": null,
+  "steps": ["load", "detect", "alert"],
+  "started_at": "2026-07-11T10:00:00Z",
+  "finished_at": "2026-07-11T10:00:12Z",
+  "duration_seconds": 12.3,
+  "status": "success",
+  "error": null,
+  "aborted": false,
+  "metrics": [
+    {
+      "name": "checkout_errors",
+      "status": "success",
+      "steps_completed": ["load", "detect", "alert"],
+      "datapoints_loaded": 144,
+      "anomalies_detected": 2,
+      "alerts_sent": 1,
+      "error": null
+    }
+  ],
+  "totals": {
+    "metrics": 1,
+    "succeeded": 1,
+    "failed": 0,
+    "skipped": 0,
+    "datapoints_loaded": 144,
+    "anomalies_detected": 2,
+    "alerts_sent": 1
+  },
+  "exit_code": 0
+}
+```
+
+**Fields**:
+- `status` — `"success"` (every metric succeeded), `"failed"` (the run
+  completed but at least one metric failed), or `"error"` (a startup failure
+  before any metric ran — `metrics` is `[]`).
+- Per-metric `status` — `"success"`, `"failed"`, or `"skipped"` (not
+  processed because the run aborted after a project-level error alert fired).
+- `exit_code` mirrors the process's real exit code (see [Exit
+  Codes](#exit-codes)), so a consumer can gate on either the JSON or the
+  shell `$?`.
+
+Useful for a finer-grained gate than the exit code alone — e.g. failing a step
+only when a *specific* metric errors:
+
+```bash
+dtk run --select "*" --json > summary.json
+jq -e '.totals.failed == 0' summary.json || alert-oncall "detectkit run had failures"
+```
+
 #### Metric Selection Rules
 
 Understanding how metric selection works is important to avoid confusion:
@@ -1457,14 +1526,34 @@ dtk osi export --select tag:critical                     # a subset, to stdout
 
 ## Exit Codes
 
+`dtk run`, `dtk autotune`, and `dtk clean` return a reliable exit code, so a
+scheduler or CI step can gate on it directly instead of parsing logs:
+
 | Code | Meaning |
 |------|---------|
-| 0 | Normal completion — **including** most user-facing errors (bad project dir, missing `profiles.yml`, config/DB connection failures), which print an error message and return |
-| 2 | Click argument error (e.g. a missing required option or an invalid `--steps`/`--from` value) |
+| `0` | Success |
+| `1` | Failure — any metric failed, the run aborted after a project-level error alert fired, a startup/config/database error occurred, or the selector matched no metrics |
+| `2` | Usage error — bad flags (e.g. an invalid `--steps`/`--from` value, or a missing required option; for `dtk clean`, being called with both or neither of `--select`/`--orphaned-metrics`) |
 
-> **Note:** detectkit does not currently exit non-zero on configuration or
-> database errors — it reports them and returns `0`. Don't gate a scheduler on
-> the exit code alone; check the logged output.
+**`dtk clean` specifics**:
+- Answering "no" to the `--orphaned-metrics --execute` confirmation prompt → `0`
+- Project configs that fail to parse (so the orphan set can't be trusted) → `1`
+- The safety refusal when the project defines no metrics and `--yes` wasn't
+  passed → `1` (an explicit `--yes` bypasses the refusal and the purge proceeds)
+- A dry-run that finds stale data to report → `0` (nothing was deleted; the
+  command itself succeeded)
+
+**`dtk autotune` specifics**:
+- A metric with autotuning disabled counts as **skipped**, not a failure
+- "No datapoints loaded" for a metric is a **failure**
+
+Other commands (`dtk tune`, `dtk ui`, `dtk unlock`, `dtk init`,
+`dtk test-alert`, `dtk osi`) are unchanged — see each command's section above
+for how it reports success or failure.
+
+`dtk run --json` (see above) also mirrors the exit code as the payload's
+`"exit_code"` field, for consumers that would rather branch on the JSON than
+on `$?`.
 
 ## Environment Variables
 
@@ -1646,6 +1735,78 @@ RUN echo "*/10 * * * * cd /app && dtk run --select '*' >> /var/log/cron.log 2>&1
 # Start cron
 CMD ["cron", "-f"]
 ```
+
+### Orchestrators & CI
+
+`dtk run` is CLI-first — orchestrators integrate by shelling out to it, not
+through a dedicated provider package, and the reliable [exit code](#exit-codes)
+is the whole health signal a task needs.
+
+**Airflow** — a `BashOperator` (no `detectkit` provider needed):
+
+```python
+from airflow.operators.bash import BashOperator
+
+run_metrics = BashOperator(
+    task_id="dtk_run",
+    bash_command="cd /path/to/project && dtk run --select 'tag:critical'",
+)
+```
+
+A non-zero exit fails the task like any other shell command.
+
+**Dagster** — an op that shells out with `subprocess.run(..., check=True)`:
+
+```python
+import subprocess
+from dagster import job, op
+
+@op
+def run_detectkit():
+    subprocess.run(["dtk", "run", "--select", "*"], cwd="/path/to/project", check=True)
+
+@job
+def detectkit_job():
+    run_detectkit()
+```
+
+`check=True` raises on a non-zero exit, which Dagster reports as a failed op.
+
+**Prefect** — a flow wrapping the same shell call:
+
+```python
+import subprocess
+from prefect import flow, task
+
+@task
+def run_detectkit():
+    subprocess.run(["dtk", "run", "--select", "*"], cwd="/path/to/project", check=True)
+
+@flow
+def detectkit_flow():
+    run_detectkit()
+```
+
+**GitHub Actions** — a scheduled workflow step, gating on `--json` totals:
+
+```yaml
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - run: pip install "detectkit[clickhouse]"
+      - run: |
+          dtk run --select "*" --json > summary.json || true
+          jq -e '.totals.failed == 0' summary.json
+```
+
+The `|| true` keeps the step alive past `dtk run`'s own non-zero exit so the
+`jq -e` check decides the outcome — drop both lines' extras to gate on the
+exit code alone, or query something finer than `.totals.failed` (a specific
+metric's status, an alert count) from the same `summary.json`.
 
 ## Best Practices
 

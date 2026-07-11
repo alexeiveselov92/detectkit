@@ -131,7 +131,9 @@ for full field reference.
 - **No persistent cooldown** between separate `dtk run` invocations.
   Storing state in the DB doesn't help when the DB itself is down,
   and a local file would break the dbt-style stateless model. Cron
-  schedule cadence covers spacing.
+  schedule cadence covers spacing — and `dtk run` exits `1` on this
+  failure, so the scheduler itself can alert independently of the
+  channel dispatch (useful if the DB outage also takes the channel down).
 - **Channel failures are swallowed.** A flaky webhook cannot crash the
   run — dispatch is wrapped in its own `try/except`.
 - Channels are resolved from the same `profiles.yml` channel block as
@@ -194,6 +196,8 @@ error_alerting:
 
 - Production deployments where silent failure is unacceptable
 - Multi-metric projects where one infra issue affects everything
-- Pair with cron monitoring (`dtk run` exit code) for full coverage —
-  `error_alerting` covers in-process failures, cron monitors `dtk run`
-  not running at all
+- Pair with your scheduler's exit-code gate for full coverage — `dtk run`
+  returns `1` on any pipeline failure (see [Exit
+  Codes](../reference/cli.md#exit-codes)), so `error_alerting` covers
+  in-process failures via the channel and the scheduler's own gate covers
+  `dtk run` not running (or exiting non-zero) at all

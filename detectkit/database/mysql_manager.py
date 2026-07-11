@@ -7,6 +7,12 @@ EXISTS``). Dedup for the ``ReplacingMergeTree`` tables is reproduced with an
 enforced primary key plus a version-aware ``INSERT ... ON DUPLICATE KEY UPDATE``
 (row-alias form, MySQL 8.0.19+).
 
+**MariaDB is also supported** through this manager (there is no separate
+class): the server vendor is detected once at connect time (``SELECT
+VERSION()``), and if it reports MariaDB, upserts fall back to the classic
+``VALUES()`` function form instead of the row-alias form, which MariaDB never
+adopted.
+
 MySQL cannot index ``TEXT`` columns in a primary key without a prefix length, so
 ``String`` columns that are part of the primary key are rendered as
 ``VARCHAR(255)`` while the rest stay ``TEXT``.
@@ -51,6 +57,11 @@ class MySQLDatabaseManager(SQLDatabaseManager):
     # MySQL quotes identifiers with backticks (``interval`` etc. are reserved).
     _IDENT_QUOTE = "`"
 
+    # Set from `_connect()` via `_detect_mariadb()`. Declared at class level (not
+    # only in `__init__`) so `_build_insert_sql` can read it safely even when a
+    # test stubs out `_connect` entirely and never sets an instance value.
+    _is_mariadb: bool = False
+
     def __init__(
         self,
         host: str = "localhost",
@@ -78,7 +89,7 @@ class MySQLDatabaseManager(SQLDatabaseManager):
         )
 
     def _connect(self) -> Any:
-        return pymysql.connect(
+        conn = pymysql.connect(
             host=self._host,
             port=self._port,
             user=self._user,
@@ -87,6 +98,24 @@ class MySQLDatabaseManager(SQLDatabaseManager):
             charset="utf8mb4",
             **self._settings,
         )
+        self._is_mariadb = self._detect_mariadb(conn)
+        return conn
+
+    @staticmethod
+    def _detect_mariadb(conn: Any) -> bool:
+        """Return whether ``conn``'s server reports itself as MariaDB.
+
+        Best-effort: any failure to query the version (a locked-down user, a
+        transport hiccup) is treated as "not MariaDB" rather than raised, since
+        the row-alias upsert form is the safe default for stock MySQL.
+        """
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT VERSION()")
+                row = cur.fetchone()
+            return bool(row) and "mariadb" in str(row[0]).lower()
+        except Exception:
+            return False
 
     def _ensure_locations(self) -> None:
         for db in (self._internal_location, self._data_location):
@@ -115,12 +144,28 @@ class MySQLDatabaseManager(SQLDatabaseManager):
         if conflict_strategy == "ignore" and (version_column is None or not non_pk):
             return f"INSERT IGNORE INTO {table_name} ({cols}) VALUES ({placeholders})"
 
+        tbl = self._q(table_name.split(".")[-1])
+
+        if self._is_mariadb:
+            # MariaDB never adopted MySQL 8.0.19's row-alias upsert, so the
+            # pending row is referenced with the classic VALUES() function
+            # instead (deprecated on MySQL, but MariaDB has no replacement).
+            if conflict_strategy == "replace":
+                sets = ", ".join(f"{self._q(c)} = VALUES({self._q(c)})" for c in non_pk)
+            else:  # versioned "ignore" -> last-writer-wins by version column
+                ver = self._q(version_column) if version_column else None
+                sets = ", ".join(
+                    f"{self._q(c)} = IF(VALUES({ver}) >= {tbl}.{ver}, "
+                    f"VALUES({self._q(c)}), {tbl}.{self._q(c)})"
+                    for c in non_pk
+                )
+            return f"{plain} ON DUPLICATE KEY UPDATE {sets}"
+
         # Row-alias form (MySQL 8.0.19+) avoids the deprecated VALUES() function.
         # Existing-row references are qualified with the table name: with the
         # `AS new` alias in scope, an unqualified column in the UPDATE expression
         # is ambiguous ("Column '…' in field list is ambiguous").
         aliased = f"{plain} AS new"
-        tbl = self._q(table_name.split(".")[-1])
         if conflict_strategy == "replace":
             sets = ", ".join(f"{self._q(c)} = new.{self._q(c)}" for c in non_pk)
         else:  # versioned "ignore" -> last-writer-wins by version column

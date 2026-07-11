@@ -5,6 +5,24 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.55.1] - 2026-07-11
+
+### Fixed
+- **`dtk ui`: the Builder's create flow could trap you on the YAML tab.** A new
+  metric's Builder opened with a *blank* name (the YAML tab's template has
+  `name: my_metric`), so touching any control and switching to YAML emitted a
+  config with no `name:` — the live-validation chip then 400-ed on every
+  keystroke (`[ui] 400 /api/metric-parse: … 1 validation error`) and, once the
+  YAML was edited, the way back to the Builder was hard-blocked on a valid
+  parse, leaving the editor apparently frozen. Three fixes: the Builder now
+  seeds the same starter name as the YAML template (an OSI compile still
+  overrides it); switching YAML → Builder with an invalid draft now offers to
+  return anyway, discarding the YAML edits (the Builder keeps its own state),
+  instead of hard-blocking; and `/api/metric-parse` 400s are no longer echoed
+  to the `dtk ui` terminal — draft rejection is that route's routine outcome,
+  surfaced in the page's validation chip, and echoing it spammed the terminal
+  while someone simply typed. Other routes' 400s still echo.
+
 ## [0.55.0] - 2026-07-11
 
 ### Added

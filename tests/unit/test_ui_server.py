@@ -605,6 +605,38 @@ def test_metric_parse_ok_returns_data_and_sanitizes_unquoted_dates(tmp_path):
         _teardown(server)
 
 
+def test_metric_parse_400_is_not_echoed_to_the_terminal(tmp_path):
+    """Draft validation failing is the route's routine outcome, not an error.
+
+    The editor's live-validation chip posts every (possibly half-typed) draft
+    here; echoing each rejection would flood the `dtk ui` terminal with
+    "[ui] 400 /api/metric-parse" lines while someone simply types. Other
+    routes' 400s must keep echoing (diagnosable without devtools).
+    """
+    lines: list[str] = []
+    server, url = build_ui_server(
+        project_config=ProjectConfig(name="proj", default_profile="p"),
+        project_root=tmp_path,
+        metrics=_metrics(["orders"]),
+        internal_manager=_StubManager(),
+        initial_window="7d",
+        echo=lines.append,
+    )
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(f"{base}/api/metric-parse?token={token}", {"text": "name: x\n"})
+        assert ei.value.code == 400
+        assert not any("/api/metric-parse" in ln for ln in lines)
+        # control: another route's 400 still echoes
+        with pytest.raises(urllib.error.HTTPError):
+            _post(f"{base}/api/osi-inspect?token={token}", {"text": "   "})
+        assert any("/api/osi-inspect" in ln for ln in lines)
+    finally:
+        _teardown(server)
+
+
 def test_metric_parse_sanitizes_yaml_set_and_binary_scalars(tmp_path):
     """YAML-only types (!!set → set, !!binary → bytes) must not 500 the JSON reply.
 

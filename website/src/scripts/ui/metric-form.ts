@@ -281,7 +281,11 @@ function buildBasicsSection(data: Record<string, unknown> | null, meta: FormMeta
   nameInput.type = 'text';
   nameInput.className = 'dtk-ui-input';
   nameInput.placeholder = 'my_metric';
-  nameInput.value = typeof data?.name === 'string' ? data.name : '';
+  // Create mode starts with the same starter NAME the YAML template uses — a
+  // blank name made every partial create draft invalid ("name — field
+  // required"), turning the YAML tab into a trap: its live-validation chip
+  // 400s and the way back to the Builder is gated on a valid parse.
+  nameInput.value = typeof data?.name === 'string' ? data.name : data === null ? 'my_metric' : '';
   const nameErr = el('div', 'dtk-ui-form-err-inline');
   function validateName(): void {
     const v = nameInput.value.trim();
@@ -1542,7 +1546,10 @@ export function buildMetricForm(
       () => schedule.getInterval(),
       () => seasonalitySec.getColumns(),
       (body, metricName) => {
-        if (opts.mode === 'create' && basics.getName() === '') basics.setName(metricName);
+        // The create-mode starter name counts as "not chosen yet" — an OSI
+        // compile should still hand its metric name over.
+        if (opts.mode === 'create' && (basics.getName() === '' || basics.getName() === 'my_metric'))
+          basics.setName(metricName);
         if (typeof body.description === 'string') basics.setDescription(body.description);
         if (body.ai_context && typeof body.ai_context === 'object') {
           aiContextSec.setData(body.ai_context as Record<string, unknown>);

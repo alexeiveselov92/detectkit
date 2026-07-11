@@ -841,10 +841,16 @@ class _Handler(BaseHTTPRequestHandler):
         error), so the detail rides in the body instead. Errors other than the
         routine bad-token 403 are also echoed to the terminal — a page stuck on
         a failing request should be diagnosable without opening devtools.
+        ``/api/metric-parse`` 400s are exempt too: that route powers the
+        editor's *live draft validation*, so "invalid config" is its routine,
+        per-keystroke outcome (surfaced in the page's validation chip), not an
+        operational error worth a terminal line.
         """
-        if code >= 400 and code != 403:
+        path = urlparse(self.path).path
+        routine = code == 403 or (code == 400 and path == "/api/metric-parse")
+        if code >= 400 and not routine:
             first_line = detail.splitlines()[0] if detail else ""
-            self._srv().echo(f"  [ui] {code} {urlparse(self.path).path}: {first_line}")
+            self._srv().echo(f"  [ui] {code} {path}: {first_line}")
         body = detail.encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "text/plain; charset=utf-8")

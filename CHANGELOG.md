@@ -5,7 +5,23 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.56.0] - 2026-07-11
+## [0.56.1] - 2026-07-11
+
+### Fixed
+- **`dtk ui`: the overview table's columns line up across blocks and the action
+  buttons stay on screen.** Each `metrics/<dir>/` block renders as its own
+  `<table>`, and the columns were auto-sized to each block's own content: a long
+  metric name (e.g. `league_group_assigned_users_pct_to_5_league_not_ru`) widened
+  that block's Name column and pushed the **Open / Tune / Run / Edit** buttons past
+  the right edge — where the `overflow:hidden` wrapper clipped them out of reach —
+  while every block sized its Name column to a different width, so the blocks didn't
+  align. The table is now `table-layout: fixed` with a shared `<colgroup>` pinning
+  identical column widths in every block (Name is the one flexible column, absorbing
+  the leftover): the blocks line up regardless of their longest name, the actions
+  column is a fixed width so all four buttons always fit, a long name wraps inside
+  its column instead of shoving the layout, and the wrapper scrolls horizontally on
+  a narrow viewport instead of clipping the buttons away. UI-bundle only — no
+  pipeline or config behavior changes.
 
 ### Added
 - **`dtk ui`: clean stale detector data from the cockpit.** Every retune /

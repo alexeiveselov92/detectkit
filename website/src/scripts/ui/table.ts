@@ -284,18 +284,38 @@ function sortRows(rows: OverviewMetric[], sort: SortState): OverviewMetric[] {
   return [...enabled, ...disabled];
 }
 
-const HEADERS: Array<{ label: string; key: SortKey | null }> = [
-  { label: '●', key: 'freshness' },
+// One column spec per column, in render order. `width` pins the column under
+// `table-layout: fixed` (see style.ts) — the Name column deliberately has no
+// width so it absorbs the leftover space. Every group renders the same fixed
+// widths, so columns line up across blocks regardless of each block's longest
+// name, and the actions column can never be shoved off the right edge.
+const HEADERS: Array<{ label: string; key: SortKey | null; width?: string }> = [
+  { label: '●', key: 'freshness', width: '22px' },
   { label: 'Name', key: 'name' },
-  { label: 'Interval', key: null },
-  { label: 'Trend', key: null },
-  { label: 'Alerts', key: 'alerts' },
-  { label: 'Last alert', key: null },
-  { label: 'Rate', key: 'rate' },
-  { label: 'Quality', key: null },
-  { label: '', key: null },
-  { label: '', key: null },
+  { label: 'Interval', key: null, width: '84px' },
+  { label: 'Trend', key: null, width: '160px' },
+  { label: 'Alerts', key: 'alerts', width: '96px' },
+  { label: 'Last alert', key: null, width: '104px' },
+  { label: 'Rate', key: 'rate', width: '72px' },
+  { label: 'Quality', key: null, width: '150px' },
+  { label: '', key: null, width: '44px' },
+  { label: '', key: null, width: '244px' },
 ];
+
+/**
+ * A `<colgroup>` pinning each column's width so a fixed-layout table sizes its
+ * columns identically in every group — the single lever that keeps the blocks
+ * aligned and the action buttons on screen.
+ */
+function buildColgroup(): HTMLTableColElement {
+  const cg = document.createElement('colgroup');
+  for (const h of HEADERS) {
+    const col = document.createElement('col');
+    if (h.width) col.style.width = h.width;
+    cg.appendChild(col);
+  }
+  return cg;
+}
 
 function buildHeaderRow(sort: SortState, cb: TableCallbacks): HTMLTableRowElement {
   const tr = document.createElement('tr');
@@ -361,6 +381,7 @@ export function buildMetricsTable(
 
     const table = document.createElement('table');
     table.className = 'dtk-ui-table';
+    table.appendChild(buildColgroup());
     const thead = document.createElement('thead');
     thead.appendChild(buildHeaderRow(sort, cb));
     table.appendChild(thead);

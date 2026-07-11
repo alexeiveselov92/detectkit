@@ -112,13 +112,18 @@ export function injectStyle(): void {
 
 /* --- metrics table --------------------------------------------------------- */
 .dtk-ui-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;
-  overflow:hidden;}
+  overflow:hidden;overflow-x:auto;}
 .dtk-ui-group + .dtk-ui-group{border-top:1px solid var(--border);}
 .dtk-ui-group-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
   padding:9px 14px;background:var(--surface-2);}
 .dtk-ui-group-name{font-family:var(--mono);font-size:11.5px;color:var(--text);font-weight:600;}
 .dtk-ui-group-sub{font-family:var(--mono);font-size:11px;color:var(--faint);}
-.dtk-ui-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+/* table-layout:fixed + the <colgroup> in table.ts pin every column to the same
+   width in every group, so the blocks line up regardless of each block's
+   longest metric name; min-width keeps the columns usable on a narrow viewport
+   (the wrap scrolls horizontally instead of squeezing the Name column to zero). */
+.dtk-ui-table{width:100%;min-width:1040px;table-layout:fixed;border-collapse:collapse;
+  font-size:12.5px;}
 .dtk-ui-table thead th{text-align:left;padding:8px 12px;font-family:var(--mono);font-size:10.5px;
   color:var(--faint);text-transform:uppercase;letter-spacing:0.05em;font-weight:600;
   border-bottom:1px solid var(--border);white-space:nowrap;}
@@ -135,7 +140,10 @@ export function injectStyle(): void {
 .dtk-ui-pending{font-family:var(--mono);color:var(--faint);}
 .dtk-ui-dotcell{width:14px;}
 .dtk-ui-dot{width:9px;height:9px;border-radius:50%;display:inline-block;cursor:help;}
-.dtk-ui-namecell{min-width:170px;}
+/* Name is the one flexible column (no <col> width) — bound its content so a
+   long snake_case identifier wraps inside the cell instead of widening the
+   column and shoving the action buttons off the right edge. */
+.dtk-ui-namecell{overflow-wrap:anywhere;}
 .dtk-ui-name{font-weight:600;color:var(--text-strong);}
 .dtk-ui-err-badge{color:var(--st-anomaly);margin-left:6px;cursor:help;font-weight:700;}
 .dtk-ui-stalechip{font-family:var(--mono);font-size:9.5px;color:var(--st-nodata);
@@ -483,7 +491,6 @@ export function injectStyle(): void {
 @media (max-width:860px){
   .dtk-ui-drawer{width:100vw;}
   .dtk-ui-row2{grid-template-columns:1fr;}
-  .dtk-ui-table-wrap{overflow-x:auto;}
 }
 `;
   const style = document.createElement('style');

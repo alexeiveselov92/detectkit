@@ -5,6 +5,7 @@ Defines configuration structure for individual metrics loaded from YAML files.
 """
 
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -1051,3 +1052,31 @@ def resolve_loading_delay_seconds(
             continue
         return loading_delay_to_seconds(value)
     return 0
+
+
+def resolve_grid_phase_seconds(loading_start_time: str | None, interval_seconds: int) -> int:
+    """Phase of the metric's interval grid on the epoch clock, in ``[0, interval)``.
+
+    The loader anchors every datapoint on ``loading_start_time`` (first run) or
+    the resume cursor descended from it, so the stored grid sits at
+    ``loading_start_time_epoch % interval`` — an arbitrary phase whenever the
+    start isn't a multiple of the interval (e.g. ``00:07:00`` on a 10-minute
+    grid). The alert step's no-data check does an **exact-timestamp** lookup, so
+    it must floor to that same phase; flooring plain epoch time (phase 0) instead
+    asks for a boundary the loader never writes and fires a permanent false
+    no-data alert. This is the single seam that keeps the two grid phases in
+    lockstep — the mirror of :func:`resolve_loading_delay_seconds` for the
+    maturity delay (see issue #114).
+
+    Returns ``0`` (the epoch grid — unchanged behaviour) when no
+    ``loading_start_time`` is set or it can't be parsed in the canonical
+    ``"%Y-%m-%d %H:%M:%S"`` UTC form the loader uses.
+    """
+    if not loading_start_time or interval_seconds <= 0:
+        return 0
+    try:
+        start = datetime.strptime(loading_start_time, "%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        return 0
+    epoch = int(start.replace(tzinfo=timezone.utc).timestamp())
+    return epoch % interval_seconds

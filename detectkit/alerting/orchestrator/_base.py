@@ -38,6 +38,7 @@ class _OrchestratorBase:
         help_url: str | None = None,
         ai_synonyms: list[str] | None = None,
         loading_delay_seconds: int = 0,
+        grid_phase_seconds: int = 0,
     ):
         self.metric_name = metric_name
         self.interval = interval
@@ -69,6 +70,16 @@ class _OrchestratorBase:
         # step AND the recovery mixin's own fetch bound) computes the same
         # delay-aware boundary as the load step's maturity cut-off.
         self.loading_delay_seconds = int(loading_delay_seconds or 0)
+        # Phase of the metric's interval grid on the epoch clock, in
+        # [0, interval). The loader anchors datapoints on loading_start_time, so
+        # a non-epoch-aligned start puts the stored grid at an arbitrary phase;
+        # ``get_last_complete_point`` floors to THIS phase (not plain epoch time)
+        # so its exact-timestamp no-data lookup asks for a boundary the loader
+        # actually writes. Constructor state, like ``loading_delay_seconds`` —
+        # the two together keep the no-data expectation in lockstep with the load
+        # step's grid. Defaults to 0 (the epoch grid), so direct-API callers and
+        # epoch-aligned metrics are unchanged (issue #114).
+        self.grid_phase_seconds = int(grid_phase_seconds or 0) % interval.seconds
 
     @staticmethod
     def _group_by_timestamp(

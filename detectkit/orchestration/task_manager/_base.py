@@ -7,7 +7,11 @@ from datetime import datetime
 from detectkit.alerting.channels.base import BaseAlertChannel
 from detectkit.alerting.channels.factory import AlertChannelFactory
 from detectkit.alerting.orchestrator import DetectionRecord, hydrate_detection_records
-from detectkit.config.metric_config import MetricConfig, resolve_loading_delay_seconds
+from detectkit.config.metric_config import (
+    MetricConfig,
+    resolve_grid_phase_seconds,
+    resolve_loading_delay_seconds,
+)
 from detectkit.database.internal_tables import InternalTablesManager
 
 
@@ -38,6 +42,19 @@ class _TaskManagerBase:
         return resolve_loading_delay_seconds(
             config.loading_delay,
             getattr(self.project_config, "loading_delay", None),
+        )
+
+    def _grid_phase_seconds(self, config: MetricConfig) -> int:
+        """Phase of *config*'s interval grid on the epoch clock (metric-derived).
+
+        The loader anchors the stored grid on ``loading_start_time``; the alert
+        step's exact-timestamp no-data lookup must floor to the same phase, so
+        this one seam feeds the orchestrator's ``get_last_complete_point`` — the
+        mirror of ``_loading_delay_seconds`` for the grid phase (issue #114).
+        """
+        return resolve_grid_phase_seconds(
+            config.loading_start_time,
+            config.get_interval().seconds,
         )
 
     def _load_recent_detections(

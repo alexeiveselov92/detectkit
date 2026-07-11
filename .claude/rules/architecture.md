@@ -377,11 +377,20 @@ Other behaviors: **cooldown** (`_cooldown.py`) suppresses repeat alerts within
 `alert_cooldown`, optionally reset on recovery; **recovery** (`_recovery.py`)
 sends a direction-aware all-clear once per incident when `notify_on_recovery`;
 **no-data** alerts fire when the latest expected datapoint is missing/NULL
-(independent of quorum) — `get_last_complete_point` is `loading_delay`-aware
-(the resolved delay rides as constructor state on the orchestrator, so every
-call site, including the recovery mixin, agrees on the same shifted boundary
-and a deliberately-withheld newest interval never false-fires). State (last
-alert / recovery, counts) is keyed by `alert_config_id` in `_dtk_alert_states`.
+(independent of quorum) — `get_last_complete_point` is both `loading_delay`- and
+**grid-phase**-aware (two scalars ride as constructor state on the orchestrator,
+so every call site, including the recovery mixin, agrees on the same boundary).
+The delay shifts the effective now back; the **grid phase**
+(`loading_start_time_epoch % interval`, resolved via `resolve_grid_phase_seconds`
+— the mirror of `resolve_loading_delay_seconds`) then floors onto the metric's
+**own** interval grid rather than plain epoch time, so the no-data check's
+exact-timestamp lookup asks for a boundary the loader actually persisted. Without
+it, a metric whose `loading_start_time` isn't epoch-aligned (e.g. `:07` on a
+`10min` grid) would look up a boundary the loader never writes and false-fire
+every cooldown cycle — issue #114 (phase 0 = the epoch grid, so epoch-aligned
+metrics are unchanged; the anomaly/recovery/replay paths were never affected,
+their fetches being `<=`-bounded not exact-match). State (last alert / recovery,
+counts) is keyed by `alert_config_id` in `_dtk_alert_states`.
 
 Channels live in `detectkit/alerting/channels/` behind `BaseAlertChannel`;
 `AlertChannelFactory` builds them with env-var interpolation. Implemented:

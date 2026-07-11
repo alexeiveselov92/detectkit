@@ -178,7 +178,11 @@ diverging state; switching away from an edited Builder re-emits the YAML, so
 you can always inspect exactly what will be written. A live validation chip
 in the footer re-checks the draft as you type (debounced; the same
 server-side validation Save runs), so most errors surface before you ever
-click Save.
+click Save. While the YAML tab still holds the Builder's own re-emit
+(nothing hand-typed since the two views last agreed), the chip shows the
+Builder's friendly checks — the same "name is required" in both tabs;
+hand-edited YAML gets the server verdict, summarized to one readable
+`field — reason` line (the full error text stays in the chip's tooltip).
 
 ### The Builder
 

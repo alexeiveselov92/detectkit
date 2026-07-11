@@ -258,7 +258,9 @@ function buildPreservedSection(topExtras: Record<string, unknown>): HTMLElement 
 // Basics
 // -----------------------------------------------------------------------
 
-const NAME_RE = /^[A-Za-z0-9_-]+$/;
+// Mirrors the server rule (MetricConfig.validate_name: unicode isalnum or _/-),
+// so a client-side block never rejects a name the server would accept.
+const NAME_RE = /^[\p{L}\p{N}_-]+$/u;
 
 interface BasicsSection {
   el: HTMLElement;

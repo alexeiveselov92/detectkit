@@ -1047,7 +1047,9 @@ extended to the whole file:
   listed under "Preserved fields". The last-edited tab wins: leaving an
   edited YAML tab validates server-side first (`POST /api/metric-parse`) and
   blocks the switch on error; leaving an edited Builder re-emits the YAML. A
-  debounced live-validation chip re-checks the draft while typing.
+  debounced live-validation chip re-checks the draft while typing — showing
+  the Builder's friendly checks while the YAML tab still mirrors the form,
+  and a one-line `field — reason` summary of server errors otherwise.
 - **New metric** opens the Builder seeded with defaults (the YAML tab holds
   the equivalent starter template) plus an optional folder field. **Create
   metric** validates server-side and writes `metrics/[<folder>/]<name>.yml`

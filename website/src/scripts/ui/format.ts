@@ -83,6 +83,21 @@ export function fmtStamp(ms: number): string {
   return new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
 }
 
+/**
+ * Lag with the configured data-maturity delay (`loading_delay`) netted out.
+ * The loader holds the newest interval back on purpose, so only lag beyond
+ * the delay signals staleness. Never negative; null when lag is unknown.
+ * The single netting rule shared by the freshness dot (table.ts) and the
+ * "Stale metrics" tile (tiles.ts) so the two can't drift.
+ */
+export function effectiveLagSeconds(
+  lagSeconds: number | null,
+  loadingDelaySeconds: number | undefined,
+): number | null {
+  if (lagSeconds === null) return null;
+  return Math.max(0, lagSeconds - (loadingDelaySeconds ?? 0));
+}
+
 /** Human duration from a second count (lag, staleness) — "45m" / "2h 30m" / "3d 4h". */
 export function fmtLag(seconds: number): string {
   const mtot = Math.round(seconds / 60);

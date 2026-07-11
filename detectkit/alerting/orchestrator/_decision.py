@@ -410,6 +410,7 @@ class _DecisionMixin(_OrchestratorBase):
             min_anomaly_share=self.conditions.min_anomaly_share,
             window_matched=window_matched,
             fired_by_share=fired_by_share,
+            loading_delay_seconds=self.loading_delay_seconds or None,
         )
 
     def should_alert_no_data(
@@ -467,15 +468,29 @@ class _DecisionMixin(_OrchestratorBase):
             project_name=self.project_name,
             help_url=self.help_url,
             interval_seconds=self.interval.seconds,
+            loading_delay_seconds=self.loading_delay_seconds or None,
         )
 
     def get_last_complete_point(self, now: datetime | None = None) -> datetime:
-        """Floor ``now`` to the previous fully completed interval boundary."""
+        """Floor ``now`` to the previous fully completed *mature* interval boundary.
+
+        With a ``loading_delay`` configured, the loader only trusts
+        ``[t, t+interval)`` once ``now >= t + interval + delay`` — so the same
+        delay shifts the effective now back here BEFORE flooring, keeping the
+        no-data expectation (an exact-timestamp lookup) in lockstep with what
+        the load step has actually had a chance to persist. Without this, a
+        delayed metric would fire a false no-data alert on every run while the
+        newest interval is deliberately still in flight.
+        """
         if now is None:
             now = now_utc()
         now = to_aware_utc(now)
 
         interval_seconds = self.interval.seconds
-        floored = (int(now.timestamp()) // interval_seconds) * interval_seconds
+        # Shift the effective now back by the maturity delay BEFORE flooring
+        # (subtract-then-floor keeps the boundary correct for delays that
+        # aren't a multiple of the interval).
+        effective_epoch = int(now.timestamp()) - self.loading_delay_seconds
+        floored = (effective_epoch // interval_seconds) * interval_seconds
         last_complete = floored - interval_seconds
         return datetime.fromtimestamp(last_complete, tz=timezone.utc)

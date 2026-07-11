@@ -210,6 +210,31 @@ class ProjectConfig(BaseModel):
             "`false_alert_budget` takes priority; unset → a built-in default."
         ),
     )
+    # Project-wide default data-maturity delay. Useful when every metric reads
+    # from the same upstream pipeline (e.g. one dbt project that finishes a few
+    # minutes after each interval closes). A per-metric ``loading_delay``
+    # overrides it; ``loading_delay: 0`` on a metric opts that metric out.
+    # Only sensible project-wide when the metrics genuinely share the upstream
+    # schedule — otherwise set it per metric.
+    loading_delay: str | int | None = Field(
+        default=None,
+        description=(
+            "Default data-maturity delay before the newest interval is trusted "
+            "as complete (duration string like '10min' or seconds). Per-metric "
+            "loading_delay overrides it; 0 on a metric opts out."
+        ),
+    )
+
+    @field_validator("loading_delay")
+    @classmethod
+    def validate_loading_delay(cls, v: "str | int | None") -> "str | int | None":
+        """A delay, if set, must parse as a duration (any zero form = no delay)."""
+        # Shared with MetricConfig.loading_delay so the accepted grammar and
+        # error message can't drift between the two levels. Imported lazily to
+        # keep this module import-light (no cycle exists either way).
+        from detectkit.config.metric_config import validate_loading_delay_value
+
+        return validate_loading_delay_value(v)
 
     @field_validator("false_alert_budget")
     @classmethod

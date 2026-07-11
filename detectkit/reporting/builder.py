@@ -24,7 +24,7 @@ from detectkit.alerting.orchestrator._types import (
     _direction_from_metadata,
     _parse_detection_metadata,
 )
-from detectkit.config.metric_config import MetricConfig
+from detectkit.config.metric_config import MetricConfig, resolve_loading_delay_seconds
 from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.orchestration.task_manager import make_alert_config_id
 from detectkit.utils.datetime_utils import to_naive_utc
@@ -226,6 +226,7 @@ def replay_alert_events(
     start: datetime,
     end: datetime,
     project_name: str | None,
+    loading_delay_seconds: int = 0,
 ) -> list[tuple[str, ReplayedEvent]]:
     """Replay every *enabled* alerting config over ``[start, end]``.
 
@@ -263,6 +264,9 @@ def replay_alert_events(
             links=cfg.links,
             project_name=project_name,
             help_url=None,
+            # Constructor parity with the live path: replayed AlertData carries
+            # the same resolved data-maturity delay the dispatching run stamps.
+            loading_delay_seconds=loading_delay_seconds,
         )
         for event in orchestrator.replay(records, value_at, start, end):
             out.append((config_id, event))
@@ -305,11 +309,14 @@ def build_report_payload(
     end: datetime | None = None,
     project_name: str | None = None,
     generated_at: str | None = None,
+    project_loading_delay: str | int | None = None,
 ) -> dict:
     """Read the internal tables for one metric and assemble the report payload.
 
     ``start`` / ``end`` bound the report window (inclusive of both grid points);
-    when omitted they default via :func:`resolve_window`.
+    when omitted they default via :func:`resolve_window`. ``project_loading_delay``
+    is the project-wide ``loading_delay`` fallback, so replayed alerts carry the
+    same resolved data-maturity delay the live pipeline stamps.
     """
     name = metric_config.name
     interval = metric_config.get_interval()
@@ -418,7 +425,16 @@ def build_report_payload(
     alerts: list[dict] = [
         _event_to_payload(event, config_id)
         for config_id, event in replay_alert_events(
-            metric_config, internal, records, value_at, start, end, project_name
+            metric_config,
+            internal,
+            records,
+            value_at,
+            start,
+            end,
+            project_name,
+            loading_delay_seconds=resolve_loading_delay_seconds(
+                metric_config.loading_delay, project_loading_delay
+            ),
         )
     ]
     alerts.sort(key=lambda a: a["t"])

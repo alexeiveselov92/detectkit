@@ -221,6 +221,40 @@ interval: 10min
 loading_batch_size: 2160  # 15 days of 10-min intervals
 ```
 
+#### `loading_delay` (string or int, optional)
+Data-maturity delay: how long after an interval closes the upstream source
+needs before its data for that interval is complete. Use it when a dbt model
+(or any other source) finishes writing a few minutes *after* the interval
+boundary — without it, a `dtk run` scheduled right on the boundary loads and
+permanently persists a partially-written bucket (load only ever resumes
+*forward* from the last saved timestamp, so that partial value is never
+revisited). This causes false "drop" anomaly alerts, false no-data alerts, and
+a skewed trailing window. Filtering in the SQL itself (`WHERE ts < now() -
+INTERVAL X`) does not fix this: the loader decides the upper bound outside
+SQL and gap-fills the still-missing bucket as `NULL`, which still trips a
+no-data alert.
+
+**Format**: duration string (`"10min"`, `"1h"`) or integer seconds.
+
+**Example** — a 10-minute metric fed by a dbt model that finishes 5-8 minutes
+after each interval closes:
+```yaml
+interval: 10min
+loading_delay: "10min"   # hold back the newest interval until dbt has caught up
+```
+
+**Behavior**:
+- Applies only when the load end bound is implicit (i.e. "now"); an explicit
+  `dtk run --to <timestamp>` is trusted verbatim and bypasses it.
+- The no-data alert expectation shifts back in lockstep, so the deliberately
+  withheld newest interval never fires a false no-data alert.
+- Resolution is **metric → project-wide default → 0** (see
+  [Project Configuration](configuration.md)); an explicit `loading_delay: 0` on
+  the metric opts it out of a project-wide default.
+
+See "Schedule around upstream data maturity" under Best Practices below for
+the caveats to weigh before setting this.
+
 ### Seasonality Extraction
 
 #### `seasonality_columns` (list of strings, optional)
@@ -684,6 +718,32 @@ detectors:
       threshold: 4.0  # Higher threshold due to noisy metric
       window_size: 8640  # 60 days to smooth seasonality
 ```
+
+### 8. Schedule Around Upstream Data Maturity
+
+Schedule `dtk run` right after the metric's interval boundary, and set
+`loading_delay` to cover how long the upstream ETL/dbt job typically takes to
+finish writing that interval's data:
+
+```yaml
+interval: 10min
+loading_delay: "10min"   # dbt model finishes ~5-8 min after the interval closes
+```
+
+This is a trade-off, not a free lunch:
+
+- Every second of delay adds the same amount to real-outage detection time
+  (a genuine no-data condition now fires `loading_delay` later). Set it to the
+  observed worst-case (p99) upstream latency, not a generous round number.
+- It reduces but does not eliminate the race — if the upstream job
+  occasionally takes *longer* than the configured delay, a partial bucket can
+  still be persisted. Repair it with `dtk run --from <date before the bad
+  bucket>`, which reloads and overwrites the bad value; no `--full-refresh`
+  needed.
+- Enabling `loading_delay` does not retroactively fix a bucket already
+  persisted before the setting existed — pair the config change with a
+  one-time `dtk run --from <date>` over the recent tail if you know a bad
+  value is already there.
 
 ## See Also
 

@@ -103,9 +103,10 @@ series, watch the band recompute live, then write the config back into the metri
 
 For a **live**, project-wide view instead of a one-off file, run `dtk ui`: the
 same reports in a browser overlay plus an overview table (alert frequency,
-freshness, quality when incidents are labeled), a panel that drives
-`dtk run` / `dtk autotune` / `dtk unlock`, and an in-browser editor to create,
-edit and delete metric YAML files. See `cli.md`.
+freshness — netting out any configured `loading_delay` so a deliberately
+delayed metric doesn't read as stale — quality when incidents are labeled), a
+panel that drives `dtk run` / `dtk autotune` / `dtk unlock`, and an in-browser
+editor to create, edit and delete metric YAML files. See `cli.md`.
 
 ## Glossary
 

@@ -72,6 +72,14 @@ export interface OverviewMetric {
   tags: string[];
   enabled: boolean;
   interval_seconds: number;
+  /**
+   * Resolved data-maturity delay (`loading_delay`, metric → project → 0),
+   * seconds. The loader intentionally holds the newest interval back this
+   * long, so freshness math nets it out of `lag_seconds` — otherwise a
+   * delayed metric would read as perpetually stale. Older servers may omit
+   * it; treat as 0.
+   */
+  loading_delay_seconds?: number;
   detectors: string[];
   alert_rule: AlertRuleSummary | null;
   last_point: number | null;

@@ -245,6 +245,7 @@ def run_command(
                     internal_manager=internal_manager,
                     report_path=report_path,
                     project_name=getattr(project_config, "name", None),
+                    project_loading_delay=getattr(project_config, "loading_delay", None),
                     from_dt=from_dt,
                     to_dt=to_dt,
                 )
@@ -275,6 +276,7 @@ def emit_metric_report(
     project_name: str | None,
     from_dt: datetime | None,
     to_dt: datetime | None,
+    project_loading_delay: str | int | None = None,
 ) -> None:
     """Build and write the HTML report for one metric (best-effort)."""
     from detectkit.reporting import build_report_payload, render_report_html
@@ -287,6 +289,7 @@ def emit_metric_report(
         end=to_dt,
         project_name=project_name,
         generated_at=now_utc_naive().strftime("%Y-%m-%d %H:%M UTC"),
+        project_loading_delay=project_loading_delay,
     )
     if not payload["points"]:
         click.echo("  │ Report: no datapoints in window, skipped")

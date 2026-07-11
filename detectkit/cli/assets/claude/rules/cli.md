@@ -49,7 +49,10 @@ dtk run --select <sel> [--steps load,detect,alert] [--from DATE] [--to DATE] \
   query), `--steps detect` (rerun detection only), `--steps detect,alert` (skip load).
 - `--from DATE` / `--to DATE` — `YYYY-MM-DD` or `YYYY-MM-DD HH:MM:SS`, UTC.
   Affects only the `load` step. `--from` overrides the metric's
-  `loading_start_time`; `--to` defaults to now.
+  `loading_start_time`; `--to` defaults to now. An explicit `--to` bypasses a
+  configured `loading_delay` (trusted verbatim); to fix a bucket already
+  loaded before `loading_delay` was set, `dtk run --from <date before it>`
+  reloads and overwrites it.
 - `--full-refresh` — **destructive**: deletes the metric's datapoints and
   detections, then reloads from `loading_start_time`/`--from`. Use after
   changing the query or to recompute detections over history.

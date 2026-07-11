@@ -9,7 +9,7 @@ import click
 from detectkit.config.metric_config import MetricConfig
 from detectkit.loaders.metric_loader import MetricLoader
 from detectkit.orchestration.task_manager._base import _TaskManagerBase
-from detectkit.utils.datetime_utils import now_utc_naive, to_naive_utc
+from detectkit.utils.datetime_utils import format_duration, now_utc_naive, to_naive_utc
 
 
 class _LoadStepMixin(_TaskManagerBase):
@@ -57,7 +57,24 @@ class _LoadStepMixin(_TaskManagerBase):
                     "Please specify from_date or set loading_start_time in config."
                 )
 
-        actual_to = to_naive_utc(actual_to) if actual_to is not None else now_utc_naive()
+        if actual_to is not None:
+            actual_to = to_naive_utc(actual_to)
+        else:
+            # Data-maturity delay (loading_delay): shift the effective "now"
+            # back BEFORE the interval snap below, so [t, t+I) is only loaded
+            # once now >= t + I + delay — a bucket the upstream ETL is still
+            # writing is withheld instead of being persisted half-full forever
+            # (resume never re-reads it). Subtract-then-snap is what keeps the
+            # boundary on the metric's grid for delays that aren't a multiple
+            # of the interval; snapping first and subtracting after would land
+            # off-grid. An explicit --to is trusted verbatim (no delay).
+            delay_seconds = self._loading_delay_seconds(config)
+            actual_to = now_utc_naive() - timedelta(seconds=delay_seconds)
+            if delay_seconds:
+                click.echo(
+                    f"  │ Holding back {format_duration(delay_seconds)} "
+                    "for data maturity (loading_delay)"
+                )
         actual_from = to_naive_utc(actual_from)
 
         if actual_from >= actual_to:

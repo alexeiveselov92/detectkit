@@ -32,6 +32,7 @@ timeouts:                      # per-step, seconds
 
 alert_help_url: null           # optional, see below — "How to read this alert" link
 false_alert_budget: null       # optional — `dtk tune` target FDR (0,1]; per-metric override wins
+loading_delay: null            # optional — default data-maturity delay; per-metric override wins
 
 error_alerting:                # optional, see below
   enabled: false
@@ -41,6 +42,13 @@ error_alerting:                # optional, see below
 `(0, 1]`, e.g. `0.3` = 30%) for manual tuning: the `dtk tune` cockpit gently flags a
 metric when its false-alert rate exceeds it. A per-metric `false_alert_budget`
 overrides it; unset → a built-in `0.5`. Tuning-only — it never touches the pipeline.
+
+`loading_delay` is a project-wide default **data-maturity delay** (duration string
+or seconds), useful when every metric reads from one upstream pipeline that
+finishes a few minutes after each interval closes. A per-metric `loading_delay`
+overrides it (`0` opts that metric out); see `metrics.md` for the full
+load/no-data behavior and the detection-latency trade-off. Only set this
+project-wide when your metrics genuinely share the same upstream schedule.
 
 ### `alert_help_url` — "How to read this alert" link
 

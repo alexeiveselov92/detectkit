@@ -24,7 +24,11 @@ import numpy as np
 
 from detectkit.alerting.orchestrator import ReplayedEvent
 from detectkit.autotune.labels import IncidentLabels, newest_labels_file, parse_labels_file
-from detectkit.config.metric_config import AlertConfig, MetricConfig
+from detectkit.config.metric_config import (
+    AlertConfig,
+    MetricConfig,
+    resolve_loading_delay_seconds,
+)
 from detectkit.config.project_config import ProjectConfig
 from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.detectors.factory import DetectorFactory
@@ -302,6 +306,7 @@ def _empty_row(name: str) -> dict[str, Any]:
         "tags": [],
         "enabled": True,
         "interval_seconds": 0,
+        "loading_delay_seconds": 0,
         "detectors": [],
         "alert_rule": None,
         "last_point": None,
@@ -328,6 +333,7 @@ def _fill_config_fields(
     metric_path: Path,
     config: MetricConfig,
     project_budget: float,
+    project_loading_delay: str | int | None = None,
 ) -> None:
     """Populate the fields derived purely from the (already-validated) config."""
     dir_str, file_str = resolve_metric_location(metric_path, project_root, metrics_dir)
@@ -336,6 +342,12 @@ def _fill_config_fields(
     row["tags"] = list(config.tags) if config.tags else []
     row["enabled"] = config.enabled
     row["interval_seconds"] = config.get_interval().seconds
+    # Resolved data-maturity delay (metric → project → 0): the frontend nets it
+    # out of ``lag_seconds`` so a deliberately-delayed metric doesn't read as
+    # perpetually stale (freshness dot + the "Stale metrics" tile).
+    row["loading_delay_seconds"] = resolve_loading_delay_seconds(
+        config.loading_delay, project_loading_delay
+    )
     row["detectors"] = [d.type for d in config.detectors]
     row["alert_rule"] = _alert_rule_summary(config.alerting)
     row["budget"] = (
@@ -400,7 +412,17 @@ def _fill_stats(
         np.datetime64(ts, "ms"): _num_or_none(v) for ts, v in zip(ts_arr, val_arr, strict=False)
     }
     records = [record_from_row(r) for r in det_rows]
-    event_pairs = replay_alert_events(config, internal, records, value_at, start, end, project_name)
+    event_pairs = replay_alert_events(
+        config,
+        internal,
+        records,
+        value_at,
+        start,
+        end,
+        project_name,
+        # Resolved by _fill_config_fields before this runs (metric → project → 0).
+        loading_delay_seconds=row["loading_delay_seconds"],
+    )
 
     counts = {"anomaly": 0, "recovery": 0, "no_data": 0}
     anomaly_events: list[tuple[str, ReplayedEvent]] = []
@@ -482,6 +504,7 @@ def build_metric_row(
         now=now if now is not None else now_utc_naive(),
         project_name=project_config.name,
         project_budget=resolve_project_budget(project_config),
+        project_loading_delay=getattr(project_config, "loading_delay", None),
     )
 
 
@@ -496,6 +519,7 @@ def _build_metric_row(
     now: datetime,
     project_name: str | None,
     project_budget: float,
+    project_loading_delay: str | int | None = None,
 ) -> dict[str, Any]:
     """Build one metric's overview row; any failure is captured into ``error``."""
     row = _empty_row(config.name)
@@ -507,6 +531,7 @@ def _build_metric_row(
             metric_path=metric_path,
             config=config,
             project_budget=project_budget,
+            project_loading_delay=project_loading_delay,
         )
         _fill_stats(
             row,
@@ -544,6 +569,7 @@ def build_overview_payload(
     now_dt = now if now is not None else now_utc_naive()
     metrics_dir = project_root / "metrics"
     project_budget = resolve_project_budget(project_config)
+    project_loading_delay = getattr(project_config, "loading_delay", None)
 
     rows = [
         _build_metric_row(
@@ -556,6 +582,7 @@ def build_overview_payload(
             now=now_dt,
             project_name=project_config.name,
             project_budget=project_budget,
+            project_loading_delay=project_loading_delay,
         )
         for metric_path, config in metrics
     ]

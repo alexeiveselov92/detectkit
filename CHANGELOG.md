@@ -5,6 +5,40 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.54.0] - 2026-07-11
+
+### Added
+- **`loading_delay` — data-maturity delay for late upstream ETL** (per-metric
+  + project-wide default). When the source table (e.g. a dbt model) finishes
+  writing minutes *after* an interval closes, a `dtk run` scheduled right
+  after the boundary used to load the still-partial bucket — and because load
+  resumes strictly after the last persisted timestamp, that wrong value stayed
+  in `_dtk_datapoints` forever, feeding false "drop"/no-data alerts and
+  skewing every later trailing window. With `loading_delay: "10min"` the
+  loader treats `[t, t+interval)` as complete only once
+  `now >= t + interval + loading_delay` (the delay is subtracted **before**
+  the interval snap, so a delay that isn't a multiple of the interval still
+  lands the bound on the metric's grid), and the alert step's
+  `get_last_complete_point` shifts in lockstep — no false no-data alert for
+  the deliberately-withheld newest interval (previously the no-data check
+  floored wall-clock time with no notion of maturity, so a lagged metric
+  would have mis-fired every cooldown cycle). Resolution: metric → project →
+  0; a per-metric `loading_delay: 0` opts out of the project default. An
+  explicit `dtk run --to` is trusted verbatim (no delay applied). Anomaly /
+  recovery message timestamps are data-time and stay correct by construction;
+  new **opt-in** template variables `{data_delay_display}` /
+  `{data_delay_line}` let a custom template disclose the delay (default
+  rendering is byte-identical). The `dtk ui` overview nets the resolved delay
+  out of `lag_seconds`, so a delayed metric no longer reads as perpetually
+  stale (freshness dot + "Stale metrics" tile; the hover title shows the
+  excluded delay). Trade-offs (documented): every second of delay adds the
+  same to real-outage detection latency — size it to the upstream job's
+  observed worst case; an upstream run that overshoots the delay can still
+  persist a partial bucket — repair with `dtk run --from <date>`, which
+  re-loads and overwrites via the version-aware upsert. Deliberately **not**
+  added as a `_dtk_metrics` column (no schema-migration mechanism exists;
+  the informational table keeps its schema).
+
 ## [0.53.3] - 2026-07-10
 
 ### Added

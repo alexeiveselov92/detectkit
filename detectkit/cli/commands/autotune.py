@@ -275,6 +275,7 @@ def run_autotune(
             dry_run=dry_run,
             report_path=report_path,
             project_name=project_name,
+            project_loading_delay=getattr(_project_config, "loading_delay", None),
         )
         if ok:
             succeeded += 1
@@ -296,6 +297,7 @@ def _tune_one(
     dry_run: bool,
     report_path: str | None = None,
     project_name: str | None = None,
+    project_loading_delay: str | int | None = None,
 ) -> bool:
     """Tune one metric end to end; return True on success."""
     name = config.name
@@ -370,6 +372,7 @@ def _tune_one(
             config=config,
             report_path=report_path,
             project_name=project_name,
+            project_loading_delay=project_loading_delay,
         )
         internal_manager.release_lock(name, "pipeline", "pipeline", status="completed")
         return True
@@ -406,6 +409,7 @@ def _finalize(
     config: MetricConfig | None = None,
     report_path: str | None = None,
     project_name: str | None = None,
+    project_loading_delay: str | int | None = None,
 ) -> None:
     """Persist run + winner detections + tuned config, prune prior winners, render RESULT."""
     folds = " ".join(f"{f:.2f}" for f in result.cv_per_fold) or "—"
@@ -486,6 +490,7 @@ def _finalize(
                 end=end,
                 project_name=project_name,
                 generated_at=now_utc_naive().strftime("%Y-%m-%d %H:%M UTC"),
+                project_loading_delay=project_loading_delay,
             )
             if payload["points"]:
                 report_out = _resolve_report_path(report_path, project_root, out_path.stem)

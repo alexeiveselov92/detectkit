@@ -209,3 +209,22 @@ false_alert_budget: 0.3
 
 This is purely a tuning aid — it only annotates a number you can already see in the
 cockpit; it never affects the load/detect/alert pipeline.
+
+#### `loading_delay` (string or int, optional)
+
+A project-wide default **data-maturity delay** — how long after an interval
+closes an upstream source needs before its data is complete (e.g. one dbt
+project that every metric reads from and that finishes a few minutes after
+each run). A per-metric [`loading_delay`](configuration-metrics.md#loading_delay-string-or-int-optional)
+overrides it; setting it to `0` on a metric opts that metric out of the
+project default.
+
+```yaml
+# detectkit_project.yml
+loading_delay: "5min"
+```
+
+Only set this project-wide when your metrics genuinely share one upstream
+schedule — otherwise configure it per metric. See the
+[Configuring Metrics guide](configuration-metrics.md#loading_delay-string-or-int-optional)
+for the full behavior and the detection-latency trade-off it introduces.

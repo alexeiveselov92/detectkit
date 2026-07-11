@@ -37,6 +37,7 @@ class _OrchestratorBase:
         project_name: str | None = None,
         help_url: str | None = None,
         ai_synonyms: list[str] | None = None,
+        loading_delay_seconds: int = 0,
     ):
         self.metric_name = metric_name
         self.interval = interval
@@ -62,6 +63,12 @@ class _OrchestratorBase:
         # every AlertData so channels can render an "Also known as" identity line.
         # Empty list when the metric has no ai_context — renders unchanged.
         self.ai_synonyms = ai_synonyms or []
+        # Resolved data-maturity delay (``loading_delay``, metric → project → 0).
+        # Constructor state — not a per-call argument — so every internal
+        # ``get_last_complete_point()`` call site (the no-data check in the alert
+        # step AND the recovery mixin's own fetch bound) computes the same
+        # delay-aware boundary as the load step's maturity cut-off.
+        self.loading_delay_seconds = int(loading_delay_seconds or 0)
 
     @staticmethod
     def _group_by_timestamp(

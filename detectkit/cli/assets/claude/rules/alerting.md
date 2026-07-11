@@ -169,7 +169,10 @@ interval) has no datapoint, or the row's value is `NULL`/`NaN`. `min_detectors`
 and `consecutive_anomalies` do **not** apply (it's a single binary signal).
 Honors `alert_cooldown` and `suppress_until`. Webhook channels render it amber.
 Use for cron loaders where source absence is a real failure; **don't** enable on
-naturally sparse metrics.
+naturally sparse metrics. With a `loading_delay` configured (`metrics.md`), the
+"last complete interval" shifts back by that same delay, so the deliberately
+withheld newest interval never trips a false no-data alert while it's still in
+flight upstream.
 
 ## Temporary suppression
 

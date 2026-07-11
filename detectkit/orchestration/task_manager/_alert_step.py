@@ -29,6 +29,10 @@ class _AlertStepMixin(_TaskManagerBase):
 
         interval = config.get_interval()
         multi = len(active_configs) > 1
+        # Same maturity cut-off as the load step: the no-data expectation (and
+        # every other last-complete-point computation) must not run ahead of
+        # what load has had a chance to persist under a loading_delay.
+        loading_delay_seconds = self._loading_delay_seconds(config)
 
         for i, alerting_config in enumerate(active_configs):
             if multi:
@@ -70,6 +74,7 @@ class _AlertStepMixin(_TaskManagerBase):
                 links=alerting_config.links,
                 project_name=getattr(self.project_config, "name", None),
                 help_url=help_url,
+                loading_delay_seconds=loading_delay_seconds,
             )
 
             last_point = orchestrator.get_last_complete_point()

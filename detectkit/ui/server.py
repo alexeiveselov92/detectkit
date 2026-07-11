@@ -402,6 +402,7 @@ class _Handler(BaseHTTPRequestHandler):
                 end=end,
                 project_name=getattr(srv.project_config, "name", None),
                 generated_at=now_utc_naive().strftime("%Y-%m-%d %H:%M UTC"),
+                project_loading_delay=getattr(srv.project_config, "loading_delay", None),
             )
         self._reply_html(render_report_html(payload))
 

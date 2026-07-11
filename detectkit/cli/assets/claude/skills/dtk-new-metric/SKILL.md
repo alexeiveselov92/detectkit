@@ -62,6 +62,12 @@ Use `{{ interval_seconds }}` if you need to bucket
 For long/complex SQL, offer to put it in `sql/<name>.sql` and use `query_file:`
 instead of inline `query:`.
 
+Also ask: **does this source finish writing after the interval closes** (a dbt
+model or other batch job that lands a few minutes late)? If so, set
+`loading_delay` (e.g. `"10min"`) so `dtk run` doesn't load and permanently
+persist a partially-written bucket right at the boundary — see `metrics.md`
+for the full behavior and its detection-latency trade-off.
+
 ## Step 3 — Interval
 
 Ask for the point spacing and set `interval` (`"1min"`, `"5min"`, `"10min"`,

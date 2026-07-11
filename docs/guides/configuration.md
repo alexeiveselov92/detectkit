@@ -192,6 +192,11 @@ alert_help_url: https://wiki.example.com/runbooks/reading-detectkit-alerts
   dashboard" link) as a "How to read this alert" link.
 - **Email** — in the footer, after "Sent by detectkit · &lt;project&gt;"
   (and any CC), a clay-colored "How to read this alert →" link.
+- **Discord** — a clickable label in the same compact Links line as the
+  webhook family.
+- **Microsoft Teams / Google Chat** — an `Action.OpenUrl` button / card
+  button, alongside the dashboard and extra links.
+- **ntfy** — one of the up to 3 `view` action buttons on the notification.
 - **Templates** (custom + plain-text defaults) — exposed as `{help_url}`
   (raw URL, empty when unset) and `{help_line}`
   (`"How to read this alert: <url>\n"`, empty when unset), mirroring the

@@ -141,7 +141,11 @@ Send alerts to multiple platforms:
 - **Slack** - Team notifications
 - **Telegram** - Mobile alerts
 - **Email** - Traditional notifications
-- **Webhook** - Generic HTTP endpoint
+- **Discord** - Community/team chat (embeds)
+- **Microsoft Teams** - Workflows/Power Automate Adaptive Cards
+- **Google Chat** - Cards v2
+- **ntfy** - Push notifications to phone/desktop/browser
+- **Webhook** - Generic HTTP endpoint (also the recipe for Rocket.Chat)
 
 ```yaml
 alerting:
@@ -215,7 +219,7 @@ for the per-backend breakdown.
       │
       ├─▶  Data source   ClickHouse query, gap-filled to the grid
       ├─▶  Detectors     MAD · Z-Score · IQR · manual_bounds · autoreg
-      └─▶  Channels      Mattermost · Slack · Telegram · Email · Webhook
+      └─▶  Channels      Mattermost · Slack · Telegram · Email · Discord · Teams · Google Chat · ntfy · Webhook
       │
       ▼
    ┌──────────────────────────────────────────────────┐

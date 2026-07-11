@@ -179,7 +179,9 @@ Defined once in `profiles.yml`, referenced by name in each metric's
 `alerting.channels` (and in `error_alerting.channels`).
 
 The bot defaults to the **detectkit brand** name + avatar on every channel.
-Override per channel; Telegram and email brand differently (see their notes).
+Override per channel; Telegram, email, Microsoft Teams and ntfy brand
+differently — the first two set their own identity, the latter two have no
+per-message avatar/username to override at all (see their notes).
 
 **Mattermost** / **Slack** (Slack-compatible webhook API, same fields):
 ```yaml
@@ -251,6 +253,88 @@ alert_channels:
 > ignore a custom `template` and add an `X-Detectkit-Event` header.
 > `secret` — signs the raw request body as HMAC-SHA256 into
 > `X-Detectkit-Signature-256: sha256=<hex>`, for any `format`.
+> Rocket.Chat note: a script-less Rocket.Chat incoming webhook accepts this
+> same Slack-style `attachments` payload — point `webhook_url` at it with the
+> default `format: attachments` and it renders natively, no integration script
+> needed.
+
+**Discord**:
+```yaml
+alert_channels:
+  discord_alerts:
+    type: discord
+    webhook_url: "{{ env_var('DISCORD_WEBHOOK_URL') }}"   # required — https://discord.com/api/webhooks/<id>/<token>
+    timeout: 10                       # optional HTTP timeout (s)
+    # Bot identity defaults to the detectkit brand; override either:
+    # username: "detectkit"             # display name
+    # avatar_url: "https://.../bot.png" # avatar image (default: brand avatar)
+```
+> Renders one **embed** per alert. Discord embeds have no "Show more" fold
+> (unlike Slack/Mattermost attachments), so the verbose evidence (Quorum,
+> Severity, the anomalous span, Detectors) rides in a compact inline **field
+> grid** instead of a folded tail; no-data/error stay short with no fields.
+> `@mentions` ride in the top-level `content` field (never inside the embed —
+> Discord never delivers a ping placed there): `all`/`everyone`/`channel` ->
+> `@everyone`, `here` -> `@here`, an already `<@user_id>`/`<@&role_id>`-shaped
+> value pings for real, anything else renders as a bare `@name` (does not ping).
+
+**Microsoft Teams**:
+```yaml
+alert_channels:
+  teams_ops:
+    type: teams
+    webhook_url: "{{ env_var('TEAMS_WEBHOOK_URL') }}"   # required — a Power Automate "Workflows" webhook URL
+    timeout: 10                                          # optional HTTP timeout (s)
+```
+> Posts an Adaptive Card to the current Power Automate **Workflows** webhook
+> (Teams channel -> Workflows -> "When a Teams webhook request is received"),
+> not the retired Office 365 connector — only the Workflows payload shape is
+> accepted. **No branding**: the message posts under the flow's own
+> identity/icon, so there is no `username`/`avatar_url` override (unlike
+> Slack/Mattermost/Discord). `mentions` render as **plain text and never
+> ping** — a real Adaptive Card mention needs an Azure AD user id, which
+> detectkit's alert config doesn't carry; wire a real ping inside the
+> Workflow itself if you need one.
+
+**Google Chat**:
+```yaml
+alert_channels:
+  googlechat_ops:
+    type: googlechat
+    webhook_url: "{{ env_var('GOOGLE_CHAT_WEBHOOK_URL') }}"   # required — the space's full incoming-webhook URL
+    icon_url: "https://.../bot.png"    # optional — header avatar (default: brand avatar)
+    timeout: 10                        # optional HTTP timeout (s)
+```
+> Renders as a **Cards v2** card (Cards v1 is deprecated by Google and not
+> supported). Mentions ride in the top-level `text` field (card content never
+> triggers a Chat notification or a ping): `all`/`everyone`/`channel`/`here`
+> (case-insensitive) all collapse to the space-wide `<users/all>`; an already
+> `<users/USER_ID>`-shaped value passes through and pings; anything else
+> renders as a bare `@name` (does not ping).
+
+**ntfy**:
+```yaml
+alert_channels:
+  ntfy_alerts:
+    type: ntfy
+    topic: "my-alerts"                     # required
+    server: "https://ntfy.sh"              # optional — self-hosted servers work the same way
+    token: "{{ env_var('NTFY_TOKEN') }}"   # optional — Authorization: Bearer (wins over user/password)
+    user: "..."                            # optional — HTTP basic auth (used only when token is unset)
+    password: "..."                        # optional
+    priority: 4                            # optional 1 (min) .. 5 (max) — overrides only the anomaly/error default
+    timeout: 10                            # optional HTTP timeout (s)
+```
+> A push notification, not a chat message — no bot identity/avatar/color bar;
+> the kind's tag emoji is the status cue (ntfy renders it as the leading
+> glyph of the title; the status dot is stripped from the title so the glyph
+> isn't doubled).
+> Priority defaults to 4 (high) for anomaly/error and 3 (default) for
+> recovery/no-data; an explicit `priority` overrides **only** anomaly/error —
+> recovery/no-data stay calm on purpose. `dashboard_url` becomes the
+> notification's tap target (`click`, never duplicated as an action); `links`
+> plus the "how to read this alert" link become up to three `view` action
+> buttons.
 
 ## Notes
 

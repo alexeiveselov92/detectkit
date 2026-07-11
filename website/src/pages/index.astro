@@ -1212,8 +1212,9 @@ const dxExplainer = (() => {
         <p class="pf-note">
           The same alert, posted by detectkit to each channel — rendered as that channel formats it: one
           folding attachment on Slack/Mattermost (its verbose tail collapses behind “Show more”), escaped
-          HTML on Telegram, a branded card in email. A fifth, generic <strong>webhook</strong> channel
-          POSTs the same payload as JSON to anything else.
+          HTML on Telegram, a branded card in email. Five more channels — <strong>Discord</strong>,
+          <strong>Microsoft Teams</strong>, <strong>Google Chat</strong>, <strong>ntfy</strong> and a
+          generic <strong>webhook</strong> — render the same alert natively everywhere else.
           Each leads with the project name (<code>[payments]</code>) so several projects can share one
           channel while keeping the brand bot identity. The <code>dashboard_url</code> below becomes a
           first-class link on every channel.

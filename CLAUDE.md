@@ -33,6 +33,17 @@ rendered on the docs site under **For developers**). Read the relevant one:
   (`X-Detectkit-Signature-256` over the raw body). **MariaDB** is a first-class
   backend through the MySQL manager (vendor sniff at connect → `VALUES()` upsert
   fallback; `type: mariadb` profile alias; in the integration test matrix).
+- **Channels wave 1:** `discord` (status-colored embed; the verbose tail is an
+  inline field grid — Discord has no fold), `teams` (Power Automate Workflows +
+  Adaptive Cards 1.4 — the retired O365-connector path is dead; posts under the
+  flow's identity, so no branding and mentions never ping), `googlechat`
+  (Cards v2; only `<users/all>`/`<users/USER_ID>` tokens in top-level text
+  ping), `ntfy` (JSON publish; per-kind priority, tag emoji as the status cue)
+  are first-class channel types; Rocket.Chat rides the generic `webhook`
+  channel (its script-less incoming webhook takes the Slack-style attachments
+  payload — documented recipe). All render from the shared `build_context`
+  seam in the uniform `description → Rule → Value/Expected → links → tail`
+  order.
 - User-facing docs are in `docs/`. The context that `dtk init-claude` ships to
   users lives in `detectkit/cli/assets/claude/` — **keep both in sync on every
   release** (see the contributing rule's release checklist).

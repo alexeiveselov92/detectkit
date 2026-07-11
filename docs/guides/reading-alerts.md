@@ -1,9 +1,10 @@
 # Reading a detectkit alert
 
 *You probably landed here by clicking **"How to read this alert"** at the bottom
-of a notification in Slack, Mattermost, Telegram, or email. This page explains —
-in plain language — what that alert is telling you and what to do about it. No
-detectkit setup knowledge required.*
+of a notification in Slack, Mattermost, Telegram, email, Discord, Microsoft
+Teams, Google Chat, ntfy, or another chat tool detectkit posts to. This page
+explains — in plain language — what that alert is telling you and what to do
+about it. No detectkit setup knowledge required.*
 
 ## In 10 seconds
 

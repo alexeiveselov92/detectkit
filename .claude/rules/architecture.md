@@ -91,6 +91,7 @@ detectkit/
 ├── alerting/
 │   ├── orchestrator/            # AlertOrchestrator: decision / cooldown / recovery / dispatch
 │   └── channels/                # base + factory + mattermost/slack/telegram/email/webhook
+│                                #   + discord/teams/googlechat/ntfy (channels wave 1)
 ├── orchestration/
 │   ├── task_manager/            # TaskManager: run-level lock + _load/_detect/_alert steps
 │   └── error_dispatch.py        # project-level error alert (shared by CLI + TaskManager)
@@ -401,7 +402,10 @@ counts) is keyed by `alert_config_id` in `_dtk_alert_states`.
 
 Channels live in `detectkit/alerting/channels/` behind `BaseAlertChannel`;
 `AlertChannelFactory` builds them with env-var interpolation. Implemented:
-`mattermost`, `slack`, `telegram`, `email`, `webhook`. Every channel defaults
+`mattermost`, `slack`, `telegram`, `email`, `webhook`, `discord`, `teams`,
+`googlechat`, `ntfy` (Rocket.Chat needs no type of its own — its script-less
+incoming webhook accepts the generic `webhook` channel's Slack-style
+attachments payload; documented recipe). Every channel defaults
 to the **detectkit brand identity** — name + avatar from `channels/branding.py`
 (`BRAND_USERNAME`, `BRAND_ICON_URL`, a PNG served from the docs site, generated
 by `website/scripts/make-bot-icon.mjs`). Webhook-family channels send the brand
@@ -412,6 +416,32 @@ its bot avatar (set in @BotFather). Project-level error
 alerting (`ProjectConfig.error_alerting` → `error_dispatch.py`) notifies on
 DB-down / DDL / runtime failures, including early CLI failures before any metric
 runs.
+
+**Channels wave 1** (`discord.py` / `teams.py` / `googlechat.py` / `ntfy.py`)
+all render natively from the same `build_context` seam, same
+`description → Rule → Value/Expected → links → tail` order (the Rule chip only
+on anomaly/recovery), transport errors swallowed (`print` + `False`), platform
+limits enforced defensively: **Discord** — one status-colored embed (int
+color) whose verbose tail rides in a compact inline field grid (Discord has no
+"Show more" fold), brand `username`/`avatar_url`, mentions in top-level
+`content` + `allowed_mentions` (`<@id>` pings pass through verbatim; bare
+names render but don't ping), per-part caps plus the 6000-char embed-total
+budget with newline-boundary truncation. **Teams** — the Power Automate
+Workflows webhook path (the retired O365 connector's MessageCard payloads are
+dead): `{type: message, attachments: [Adaptive Card 1.4]}`, status via
+TextBlock color (Attention/Good/Warning/Accent), FactSet evidence,
+`Action.OpenUrl` links; posts under the flow's identity — no branding, and
+mentions render as plain text (real pings would need AAD-id mention
+entities). **Google Chat** — space incoming webhook, Cards v2 only: brand
+avatar + `detectkit · <project>` in the card header, HTML-escaped
+`decoratedText` evidence rows (`<br>` not `\n`), `buttonList` links (button
+text is plain text — deliberately unescaped), `<users/all>`/`<users/USER_ID>`
+mention tokens in top-level `text` (the only place a ping fires). **ntfy** —
+JSON publish to the server root (headers can't carry UTF-8): per-kind
+priority (anomaly/error 4, else 3; a `priority` knob overrides only
+anomaly/error) and tag emoji as the status cue (the title's status dot is
+stripped so the glyph isn't doubled), `click` = dashboard, up to 3 view
+actions, Bearer-token or basic auth, 3800-byte message cap.
 
 **Default rendering is platform-native** (no custom `template`). The value
 computation behind all of it is shared: `BaseAlertChannel.build_context` is the

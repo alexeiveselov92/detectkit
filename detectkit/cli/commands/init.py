@@ -222,12 +222,47 @@ alert_channels:
   #   smtp_username: "{{ env_var('SMTP_USERNAME') }}"
   #   smtp_password: "{{ env_var('SMTP_PASSWORD') }}"
 
-  # Generic webhook example (required: webhook_url; optional extra_headers)
+  # Generic webhook example (required: webhook_url; optional extra_headers,
+  # format: attachments|json|alertmanager, secret for HMAC-SHA256 signing)
   # webhook_alerts:
   #   type: webhook
   #   webhook_url: "{{ env_var('WEBHOOK_URL') }}"
   #   extra_headers:
   #     Authorization: "Bearer {{ env_var('WEBHOOK_TOKEN') }}"
+
+  # Discord example (required: webhook_url). Optional: username (default:
+  # detectkit brand), avatar_url (default: detectkit brand avatar), timeout
+  # (default: 10).
+  # discord_alerts:
+  #   type: discord
+  #   webhook_url: "{{ env_var('DISCORD_WEBHOOK_URL') }}"
+  #   # username: detectkit
+  #   # avatar_url: "https://.../bot.png"
+
+  # Microsoft Teams example (required: webhook_url — a Power Automate
+  # "Workflows" webhook trigger URL, not the retired O365 connector).
+  # Optional: timeout (default: 10).
+  # teams_alerts:
+  #   type: teams
+  #   webhook_url: "{{ env_var('TEAMS_WEBHOOK_URL') }}"
+
+  # Google Chat example (required: webhook_url — the space's incoming
+  # webhook URL). Optional: icon_url (default: detectkit brand avatar),
+  # timeout (default: 10).
+  # googlechat_alerts:
+  #   type: googlechat
+  #   webhook_url: "{{ env_var('GOOGLE_CHAT_WEBHOOK_URL') }}"
+  #   # icon_url: "https://.../bot.png"
+
+  # ntfy.sh push-notification example (required: topic). Optional:
+  # server (default: https://ntfy.sh), token (Bearer auth), user/password
+  # (basic auth, used only when token is unset), priority (1-5, overrides
+  # only anomaly/error notifications), timeout (default: 10).
+  # ntfy_alerts:
+  #   type: ntfy
+  #   topic: "{{ env_var('NTFY_TOPIC') }}"
+  #   # server: https://ntfy.sh
+  #   # token: "{{ env_var('NTFY_TOKEN') }}"
 """
 
 

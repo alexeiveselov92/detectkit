@@ -5,7 +5,9 @@ This guide explains how to configure and customize alerting in detectkit.
 > **This guide is split into focused pages:**
 >
 > - **This page** — how alerting works + the quorum / direction / consecutive filtering rules.
-> - [Alert channels](alerting-channels.md) — Mattermost, Slack, Telegram, Email, generic webhook.
+> - [Alert channels](alerting-channels.md) — Mattermost, Slack, Telegram, Email,
+>   Discord, Microsoft Teams, Google Chat, ntfy, generic webhook (incl. a
+>   Rocket.Chat recipe).
 > - [Multiple alert blocks](alerting-multiple-blocks.md) — route one metric to several independent alert rules.
 > - [Reading an alert (for stakeholders)](reading-alerts.md) — what a received alert means and what to do.
 > - [Cooldown, suppression & recovery](alerting-cooldown-recovery.md)
@@ -18,7 +20,8 @@ This guide explains how to configure and customize alerting in detectkit.
 detectkit's alerting system:
 - Checks only recent data (not historical)
 - Requires consecutive anomalies (reduces false positives)
-- Supports multiple channels (Mattermost, Slack, Telegram, Email, generic webhook)
+- Supports multiple channels (Mattermost, Slack, Telegram, Email, Discord,
+  Microsoft Teams, Google Chat, ntfy, generic webhook)
 - Filters by detector agreement and direction
 - Customizable templates
 - @mentions for users and groups (channel-agnostic)

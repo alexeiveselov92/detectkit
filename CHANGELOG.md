@@ -5,6 +5,38 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.57.0] - 2026-07-11
+
+### Added
+- **`dtk tune`: a `min_samples_per_group` knob in the cockpit.** The manual
+  tuner already exposed the seasonality *grouping*, but the per-group fill
+  threshold — how many same-key points the window must hold before a seasonal
+  group earns its **own** band — was pinned to the per-detector default and could
+  not be tuned. It is now a slider (shown only for a metric that has seasonality
+  columns, hidden for `autoreg` / `manual_bounds` like the other windowed-only
+  knobs), clamped to the active detector's floor (IQR's is 4) and reset to the
+  type default on a detector switch, just like the threshold knob. This matters
+  because a seasonal group engages only when
+  `window_size ≳ min_samples_per_group × distinct_keys`, so **shrinking Window
+  size / Points shown can silently push a group below the threshold** — the band
+  falls back to the global statistics and *widens for a reason that isn't the
+  smaller window itself*, which reads like the window shrink "broke" the band.
+  The under-window warning now names lowering this knob as the alternative to
+  widening the window, so the trade-off is legible instead of a mystery. This is
+  a manual lever only: `dtk autotune` still holds `min_samples_per_group` at the
+  class default and steers group-fill through `window_size` /
+  `seasonal_fill_window` (unchanged).
+
+### Fixed
+- **`dtk tune`: a metric's configured `min_samples_per_group` is now honored in
+  the live preview.** The cockpit's recompute always read the per-detector
+  *default* (MAD 10 / Z-Score 3 / IQR 4), silently discarding a non-default
+  `min_samples_per_group` set in the metric YAML — so the previewed band, the
+  effective-config echo and Apply could all disagree with the metric's real
+  config. The live read now honors the seeded value (and the new knob when
+  present). Purely a `dtk tune` preview/write-back fix — the pipeline detectors
+  always read the configured value.
+
 ## [0.56.2] - 2026-07-11
 
 ### Fixed

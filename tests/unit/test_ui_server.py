@@ -584,6 +584,205 @@ def test_job_log_offsets_keep_streaming_past_buffer_cap(tmp_path, monkeypatch):
     assert done["next_offset"] == 120
 
 
+# ── POST /api/metric-parse (the Builder form's parse/validate seam) ──────────
+
+
+def test_metric_parse_ok_returns_data_and_sanitizes_unquoted_dates(tmp_path):
+    server, url = _build(tmp_path)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        # `snapshot_date` isn't a modeled field, so MetricConfig's default
+        # extra="ignore" lets it through validation untouched — but the raw
+        # yaml.safe_load of an *unquoted* date produces a real `datetime.date`
+        # object, which json.dumps can't serialize on its own.
+        text = "name: orders\n" "interval: 1h\n" 'query: "SELECT 1"\n' "snapshot_date: 2024-01-01\n"
+        row = json.loads(_post(f"{base}/api/metric-parse?token={token}", {"text": text}).read())
+        assert row["name"] == "orders"
+        assert row["data"]["interval"] == "1h"
+        assert row["data"]["snapshot_date"] == "2024-01-01 00:00:00"
+    finally:
+        _teardown(server)
+
+
+def test_metric_parse_sanitizes_yaml_set_and_binary_scalars(tmp_path):
+    """YAML-only types (!!set → set, !!binary → bytes) must not 500 the JSON reply.
+
+    Both are valid YAML that pydantic coerces fine at the MetricConfig level
+    (set → list[str] for tags, bytes → str), so the config *validates* — but the
+    raw mapping handed to the Builder seed still holds the Python-native values,
+    which json.dumps rejects without `_json_safe_mapping`'s coercion.
+    """
+    server, url = _build(tmp_path)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        text = (
+            "name: orders\n"
+            "interval: 1h\n"
+            'query: "SELECT 1"\n'
+            "tags: !!set\n"
+            "  ? prod\n"
+            "  ? critical\n"
+            "extra_note: !!binary |\n"
+            "  aGVsbG8=\n"
+        )
+        row = json.loads(_post(f"{base}/api/metric-parse?token={token}", {"text": text}).read())
+        assert sorted(row["data"]["tags"]) == ["critical", "prod"]
+        assert row["data"]["extra_note"] == "hello"
+    finally:
+        _teardown(server)
+
+
+def test_metric_parse_bad_detector_type_400s_naming_it(tmp_path):
+    server, url = _build(tmp_path)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        text = (
+            "name: orders\n"
+            "interval: 1h\n"
+            'query: "SELECT 1"\n'
+            "detectors:\n"
+            "  - type: not_a_real_detector\n"
+        )
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(f"{base}/api/metric-parse?token={token}", {"text": text})
+        assert ei.value.code == 400
+        assert "not_a_real_detector" in ei.value.read().decode()
+    finally:
+        _teardown(server)
+
+
+# ── POST /api/osi-inspect / /api/osi-import ───────────────────────────────────
+
+_OSI_TEXT = """
+semantic_model:
+  - name: ecommerce
+    datasets:
+      - name: store_sales
+        source: analytics.store_sales
+        fields:
+          - name: sold_at
+            dimension: {is_time: true}
+    metrics:
+      - name: total_sales
+        expression:
+          dialects:
+            - {dialect: ANSI_SQL, expression: "SUM(store_sales.ss_ext_sales_price)"}
+"""
+
+
+def test_osi_inspect_ok_and_400_on_bad_yaml(tmp_path):
+    server, url = _build(tmp_path)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        row = json.loads(_post(f"{base}/api/osi-inspect?token={token}", {"text": _OSI_TEXT}).read())
+        assert row["models"] == [
+            {"name": "ecommerce", "metrics": ["total_sales"], "datasets": ["store_sales"]}
+        ]
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(f"{base}/api/osi-inspect?token={token}", {"text": "not: [valid : yaml"})
+        assert ei.value.code == 400
+    finally:
+        _teardown(server)
+
+
+def test_osi_import_cube_target_ok_and_unknown_metric_400s(tmp_path):
+    """The cube target needs no sqlglot, so this test always runs."""
+    server, url = _build(tmp_path)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        req = {
+            "text": _OSI_TEXT,
+            "metric": "total_sales",
+            "interval": "1h",
+            "target": "cube",
+            "cube": "store_sales",
+            "time_dimension": "sold_at",
+        }
+        row = json.loads(_post(f"{base}/api/osi-import?token={token}", req).read())
+        assert row["name"] == "total_sales"
+        assert row["target"] == "cube"
+        assert "MEASURE(store_sales.total_sales)" in row["sql"]
+        assert row["body"]["name"] == "total_sales"
+        assert row["fingerprint"]
+
+        bad = dict(req, metric="does-not-exist")
+        with pytest.raises(urllib.error.HTTPError) as ei:
+            _post(f"{base}/api/osi-import?token={token}", bad)
+        assert ei.value.code == 400
+        assert "not found" in ei.value.read().decode()
+    finally:
+        _teardown(server)
+
+
+def test_osi_import_clickhouse_target_ok(tmp_path):
+    pytest.importorskip("sqlglot")
+    server, url = _build(tmp_path)
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        req = {"text": _OSI_TEXT, "metric": "total_sales", "interval": "1h", "target": "clickhouse"}
+        row = json.loads(_post(f"{base}/api/osi-import?token={token}", req).read())
+        assert row["target"] == "clickhouse"
+        assert "toStartOfInterval" in row["sql"]
+        assert "FROM analytics.store_sales" in row["sql"]
+    finally:
+        _teardown(server)
+
+
+# ── boot payload: form_meta ───────────────────────────────────────────────────
+
+
+def test_boot_html_contains_form_meta(tmp_path):
+    meta = {
+        "channels": [{"name": "ops", "type": "slack"}],
+        "profiles": ["p"],
+        "default_profile": "p",
+    }
+    server, url = _build(tmp_path, form_meta=meta)
+    _serve(server)
+    try:
+        html = _get(url).read().decode()
+        assert '"form_meta"' in html
+        assert '"ops"' in html
+    finally:
+        _teardown(server)
+
+
+def test_build_form_meta_drops_channel_secrets_and_sorts_names():
+    from detectkit.config.profile import ProfileConfig, ProfilesConfig
+    from detectkit.ui.server import build_form_meta
+
+    profiles_config = ProfilesConfig(
+        profiles={
+            "prod": ProfileConfig(type="clickhouse", port=9000),
+            "dev": ProfileConfig(type="clickhouse", port=9000),
+        },
+        default_profile="prod",
+        alert_channels={
+            "ops": {"type": "webhook", "url": "https://hooks.example.com/super-secret-token"},
+            "alerts": {"type": "slack", "webhook_url": "https://hooks.slack.com/T000/B000/secret"},
+        },
+    )
+    meta = build_form_meta(profiles_config)
+    assert meta["default_profile"] == "prod"
+    assert meta["profiles"] == ["dev", "prod"]
+    assert meta["channels"] == [
+        {"name": "alerts", "type": "slack"},
+        {"name": "ops", "type": "webhook"},
+    ]
+    for channel in meta["channels"]:
+        assert set(channel) == {"name", "type"}
+    dumped = json.dumps(meta)
+    assert "secret" not in dumped
+    assert "hooks.slack.com" not in dumped
+    assert "hooks.example.com" not in dumped
+
+
 # ── metric CRUD (detectkit/ui/metric_files.py routes) ─────────────────────────
 
 
@@ -613,9 +812,28 @@ def test_metric_source_returns_exact_text_and_404_for_unknown(tmp_path):
         assert row["name"] == "orders"
         assert row["file"] == "metrics/orders.yml"
         assert row["text"] == text
+        assert row["data"]["name"] == "orders"
+        assert row["data"]["description"] == "hello"
+        assert row["parse_error"] is None
         with pytest.raises(urllib.error.HTTPError) as ei:
             _get(f"{base}/api/metric-source/nope?token={token}")
         assert ei.value.code == 404
+    finally:
+        _teardown(server)
+
+
+def test_metric_source_reports_parse_error_when_on_disk_file_is_broken(tmp_path):
+    """A metric edited on disk into a broken state degrades to `data: null` +
+    `parse_error`, instead of a raw 500 — the Builder tab disables itself."""
+    server, url = _build(tmp_path, metrics=_real_metrics(tmp_path, ["orders"]))
+    (tmp_path / "metrics" / "orders.yml").write_text("name: [unterminated\n", encoding="utf-8")
+    _serve(server)
+    try:
+        base, token = url.split("/?")[0], url.split("token=")[1]
+        row = json.loads(_get(f"{base}/api/metric-source/orders?token={token}").read())
+        assert row["data"] is None
+        assert row["parse_error"]
+        assert row["text"] == "name: [unterminated\n"
     finally:
         _teardown(server)
 

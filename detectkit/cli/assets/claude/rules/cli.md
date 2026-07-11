@@ -224,20 +224,39 @@ exactly as if typed into a terminal.
 
 ### Managing metrics from the UI
 
-The cockpit header has a **New metric** button — an editor overlay seeded
-with a starter YAML template, with an optional subfolder under `metrics/`;
-saving writes `metrics/[<folder>/]<name>.yml`. Every metric row also has an
-**Edit** action that opens its raw YAML in the same editor. **Save** validates
+The cockpit header has a **New metric** button, and every metric row an
+**Edit** action; both open an editor overlay with **two tabs sharing one
+draft**: **Builder** — a structured form over the whole config (basics,
+schedule/loading, seasonality, minimal detector rows with type + 1-2 key
+params — fine-tuning belongs in `dtk tune` —, alerting with a channel
+multi-select seeded from `profiles.yml` channel names, `ai_context`; SQL in
+a syntax-highlighted pane, `query_file` paths read-only; a **From OSI**
+sub-tab compiles a pasted OSI semantic-model metric through the same code
+path as `dtk osi import`) — and **YAML**, the raw text, kept for whole-config
+pastes. The last-edited tab wins, never silently: leaving an edited YAML tab
+validates server-side first and blocks the switch on error; leaving an
+edited Builder re-emits the YAML. A debounced live-validation chip re-checks
+the draft while typing. Keys the form doesn't model (`autotune:`, custom
+templates, unknown detector types/params, a multi-entry alerting list)
+round-trip verbatim, listed under "Preserved fields". Create writes
+`metrics/[<folder>/]<name>.yml`; after a create, a **next-steps strip**
+offers **Load & detect** (`dtk run --steps load,detect` for just that metric
+— no alert step, so an untuned config can't spam a channel) and then **Open
+tune** on the loaded series. **Save** validates
 server-side **before any write**: YAML syntax → full `MetricConfig` → a deep
 detector-params check (each factory-known detector is actually constructed) —
 an invalid config lands in the editor's error pane with nothing written. A
 successful save **archives the previous file verbatim** to
 `metrics/.history/<metric>/` (the same archive `dtk tune`'s Apply writes,
-excluded from metric discovery) and only then overwrites in place, so the
-text typed is what lands on disk, comments intact (normalized only to end
-with a newline). A save is refused when the file changed on disk after the
-editor was opened (a `dtk tune` Apply or another session saved first) —
-reopen the metric rather than overwrite it. Renaming via `name:`
+excluded from metric discovery) and only then overwrites in place. A
+YAML-tab save writes the text typed, comments intact (normalized only to end
+with a newline); a Builder save **re-emits the YAML deterministically,
+dropping hand-written comments** (the archive keeps the previous file; edit
+comment-heavy files from the YAML tab). A save is refused when the file
+changed on disk after the editor was opened (a `dtk tune` Apply or another
+session saved first) — reopen the metric rather than overwrite it. A file
+that doesn't parse opens YAML-only, with the parse error on the disabled
+Builder tab. Renaming via `name:`
 is allowed — uniqueness is enforced project-wide — and rows under the old name
 stay in the `_dtk_*` tables until `dtk clean`. **Delete** lives in the edit
 overlay behind an explicit confirmation step, and the server additionally
@@ -319,6 +338,10 @@ dtk osi compile model.osi.yml -m total_sales -i 1h          # preview the SQL
 dtk osi import model.osi.yml -m total_sales -i 1h -o metrics/  # scaffold a metric
 dtk osi export -o semantic/detectkit.osi.yml                  # publish back to OSI
 ```
+
+The `dtk ui` metric Builder's **From OSI** sub-tab does the import
+interactively (paste a model, pick a metric/target, Compile) through the
+same code path — see "Managing metrics from the UI" above.
 
 ## Common workflows
 

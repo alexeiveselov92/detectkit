@@ -5,6 +5,74 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.55.0] - 2026-07-11
+
+### Added
+- **`dtk ui`: a Builder form for the metric editor, next to the raw YAML.**
+  Creating or editing a metric used to mean a bare textarea over the whole
+  file; the editor now opens two tabs sharing one draft — **Builder** (a
+  structured form) and **YAML** (the existing raw editor, kept for experts who
+  paste whole configs). The last-edited tab wins, never silently: switching
+  away from a dirty YAML tab first validates it server-side
+  (`POST /api/metric-parse`, a new pure-CPU route with no filesystem/DB access)
+  and blocks the switch on error, while switching away from a dirty Builder
+  re-emits the YAML deterministically. A debounced live-validation chip (quick
+  client checks, then the same `/api/metric-parse`) shows valid/invalid while
+  typing; **Save** still posts through the unchanged create/update endpoints
+  and surfaces their authoritative errors.
+  - The SQL query gets a dedicated syntax-highlighted code pane (keywords,
+    strings, comments, numbers, Jinja `{{ … }}` variables — a hand-rolled
+    highlighter, no new runtime dependency). A metric using `query_file` shows
+    the path read-only; the Builder never silently converts it to an inline
+    `query:`.
+  - The query source has a second sub-tab, **From OSI**: paste an OSI semantic
+    model, inspect it server-side (`POST /api/osi-inspect`), pick a metric and
+    a target (`clickhouse` or `cube`), and **Compile**
+    (`POST /api/osi-import`) — the exact same `import_osi_metric` code path
+    `dtk osi import` uses, so the Builder and the CLI produce identical output.
+    The compiled SQL, description and `ai_context` seed the form, and the
+    sql-fingerprint lands in a YAML header comment exactly like the CLI
+    command. The `clickhouse` target still needs the optional `[osi]` extra
+    (sqlglot) — the error message says so; `cube` doesn't.
+  - Every other parameter gets a form control: basics (name, description,
+    tags, profile, enabled), schedule & loading (interval with presets,
+    `loading_start_time`; advanced: `loading_delay`, `loading_batch_size`,
+    `query_columns`), seasonality checkboxes, minimal detector rows (type plus
+    1-2 key params — threshold/window_size, lags for `autoreg`, lower/upper
+    for `manual_bounds` — with a hint that fine-tuning belongs in `dtk tune`),
+    alerting (a channel multi-select seeded from `profiles.yml`, plus
+    consecutive/direction/no-data/recovery/cooldown and, under advanced,
+    `min_detectors`, the `anomaly_window` + `min_anomaly_share` pair,
+    mentions, `dashboard_url`), and `ai_context`. The boot payload carries a
+    new `form_meta` (channel **names and types only** — never configs or
+    secrets — plus profile names and the default profile), built by
+    `build_form_meta()` in `ui/server.py`.
+  - **Nothing modeled is lost.** Config keys the form doesn't render
+    (`autotune:`, `tables:`, a custom `template`, an unrecognized detector
+    param like `smoothing`, an unlisted detector type like `prophet`, a
+    multi-entry `alerting` list) round-trip verbatim and are listed in a
+    "Preserved fields" section. Saving from the **Builder** re-emits the whole
+    YAML — hand-written comments are dropped (the previous file is still
+    archived to `metrics/.history/<metric>/` first, exactly like a `dtk tune`
+    Apply); saving from the **YAML** tab writes the text verbatim, unchanged
+    from before. Edit mode opens on Builder when the file parses; a file
+    hand-edited into a broken state opens YAML-only, with the parse error on
+    the disabled Builder tab. `GET /api/metric-source` now also returns the
+    parsed mapping (`data`) and `parse_error` alongside the raw text.
+  - **The full create-to-tune loop is now one flow.** After creating a metric,
+    a next-steps strip offers **Load & detect**, which spawns
+    `dtk run --steps load,detect` for just that metric (deliberately no
+    `alert` step, so a rough starter config can't spam a real channel); once
+    that job succeeds, **Open tune** unlocks and opens the `dtk tune` cockpit
+    on the freshly loaded series — create with rough defaults, load real
+    data, then tune the detector against it.
+  - New backend seams: `metric_files.parse_metric_mapping()` (validated
+    config plus the raw unwrapped mapping), `semantic.parse_osi_models(text)`
+    (the text-in seam `load_osi_models` now delegates to, so the server can
+    parse a pasted model with no temp file), and `build_form_meta()`. The new
+    routes are token-guarded like every other `dtk ui` route. Committed bundle
+    `detectkit/ui/assets/ui.js` regenerated.
+
 ## [0.54.0] - 2026-07-11
 
 ### Added

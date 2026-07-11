@@ -18,7 +18,7 @@ from detectkit.config.profile import ProfilesConfig
 from detectkit.config.project_config import ProjectConfig
 from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.ui.overview import ALL_WINDOW_PRESETS
-from detectkit.ui.server import serve_ui
+from detectkit.ui.server import build_form_meta, serve_ui
 
 
 def run_ui(
@@ -82,6 +82,8 @@ def run_ui(
     click.echo(click.style(f"detectkit UI: {project_config.name}", fg="cyan", bold=True))
     click.echo(f"  {len(metrics)} metric(s) covered by --select {select} (window: {window})")
 
+    form_meta = build_form_meta(profiles_config)
+
     try:
         serve_ui(
             project_config=project_config,
@@ -92,6 +94,7 @@ def run_ui(
             profile=profile,
             echo=click.echo,
             open_browser=not no_open,
+            form_meta=form_meta,
         )
     except KeyboardInterrupt:
         pass

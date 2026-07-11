@@ -27,7 +27,7 @@ import sys
 import threading
 import webbrowser
 from collections.abc import Callable, Iterator
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -40,6 +40,7 @@ from detectkit.ui.jobs import JobManager
 from detectkit.ui.metric_files import (
     create_metric_file,
     delete_metric_file,
+    parse_metric_mapping,
     text_digest,
     update_metric_file,
 )
@@ -54,6 +55,7 @@ from detectkit.utils.datetime_utils import now_utc_naive
 
 if TYPE_CHECKING:
     from detectkit.config.metric_config import MetricConfig
+    from detectkit.config.profile import ProfilesConfig
     from detectkit.config.project_config import ProjectConfig
     from detectkit.database.internal_tables import InternalTablesManager
 
@@ -98,6 +100,7 @@ class _UiServer(ThreadingHTTPServer):
         self.internal_manager: InternalTablesManager | None = None
         self.initial_window: str = "30d"
         self.profile: str | None = None
+        self.form_meta: dict[str, Any] = {"channels": [], "profiles": [], "default_profile": None}
         self.echo: Callable[[str], None] = print
         self.tune_url_timeout: float = _DEFAULT_TUNE_URL_TIMEOUT
         self.jobs = JobManager()
@@ -115,7 +118,7 @@ class _UiServer(ThreadingHTTPServer):
         swallowed; anything else is echoed as one compact line.
         """
         exc = sys.exc_info()[1]
-        if isinstance(exc, (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)):
+        if isinstance(exc, BrokenPipeError | ConnectionResetError | ConnectionAbortedError):
             return
         self.echo(f"  [ui] request error: {type(exc).__name__}: {exc}")
 
@@ -334,6 +337,12 @@ class _Handler(BaseHTTPRequestHandler):
         elif path.startswith("/api/job/") and path.endswith("/stop"):
             job_id = path[len("/api/job/") : -len("/stop")].rstrip("/")
             self._handle_stop(srv, job_id)
+        elif path == "/api/metric-parse":
+            self._handle_metric_parse(srv, body)
+        elif path == "/api/osi-inspect":
+            self._handle_osi_inspect(srv, body)
+        elif path == "/api/osi-import":
+            self._handle_osi_import(srv, body)
         elif path == "/api/metric-create":
             self._handle_metric_create(srv, body)
         elif path.startswith("/api/metric/") and path.endswith("/update"):
@@ -420,7 +429,12 @@ class _Handler(BaseHTTPRequestHandler):
         overwrites the same file in place (a plain truncate-and-write), so an
         unserialized read could hand the editor a torn half-written file. The
         ``digest`` is the optimistic-concurrency token the editor echoes back
-        on save (see ``update_metric_file``).
+        on save (see ``update_metric_file``). ``data``/``parse_error`` are the
+        Builder-mode seed: a live metric normally validates, so ``data`` holds
+        its parsed mapping and ``parse_error`` is ``None``; a file hand-edited
+        on disk into a broken state instead gets ``data: null`` plus the
+        validation message, so the editor can open on the YAML tab with the
+        Builder tab disabled (title = the error) rather than crashing.
         """
         with srv.db_lock:
             entry = _find_metric_entry(srv.metrics, name)
@@ -432,6 +446,7 @@ class _Handler(BaseHTTPRequestHandler):
         dir_str, file_str = _resolve_metric_location(
             mpath, srv.project_root, srv.project_root / "metrics"
         )
+        data, parse_error = _parse_metric_source(text)
         self._reply_json(
             {
                 "name": name,
@@ -439,10 +454,129 @@ class _Handler(BaseHTTPRequestHandler):
                 "file": file_str,
                 "text": text,
                 "digest": text_digest(text),
+                "data": data,
+                "parse_error": parse_error,
             }
         )
 
     # ── POST handlers ────────────────────────────────────────────────────
+
+    def _handle_metric_parse(self, srv: _UiServer, body: bytes) -> None:
+        """Validate metric YAML text and return its parsed mapping for the Builder form.
+
+        Runs the same validation ``POST /api/metric-create``/``update`` do
+        (``metric_files.parse_metric_text`` — full ``MetricConfig`` plus a deep
+        detector-params check) but never touches the filesystem: this route
+        only powers the editor's Builder⇄YAML tab sync and its debounced
+        live-validation chip, so a 400 here just means "stay on this tab, show
+        the error" rather than "the save failed". No ``db_lock`` — pure CPU
+        (parse + validate), no file or DB access.
+        """
+        payload = _load_json(body)
+        text = _validate_yaml_text(payload.get("text"))
+        config, data = parse_metric_mapping(text)  # raises ValueError -> 400 via do_POST
+        self._reply_json({"name": config.name, "data": _json_safe_mapping(data)})
+
+    def _handle_osi_inspect(self, srv: _UiServer, body: bytes) -> None:
+        """Parse a pasted OSI semantic model and summarize its metrics/datasets.
+
+        Powers the Builder's "From OSI" tab: a lightweight text -> names
+        summary so the user can pick a metric before compiling. Uses the real
+        ``detectkit.semantic.parse_osi_models`` — the same parser
+        ``dtk osi import`` reads a file through — so the picker reflects
+        exactly what an import would see.
+
+        The ``detectkit.semantic`` import is **local to this handler**, not a
+        module-level import of ``ui/server.py``: OSI interop is documented as
+        an isolated, additive layer that nothing in the core pipeline imports
+        (see ``.claude/rules/architecture.md``), and keeping the import inside
+        the handler means a cockpit session that never opens the OSI tab never
+        pays for loading it, mirroring how ``tuning/server.py``'s ``/autotune``
+        route reaches into the autotune engine only inside its own handler.
+        """
+        from detectkit.semantic import parse_osi_models
+
+        payload = _load_json(body)
+        text = payload.get("text")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("'text' must be a non-empty string (the OSI model YAML)")
+        models = parse_osi_models(text, source="<pasted OSI model>")
+        self._reply_json(
+            {
+                "models": [
+                    {
+                        "name": m.name,
+                        "metrics": [mt.name for mt in m.metrics],
+                        "datasets": [d.name for d in m.datasets],
+                    }
+                    for m in models
+                ]
+            }
+        )
+
+    def _handle_osi_import(self, srv: _UiServer, body: bytes) -> None:
+        """Compile one OSI metric into a native metric scaffold for the Builder.
+
+        Delegates to ``detectkit.semantic.importer.import_osi_metric`` — the
+        exact function ``dtk osi import`` calls — so the Builder's "Compile"
+        button and the CLI produce byte-identical output; only the model
+        parsing (via ``parse_osi_models``) happens over the pasted text instead
+        of a file path. ``OsiError`` (including the "install detectkit[osi]"
+        message when sqlglot is missing) propagates through ``do_POST``'s
+        generic 400 handler unchanged, same as any other validation failure
+        here. Local import for the same isolation reason as
+        ``_handle_osi_inspect``.
+        """
+        from detectkit.semantic import parse_osi_models
+        from detectkit.semantic.importer import import_osi_metric
+
+        payload = _load_json(body)
+        text = payload.get("text")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("'text' must be a non-empty string (the OSI model YAML)")
+        metric = payload.get("metric")
+        if not isinstance(metric, str) or not metric.strip():
+            raise ValueError("'metric' must be a non-empty string")
+        interval = payload.get("interval")
+        if isinstance(interval, str):
+            if not interval.strip():
+                raise ValueError("'interval' must be a non-empty string or int")
+        elif not isinstance(interval, int):
+            raise ValueError("'interval' must be a non-empty string or int")
+        target = payload.get("target", "clickhouse")
+        if target not in ("clickhouse", "cube"):
+            raise ValueError("'target' must be 'clickhouse' or 'cube'")
+        seasonality = payload.get("seasonality")
+        if seasonality is not None and (
+            not isinstance(seasonality, list) or not all(isinstance(s, str) for s in seasonality)
+        ):
+            raise ValueError("'seasonality' must be a list of strings")
+
+        models = parse_osi_models(text, source="<pasted OSI model>")
+        result = import_osi_metric(
+            models=models,
+            metric_name=metric,
+            interval=interval,
+            target=target,
+            dataset=_opt_str(payload, "dataset"),
+            time_field=_opt_str(payload, "time_field"),
+            where=_opt_str(payload, "where"),
+            cube=_opt_str(payload, "cube"),
+            cube_measure=_opt_str(payload, "cube_measure"),
+            time_dimension=_opt_str(payload, "time_dimension"),
+            seasonality=seasonality,
+            detector_type=_opt_str(payload, "detector") or "mad",
+        )
+        self._reply_json(
+            {
+                "name": result.metric_name,
+                "body": result.metric,
+                "sql": result.sql,
+                "fingerprint": result.fingerprint,
+                "target": result.target,
+                "warnings": result.warnings,
+            }
+        )
 
     def _handle_run(self, srv: _UiServer, body: bytes) -> None:
         payload = _load_json(body)
@@ -737,6 +871,64 @@ def _validate_yaml_text(value: Any) -> str:
     return value
 
 
+def _opt_str(payload: dict[str, Any], key: str) -> str | None:
+    """An optional string field from a POST body: ``None`` when absent, else validated."""
+    value = payload.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"'{key}' must be a string")
+    return value
+
+
+def _json_safe_mapping(value: Any) -> Any:
+    """Recursively coerce a parsed-YAML mapping into something ``json.dumps`` accepts.
+
+    ``yaml.safe_load`` turns an *unquoted* date/datetime scalar (a bare
+    ``2024-01-01`` or ``loading_start_time: 2024-01-01 00:00:00``) into a real
+    ``date``/``datetime`` object — a value the raw-YAML textarea round-trips
+    fine as text, but one the stdlib JSON encoder rejects outright. Every such
+    value found anywhere in the mapping (nested in lists/dicts), and every
+    non-string mapping key (YAML also allows bare bools/ints as keys), is
+    coerced here so the mapping handed to the Builder form (``/api/metric-parse``,
+    ``/api/metric-source``) is always valid JSON — this never touches the
+    on-disk text or the ``MetricConfig`` validation, only the JSON view of it.
+    """
+    if isinstance(value, dict):
+        # str(k) can collide (`{1: a, "1": b}`) — JSON keys must be strings, so
+        # the later entry wins; a config exercising that is pathological enough
+        # that the YAML tab (which keeps the raw text) is the right editor for it.
+        return {str(k): _json_safe_mapping(v) for k, v in value.items()}
+    if isinstance(value, list | tuple | set | frozenset):
+        # YAML !!set / sequence variants: JSON has only arrays. Sets are sorted
+        # by their string form so the seed is deterministic.
+        items = sorted(value, key=str) if isinstance(value, set | frozenset) else list(value)
+        return [_json_safe_mapping(v) for v in items]
+    if isinstance(value, datetime | date):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(value, bytes):
+        # YAML !!binary: pydantic may coerce it to str at the config level, but the
+        # raw mapping still holds bytes, which json.dumps rejects outright.
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
+def _parse_metric_source(text: str) -> tuple[dict[str, Any] | None, str | None]:
+    """The Builder-seed ``data`` mapping for a metric file's raw text, plus any parse error.
+
+    Mirrors ``/api/metric-parse``'s validation (``metric_files.parse_metric_mapping``)
+    so ``GET /api/metric-source`` can offer the same Builder seed. A metric
+    normally validates; a file hand-edited on disk into a broken state degrades
+    to ``(None, <message>)`` instead of raising, so the route can still return
+    the raw text (the YAML tab still works) with the Builder tab disabled.
+    """
+    try:
+        _config, data = parse_metric_mapping(text)
+    except Exception as exc:  # noqa: BLE001 — surfaced as parse_error, never raised
+        return None, str(exc)
+    return _json_safe_mapping(data), None
+
+
 def _load_json(body: bytes) -> dict[str, Any]:
     if not body:
         return {}
@@ -782,11 +974,33 @@ def metric_entries(
     return entries
 
 
+def build_form_meta(profiles_config: ProfilesConfig) -> dict[str, Any]:
+    """The Builder form's non-secret seed data: channel names/types + profile names.
+
+    Deliberately drops each alert channel's *config* — webhook URLs, bot
+    tokens, SMTP credentials, and everything else under ``alert_channels.<name>``
+    besides ``type`` are secrets that must never reach the browser; only the
+    channel's ``name`` (for the multi-select) and ``type`` (shown as a muted
+    suffix) are safe to ship. Channels and profiles are name-sorted so the
+    payload — and the rendered ``<select>``s — don't depend on YAML key order.
+    """
+    channels = [
+        {"name": name, "type": str(cfg.get("type", ""))}
+        for name, cfg in sorted(profiles_config.alert_channels.items())
+    ]
+    return {
+        "channels": channels,
+        "profiles": sorted(profiles_config.profiles),
+        "default_profile": profiles_config.default_profile,
+    }
+
+
 def _boot_payload(
     project_config: ProjectConfig,
     project_root: Path,
     metrics: list[tuple[Path, MetricConfig]],
     initial_window: str,
+    form_meta: dict[str, Any],
 ) -> dict[str, Any]:
     """The ``GET /`` shell payload: project + metric list, no stats, no URLs."""
     return {
@@ -795,7 +1009,11 @@ def _boot_payload(
         "version": __version__,
         "metrics": metric_entries(project_root, metrics),
         "generated_at": int(now_utc_naive().timestamp() * 1000),
+        "form_meta": form_meta,
     }
+
+
+_EMPTY_FORM_META: dict[str, Any] = {"channels": [], "profiles": [], "default_profile": None}
 
 
 def build_ui_server(
@@ -808,17 +1026,21 @@ def build_ui_server(
     profile: str | None = None,
     echo: Callable[[str], None] = print,
     tune_url_timeout: float = _DEFAULT_TUNE_URL_TIMEOUT,
+    form_meta: dict[str, Any] | None = None,
 ) -> tuple[_UiServer, str]:
     """Construct (without running) the UI server; return ``(server, page_url)``.
 
     No URLs are baked into the boot payload — the client reads ``token`` from
     ``location.search`` and builds every API URL itself, so the same served
-    HTML works regardless of which port was bound.
+    HTML works regardless of which port was bound. ``form_meta`` (see
+    :func:`build_form_meta`) defaults to an empty shape when omitted, so
+    existing callers/tests and the static-preview path keep working unchanged.
     """
     if initial_window not in ALL_WINDOW_PRESETS:
         allowed = ", ".join(sorted(ALL_WINDOW_PRESETS))
         raise ValueError(f"Unknown window preset {initial_window!r}. Choose one of: {allowed}.")
 
+    resolved_form_meta = form_meta if form_meta is not None else _EMPTY_FORM_META
     server = _UiServer(("127.0.0.1", 0), _Handler)
     token = secrets.token_urlsafe(16)
     port = int(server.server_address[1])
@@ -829,10 +1051,11 @@ def build_ui_server(
     server.internal_manager = internal_manager
     server.initial_window = initial_window
     server.profile = profile
+    server.form_meta = resolved_form_meta
     server.echo = echo
     server.tune_url_timeout = tune_url_timeout
     server.html = render_ui_html(
-        _boot_payload(project_config, project_root, metrics, initial_window)
+        _boot_payload(project_config, project_root, metrics, initial_window, resolved_form_meta)
     )
     return server, f"http://127.0.0.1:{port}/?token={token}"
 
@@ -848,6 +1071,7 @@ def serve_ui(
     echo: Callable[[str], None] = print,
     open_browser: bool = True,
     tune_url_timeout: float = _DEFAULT_TUNE_URL_TIMEOUT,
+    form_meta: dict[str, Any] | None = None,
 ) -> None:
     """Serve the cockpit until Ctrl-C. Every spawned job is stopped on exit."""
     server, url = build_ui_server(
@@ -859,6 +1083,7 @@ def serve_ui(
         profile=profile,
         echo=echo,
         tune_url_timeout=tune_url_timeout,
+        form_meta=form_meta,
     )
     echo(f"  UI: {url}")
     echo("  Open the URL above if no browser opens. Ctrl-C to stop.")

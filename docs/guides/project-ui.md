@@ -4,8 +4,9 @@
 you already run: one overview of every metric's alerting behavior, a detail
 view per metric, a panel that drives `dtk run` / `dtk autotune` /
 `dtk unlock` and launches `dtk tune` — plus **New metric** / **Edit** actions
-that create, edit, and delete metric YAML files — all from the browser
-instead of memorized flags and a text editor. Like `dtk tune`, it is a
+that create, edit, and delete metric YAML files, either through a structured
+**Builder** form or the raw **YAML** directly — all from the browser instead
+of memorized flags and a text editor. Like `dtk tune`, it is a
 superstructure over the existing CLI and config files: the server itself
 never runs the pipeline in-process, takes no pipeline lock, and never touches
 the database; every pipeline action it takes is the same subprocess you'd
@@ -168,27 +169,93 @@ own isolated tuning server and none of them touch the pipeline lock.
 ## Managing metrics
 
 Every row's **Edit** action, and a **New metric** button in the header, open a
-full-screen editor over the metric's raw YAML — no separate form, no
-re-serialized config: what you type is what lands on disk (normalized only to
-end with a newline).
+full-screen editor with **two tabs sharing one draft**: **Builder** — a
+structured form over every metric parameter — and **YAML** — the raw text,
+kept for experts who paste whole configs. The last-edited tab wins, and never
+silently: switching away from an edited YAML tab first validates it
+server-side and blocks the switch on error, so the two views can't hold
+diverging state; switching away from an edited Builder re-emits the YAML, so
+you can always inspect exactly what will be written. A live validation chip
+in the footer re-checks the draft as you type (debounced; the same
+server-side validation Save runs), so most errors surface before you ever
+click Save.
 
-- **New metric** seeds the editor with a starter YAML template (a name,
-  interval, query, one detector, alerting) and an optional folder field, so a
-  new file can land in a `metrics/` subfolder instead of the root. **Create
-  metric** validates the text server-side and writes
-  `metrics/[<folder>/]<name>.yml`, with the filename derived from the
-  metric's `name:`. The new metric joins the current session immediately —
-  even if it wouldn't match the `--select` the server was started with — so
-  you don't need to restart `dtk ui` to see it in the overview.
-- **Edit** opens the metric's existing YAML file verbatim in the same editor.
-  This is deliberately raw-text editing, not a generated form: the file is
-  the source of truth, and **Save changes** writes back the text you typed,
-  comments and formatting intact — there's no re-emit step to lose a
-  hand-written comment or reorder keys (the only normalization is ensuring
-  the file ends with a newline). Before overwriting, it **archives the
-  previous file verbatim** to `metrics/.history/<metric>/<metric>-<stamp>.yml`
-  — the same archive `dtk tune`'s Apply writes to, and excluded from metric
-  discovery, so it never collides with the live file as a duplicate name.
+### The Builder
+
+The Builder covers the whole config as form controls: the basics (name,
+description, tags, profile, enabled), schedule & loading (interval with
+common presets, `loading_start_time`; `loading_delay`, `loading_batch_size`
+and `query_columns` under an advanced fold), seasonality-feature checkboxes,
+detector rows, alerting, and `ai_context`.
+
+- **SQL gets a real code pane** — syntax-highlighted (keywords, strings,
+  comments, numbers, and the Jinja `{{ dtk_start_time }}`-style variables),
+  not a plain textarea. A metric that uses `query_file:` shows the path
+  read-only instead: edit the file on disk (or switch to the YAML tab); the
+  Builder never converts a `query_file` into an inline query.
+- **Detector rows are deliberately minimal** — the type plus one or two key
+  parameters (threshold and window size; lags for `autoreg`; lower/upper
+  bounds for `manual_bounds`). That's intentional: picking a detector and a
+  rough starting point belongs here, but fine-tuning belongs in the
+  [`dtk tune` cockpit](tuning.md), against the metric's real series — the
+  form says as much next to the rows.
+- **Alerting is form-first too**: channels come as a multi-select seeded from
+  the channel names in your `profiles.yml` (names and types only — channel
+  configs and secrets never reach the browser), alongside direction,
+  consecutive anomalies, no-data / recovery toggles and the cooldown;
+  `min_detectors`, the `anomaly_window` + `min_anomaly_share` pair, mentions
+  and `dashboard_url` sit under an advanced fold.
+- **Nothing you don't edit is lost.** Config keys the form doesn't model — an
+  `autotune:` block, `tables:`, a custom alert `template`, a detector
+  parameter the row doesn't render (say `smoothing`), a detector type the
+  picker doesn't know (`prophet`, `timesfm`), a multi-entry alerting list —
+  round-trip verbatim and are listed in a **Preserved fields** section so you
+  can see what's riding along.
+- **One caveat: comments.** Saving from the Builder re-emits the YAML
+  deterministically, and hand-written comments don't survive a re-emit — the
+  editor warns about this when the file has any, and the previous file is
+  always archived first (see below), so nothing is unrecoverable. When a
+  file's comments matter, edit it from the YAML tab, which still writes your
+  text verbatim.
+
+### From OSI
+
+The query source has a second sub-tab, **From OSI**, for teams with a
+governed [OSI semantic model](osi.md): paste the model, the page inspects it
+server-side and lists its metrics, pick one and a target — `clickhouse` or
+`cube` — and **Compile**. This is the exact code path `dtk osi import` runs,
+so the Builder and the CLI produce identical output: the compiled SQL lands
+in the code pane, the metric's description and `ai_context` seed the form,
+and the sql-fingerprint is recorded as a header comment in the emitted YAML.
+The `clickhouse` target needs the optional `[osi]` extra (sqlglot) — the
+error message says so if it's missing; the `cube` target doesn't.
+
+### Creating, editing, deleting
+
+- **New metric** opens the Builder seeded with sensible defaults (the YAML
+  tab holds the equivalent starter template) and an optional folder field, so
+  a new file can land in a `metrics/` subfolder instead of the root. **Create
+  metric** validates server-side and writes `metrics/[<folder>/]<name>.yml`,
+  with the filename derived from the metric's `name:`. The new metric joins
+  the current session immediately — even if it wouldn't match the `--select`
+  the server was started with — so you don't need to restart `dtk ui` to see
+  it in the overview.
+- **After a create, a next-steps strip closes the loop**: **Load & detect**
+  spawns `dtk run --steps load,detect` for just that metric — deliberately
+  *without* the alert step, so an untuned starter config can't spam a real
+  channel — and once the job succeeds, **Open tune** unlocks and opens the
+  `dtk tune` cockpit on the freshly loaded series. That's the intended flow:
+  create with rough defaults, load real data, then tune the detector against
+  it.
+- **Edit** opens the metric on the Builder whenever the file parses; a file
+  that doesn't (hand-edited on disk into a broken state) opens YAML-only,
+  with the parse error shown on the disabled Builder tab — fix it in YAML and
+  reopen. Saving from the YAML tab behaves exactly as before: the text you
+  typed lands on disk, comments and formatting intact (normalized only to
+  end with a newline). Either way, Save first **archives the previous file
+  verbatim** to `metrics/.history/<metric>/<metric>-<stamp>.yml` — the same
+  archive `dtk tune`'s Apply writes to, and excluded from metric discovery,
+  so it never collides with the live file as a duplicate name.
   Saves are also **conflict-checked**: if the file changed on disk after the
   editor was opened — a `dtk tune` Apply landed, another tab saved, or you
   edited the file directly — Save is refused with a clear message instead of
@@ -211,7 +278,9 @@ end with a newline).
   full config validation, then a deep check of each detector's parameters (by
   actually constructing it) — the same discipline `dtk tune`'s Apply uses. An
   invalid config never touches the filesystem; it comes back as an error in
-  the editor's error pane so you can fix it in place.
+  the editor's error pane so you can fix it in place. The live chip runs the
+  same validation while you type, but it's advisory — Save's own response is
+  authoritative.
 - **If you're tuning the metric at the same time**, Save and Delete are
   refused while a `dtk tune` session for that metric (launched from this UI)
   is still running — the tuner's own **Apply** would otherwise race your

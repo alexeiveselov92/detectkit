@@ -106,6 +106,12 @@ The query is a normal Jinja template — the loader injects the `{{ dtk_start_ti
 > **Interval is required** because OSI is grain-agnostic: the time grain is a
 > detectkit choice, not part of the OSI model.
 
+You can also do this interactively: the [`dtk ui`](project-ui.md) metric
+Builder's **From OSI** sub-tab takes a pasted OSI model, lets you pick a
+metric and target, and compiles through the **same code path** as
+`dtk osi import` — the compiled SQL, description and `ai_context` seed the
+form, fingerprint comment included.
+
 ### What compiles, and what is refused
 
 Monitoring a subtly-wrong series is worse than no integration, so detectkit

@@ -24,12 +24,27 @@ export interface BootMetric {
 
 export type WindowPreset = '24h' | '7d' | '30d' | '90d' | 'all';
 
+/** One profiles.yml alert channel, name + type only — never its config (webhook URLs/tokens are secrets). */
+export interface FormMetaChannel {
+  name: string;
+  type: string;
+}
+
+/** Metric-builder seed data resolved from profiles.yml, baked into the boot payload. */
+export interface FormMeta {
+  channels: FormMetaChannel[];
+  profiles: string[];
+  default_profile: string | null;
+}
+
 export interface BootPayload {
   project: string;
   initial_window: string;
   version: string;
   metrics: BootMetric[];
   generated_at: number;
+  /** Older servers/tests may omit this — callers should fall back to `{channels:[],profiles:[],default_profile:null}`. */
+  form_meta?: FormMeta;
 }
 
 // ----------------------------------------------------------------------------
@@ -214,6 +229,10 @@ export interface MetricSourceResponse {
   text: string;
   /** Optimistic-concurrency token: echo it back on update so a stale editor can't clobber a newer save. */
   digest: string;
+  /** The parsed mapping (Builder seed) when `text` validates on the server; `null` when it doesn't. */
+  data?: Record<string, unknown> | null;
+  /** Why `data` is null — shown as a tooltip on the disabled Builder tab. `null` when `text` validates. */
+  parse_error?: string | null;
 }
 
 /** POST /api/metric-create body. */
@@ -241,6 +260,61 @@ export interface MetricMutationResponse {
   archived?: string | null;
   note?: string | null;
   metrics: BootMetric[];
+}
+
+// ----------------------------------------------------------------------------
+// Metric text parsing (POST /api/metric-parse) — the Builder form's "does this
+// YAML validate" seam, shared by the YAML->Builder tab switch and the
+// debounced live-validation chip.
+// ----------------------------------------------------------------------------
+
+/** POST /api/metric-parse response: the raw parsed mapping behind a metric YAML text that validated. */
+export interface MetricParseResponse {
+  name: string;
+  data: Record<string, unknown>;
+}
+
+// ----------------------------------------------------------------------------
+// OSI (Open Semantic Interchange) interop (POST /api/osi-inspect, /api/osi-import)
+// — an isolated, additive bridge; see detectkit/semantic/.
+// ----------------------------------------------------------------------------
+
+/** One OSI semantic model found in a pasted document, summarized for the picker. */
+export interface OsiInspectModel {
+  name: string;
+  metrics: string[];
+  datasets: string[];
+}
+
+/** POST /api/osi-inspect response. */
+export interface OsiInspectResponse {
+  models: OsiInspectModel[];
+}
+
+/** POST /api/osi-import body. */
+export interface OsiImportRequest {
+  text: string;
+  metric: string;
+  interval: string;
+  target: 'clickhouse' | 'cube';
+  dataset?: string;
+  time_field?: string;
+  where?: string;
+  cube?: string;
+  cube_measure?: string;
+  time_dimension?: string;
+  seasonality?: string[];
+  detector?: string;
+}
+
+/** POST /api/osi-import response: a compiled native-metric scaffold ready to seed the Builder form. */
+export interface OsiImportResponse {
+  name: string;
+  body: Record<string, unknown>;
+  sql: string;
+  fingerprint: string;
+  target: string;
+  warnings: string[];
 }
 
 // ----------------------------------------------------------------------------

@@ -3,9 +3,13 @@ Alert channel factory for creating channel instances from configuration.
 """
 
 from detectkit.alerting.channels.base import BaseAlertChannel
+from detectkit.alerting.channels.discord import DiscordChannel
 from detectkit.alerting.channels.email import EmailChannel
+from detectkit.alerting.channels.googlechat import GoogleChatChannel
 from detectkit.alerting.channels.mattermost import MattermostChannel
+from detectkit.alerting.channels.ntfy import NtfyChannel
 from detectkit.alerting.channels.slack import SlackChannel
+from detectkit.alerting.channels.teams import TeamsChannel
 from detectkit.alerting.channels.telegram import TelegramChannel
 from detectkit.alerting.channels.webhook import WebhookChannel
 from detectkit.utils.env_interpolation import interpolate_env_vars
@@ -31,6 +35,10 @@ class AlertChannelFactory:
         "slack": SlackChannel,
         "telegram": TelegramChannel,
         "email": EmailChannel,
+        "discord": DiscordChannel,
+        "teams": TeamsChannel,
+        "googlechat": GoogleChatChannel,
+        "ntfy": NtfyChannel,
     }
 
     @classmethod

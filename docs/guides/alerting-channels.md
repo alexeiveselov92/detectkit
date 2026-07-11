@@ -56,13 +56,42 @@ also leads with the **project name** (`[name] `) — see
   footer (`Sent by detectkit · <project>`) that ends with a clay-colored "How to
   read this alert ->" link. The subject is prefixed with `[project]` and the
   plain-text body remains the multipart fallback.
+- **Discord**: one **embed** per alert (Discord's own rich-message unit) — a
+  clickable title, a CommonMark description with the lead + **Rule** chip,
+  Value/Expected and the compact Links line, then a fenced `Parameters` block
+  (anomaly only, dropped rather than truncated if it would blow the size
+  budget). Discord embeds have **no "Show more" fold**, so the verbose tail
+  (Quorum / Severity / the anomalous span / Detectors) rides in a compact
+  **inline field grid** instead of collapsing. The branded footer (name + logo)
+  stays on every embed; `@mentions` ride in the top-level message content
+  (never inside the embed, where Discord never delivers a ping).
+- **Microsoft Teams**: an Adaptive Card posted through the **Workflows** app
+  (Power Automate), not the retired Office 365 connector — a colored title,
+  the lead, a monospace **Rule** line, a `FactSet` mirroring the webhook
+  tail, detector params (anomaly only), and `Action.OpenUrl` buttons for the
+  dashboard/links/help. See the caveats in its own section below (flow
+  identity, no branding; mentions render but don't ping).
+- **Google Chat**: a Cards v2 card — a header (title = the status-dot
+  headline, since Cards v2 has no color bar; subtitle = the brand + project
+  name; the brand avatar as a circle image), the lead + a bold **Rule**
+  label (plain text, not a code chip), evidence rows, then action buttons for
+  the dashboard/links/help. A custom `template` keeps the header and renders
+  as one opaque text paragraph.
+- **ntfy**: a push notification (title + message + tags), published via
+  ntfy's JSON endpoint — no bot identity/avatar/color-bar concept, so the
+  kind's tag renders as the client's leading emoji instead of a brand mark.
+  See its own section below for the priority mapping and action-button
+  limits.
 
 On both anomaly and recovery alerts the **firing rule is set apart the same way
-in every channel**: a bold **Rule** label followed by an inline-code chip
+in every channel**: a bold **Rule** label followed by the rule
 (`min_detectors=… · direction=… · consecutive=…`), with the quorum explanation
 on its own line — so the configured rule reads at a glance instead of running
-into the surrounding prose. (Bold is rendered in each platform's native syntax;
-the code chip looks the same everywhere.)
+into the surrounding prose. (Bold is rendered in each platform's native syntax.
+Most channels — Slack/Mattermost/webhook, Telegram, email, Discord — style the
+rule itself as an inline-code chip too; Google Chat renders it as plain bold
+label + plain text (no code styling), Teams as a single monospace text block,
+and ntfy as plain text — a push notification has no markup at all.)
 
 ### Dashboard and runbook links
 
@@ -126,6 +155,15 @@ avatar is sent as an `icon_url` (a hosted PNG). Override it per channel:
 `icon_url` takes precedence over `icon_emoji`; setting either one opts out of
 the brand avatar. Telegram and email brand differently — see their sections.
 
+Discord follows the same pattern with its own field names — `username` /
+`avatar_url` (no `icon_emoji` equivalent; Discord embeds only take an image
+URL). Google Chat has a single `icon_url` knob (no display-name override —
+the subtitle always reads `detectkit`, or `detectkit · <project>`). Teams and
+ntfy have **no** bot identity knob at all: Teams posts under the Workflow's
+own identity/icon, and ntfy has no avatar concept — see each channel's own
+section for what still distinguishes the alert (a plain-text footer for
+Teams, the tag emoji for ntfy).
+
 ## Project label (multi-project channels)
 
 Because the bot keeps the brand name + avatar by default, two detectkit projects
@@ -140,6 +178,14 @@ extra config:
 - **Telegram** carries it in the bold headline (it has no footer or per-message avatar).
 - **Email** prefixes the subject, adds a project eyebrow above the metric, and
   pairs it in the footer.
+- **Discord** pairs it in the embed footer (`detectkit · payments`), same as
+  the webhook family.
+- **Microsoft Teams** pairs it in the card's plain-text footer line — the only
+  branding available on that path (see the Teams caveats below).
+- **Google Chat** pairs it in the card header's subtitle
+  (`detectkit · payments`).
+- **ntfy** carries it in the title, same as every other kind's
+  `{project_name_prefix}`; there's no footer to pair it in separately.
 
 It is also exposed to custom templates as `{project_name}` and
 `{project_name_prefix}` (`"[name] "` when set, else `""`). The `name` is
@@ -280,6 +326,206 @@ alerting:
 > header (the plain-text body stays the fallback). The avatar a mail client
 > shows next to the sender is controlled by the sending domain (e.g. BIMI), not
 > by the message — so brand it via `from_name` and your domain's avatar setup.
+
+### Discord
+
+```yaml
+# In profiles.yml
+alert_channels:
+  discord_ops:
+    type: discord
+    webhook_url: "${DISCORD_WEBHOOK}"
+    # Bot identity is optional — defaults to the detectkit brand name + avatar.
+    # username: "detectkit"
+    # avatar_url: "https://.../bot.png"
+    timeout: 10
+
+# In metric config
+alerting:
+  channels:
+    - discord_ops
+```
+
+**Parameters**:
+- `webhook_url` (required) - Discord incoming-webhook URL
+  (`https://discord.com/api/webhooks/<id>/<token>`)
+- `username` (default: `"detectkit"`) - Bot display name
+- `avatar_url` (default: detectkit brand avatar) - Bot avatar image URL
+- `timeout` (default: `10`) - HTTP timeout in seconds
+
+**Default rendering**: one **embed** per alert — a clickable title (links to
+`dashboard_url` when set), a CommonMark description (the lead + **Rule** chip,
+then Value/Expected and the compact Links line), a fenced code block titled
+"Parameters" on anomaly alerts (dropped entirely, never truncated mid-JSON, if
+it would push the description past Discord's size budget), and the branded
+footer + logo. A custom `template` renders as a single plain embed (color,
+title, footer, timestamp kept; no field grid).
+
+> **Bare `@name` doesn't ping (Discord).** A plain username in `mentions:`
+> (e.g. `oncall_engineer`) renders as visible text but does **not** actually
+> notify — Discord only delivers a ping for a real mention token. Put the
+> literal `<@user_id>` (user) or `<@&role_id>` (role) form directly in
+> `mentions:` for a real ping; the broadcast keywords `all`/`everyone`/`channel`
+> → `@everyone` and `here` → `@here` **do** ping (paired with an
+> `allowed_mentions` object). Mentions ride in the top-level message content —
+> Discord never delivers a ping placed inside an embed.
+
+> **No "Show more" fold (Discord).** Unlike Slack/Mattermost attachments,
+> Discord embeds don't collapse long text behind a fold. So the verbose
+> evidence that those channels hide (Quorum / Severity / the anomalous span /
+> Detectors) rides instead in a compact **inline field grid** below the
+> description — everything is visible at once on anomaly/recovery alerts;
+> no-data and error stay short with no field grid.
+
+### Microsoft Teams
+
+```yaml
+# In profiles.yml
+alert_channels:
+  teams_ops:
+    type: teams
+    webhook_url: "${TEAMS_WEBHOOK_URL}"
+    timeout: 10
+
+# In metric config
+alerting:
+  channels:
+    - teams_ops
+```
+
+**Parameters**:
+- `webhook_url` (required) - the **Workflows** app's webhook-trigger URL
+  (Teams channel → **Workflows** → "When a Teams webhook request is
+  received"). This is deliberately *not* the legacy Office 365 connector
+  webhook, which Microsoft is retiring — that URL accepts a different payload
+  shape and will not work here.
+- `timeout` (default: `10`) - HTTP timeout in seconds
+
+**Default rendering**: an Adaptive Card — a colored title (`Attention` red for
+anomaly, `Good` green for recovery, `Warning` amber for no-data, `Accent` blue
+for error), the lead sentence, a monospace **Rule** line, a `FactSet`
+mirroring the other channels' verbose tail (Quorum/Severity/the anomalous
+span/Detectors, or the recovery timeline), detector params on anomaly alerts,
+and `Action.OpenUrl` buttons for the dashboard, extra links, and the help
+link. A custom `template` renders a minimal card (colored title + the
+rendered template text + footer; action buttons still attached).
+
+> **Flow identity, no branding (Teams).** The message posts under the
+> **Workflow's own identity and icon** — there is no per-message `username` /
+> avatar override on this path, unlike the Slack/Mattermost-style webhook
+> channels. The card's footer still names `detectkit` (and the project, when
+> set) as plain text so two projects sharing one channel stay distinguishable,
+> but there is no bot avatar to brand; rename the Workflow itself in Power
+> Automate if you want a different sender name.
+
+> **Mentions render but don't ping (Teams).** `@mentions` render as a plain,
+> subtle text line on the card — a real Adaptive Card mention needs an Azure
+> AD user object id, which detectkit's alert config doesn't carry. Configure
+> an actual ping inside the Workflow itself if you need one.
+
+### Google Chat
+
+```yaml
+# In profiles.yml
+alert_channels:
+  googlechat_ops:
+    type: googlechat
+    webhook_url: "${GOOGLE_CHAT_WEBHOOK_URL}"
+    # icon_url: "https://.../bot.png"   # optional — defaults to the detectkit brand avatar
+    timeout: 10
+
+# In metric config
+alerting:
+  channels:
+    - googlechat_ops
+```
+
+**Parameters**:
+- `webhook_url` (required) - the space's full incoming-webhook URL (already
+  carrying the `key`/`token` query params Google Chat issues when the webhook
+  is registered)
+- `icon_url` (default: detectkit brand avatar) - header avatar image URL
+- `timeout` (default: `10`) - HTTP timeout in seconds
+
+**Default rendering**: a Cards v2 card — a header (title = the status-dot
+headline, since Cards v2 has no color bar so the emoji dot is the only color
+cue; subtitle = `detectkit`, or `detectkit · <project>`; the brand avatar as a
+circle image), the lead sentence followed by a bold **Rule** label and the
+rule as plain text (Cards v2's HTML subset has a `<code>` tag, but this
+channel doesn't reach for it — unlike the code-styled chip on the webhook
+family/Telegram/email/Discord), evidence rows (value / expected / quorum /
+severity / the anomalous span / detectors, trimmed for no-data/error), and a
+row of action buttons for the dashboard, extra links, and the help link. A
+custom `template` keeps the header and renders as a single opaque text
+paragraph.
+
+> **Only `<users/all>` actually pings (Google Chat).** Google Chat only
+> triggers a notification — and pings mentioned users — from a
+> `<users/USER_ID>` (or the space-wide `<users/all>`) token in the message's
+> **top-level text**, never from card content. So `all`/`everyone`/`channel`/
+> `here` (Chat has no separate "here" vs "channel" concept) all collapse to
+> one deduped, space-wide `<users/all>` mention; anything else falls back to a
+> plain, non-pinging `@name`. Mentions are added to the top-level `text` field
+> only when `mentions:` is non-empty — a card with no mentions carries no
+> top-level `text` and triggers no notification banner.
+
+### ntfy
+
+```yaml
+# In profiles.yml
+alert_channels:
+  ntfy_ops:
+    type: ntfy
+    topic: "my-alerts"
+    # server: "https://ntfy.sh"     # default; self-hosted servers work the same way
+    # token: "${NTFY_TOKEN}"        # access token -> Authorization: Bearer
+    # user: "${NTFY_USER}"          # basic auth, used only when token is unset
+    # password: "${NTFY_PASSWORD}"
+    # priority: 5                   # overrides the anomaly/error priority only
+    timeout: 10
+
+# In metric config
+alerting:
+  channels:
+    - ntfy_ops
+```
+
+**Parameters**:
+- `topic` (required) - ntfy topic to publish to
+- `server` (default: `"https://ntfy.sh"`) - ntfy server base URL; a
+  self-hosted server works the same way
+- `token` (optional) - ntfy access token, sent as `Authorization: Bearer
+  <token>`; wins over `user`/`password` when both are set
+- `user` / `password` (optional) - HTTP basic auth, used only when `token` is
+  unset
+- `priority` (optional, `1`-`5`) - overrides the **anomaly/error** notification
+  priority only (default `4`, high); a recovery or no-data notice always
+  publishes at `3` (default) regardless of this setting — a deliberate choice
+  so "all clear" / "still waiting on data" notices stay calm even when you
+  want urgent anomalies to buzz the phone
+- `timeout` (default: `10`) - HTTP timeout in seconds
+
+**Default rendering**: a push notification — title + message body, published
+via ntfy's JSON endpoint (not the header-based publish form, since HTTP
+headers can't reliably carry non-ASCII titles/params). `dashboard_url` becomes
+the notification's tap target (`click`); `links` plus the "how to read this
+alert" link become up to **3** `view` action buttons — `dashboard_url` is
+deliberately excluded from the action list since it already rides on `click`.
+
+> **Tag emoji leads the title (ntfy).** ntfy has no bot avatar or color-bar
+> concept — a push notification is just title + body + tags. detectkit maps
+> each kind to an ntfy tag (`rotating_light` anomaly, `white_check_mark`
+> recovery, `warning` no-data, `large_blue_circle` error), which ntfy clients
+> render as a **leading emoji** on the notification. Because that would
+> duplicate the status-dot emoji every other channel's title starts with,
+> detectkit strips it from the ntfy title — the tag is the only status glyph
+> shown.
+
+> **Message byte cap.** ntfy's own per-message limit is ~4096 bytes; past it,
+> ntfy silently converts the message into a file attachment instead of a
+> plain notification. detectkit caps the message body at ~3800 UTF-8 bytes
+> (truncated on a character boundary, with a trailing `…`) to stay comfortably
+> under that.
 
 ### Generic Webhook
 
@@ -500,6 +746,60 @@ def verify_detectkit_signature(secret: str, body: bytes, header_value: str) -> b
 Compute the HMAC over the **raw** request body (bytes, before any JSON
 re-parsing) — re-serializing the payload can reorder keys or change
 whitespace and break the signature.
+
+#### Rocket.Chat
+
+Rocket.Chat isn't a dedicated channel type — route it through the **generic
+webhook** channel (`type: webhook`, default `format: attachments`) pointed at
+a Rocket.Chat **incoming webhook** integration. Rocket.Chat's script-less
+incoming webhooks accept requests through the same endpoint as its
+`chat.postMessage` API, whose payload schema is close enough to Slack's
+attachments format (`color` / `title` / `title_link` / `text` / `fields`) that
+the default `attachments` rendering lands correctly:
+
+```yaml
+# In profiles.yml
+alert_channels:
+  rocketchat_ops:
+    type: webhook
+    webhook_url: "https://rocketchat.example.com/hooks/<integrationId>/<token>"
+    # format defaults to "attachments" — Rocket.Chat's incoming-webhook
+    # payload schema accepts the same color/title/text/fields shape.
+
+# In metric config
+alerting:
+  channels:
+    - rocketchat_ops
+```
+
+Two things to know before relying on it:
+
+- **`username` / `icon_url` / `icon_emoji` don't do anything on Rocket.Chat.**
+  Its own field names for a per-message sender override are `alias` / `avatar`
+  / `emoji`, not detectkit's Slack-shaped `username` / `icon_url` /
+  `icon_emoji` — Rocket.Chat ignores the fields it doesn't recognize, so the
+  brand name/avatar knobs are silently no-ops there. Brand the bot instead on
+  the integration itself, via the **Alias** / **Avatar URL** / **Emoji**
+  fields in Rocket.Chat's incoming-webhook settings (Manage → Workspace →
+  Integrations → your webhook) — those apply to every message the
+  integration posts. Rocket.Chat's attachment schema also has no `footer` /
+  `footer_icon` field, so the branded footer + logo detectkit appends to the
+  attachment is dropped; the alert still renders in full (title, color bar,
+  body, fields) — just without that watermark.
+- **A message needs a top-level `text` to reliably post.** detectkit's
+  `attachments` payload only sets a top-level `text` field when `mentions:` is
+  configured (it rides the `@mention` string) — otherwise the request is
+  `username` + `attachments` only. Rocket.Chat's own webhook examples always
+  pair a top-level `text` with `attachments`, so an alert config with no
+  `mentions` is worth verifying with `dtk test-alert` before you rely on it;
+  if messages don't show up, add at least one entry to `mentions` (e.g.
+  `mentions: ["@here"]`) to guarantee a top-level `text`.
+
+If you want the destination channel to be overridable per-request via the
+payload's `channel` field, enable "Allow to overwrite destination channel in
+the body parameters" on the Rocket.Chat integration — otherwise every message
+posts to whatever channel the webhook is configured for, and detectkit's
+optional `channel` param has no effect.
 
 ### Multiple Channels
 

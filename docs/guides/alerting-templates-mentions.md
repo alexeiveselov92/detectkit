@@ -23,23 +23,40 @@ This appends `@oncall_engineer @devops_team` to alert messages in Mattermost.
 
 detectkit automatically formats mentions for each platform:
 
-| Config Value | Mattermost | Slack | Telegram | Email |
-|---|---|---|---|---|
-| `username` | `@username` | `@username` (display only) | `@username` | `CC: username` |
-| `here` | `@here` | `<!here>` (broadcast) | `@here` | *(ignored)* |
-| `channel` | `@channel` | `<!channel>` (broadcast) | `@channel` | *(ignored)* |
-| `all` | `@all` | `<!everyone>` (broadcast) | `@all` | *(ignored)* |
-| `U04ABCD1234` | `@U04ABCD1234` | `<@U04ABCD1234>` (real ping) | `@U04ABCD1234` | `CC: U04ABCD1234` |
+| Config Value | Mattermost | Slack | Telegram | Email | Discord | Teams | Google Chat | ntfy |
+|---|---|---|---|---|---|---|---|---|
+| `username` | `@username` | `@username` (display only) | `@username` | `CC: username` | `@username` (display only) | plain text (never pings) | `@username` (display only) | plain text in body (never pings) |
+| `here` | `@here` | `<!here>` (broadcast) | `@here` | *(ignored)* | `@here` (real ping) | plain text (never pings) | `<users/all>` (real ping) | plain text in body (never pings) |
+| `channel` | `@channel` | `<!channel>` (broadcast) | `@channel` | *(ignored)* | `@everyone` (real ping) | plain text (never pings) | `<users/all>` (real ping) | plain text in body (never pings) |
+| `all` | `@all` | `<!everyone>` (broadcast) | `@all` | *(ignored)* | `@everyone` (real ping) | plain text (never pings) | `<users/all>` (real ping) | *(ignored)* |
+| `U04ABCD1234` | `@U04ABCD1234` | `<@U04ABCD1234>` (real ping) | `@U04ABCD1234` | `CC: U04ABCD1234` | `@U04ABCD1234` (display only) | plain text (never pings) | `@U04ABCD1234` (display only) | *(ignored)* |
 
 > **Slack note**: Slack webhooks do **not** actually ping users with `@username` — it's display-only. For real pings, use Slack User IDs (format: `U` + alphanumeric, found in user profile > "Copy member ID").
+
+> **Discord note**: a bare username never pings — only `all`/`everyone`/`channel`/`here` and a real `<@user_id>`/`<@&role_id>` token do. Put the real Discord mention id directly in `mentions:` for a ping.
+
+> **Teams note**: `@mentions` are **always** plain text on this channel — Teams
+> needs a real Adaptive Card mention entity (an Azure AD user object id),
+> which detectkit's alert config doesn't carry. Set up a real ping inside the
+> Workflow itself if you need one.
+
+> **Google Chat note**: only the space-wide `<users/all>` token (or a real `<users/USER_ID>` id passed through verbatim) actually pings; a bare username or `<users/USER_ID>` id renders as visible text.
+
+> **ntfy note**: ntfy is a push-notification service with no user-mention concept — `mentions:` entries render as plain `@name` text at the end of the notification body and never ping anyone.
 
 ### Special Keywords
 
 Use these keywords for broadcast mentions:
 
-- **`here`** — Notify active members (Mattermost: `@here`, Slack: `<!here>`)
-- **`channel`** — Notify all channel members (Mattermost: `@channel`, Slack: `<!channel>`)
-- **`all`** — Notify everyone (Mattermost: `@all`, Slack: `<!everyone>`)
+- **`here`** — Notify active members (Mattermost: `@here`, Slack: `<!here>`,
+  Discord: `@here`, Google Chat: `<users/all>`; Teams and ntfy render it as
+  plain text)
+- **`channel`** — Notify all channel members (Mattermost: `@channel`, Slack:
+  `<!channel>`, Discord: `@everyone`, Google Chat: `<users/all>`; Teams and
+  ntfy render it as plain text)
+- **`all`** — Notify everyone (Mattermost: `@all`, Slack: `<!everyone>`,
+  Discord: `@everyone`, Google Chat: `<users/all>`; Teams and ntfy render it
+  as plain text)
 
 ### Custom Template Placement
 
@@ -213,9 +230,9 @@ alerting:
 | `description` / `description_line` | Metric description | all |
 | `synonyms` / `synonyms_line` | Metric's alternative names from `ai_context.synonyms` — `"total revenue, gross sales"` / `"Also known as: …\n"` (empty when unset). **Opt-in**: not in the default templates, so add `{synonyms_line}` to a custom `template` to surface an "Also known as: …" line | all |
 | `mentions` / `mentions_line` | Formatted mentions | all |
-| `dashboard_url` | Raw `alerting.dashboard_url` (empty string when unset); also surfaced natively as a clickable title on Slack/Mattermost, an inline link on Telegram, and an "Open dashboard" button in email | all |
+| `dashboard_url` | Raw `alerting.dashboard_url` (empty string when unset); also surfaced natively as a clickable title on Slack/Mattermost/Discord, an inline link on Telegram, an "Open dashboard" button in email, and an action button on Teams/Google Chat/ntfy | all |
 | `dashboard_line` | `"Dashboard: <url>\n"` when set, else empty; appended to the default plain-text templates | all |
-| `help_url` | Raw "How to read this alert" URL (empty when hidden via `alert_help_url: false`); also surfaced natively as a clickable label in the webhook `Links` line, a links-line entry on Telegram, and a footer link in email | all |
+| `help_url` | Raw "How to read this alert" URL (empty when hidden via `alert_help_url: false`); also surfaced natively as a clickable label in the webhook/Discord `Links` line, a links-line entry on Telegram, a footer link in email, and an action button on Teams/Google Chat/ntfy | all |
 | `help_line` | `"How to read this alert: <url>\n"` when set, else empty; appended to the default plain-text templates | all |
 
 All variables are always substitutable in every alert kind — the

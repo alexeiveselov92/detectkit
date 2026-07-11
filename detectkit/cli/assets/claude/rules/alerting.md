@@ -195,7 +195,16 @@ natively. Special broadcast keywords: `here`, `channel`, `all`. Available as
 not placed in a template). On Slack/Mattermost the default rendering puts the
 mentions in the **top-level message text** (not the attachment) so they actually
 notify. Slack `@username` is display-only — use Slack user IDs (`U…`) for real
-pings.
+pings. Discord and Google Chat mentions also ride in the top-level message
+text (embed/card content never notifies): Discord maps
+`all`/`everyone`/`channel` -> `@everyone`, `here` -> `@here`, and an already
+`<@user_id>`/`<@&role_id>`-shaped value pings for real; Google Chat collapses
+any broadcast keyword to the space-wide `<users/all>` and passes an already
+`<users/USER_ID>`-shaped value through. On both, a bare name still renders but
+does not ping. Teams mentions are always **plain text and never ping** (the
+message posts under the flow's own identity, with no per-message entity to
+attach a real mention to). ntfy has no mention concept — mentions render as
+plain `@name` text inside the notification body.
 
 ## Dashboard / runbook links
 
@@ -209,8 +218,11 @@ links:                                             # optional; default {}
 `dashboard_url` is surfaced as a first-class action on **every** channel: the
 attachment title is clickable and a link is shown on Slack/Mattermost, Telegram
 gets an inline "Open dashboard" link, and email gets an "Open dashboard" button.
-`links` adds extra `label: url` entries alongside it. Both are also exposed to
-custom templates — see `{dashboard_url}` / `{dashboard_line}` below.
+Discord's embed title is clickable the same way; Teams and Google Chat each get
+an `Open dashboard`-style button; ntfy uses it as the notification's tap target
+(`click`) instead of an action button, so it's never duplicated as one. `links`
+adds extra `label: url` entries alongside it. Both are also exposed to custom
+templates — see `{dashboard_url}` / `{dashboard_line}` below.
 
 ## "How to read this alert" link
 
@@ -236,6 +248,16 @@ Per-channel rendering (defaults only; the resolved help URL is rendered per chan
   link) as an `<a>` link reading `How to read this alert`.
 - **Email** — in the footer, after `Sent by detectkit · <project>` (and any CC),
   a clay-colored `How to read this alert ->` link.
+- **Discord** — a clickable `How to read this alert` label in the embed
+  description's compact `Links` line, alongside `Dashboard` and any extra
+  links — never a raw URL.
+- **Microsoft Teams** — an `Action.OpenUrl` button titled `How to read this
+  alert`, alongside the Dashboard/extra-link buttons.
+- **Google Chat** — its own action button in the card's button row, alongside
+  Dashboard and any extra links.
+- **ntfy** — one of the notification's `view` action buttons (up to three,
+  shared with `links`; `dashboard_url` rides on `click` instead and never
+  duplicates as a button).
 
 Exposed to custom templates as `{help_url}` (raw URL, empty when unset/hidden)
 and `{help_line}` (`How to read this alert: <url>\n`, empty when unset/hidden) —
@@ -285,14 +307,51 @@ leads with a colored **status circle** — 🔴 anomaly, 🟢 recovery, 🟡 no-
   grid (value/expected/severity/quorum/anomaly began/latest reading; began/alert fired/recovered on recovery), a monospace params box,
   an optional "Open dashboard" button, and a footer. The plain-text body remains
   the multipart fallback.
+- **Discord** — one **embed** (Discord embeds have no "Show more" fold, unlike
+  Slack/Mattermost attachments): the clickable title, the lead + **Rule** chip,
+  **Value/Expected** plus the compact **Links** line in the description, and
+  the verbose tail (Quorum/Severity/anomalous span/Detectors) in an inline
+  **field grid** instead of a folded block. Detector parameters (anomaly only)
+  append as a fenced code block, dropped entirely (not truncated) if it would
+  blow the description budget. No-data/error stay short (no fields).
+  `@mentions` ride in the top-level `content`, never inside the embed. A
+  custom `template` renders as a single plain embed (no fields).
+- **Microsoft Teams** — an Adaptive Card posted via the Power Automate
+  **Workflows** webhook (not the retired O365 connector): a colored title, the
+  lead, a monospace `Rule: <value>` line, a `FactSet` mirroring the webhook
+  tail for the kind, detector params (anomaly only), mentions, and a
+  plain-text footer — plus `Action.OpenUrl` buttons for the
+  dashboard/links/help. No brand avatar (the card posts under the flow's own
+  identity/icon). A custom `template` renders a minimal 3-block card (colored
+  title, template text, footer).
+- **Google Chat** — a Cards v2 card (Cards v1 is deprecated): a header (title =
+  the status-dot headline, since cards v2 has no color bar; subtitle = the
+  brand name paired with the project; the brand avatar as a circle image),
+  then the lead + a bold **Rule** label (plain text value, no code chip),
+  evidence rows, and an action-button row. Mentions ride in the top-level
+  `text` (card content never notifies). A custom `template` renders as one
+  opaque text paragraph, header/branding unchanged.
+- **ntfy** — a push notification, not a chat message (no bot identity/avatar/
+  color bar): the title carries the status dot **stripped** (ntfy's own `tags`
+  already render a leading emoji) and the body is the same plain-text content
+  other channels send. `dashboard_url` becomes the notification's tap target
+  (`click`); `links` plus the help link become up to three `view` action
+  buttons. Priority defaults to 4 (high) for anomaly/error, 3 (default) for
+  recovery/no-data — an explicit `priority` overrides only anomaly/error.
 
 **Message order is uniform** — `description → Rule → Value/Expected` on every
 channel, for both anomaly and recovery. The **firing rule is set apart
 uniformly**: a bold **Rule** label + an inline-code chip (`min_detectors=… ·
 direction=… · consecutive=…`) sitting right above the value/expected evidence.
-Bold is platform-aware (`*Rule*` on Slack, `**Rule**` on Mattermost/generic;
-`<b>Rule</b>` on Telegram; `<strong>` in email), while the code chip is
-identical everywhere.
+Bold is platform-aware (`*Rule*` on Slack, `**Rule**` on Mattermost/generic/
+Discord — all CommonMark/mrkdwn; `<b>Rule</b>` on Telegram; `<strong>` in
+email), while the code chip is identical everywhere on those channels. Two of
+the newer channels render the rule line differently rather than forcing their
+format onto it: Google Chat uses `<b>Rule</b>` followed by plain escaped text
+(no code tag — Cards v2's allowed HTML subset has `<code>`, but the renderer
+doesn't reach for it here); Teams and ntfy render it as one unstyled `Rule:
+<value>` line (Teams: a single `Monospace`-fontType `TextBlock`; ntfy: plain
+text, since a push notification has no markup at all).
 
 **Incident timing — "how long has this been going on".** Each default anomaly
 leads with `Anomalous for 2h 30m — 15 consecutive 10min intervals.` (metric
@@ -323,6 +382,13 @@ alert and shows it by default — no config needed:
 - **Telegram** carries it in the bold headline (no footer/avatar to override).
 - **Email** prefixes the subject, shows a small project eyebrow above the metric,
   and pairs it in the footer (`Sent by detectkit · payments`).
+- **Discord** pairs it in the embed footer (`detectkit · payments`).
+- **Microsoft Teams** has no avatar/username override at all (the Workflows
+  identity owns those), so the project name rides only in the plain-text
+  footer line (`detectkit · payments`).
+- **Google Chat** pairs it in the card header subtitle (`detectkit · payments`).
+- **ntfy** has no footer concept — the project name rides only in the title
+  prefix (there is no separate branding surface to pair it with).
 
 It is exposed to custom templates as `{project_name}` and `{project_name_prefix}`
 (`"[name] "` when set, else `""`). Direct library/API callers that don't set it

@@ -5,6 +5,60 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.59.0] - 2026-07-12
+
+### Added
+- **Discord alert channel** (`type: discord`). Native incoming-webhook
+  rendering: one status-colored embed (integer color) per alert, the same
+  `description → Rule → Value/Expected → links` order as every other channel,
+  and — since Discord has no "Show more" fold — the verbose evidence tail as a
+  compact inline **field grid** (Quorum / Severity / the anomalous span /
+  Detectors; the incident timeline on recovery). Brand `username`/`avatar_url`
+  by default, branded footer + timestamp, clickable title via `dashboard_url`.
+  Mentions ride in top-level `content` with `allowed_mentions`: `all` /
+  `everyone` / `channel` → `@everyone`, `here` → `@here`, and a literal
+  `<@id>` / `<@&id>` passes through and really pings (bare names render but
+  don't ping). Discord's per-part limits and the 6000-character embed-total
+  budget are enforced defensively, truncating on line boundaries so a markdown
+  link is never sliced mid-URL.
+- **Microsoft Teams alert channel** (`type: teams`) via the **Power Automate
+  Workflows webhook** ("When a Teams webhook request is received") posting an
+  **Adaptive Card 1.4** — the only path that still works after Microsoft
+  retired Office 365 connectors (legacy MessageCard tutorials no longer
+  apply). Status-colored TextBlock headline (Attention/Good/Warning/Accent), a
+  monospace Rule chip, a FactSet evidence tail, `Action.OpenUrl` buttons for
+  dashboard/links/help. Honest caveats, documented: the message posts under
+  the flow's identity (no bot branding on this path) and mentions render as
+  plain text (an Adaptive Card ping needs AAD user ids).
+- **Google Chat alert channel** (`type: googlechat`). Space incoming webhook,
+  **Cards v2** (Cards v1 is deprecated): brand avatar + `detectkit · <project>`
+  in the card header, HTML-escaped `decoratedText` evidence rows, action
+  buttons for dashboard/links/help. Mentions ride in top-level text — `all` /
+  `everyone` / `channel` / `here` collapse to one `<users/all>`, a literal
+  `<users/USER_ID>` passes through and pings; card content never pings.
+- **ntfy alert channel** (`type: ntfy`). Publishes push notifications via
+  ntfy's JSON endpoint (server root, so UTF-8 titles/bodies survive — headers
+  can't carry them) to `server` (default `https://ntfy.sh`) + `topic`, with
+  Bearer-token or user/password auth. Per-kind priority (anomaly/error 4,
+  recovery/no-data 3; an explicit `priority` overrides only anomaly/error) and
+  a per-kind tag emoji as the status cue (the title's status dot is stripped
+  so the glyph isn't doubled); `dashboard_url` becomes the notification's
+  `click` action, extra links + the help link become view actions (ntfy's max
+  3); message capped under ntfy's ~4 KB limit.
+- **Rocket.Chat — documented recipe** through the existing generic `webhook`
+  channel: a script-less Rocket.Chat incoming webhook accepts the same
+  Slack-style attachments payload (verified against current Rocket.Chat docs),
+  so no dedicated type is needed. Covered in the alerting-channels guide.
+- A **factory-registry test** pins every config-facing channel type string
+  (`discord`/`teams`/`googlechat`/`ntfy` plus the five existing ones) to its
+  channel class, and each new channel joins the send-contract suite; `dtk init`
+  scaffolds commented profile examples for all four new types.
+
+### Changed
+- The **Rule chip** now renders only on anomaly/recovery across all channels —
+  no-data and error alerts don't fire on the quorum rule, so the new channels
+  never show it there (the existing five already didn't).
+
 ## [0.58.0] - 2026-07-11
 
 ### Added

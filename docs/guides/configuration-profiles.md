@@ -239,6 +239,106 @@ alert_channels:
 - `subject_template` (default: `"🔴 Alert: {metric_name}"`) - Email subject, supports `{metric_name}`
 - `template`: Custom message body template (falls back to the built-in default)
 
+#### Discord Channel
+
+```yaml
+alert_channels:
+  discord_ops:
+    type: discord
+    webhook_url: "${DISCORD_WEBHOOK}"
+    # Bot identity is optional — defaults to the detectkit brand name + avatar.
+    # username: "detectkit"
+    # avatar_url: "https://.../bot.png"
+```
+
+**Required fields**:
+- `type`: Must be `"discord"`
+- `webhook_url`: Discord incoming-webhook URL
+  (`https://discord.com/api/webhooks/<id>/<token>`)
+
+**Optional fields**:
+- `username` (default: `"detectkit"`) - Bot display name
+- `avatar_url` (default: detectkit brand avatar) - Bot avatar image URL
+- `timeout` (default: `10`) - HTTP request timeout
+
+> A bare `@name` in `mentions:` doesn't ping on Discord — use the literal
+> `<@user_id>` / `<@&role_id>` form for a real ping. See the [Channels
+> guide → Discord](alerting-channels.md#discord) for the full rendering and
+> mention notes.
+
+#### Microsoft Teams Channel
+
+```yaml
+alert_channels:
+  teams_ops:
+    type: teams
+    webhook_url: "${TEAMS_WEBHOOK_URL}"
+```
+
+**Required fields**:
+- `type`: Must be `"teams"`
+- `webhook_url`: the **Workflows** app's webhook-trigger URL (not the retired
+  Office 365 connector)
+
+**Optional fields**:
+- `timeout` (default: `10`) - HTTP request timeout
+
+> The message posts under the Workflow's own identity — there is no
+> `username`/avatar override, and `@mentions` render as plain text without
+> actually pinging. See the [Channels guide →
+> Teams](alerting-channels.md#microsoft-teams) for the full caveats.
+
+#### Google Chat Channel
+
+```yaml
+alert_channels:
+  googlechat_ops:
+    type: googlechat
+    webhook_url: "${GOOGLE_CHAT_WEBHOOK_URL}"
+    # icon_url: "https://.../bot.png"   # optional — defaults to the detectkit brand avatar
+```
+
+**Required fields**:
+- `type`: Must be `"googlechat"`
+- `webhook_url`: the space's full incoming-webhook URL
+
+**Optional fields**:
+- `icon_url` (default: detectkit brand avatar) - header avatar image URL
+- `timeout` (default: `10`) - HTTP request timeout
+
+> Only the space-wide `<users/all>` token actually pings; anything else in
+> `mentions:` renders as a plain, non-pinging `@name`. See the [Channels
+> guide → Google Chat](alerting-channels.md#google-chat).
+
+#### ntfy Channel
+
+```yaml
+alert_channels:
+  ntfy_ops:
+    type: ntfy
+    topic: "my-alerts"
+    # server: "https://ntfy.sh"     # default; self-hosted servers work the same way
+    # token: "${NTFY_TOKEN}"        # access token -> Authorization: Bearer
+    # priority: 5                   # overrides the anomaly/error priority only
+```
+
+**Required fields**:
+- `type`: Must be `"ntfy"`
+- `topic`: ntfy topic to publish to
+
+**Optional fields**:
+- `server` (default: `"https://ntfy.sh"`) - ntfy server base URL
+- `token` (optional) - ntfy access token (`Authorization: Bearer <token>`);
+  wins over `user`/`password`
+- `user` / `password` (optional) - HTTP basic auth, used only when `token` is unset
+- `priority` (optional, `1`-`5`) - overrides the anomaly/error notification
+  priority only; recovery/no-data always stay calm at `3`
+- `timeout` (default: `10`) - HTTP request timeout
+
+> ntfy has no bot avatar/color-bar concept — see the [Channels guide →
+> ntfy](alerting-channels.md#ntfy) for the tag-emoji title, priority mapping
+> and message-size cap.
+
 #### Generic Webhook Channel
 
 Sends alerts to any endpoint that accepts a JSON payload (Mattermost/Slack
@@ -282,4 +382,6 @@ alert_channels:
 
 See the [Channels guide → Generic
 Webhook](alerting-channels.md#generic-webhook) for the full payload examples
-of each format and the HMAC verification snippet.
+of each format and the HMAC verification snippet, and [→
+Rocket.Chat](alerting-channels.md#rocketchat) for the recipe (and caveats) to
+route through this same channel type into a Rocket.Chat incoming webhook.

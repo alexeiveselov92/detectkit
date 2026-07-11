@@ -33,6 +33,12 @@ class _AlertStepMixin(_TaskManagerBase):
         # every other last-complete-point computation) must not run ahead of
         # what load has had a chance to persist under a loading_delay.
         loading_delay_seconds = self._loading_delay_seconds(config)
+        # Same grid phase as the load step: the no-data check floors to the
+        # metric's own interval grid (anchored on loading_start_time), not plain
+        # epoch time, so a non-epoch-aligned start (e.g. :07 on a 10min grid)
+        # doesn't make the exact-timestamp lookup ask for a boundary the loader
+        # never writes — a permanent false no-data alert (issue #114).
+        grid_phase_seconds = self._grid_phase_seconds(config)
 
         for i, alerting_config in enumerate(active_configs):
             if multi:
@@ -75,6 +81,7 @@ class _AlertStepMixin(_TaskManagerBase):
                 project_name=getattr(self.project_config, "name", None),
                 help_url=help_url,
                 loading_delay_seconds=loading_delay_seconds,
+                grid_phase_seconds=grid_phase_seconds,
             )
 
             last_point = orchestrator.get_last_complete_point()

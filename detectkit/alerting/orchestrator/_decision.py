@@ -474,6 +474,15 @@ class _DecisionMixin(_OrchestratorBase):
     def get_last_complete_point(self, now: datetime | None = None) -> datetime:
         """Floor ``now`` to the previous fully completed *mature* interval boundary.
 
+        Flooring happens on the metric's **own** interval grid, whose phase on
+        the epoch clock is ``grid_phase_seconds`` (0 = epoch-aligned). The loader
+        anchors datapoints on ``loading_start_time``, so a non-epoch-aligned
+        start (e.g. ``:07`` on a 10-minute grid) puts the stored series at an
+        arbitrary phase; flooring plain epoch time would return a boundary the
+        loader never writes and make the exact-timestamp no-data lookup fire a
+        permanent false alert (issue #114). Phasing here keeps the no-data
+        expectation on the same grid the load step persists.
+
         With a ``loading_delay`` configured, the loader only trusts
         ``[t, t+interval)`` once ``now >= t + interval + delay`` — so the same
         delay shifts the effective now back here BEFORE flooring, keeping the
@@ -487,10 +496,12 @@ class _DecisionMixin(_OrchestratorBase):
         now = to_aware_utc(now)
 
         interval_seconds = self.interval.seconds
+        phase = self.grid_phase_seconds  # already normalised into [0, interval)
         # Shift the effective now back by the maturity delay BEFORE flooring
         # (subtract-then-floor keeps the boundary correct for delays that
-        # aren't a multiple of the interval).
+        # aren't a multiple of the interval), then floor onto the metric's grid
+        # phase rather than the epoch grid.
         effective_epoch = int(now.timestamp()) - self.loading_delay_seconds
-        floored = (effective_epoch // interval_seconds) * interval_seconds
+        floored = ((effective_epoch - phase) // interval_seconds) * interval_seconds + phase
         last_complete = floored - interval_seconds
         return datetime.fromtimestamp(last_complete, tz=timezone.utc)

@@ -5,6 +5,33 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.56.2] - 2026-07-11
+
+### Fixed
+- **No more false no-data alerts when `loading_start_time` isn't aligned to the
+  epoch interval grid.** The load step anchors a metric's datapoint grid on
+  `loading_start_time` (or the resume cursor descended from it), so a start that
+  isn't a multiple of the interval — e.g. `loading_start_time: "2024-06-01
+  00:07:00"` on a `10min` metric — persists points at `:07 / :17 / :27 / …`. But
+  the alert step's no-data check floored **plain epoch wall-clock time** to find
+  "the last complete interval" (`:00 / :10 / :20 / …`) and then did an
+  **exact-timestamp** lookup at that boundary — a grid point the loader *never*
+  writes. The result was a permanent false no-data alert that re-fired every
+  cooldown cycle while the metric was perfectly healthy (the two grid phases only
+  coincided when the start happened to be epoch-aligned, which round values like
+  `2024-01-01 00:00:00` guarantee — so most configs never hit it). The no-data
+  expectation now floors onto the metric's **own** interval grid: the phase
+  (`loading_start_time_epoch % interval`) rides as orchestrator constructor state
+  — the mirror of the `loading_delay` maturity shift added in 0.54.0, and
+  composed with it (subtract the delay, then floor on the metric's phase) — so
+  the exact-timestamp lookup asks for a boundary the loader actually persisted.
+  Resolved through one seam (`resolve_grid_phase_seconds`), shared by the load
+  and alert steps so the two grid phases can't drift. Epoch-aligned metrics and
+  direct-API callers are unchanged (phase 0 = the previous behaviour); the
+  anomaly / recovery / report-replay paths were never affected (their fetches are
+  `<=`-bounded, not exact-match). No config change or migration needed — an
+  existing misaligned metric is fixed on upgrade. (#114)
+
 ## [0.56.1] - 2026-07-11
 
 ### Fixed

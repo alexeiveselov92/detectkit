@@ -1572,10 +1572,25 @@
   color: var(--ink);
   border-color: #d8d1c2;
 }
+/* eight tabs need to wrap tighter on narrow widths than the default gap/padding */
+@media (max-width: 640px) {
+  .pf-tabs {
+    gap: 6px;
+  }
+  .pf-tabs label {
+    gap: 6px;
+    font-size: 12px;
+    padding: 5px 11px 5px 6px;
+  }
+}
 #pf-slack:checked ~ .pf-controls .pf-tabs label[for='pf-slack'],
 #pf-mattermost:checked ~ .pf-controls .pf-tabs label[for='pf-mattermost'],
 #pf-telegram:checked ~ .pf-controls .pf-tabs label[for='pf-telegram'],
-#pf-email:checked ~ .pf-controls .pf-tabs label[for='pf-email'] {
+#pf-email:checked ~ .pf-controls .pf-tabs label[for='pf-email'],
+#pf-discord:checked ~ .pf-controls .pf-tabs label[for='pf-discord'],
+#pf-teams:checked ~ .pf-controls .pf-tabs label[for='pf-teams'],
+#pf-gchat:checked ~ .pf-controls .pf-tabs label[for='pf-gchat'],
+#pf-ntfy:checked ~ .pf-controls .pf-tabs label[for='pf-ntfy'] {
   color: var(--surface);
   background: var(--ink);
   border-color: var(--ink);
@@ -1584,7 +1599,11 @@
 #pf-slack:focus-visible ~ .pf-controls .pf-tabs label[for='pf-slack'],
 #pf-mattermost:focus-visible ~ .pf-controls .pf-tabs label[for='pf-mattermost'],
 #pf-telegram:focus-visible ~ .pf-controls .pf-tabs label[for='pf-telegram'],
-#pf-email:focus-visible ~ .pf-controls .pf-tabs label[for='pf-email'] {
+#pf-email:focus-visible ~ .pf-controls .pf-tabs label[for='pf-email'],
+#pf-discord:focus-visible ~ .pf-controls .pf-tabs label[for='pf-discord'],
+#pf-teams:focus-visible ~ .pf-controls .pf-tabs label[for='pf-teams'],
+#pf-gchat:focus-visible ~ .pf-controls .pf-tabs label[for='pf-gchat'],
+#pf-ntfy:focus-visible ~ .pf-controls .pf-tabs label[for='pf-ntfy'] {
   outline: 2px solid var(--clay);
   outline-offset: 2px;
 }
@@ -1649,13 +1668,26 @@
   border-radius: 14px;
   padding: 22px;
 }
+/* Discord needs the same treatment as Telegram: the embed's own dark fill
+   (#2b2d31) reads as "Discord" only against the darker message-list
+   background (#313338) around it, not the light demo card. */
+.platform-demo:has(#pf-discord:checked) .pf-surface {
+  background: #313338;
+  border: 1px solid #26282c;
+  border-radius: 14px;
+  padding: 22px;
+}
 .pf-panel {
   display: none;
 }
 #pf-slack:checked ~ .pf-surface .pf-slack-panel,
 #pf-mattermost:checked ~ .pf-surface .pf-mm-panel,
 #pf-telegram:checked ~ .pf-surface .pf-tg-panel,
-#pf-email:checked ~ .pf-surface .pf-email-panel {
+#pf-email:checked ~ .pf-surface .pf-email-panel,
+#pf-discord:checked ~ .pf-surface .pf-discord-panel,
+#pf-teams:checked ~ .pf-surface .pf-teams-panel,
+#pf-gchat:checked ~ .pf-surface .pf-gchat-panel,
+#pf-ntfy:checked ~ .pf-surface .pf-ntfy-panel {
   display: block;
 }
 /* Anomaly / Recovery variant toggle (both rendered, one shown). */
@@ -2079,6 +2111,411 @@
 .ec-foot-link {
   color: var(--clay);
   text-decoration: none;
+}
+
+/* Discord — dark chrome (own backdrop set above), brand bot avatar + BOT tag,
+   one status-colored embed with an inline field grid (no fold on Discord). */
+.pfd-msg {
+  display: flex;
+  gap: 12px;
+  max-width: 560px;
+}
+.pfd-body {
+  flex: 1;
+  min-width: 0;
+}
+.pfd-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.pfd-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: #f2f3f5;
+}
+.pfd-tag {
+  font-size: 10px;
+  font-weight: 700;
+  background: #5865f2;
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+}
+.pfd-time {
+  font-size: 12px;
+  color: #949ba4;
+}
+.pfd-embed {
+  display: flex;
+  background: #2b2d31;
+  border-radius: 4px;
+  max-width: 480px;
+  overflow: hidden;
+}
+.pfd-bar {
+  width: 4px;
+  background: var(--accent);
+  flex: none;
+}
+.pfd-content {
+  padding: 10px 14px 12px;
+  min-width: 0;
+  flex: 1;
+}
+a.pfd-title {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 14.5px;
+  color: #00a8fc;
+  text-decoration: none;
+  margin-bottom: 6px;
+}
+a.pfd-title:hover {
+  text-decoration: underline;
+}
+.pfd-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #dbdee1;
+  margin-bottom: 8px;
+}
+.pfd-desc strong {
+  color: #f2f3f5;
+}
+.pfd-desc code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: #1e1f22;
+  color: #dbdee1;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.pfd-desc a {
+  color: #00a8fc;
+  text-decoration: none;
+}
+.pfd-plabel {
+  font-size: 12px;
+  color: #f2f3f5;
+  margin-bottom: 3px;
+}
+.pfd-pblock {
+  margin: 0 0 8px;
+  background: #1e1f22;
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #dbdee1;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.pfd-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px 16px;
+  margin-top: 4px;
+}
+.pfd-fk {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f2f3f5;
+  margin-bottom: 2px;
+}
+.pfd-fv {
+  font-size: 12.5px;
+  color: #dbdee1;
+}
+.pfd-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: #949ba4;
+}
+.pfd-footer svg {
+  border-radius: 3px;
+}
+.pfd-fdot {
+  opacity: 0.6;
+}
+
+/* Microsoft Teams — light chrome, posted under the Workflows app's own
+   identity (a generic icon; no detectkit branding on this path). */
+.pft-msg {
+  display: flex;
+  gap: 12px;
+  max-width: 560px;
+}
+.pft-avatar {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 4px;
+  background: #edebe9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pft-avatar svg {
+  width: 20px;
+  height: 20px;
+}
+.pft-body {
+  flex: 1;
+  min-width: 0;
+}
+.pft-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.pft-name {
+  font-weight: 700;
+  font-size: 14.5px;
+  color: #242424;
+}
+.pft-tag {
+  font-size: 10px;
+  font-weight: 700;
+  background: #e8e8e8;
+  color: #616161;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.pft-time {
+  font-size: 12px;
+  color: #8a8886;
+}
+.pft-card {
+  background: #fff;
+  border: 1px solid #e1dfdd;
+  border-radius: 4px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.pft-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.pft-lead {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #242424;
+  margin-bottom: 6px;
+}
+.pft-rule {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: #424242;
+  margin-bottom: 10px;
+}
+.pft-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.pft-fact {
+  display: flex;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.pft-fk {
+  flex: 0 0 128px;
+  color: #605e5c;
+  font-weight: 600;
+}
+.pft-fv {
+  color: #242424;
+  word-break: break-word;
+}
+.pft-params {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: #8a8886;
+  background: #f5f5f5;
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  word-break: break-all;
+}
+.pft-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.pft-btn {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #5b5fc7;
+  border: 1px solid #d1d1d1;
+  border-radius: 4px;
+  padding: 6px 12px;
+  text-decoration: none;
+}
+.pft-btn:hover {
+  background: #f5f5f5;
+}
+.pft-foot {
+  font-size: 11.5px;
+  color: #a19f9d;
+}
+
+/* Google Chat — light Cards v2 card; no color bar (the title's status dot is
+   the only color cue), so the header carries the brand avatar instead. */
+.pfg-card {
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  max-width: 480px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.pfg-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f3f4;
+}
+.pfg-headtext {
+  min-width: 0;
+}
+.pfg-title {
+  font-weight: 600;
+  font-size: 14.5px;
+  color: #202124;
+}
+.pfg-sub {
+  font-size: 12px;
+  color: #5f6368;
+  margin-top: 1px;
+}
+.pfg-sec {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f3f4;
+}
+.pfg-sec:last-child {
+  border-bottom: none;
+}
+.pfg-lead {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #202124;
+}
+.pfg-lead strong {
+  color: #202124;
+}
+.pfg-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pfg-row {
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.pfg-rk {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #5f6368;
+}
+.pfg-rv {
+  color: #202124;
+  word-break: break-word;
+}
+.pfg-params {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: #3c4043;
+  background: #f8f9fa;
+  border-radius: 4px;
+  padding: 8px 10px;
+  word-break: break-all;
+}
+.pfg-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pfg-btn {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1a73e8;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  padding: 6px 14px;
+  text-decoration: none;
+}
+.pfg-btn:hover {
+  background: #f1f3f4;
+}
+
+/* ntfy — the app delivers a push notification, not a branded card: a minimal
+   OS-notification list item. No color bar, no bot avatar, no status dot —
+   the kind's tag emoji is the only status cue, leading the title. */
+.pfn-msg {
+  max-width: 420px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 6px 20px -8px rgba(0, 0, 0, 0.2);
+}
+.pfn-app {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #6e675b;
+}
+.pfn-appicon {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+}
+.pfn-appname {
+  font-weight: 700;
+  color: #1b1916;
+}
+.pfn-when {
+  margin-left: auto;
+}
+.pfn-title {
+  font-weight: 700;
+  font-size: 14.5px;
+  color: #1b1916;
+  margin-bottom: 4px;
+}
+.pfn-body {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #4a463d;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--sans);
+}
+.pfn-meta {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: #9a9384;
 }
 
 /* ---------- CTA band ---------- */

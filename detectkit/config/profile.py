@@ -5,13 +5,14 @@ Manages database connections and locations (similar to dbt profiles).
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import yaml
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from detectkit.database.clickhouse_manager import ClickHouseDatabaseManager
 from detectkit.database.manager import BaseDatabaseManager
+from detectkit.database.source_manager import SourceDatabaseManager
 from detectkit.utils.env_interpolation import interpolate_env_vars
 
 
@@ -22,23 +23,63 @@ class ProfileConfig(BaseModel):
     Defines connection parameters and database locations for a specific
     environment (dev, prod, etc.).
 
+    Two classes of profile types exist:
+
+    - **Full backends** (``STATE_TYPES``: clickhouse/postgres/mysql/mariadb/
+      duckdb) can hold detectkit state (the ``_dtk_*`` tables) — and, since
+      state managers also expose ``execute_query``, double as hybrid-mode
+      sources.
+    - **Source-only backends** (``SOURCE_ONLY_TYPES``: snowflake) implement
+      only connect + read query. They are valid **only** as a metric/project
+      ``source_profile``; :meth:`create_manager` refuses them as a state
+      profile with a clear error.
+
     Attributes:
-        type: Database type ("clickhouse", "postgres", "mysql", "mariadb", "duckdb")
+        type: Database type ("clickhouse", "postgres", "mysql", "mariadb",
+            "duckdb"; source-only: "snowflake")
         host: Database host (unused for DuckDB — it is an in-process, file-backed
-            database with no network endpoint)
-        port: Database port (unused for DuckDB; required for every other backend)
-        user: Database user (unused for DuckDB)
-        password: Database password (unused for DuckDB)
-        database: Connection-target database (PostgreSQL/MySQL/MariaDB; unused
-            for DuckDB — use `path` instead)
+            database with no network endpoint — and for Snowflake, which
+            connects by `account`)
+        port: Database port (unused for DuckDB/Snowflake; required for every
+            other backend)
+        user: Database user (unused for DuckDB; required explicitly for Snowflake)
+        password: Database password (unused for DuckDB; for Snowflake either
+            `password` or `private_key_path` must be set)
+        database: Connection-target database (PostgreSQL/MySQL/MariaDB; the
+            session default database for Snowflake; unused for DuckDB — use
+            `path` instead)
         path: Path to the DuckDB database file, or ":memory:" for a transient
             in-process database (DuckDB only)
+        account: Snowflake account identifier (e.g. "myorg-myaccount")
+        warehouse: Snowflake virtual warehouse to run load queries on
+        role: Snowflake role for the session
+        schema_name: Session default schema (YAML key: `schema`; Snowflake only)
+        private_key_path: Path to a PEM private key for Snowflake key-pair
+            auth (recommended for service accounts)
+        private_key_passphrase: Passphrase of the private key, if encrypted
         internal_database: Database/schema for internal tables
         internal_schema: Schema for internal tables (PostgreSQL/DuckDB only)
         data_database: Database for user data tables
         data_schema: Schema for user data (PostgreSQL/DuckDB only)
-        settings: Additional database-specific settings
+        settings: Additional database-specific settings (for Snowflake these
+            merge into the session parameters)
     """
+
+    # `schema_name` carries the YAML key `schema` via its alias (a field
+    # literally named `schema` would shadow pydantic's BaseModel attribute).
+    model_config = ConfigDict(populate_by_name=True)
+
+    # Full backends: may hold detectkit state (_dtk_* tables), and therefore
+    # also work as hybrid-mode sources.
+    STATE_TYPES: ClassVar[frozenset[str]] = frozenset(
+        {"clickhouse", "postgres", "mysql", "mariadb", "duckdb"}
+    )
+    # Source-only backends: connect + execute_query only (no DDL/upserts/
+    # locks); valid ONLY as a metric/project `source_profile` (hybrid mode).
+    SOURCE_ONLY_TYPES: ClassVar[frozenset[str]] = frozenset({"snowflake"})
+    # Backends with no network port to validate (in-process file DB; an
+    # account-resolved cloud driver).
+    _PORTLESS_TYPES: ClassVar[frozenset[str]] = frozenset({"duckdb", "snowflake"})
 
     type: str = Field(..., description="Database type")
     host: str = Field(default="localhost", description="Database host (unused for DuckDB)")
@@ -70,6 +111,36 @@ class ProfileConfig(BaseModel):
         ),
     )
 
+    # Snowflake-only (source-only backend). host/port are meaningless for it:
+    # the driver resolves the endpoint from `account`.
+    account: str | None = Field(
+        default=None,
+        description="Snowflake account identifier, e.g. 'myorg-myaccount' (Snowflake only)",
+    )
+    warehouse: str | None = Field(
+        default=None,
+        description="Virtual warehouse to run load queries on (Snowflake only; "
+        "falls back to the user's default warehouse when unset)",
+    )
+    role: str | None = Field(
+        default=None,
+        description="Role for the session (Snowflake only; user's default role when unset)",
+    )
+    schema_name: str | None = Field(
+        default=None,
+        alias="schema",
+        description="Session default schema (Snowflake only; YAML key: 'schema')",
+    )
+    private_key_path: str | None = Field(
+        default=None,
+        description="Path to a PEM private key for key-pair auth (Snowflake only; "
+        "recommended for service accounts over 'password')",
+    )
+    private_key_passphrase: str | None = Field(
+        default=None,
+        description="Passphrase of the private key, when it is encrypted (Snowflake only)",
+    )
+
     # Internal location for _dtk_* tables
     internal_database: str | None = Field(
         default=None, description="Database for internal tables (ClickHouse/MySQL/MariaDB)"
@@ -90,14 +161,19 @@ class ProfileConfig(BaseModel):
         default_factory=dict, description="Additional database settings"
     )
 
+    @property
+    def is_source_only(self) -> bool:
+        """True for profile types valid only as a hybrid-mode ``source_profile``."""
+        return self.type in self.SOURCE_ONLY_TYPES
+
     @field_validator("type")
     @classmethod
     def validate_type(cls, v: str) -> str:
         """Validate database type."""
-        allowed_types = {"clickhouse", "postgres", "mysql", "mariadb", "duckdb"}
+        allowed_types = cls.STATE_TYPES | cls.SOURCE_ONLY_TYPES
         if v not in allowed_types:
             raise ValueError(
-                f"Invalid database type: {v}. " f"Allowed types: {', '.join(allowed_types)}"
+                f"Invalid database type: {v}. " f"Allowed types: {', '.join(sorted(allowed_types))}"
             )
         return v
 
@@ -113,9 +189,30 @@ class ProfileConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_port_required(self) -> "ProfileConfig":
-        """Every backend but DuckDB needs a port; DuckDB has no network endpoint."""
-        if self.type != "duckdb" and self.port is None:
+        """Server backends need a port; DuckDB is in-process, Snowflake connects by account."""
+        if self.type not in self._PORTLESS_TYPES and self.port is None:
             raise ValueError(f"port is required for database type '{self.type}'")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_snowflake_fields(self) -> "ProfileConfig":
+        """Snowflake profiles need an account, an explicit user, and one auth method."""
+        if self.type != "snowflake":
+            return self
+        if not self.account:
+            raise ValueError(
+                "snowflake profiles must set 'account' "
+                "(the account identifier, e.g. 'myorg-myaccount')"
+            )
+        if "user" not in self.model_fields_set:
+            # `user` carries a generic default ("default") that would silently
+            # reach the Snowflake driver; require it spelled out.
+            raise ValueError("snowflake profiles must set 'user' explicitly")
+        if not self.password and not self.private_key_path:
+            raise ValueError(
+                "snowflake profiles must set 'password' or 'private_key_path' "
+                "(key-pair auth — recommended for service accounts)"
+            )
         return self
 
     def get_internal_location(self) -> str:
@@ -193,11 +290,19 @@ class ProfileConfig(BaseModel):
             Database manager instance
 
         Raises:
-            ValueError: If the database type is unsupported, or required
-                connection fields (e.g. PostgreSQL ``database``, DuckDB
-                ``path``) are missing
+            ValueError: If the database type is unsupported or source-only,
+                or required connection fields (e.g. PostgreSQL ``database``,
+                DuckDB ``path``) are missing
             ImportError: If the backend's driver is not installed
         """
+        if self.type in self.SOURCE_ONLY_TYPES:
+            raise ValueError(
+                f"Profile type '{self.type}' is source-only: it can serve as a "
+                f"metric/project 'source_profile' (hybrid mode — the metric's load "
+                f"SQL runs there while _dtk_* state stays in the state profile), "
+                f"but it cannot hold detectkit state. Point --profile/"
+                f"default_profile at one of: {', '.join(sorted(self.STATE_TYPES))}."
+            )
         if self.type == "clickhouse":
             # `port` is guaranteed non-None here by `_validate_port_required`
             # (every type but "duckdb" requires it at construction time).
@@ -272,6 +377,40 @@ class ProfileConfig(BaseModel):
             )
         else:
             raise ValueError(f"Unsupported database type: {self.type}")
+
+    def create_source_manager(self) -> SourceDatabaseManager:
+        """
+        Create a manager for use as a hybrid-mode SOURCE (read-only load queries).
+
+        Source-only types build their lightweight query-only manager here;
+        full backends route through :meth:`create_manager` unchanged, so any
+        state-capable profile keeps working as a source exactly as before.
+
+        Returns:
+            A manager satisfying the minimal execute_query + close contract
+
+        Raises:
+            ValueError: If required connection fields are missing
+            ImportError: If the backend's driver is not installed
+        """
+        if self.type == "snowflake":
+            from detectkit.database.snowflake_manager import SnowflakeSourceManager
+
+            # Guaranteed by `_validate_snowflake_fields` at construction time.
+            assert self.account is not None
+            return SnowflakeSourceManager(
+                account=self.account,
+                user=self.user,
+                password=self.password or None,
+                private_key_path=self.private_key_path,
+                private_key_passphrase=self.private_key_passphrase,
+                warehouse=self.warehouse,
+                database=self.database,
+                schema=self.schema_name,
+                role=self.role,
+                settings=self.settings,
+            )
+        return self.create_manager()
 
 
 class ProfilesConfig(BaseModel):
@@ -382,6 +521,23 @@ class ProfilesConfig(BaseModel):
         """
         profile = self.get_profile(profile_name)
         return profile.create_manager(ensure_locations=ensure_locations)
+
+    def create_source_manager(self, profile_name: str | None = None) -> SourceDatabaseManager:
+        """
+        Create a manager for a profile used as a hybrid-mode SOURCE.
+
+        Unlike :meth:`create_manager`, source-only profile types (e.g.
+        Snowflake) are valid here; full backends behave exactly as with
+        :meth:`create_manager`.
+
+        Args:
+            profile_name: Profile name (if None, use default)
+
+        Returns:
+            A manager satisfying the minimal execute_query + close contract
+        """
+        profile = self.get_profile(profile_name)
+        return profile.create_source_manager()
 
     def get_alert_channel_config(self, channel_name: str) -> dict[str, Any]:
         """

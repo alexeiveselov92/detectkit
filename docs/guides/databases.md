@@ -25,8 +25,24 @@ only one read-write connection at a time. See the [DuckDB guide → Single
 writer](databases-duckdb.md#single-writer-one-process-at-a-time) before
 relying on it for anything beyond local use or CI.
 
-Install everything at once with `detectkit[all-db]` (all four backends,
-DuckDB included).
+Install everything at once with `detectkit[all-db]` (every state backend plus
+the Snowflake source driver, DuckDB included).
+
+## Source-only backends (hybrid mode)
+
+The four backends above are **state-capable** (five profile types — MySQL and
+MariaDB share one backend): any of them can hold detectkit's
+own `_dtk_*` tables *and* run your metric SQL. A second, smaller class is
+**source-only** — usable only as a hybrid-mode
+[`source_profile`](hybrid-mode.md) (the database a metric's load SQL reads
+from), never as a place to store state:
+
+- **[Snowflake](./databases-snowflake.md)** — a governed cloud warehouse. A
+  `type: snowflake` profile can only be a metric source; detectkit refuses it as
+  a state profile with a clear error. Because Snowflake bills each warehouse
+  resume with a 60-second minimum, hybrid mode (read from Snowflake, keep state
+  in a cheap local database) is the only way to use it — see its guide and the
+  [Hybrid Mode guide](./hybrid-mode.md).
 
 ## How detectkit uses the database
 
@@ -59,6 +75,8 @@ any of this; detectkit picks the right strategy per backend.
   local file. The fastest way to try detectkit or run it in CI, but only one
   process can write to the file at a time — see its single-writer caveat
   before using it alongside a long-running `dtk ui`.
+- **[Snowflake](./databases-snowflake.md)** — **source-only** (hybrid mode);
+  runs a metric's load SQL, never holds detectkit state.
 
 Only the **connection** and the **SQL dialect of your metric queries** differ
 between backends — detectors, alerting, the CLI and the project layout are
@@ -70,7 +88,9 @@ extras.
 
 By default, one profile does everything: it runs your metric SQL *and* holds
 every `_dtk_*` table. **Hybrid mode** splits the two — a metric's SQL runs
-against one profile (the source, e.g. a billed-per-query warehouse) while all
-`_dtk_*` state stays in a separate, cheaper profile (e.g. a local DuckDB
-file). See the [Hybrid Mode guide](./hybrid-mode.md) for the full config,
-what runs where, and the operational caveats.
+against one profile (the source, e.g. a billed-per-query warehouse like
+[Snowflake](./databases-snowflake.md)) while all `_dtk_*` state stays in a
+separate, cheaper profile (e.g. a local DuckDB file). Source-only backends such
+as Snowflake can be used *only* this way. See the [Hybrid Mode
+guide](./hybrid-mode.md) for the full config, what runs where, and the
+operational caveats.

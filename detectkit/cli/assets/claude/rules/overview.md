@@ -6,7 +6,9 @@ metrics with automatic anomaly detection and multi-channel alerting. It is
 them with one command. Core logic is pure numpy (no pandas). **ClickHouse,
 PostgreSQL, MySQL/MariaDB and DuckDB are all fully supported** — only the
 connection and the SQL dialect of your metric queries differ between them
-(DuckDB additionally needs no server at all — just a local file).
+(DuckDB additionally needs no server at all — just a local file); **Snowflake**
+is supported as a **source-only** backend (hybrid mode — it runs a metric's
+load SQL, but `_dtk_*` state must live in one of the full backends).
 
 ## The pipeline: load → detect → alert
 

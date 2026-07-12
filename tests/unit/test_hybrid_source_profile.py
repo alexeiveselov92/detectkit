@@ -57,15 +57,16 @@ class TestResolveSourceProfile:
 
 
 class _CountingProfiles:
-    """Minimal ``ProfilesConfig`` stand-in that counts ``create_manager`` calls
-    and can be told to fail for specific profile names."""
+    """Minimal ``ProfilesConfig`` stand-in that counts ``create_source_manager``
+    calls (the pool's construction seam) and can be told to fail for specific
+    profile names."""
 
     def __init__(self, fail_names: set[str] | None = None):
         self.managers: dict[str, Mock] = {}
         self.fail_names = fail_names or set()
         self.calls: list[str] = []
 
-    def create_manager(self, profile_name: str) -> Mock:
+    def create_source_manager(self, profile_name: str) -> Mock:
         self.calls.append(profile_name)
         if profile_name in self.fail_names:
             raise ConnectionError(f"cannot reach '{profile_name}'")
@@ -171,8 +172,8 @@ class TestSourceManagerPool:
         with pytest.raises(SourceDatabaseError) as exc_b:
             tm._resolve_source_manager(_metric("b", "warehouse"))
 
-        # create_manager was attempted exactly once — the failure is cached,
-        # not retried for the second metric.
+        # create_source_manager was attempted exactly once — the failure is
+        # cached, not retried for the second metric.
         assert profiles.calls == ["warehouse"]
         assert exc_a.value.profile_name == "warehouse"
         assert exc_b.value.profile_name == "warehouse"
@@ -464,6 +465,53 @@ class TestRunFailFastUnknownSourceProfile:
         assert reached["task_manager_built"] is True
 
 
+class TestRunFailFastSourceOnlyStateProfile:
+    """A source-only profile type pointed at by --profile/default_profile is
+    a config error: exit 1 before any manager is built, without paging
+    error_alerting (mirrors the unknown-source_profile fail-fast above)."""
+
+    def test_source_only_state_profile_exits_one_before_manager(self, tmp_path, monkeypatch):
+        from detectkit.cli.commands import run as run_module
+
+        (tmp_path / "detectkit_project.yml").write_text("name: demo\ndefault_profile: prod\n")
+        (tmp_path / "profiles.yml").write_text(
+            "profiles:\n"
+            "  prod:\n"
+            "    type: snowflake\n"
+            "    account: org-acct\n"
+            "    user: svc\n"
+            "    password: pw\n"
+            "default_profile: prod\n"
+        )
+        metrics_dir = tmp_path / "metrics"
+        metrics_dir.mkdir()
+        (metrics_dir / "a.yml").write_text('name: a\ninterval: 1min\nquery: "SELECT 1"\n')
+        monkeypatch.setattr(run_module, "find_project_root", lambda: tmp_path)
+
+        def _must_not_page(**kwargs):
+            raise AssertionError("error_alerting must not fire on a config error")
+
+        monkeypatch.setattr(run_module, "dispatch_project_error_alert", _must_not_page)
+
+        def _must_not_construct(*args, **kwargs):
+            raise AssertionError("no database manager may be built for a source-only state")
+
+        monkeypatch.setattr(run_module.ProfilesConfig, "create_manager", _must_not_construct)
+
+        rc = run_module.run_command(
+            select="*",
+            exclude=None,
+            steps="load,detect,alert",
+            from_date=None,
+            to_date=None,
+            full_refresh=False,
+            force=False,
+            profile=None,
+        )
+
+        assert rc == 1
+
+
 # ── end-to-end with real DuckDB engines ──────────────────────────────────────
 # Class-level skip, NOT a module-level importorskip: the mock-based hybrid
 # tests above need no duckdb and must keep running on a bare `[dev]` install —
@@ -488,7 +536,7 @@ class _OneProfileProfilesConfig:
         self._profile_name = profile_name
         self._manager = manager
 
-    def create_manager(self, profile_name: str) -> DuckDBDatabaseManager:
+    def create_source_manager(self, profile_name: str) -> DuckDBDatabaseManager:
         assert profile_name == self._profile_name
         return self._manager
 
@@ -569,9 +617,9 @@ class TestHybridEndToEndDuckDB:
         internal.ensure_tables()
 
         class _BoomIfCalled:
-            def create_manager(self, profile_name: str):
+            def create_source_manager(self, profile_name: str):
                 raise AssertionError(
-                    "create_manager must not be called when source == state profile"
+                    "create_source_manager must not be called when source == state profile"
                 )
 
         try:

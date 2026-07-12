@@ -16,7 +16,7 @@ import numpy as np
 
 from detectkit.config.metric_config import MetricConfig
 from detectkit.database.internal_tables import InternalTablesManager
-from detectkit.database.manager import BaseDatabaseManager
+from detectkit.database.source_manager import SourceDatabaseManager
 from detectkit.loaders.errors import SourceDatabaseError
 from detectkit.loaders.query_template import QueryTemplate
 from detectkit.utils.datetime_utils import now_utc_naive, to_naive_utc
@@ -74,7 +74,7 @@ class MetricLoader:
     def __init__(
         self,
         config: MetricConfig,
-        db_manager: BaseDatabaseManager,
+        db_manager: SourceDatabaseManager,
         internal_manager: InternalTablesManager,
         source_profile_name: str | None = None,
     ):
@@ -83,10 +83,12 @@ class MetricLoader:
 
         Args:
             config: Metric configuration
-            db_manager: Database manager for executing the metric's SQL. In
-                hybrid mode this is a SOURCE-profile manager, distinct from
-                the manager holding _dtk_* state; ``internal_manager`` below
-                always talks to state.
+            db_manager: Database manager for executing the metric's SQL —
+                only the minimal source contract (execute_query) is needed,
+                so both full state managers and source-only managers (e.g.
+                Snowflake) fit. In hybrid mode this is a SOURCE-profile
+                manager, distinct from the manager holding _dtk_* state;
+                ``internal_manager`` below always talks to state.
             internal_manager: Internal tables manager for saving data
             source_profile_name: Name of the source profile *db_manager*
                 belongs to, when it differs from the active state profile

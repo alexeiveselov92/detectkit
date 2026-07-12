@@ -57,7 +57,9 @@ profile whose database runs metric SQL, while *every* `_dtk_*` table
 **state** profile — the one `dtk run` is already connected to for everything
 else. A per-metric `source_profile` overrides it (`metrics.md`); resolves
 **metric → project → unset**, same precedence as `loading_delay`. Unset on
-both = today's behavior (one profile does everything). Only the LOAD step's
+both = today's behavior (one profile does everything). The source profile can
+be a full backend **or** a **source-only** type like `snowflake` (valid only
+here, never as the state profile). Only the LOAD step's
 metric-SQL query is affected — detect/alert and every other command
 (`dtk autotune`/`tune`/`ui`/`clean`/`unlock`) only ever touch the state
 profile. A source-side failure raises `SourceDatabaseError` (message leads
@@ -137,12 +139,15 @@ alert_channels:
 
 ### Database profiles
 
-> ClickHouse, PostgreSQL, MySQL, MariaDB and DuckDB are all supported.
+> ClickHouse, PostgreSQL, MySQL, MariaDB and DuckDB are all supported as
+> **state** backends (they hold the `_dtk_*` tables); **Snowflake** is
+> **source-only** — see its block below.
 > ClickHouse/MySQL/MariaDB use two *databases*; PostgreSQL connects to one
 > `database` and uses two *schemas*; DuckDB is a single *file* (or `:memory:`
 > for tests) holding two *schemas*.
 > `dtk init --db-type {clickhouse,postgres,mysql,mariadb}` scaffolds the right
-> shape — DuckDB profiles are written by hand (not yet a `--db-type` choice).
+> shape — DuckDB and Snowflake profiles are written by hand (not yet a
+> `--db-type` choice).
 
 **ClickHouse**:
 ```yaml
@@ -214,6 +219,36 @@ profiles:
 > `path: ":memory:"` has no on-disk state, so resume/idempotency breaks across
 > process restarts — use it for tests/scratch only, never a real project.
 > `pip install 'detectkit[duckdb]'`.
+
+**Snowflake** (**source-only** — hybrid mode; runs a metric's load SQL, never
+holds `_dtk_*` state):
+```yaml
+profiles:
+  warehouse:
+    type: snowflake
+    account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"   # required — e.g. ab12345.eu-central-1
+    user: svc_detectkit                             # required
+    # key-pair auth (recommended — Snowflake retires single-factor passwords for
+    # service accounts through 2026); use ONE of key-pair or password:
+    private_key_path: /etc/detectkit/snowflake.p8   # PEM private key file
+    private_key_passphrase: "{{ env_var('SNOWFLAKE_KEY_PASSPHRASE') }}"   # optional
+    # password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"   # alternative to key-pair
+    warehouse: COMPUTE_WH          # required — the virtual warehouse to run on
+    database: ANALYTICS            # required — where the metric SQL reads from
+    schema: PUBLIC                 # optional — default schema (aliases schema_name)
+    role: DETECTKIT_RO             # optional — Snowflake role
+    settings: {}                   # optional — extra session parameters
+```
+> **Source-only**: a `snowflake` profile is valid **only** as a metric's or the
+> project's `source_profile` (hybrid mode) — `dtk run` refuses it as a state
+> profile (`--profile`/`default_profile`), so pair it with a full backend
+> (DuckDB/Postgres/ClickHouse) that holds the `_dtk_*` tables. See `metrics.md`
+> and the [Hybrid Mode guide](https://dtk.pipelab.dev/guides/hybrid-mode/).
+> Key-pair auth is first-class and recommended; a plain `password` works too.
+> The session `TIMEZONE` is pinned to UTC (override via `settings`). Billing
+> note: every query resumes the warehouse with a **60-second minimum bill**, so
+> hybrid mode (load from Snowflake, keep cheap local state) is the point.
+> `pip install 'detectkit[snowflake]'`.
 
 ### Alert channels
 

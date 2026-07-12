@@ -560,3 +560,142 @@ default_profile: dev
                 ProfilesConfig.from_yaml(temp_path)
         finally:
             temp_path.unlink()
+
+
+class TestSourceOnlyProfiles:
+    """Snowflake — a source-only profile type (valid as a hybrid source, refused
+    as state)."""
+
+    def test_snowflake_type_accepted(self):
+        profile = ProfileConfig(type="snowflake", account="a", user="u", password="p")
+        assert profile.type == "snowflake"
+
+    def test_invalid_type_message_lists_snowflake(self):
+        """The allowed-types list in the error message includes snowflake."""
+        with pytest.raises(ValueError, match="snowflake"):
+            ProfileConfig(type="invalid", host="localhost", port=9000)
+
+    def test_no_port_required(self):
+        """Snowflake connects by account — no port needed."""
+        profile = ProfileConfig(type="snowflake", account="a", user="u", password="p")
+        assert profile.port is None
+
+    def test_account_missing_raises(self):
+        with pytest.raises(ValueError, match="account"):
+            ProfileConfig(type="snowflake", user="u", password="p")
+
+    def test_user_not_explicit_raises(self):
+        """The generic `user` default must not silently reach the driver."""
+        with pytest.raises(ValueError, match="explicitly"):
+            ProfileConfig(type="snowflake", account="a", password="p")
+
+    def test_no_auth_method_raises(self):
+        with pytest.raises(ValueError, match="password.*private_key_path|private_key_path"):
+            ProfileConfig(type="snowflake", account="a", user="u")
+
+    def test_private_key_path_satisfies_auth(self):
+        profile = ProfileConfig(type="snowflake", account="a", user="u", private_key_path="/k.pem")
+        assert profile.private_key_path == "/k.pem"
+
+    def test_schema_yaml_alias(self):
+        """The YAML key `schema` maps to the `schema_name` field."""
+        profile = ProfileConfig.model_validate(
+            {
+                "type": "snowflake",
+                "account": "a",
+                "user": "u",
+                "password": "p",
+                "schema": "analytics",
+            }
+        )
+        assert profile.schema_name == "analytics"
+
+    def test_create_manager_refuses_source_only(self):
+        """Snowflake cannot hold state — create_manager() names the state types."""
+        profile = ProfileConfig(type="snowflake", account="a", user="u", password="p")
+        with pytest.raises(ValueError, match="source-only") as exc:
+            profile.create_manager()
+        # The error steers the user to a state-capable backend.
+        assert "duckdb" in str(exc.value)
+        assert "clickhouse" in str(exc.value)
+
+    def test_create_source_manager_dispatch_is_mocked(self, monkeypatch):
+        """``create_source_manager()`` dispatches "snowflake" to
+        SnowflakeSourceManager with the exact kwargs forwarded."""
+        import detectkit.database.snowflake_manager as snow_mod
+
+        captured: dict = {}
+
+        class FakeSnowflakeSourceManager:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        monkeypatch.setattr(snow_mod, "SnowflakeSourceManager", FakeSnowflakeSourceManager)
+
+        profile = ProfileConfig(
+            type="snowflake",
+            account="myorg-acct",
+            user="svc",
+            password="",  # empty -> forwarded as None
+            private_key_path="/k.pem",
+            private_key_passphrase="pp",
+            warehouse="WH",
+            database="DB",
+            role="R",
+            settings={"QUERY_TAG": "dtk"},
+        )
+        # Set schema via the alias to prove it forwards from schema_name.
+        profile.schema_name = "analytics"
+
+        manager = profile.create_source_manager()
+
+        assert isinstance(manager, FakeSnowflakeSourceManager)
+        assert captured["account"] == "myorg-acct"
+        assert captured["user"] == "svc"
+        assert captured["password"] is None  # empty string -> None
+        assert captured["private_key_path"] == "/k.pem"
+        assert captured["private_key_passphrase"] == "pp"
+        assert captured["warehouse"] == "WH"
+        assert captured["database"] == "DB"
+        assert captured["schema"] == "analytics"
+        assert captured["role"] == "R"
+        assert captured["settings"] == {"QUERY_TAG": "dtk"}
+
+    def test_create_source_manager_full_backend_routes_to_create_manager(self, monkeypatch):
+        """A full backend's create_source_manager() routes through create_manager()."""
+        profile = ProfileConfig(type="duckdb", path="./detectkit.duckdb")
+
+        sentinel = object()
+        called: dict = {}
+
+        def _fake_create_manager(self, ensure_locations=True):
+            called["hit"] = True
+            return sentinel
+
+        monkeypatch.setattr(ProfileConfig, "create_manager", _fake_create_manager)
+
+        assert profile.create_source_manager() is sentinel
+        assert called.get("hit") is True
+
+    def test_profiles_config_create_source_manager_resolves_by_name(self, monkeypatch):
+        """ProfilesConfig.create_source_manager(name) resolves the named profile."""
+        import detectkit.database.snowflake_manager as snow_mod
+
+        captured: dict = {}
+
+        class FakeSnowflakeSourceManager:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        monkeypatch.setattr(snow_mod, "SnowflakeSourceManager", FakeSnowflakeSourceManager)
+
+        config = ProfilesConfig(
+            profiles={
+                "state": ProfileConfig(type="duckdb", path="./s.duckdb"),
+                "warehouse": ProfileConfig(type="snowflake", account="a", user="u", password="p"),
+            }
+        )
+
+        manager = config.create_source_manager("warehouse")
+        assert isinstance(manager, FakeSnowflakeSourceManager)
+        assert captured["account"] == "a"

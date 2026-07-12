@@ -6,7 +6,7 @@ This guide covers installing detectkit and its dependencies.
 
 - **Python**: 3.10 or higher
 - **pip**: Latest version recommended
-- **Database**: ClickHouse (20.3+), PostgreSQL (12+), MySQL (8.0+), MariaDB (10.4+), or DuckDB (1.1+) — all fully supported (DuckDB needs no server at all)
+- **Database**: ClickHouse (20.3+), PostgreSQL (12+), MySQL (8.0+), MariaDB (10.4+), or DuckDB (1.1+) — all fully supported as state backends (DuckDB needs no server at all). Snowflake is additionally supported as a source-only [hybrid-mode](../guides/hybrid-mode.md) source.
 
 ## Basic Installation
 
@@ -110,13 +110,33 @@ guide](../guides/databases-duckdb.md) for the profile shape and its
 single-writer operational caveat (a DuckDB file supports only one read-write
 connection at a time — important if you also run `dtk ui`).
 
+### Snowflake (source-only)
+
+Snowflake is a **source-only** backend — a `type: snowflake` profile works only
+as a hybrid-mode `source_profile` (running a metric's load SQL), never as a
+place to store detectkit state:
+
+```bash
+pip install detectkit[snowflake]
+```
+
+Or install the driver manually:
+
+```bash
+pip install snowflake-connector-python
+```
+
+**Supported versions**: `snowflake-connector-python` 3.12+. See the
+[Snowflake guide](../guides/databases-snowflake.md) for key-pair auth, the
+hybrid-mode setup it requires, and the operational notes.
+
 ### Multiple Databases
 
 Install drivers for all databases you'll use:
 
 ```bash
-pip install detectkit[clickhouse,postgres,mysql,mariadb,duckdb]
-# or the shorthand (includes all four, DuckDB included):
+pip install detectkit[clickhouse,postgres,mysql,mariadb,duckdb,snowflake]
+# or the shorthand (all five state backends + the Snowflake source):
 pip install detectkit[all-db]
 ```
 
@@ -174,9 +194,10 @@ autotune runs. See the [MCP guide](../guides/mcp.md) for the full walkthrough.
 
 ### Everything
 
-The `[all]` extra installs **everything** — all four database drivers
-(including DuckDB), Prophet and TimesFM, the [OSI interop](../guides/osi.md)
-dependency (`sqlglot`), and the [MCP server](../guides/mcp.md) SDK:
+The `[all]` extra installs **everything** — all five state-backend drivers
+(including DuckDB) plus the Snowflake source driver, Prophet and TimesFM, the
+[OSI interop](../guides/osi.md) dependency (`sqlglot`), and the
+[MCP server](../guides/mcp.md) SDK:
 
 ```bash
 pip install detectkit[all]

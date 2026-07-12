@@ -341,6 +341,16 @@ def _run_impl(
         summary["error"] = f"Error: {source_profile_error}"
         return 1
 
+    # Fail-fast: the STATE profile must be a state-capable type. Like the
+    # source_profile check above this is a config error, not an outage —
+    # exit 1 without paging error_alerting (create_manager would raise the
+    # same refusal, but through the path that fires the error alert).
+    state_type_error = _validate_state_profile_type(profiles_config, profile)
+    if state_type_error:
+        click.echo(click.style(f"Error: {state_type_error}", fg="red", bold=True))
+        summary["error"] = f"Error: {state_type_error}"
+        return 1
+
     # Create database manager
     try:
         db_manager = profiles_config.create_manager(profile)
@@ -516,6 +526,33 @@ def _validate_source_profiles(
     return (
         f"Unknown source_profile referenced by metric(s): {details}. "
         f"Available profiles: {available}"
+    )
+
+
+def _validate_state_profile_type(
+    profiles_config: ProfilesConfig, profile_name: str | None
+) -> str | None:
+    """Cheap, connection-free check that the STATE profile is state-capable.
+
+    A source-only profile type (e.g. ``snowflake``) pointed at by
+    ``--profile``/``default_profile`` is a config error, not an outage, so it
+    must exit 1 *without* paging ``error_alerting`` — same spirit as the
+    source_profile name check above. An unknown/unset profile name returns
+    ``None`` here so the existing ``create_manager`` path reports it exactly
+    as before. Duck-typed via ``getattr`` like ``_validate_source_profiles``,
+    so test doubles need not model the full ProfilesConfig surface.
+    """
+    known_profiles = getattr(profiles_config, "profiles", {}) or {}
+    name = profile_name or getattr(profiles_config, "default_profile", None)
+    profile_config = known_profiles.get(name) if name else None
+    if profile_config is None or not getattr(profile_config, "is_source_only", False):
+        return None
+    state_types = ", ".join(sorted(profile_config.STATE_TYPES))
+    return (
+        f"Profile type '{profile_config.type}' is source-only: it can serve "
+        f"as a metric/project 'source_profile' (hybrid mode), but it cannot "
+        f"hold detectkit state. Point --profile/default_profile at one of: "
+        f"{state_types}."
     )
 
 

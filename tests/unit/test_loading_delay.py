@@ -94,7 +94,7 @@ class TestLoadingDelayValidation:
 class _LoaderStub:
     """Stands in for MetricLoader; records every load_and_save window."""
 
-    def __init__(self, config, db_manager, internal_manager):
+    def __init__(self, config, db_manager, internal_manager, source_profile_name=None):
         self.calls: list[tuple[datetime, datetime]] = []
         _LoaderStub.last_instance = self
 

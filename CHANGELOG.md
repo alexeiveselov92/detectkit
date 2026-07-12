@@ -5,6 +5,32 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.61.0] - 2026-07-12
+
+### Added
+- **Hybrid mode (`source_profile`)** — read metric SQL from one database,
+  keep detectkit's state in another. A new optional `source_profile` field on
+  the metric (overriding a project-wide default; resolution
+  metric → project → unset, like `loading_delay`) names the `profiles.yml`
+  profile whose database runs that metric's **load** query, while every
+  `_dtk_*` table — datapoints, detections, task locks, alert state — stays in
+  the **state** profile (the one `dtk run --profile` / `default_profile`
+  selects; its meaning is unchanged, and a project with no `source_profile`
+  anywhere behaves exactly as before). This is the warehouse unlock:
+  warehouses bill in ways that punish detectkit's frequent small state writes,
+  so point the load at the warehouse and keep state in a cheap local database
+  (e.g. DuckDB or PostgreSQL). Implementation notes: one lazily-opened
+  connection per source profile per run (shared across metrics, closed on
+  exit; a failed source connection is cached, not retried per metric);
+  detect/alert-only runs never open source connections; a source-side failure
+  raises `SourceDatabaseError` with a message leading with
+  `source database (profile '<name>')`, so an error alert distinguishes a
+  warehouse outage from a state-DB outage; `dtk run` fail-fast validates every
+  resolved `source_profile` name before opening any connection (a typo exits 1
+  without paging `error_alerting`). `dtk autotune` / `tune` / `ui` / `clean` /
+  `unlock` are state-only and unaffected. New guide:
+  `docs/guides/hybrid-mode.md`.
+
 ## [0.60.0] - 2026-07-12
 
 ### Added

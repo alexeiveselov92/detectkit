@@ -31,7 +31,20 @@ run summary on stdout while human logs go to stderr.
   interval boundary. An optional `loading_delay` (metric → project → 0) shifts
   that "now" bound back first, so an interval isn't loaded until the upstream
   source has had time to finish writing it — an explicit `--to` bypasses this
-  and is trusted verbatim.
+  and is trusted verbatim. In **hybrid mode** (`source_profile`, resolved
+  metric → project → unset like `loading_delay`) the load query runs against a
+  *different* profile's database while `_dtk_*` state — and every other stage
+  and command — stays on the state profile: the `TaskManager` keeps a lazy
+  one-connection-per-source-profile pool (shared across metrics, closed at
+  run end via `close_sources()`; a failed source connection is cached, not
+  retried per metric), `_load_step` threads the pooled manager into
+  `MetricLoader` as its `db_manager`, and the loader wraps only the source
+  `execute_query` in `SourceDatabaseError` (`loaders/errors.py`, message leads
+  with `source database (profile '<name>')`) so error alerts distinguish
+  source-down from state-down. `dtk run` fail-fast validates every resolved
+  name against `profiles.yml` before opening any connection (a typo exits 1
+  without paging `error_alerting`); detect/alert-only runs never open source
+  connections.
 - **detect** (`detectkit/orchestration/task_manager/_detect_step.py`): for each
   configured detector, builds the detector, computes its `detector_id`, resumes
   after the last persisted detection, loads datapoints **plus a historical
@@ -79,6 +92,7 @@ detectkit/
 │   └── internal_tables/         # InternalTablesManager: per-table mixins over the manager
 ├── loaders/
 │   ├── metric_loader.py         # SQL execution, gap filling, seasonality extraction
+│   ├── errors.py                # SourceDatabaseError (hybrid source-vs-state distinction)
 │   └── query_template.py        # Jinja2 SQL rendering (StrictUndefined)
 ├── detectors/
 │   ├── base.py                  # BaseDetector, DetectionResult, detector_id hashing

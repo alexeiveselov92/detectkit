@@ -264,11 +264,15 @@ class TestTaskManager:
             )
 
             assert result["points_loaded"] == 100
-            # Check constructor call (parameter order: config, db_manager, internal_manager)
+            # Check constructor call (parameter order: config, db_manager, internal_manager).
+            # No hybrid source_profile configured (and no project_config), so the
+            # resolved source manager is the state db_manager itself and
+            # source_profile_name is None (no SourceDatabaseError wrapping).
             MockLoader.assert_called_once_with(
                 config=config,
                 db_manager=db_manager,
                 internal_manager=internal_manager,
+                source_profile_name=None,
             )
             mock_loader.load_and_save.assert_called_once()
 

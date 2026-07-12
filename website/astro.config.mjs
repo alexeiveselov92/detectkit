@@ -64,6 +64,7 @@ export default defineConfig({
                 { label: 'PostgreSQL', link: '/guides/databases-postgres/' },
                 { label: 'MySQL', link: '/guides/databases-mysql/' },
                 { label: 'DuckDB', link: '/guides/databases-duckdb/' },
+                { label: 'Hybrid mode', link: '/guides/hybrid-mode/' },
               ],
             },
             {

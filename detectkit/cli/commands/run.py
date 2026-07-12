@@ -13,7 +13,7 @@ from typing import Any
 
 import click
 
-from detectkit.config.metric_config import MetricConfig
+from detectkit.config.metric_config import MetricConfig, resolve_source_profile
 from detectkit.config.profile import ProfilesConfig
 from detectkit.config.project_config import ProjectConfig
 from detectkit.config.validator import (
@@ -326,6 +326,21 @@ def _run_impl(
         summary["error"] = f"Error loading profiles.yml: {e}"
         return 1
 
+    # Fail-fast: every selected metric's RESOLVED source_profile (hybrid
+    # mode) must name a real profile. This is a cheap name check — no
+    # connections opened — so a typo'd source_profile fails the whole run
+    # up front instead of surfacing deep inside whichever metric's LOAD step
+    # happens to hit it first.
+    source_profile_error = _validate_source_profiles(metrics, project_config, profiles_config)
+    if source_profile_error:
+        # A config typo, not an outage: exit 1 without paging error_alerting,
+        # consistent with the sibling config-error paths (bad selector,
+        # unparseable profiles.yml). The error alert channel is reserved for
+        # DB-down / DDL / runtime failures.
+        click.echo(click.style(f"Error: {source_profile_error}", fg="red", bold=True))
+        summary["error"] = f"Error: {source_profile_error}"
+        return 1
+
     # Create database manager
     try:
         db_manager = profiles_config.create_manager(profile)
@@ -372,84 +387,136 @@ def _run_impl(
         summary["error"] = f"Error initializing internal tables: {e}"
         return 1
 
+    # The active STATE profile's actual name (mirrors ProfilesConfig.get_profile's
+    # own None -> default_profile resolution) — lets the task manager recognize
+    # a metric's source_profile that happens to name the state profile itself,
+    # and reuse db_manager instead of opening a duplicate connection.
+    state_profile_name: str | None
+    if profile is not None:
+        state_profile_name = profile
+    else:
+        state_profile_name = getattr(profiles_config, "default_profile", None)
+
     # Create task manager
     task_manager = TaskManager(
         internal_manager=internal_manager,
         db_manager=db_manager,
         profiles_config=profiles_config,
         project_config=project_config,
+        state_profile_name=state_profile_name,
     )
 
-    # Process each metric
-    for index, (metric_path, config) in enumerate(metrics):
-        result = process_metric(
-            metric_path=metric_path,
-            config=config,
-            project_root=project_root,
-            task_manager=task_manager,
-            steps=step_list,
-            from_date=from_dt,
-            to_date=to_dt,
-            full_refresh=full_refresh,
-            force=force,
-        )
-        summary["metrics"].append(
-            {
-                "name": config.name,
-                "status": _status_str(result["status"]),
-                "steps_completed": [s.value for s in result["steps_completed"]],
-                "datapoints_loaded": result["datapoints_loaded"],
-                "anomalies_detected": result["anomalies_detected"],
-                "alerts_sent": result["alerts_sent"],
-                "error": result["error"],
-            }
-        )
-
-        # Project-level error alert was dispatched — stop processing the
-        # rest of the metrics. The DB / source is presumed unreachable;
-        # subsequent metrics would all fail with the same error.
-        if result.get("abort_run"):
-            click.echo(
-                click.style(
-                    "✗ Aborting run after project error alert. " "Remaining metrics skipped.",
-                    fg="red",
-                    bold=True,
-                )
+    try:
+        # Process each metric
+        for index, (metric_path, config) in enumerate(metrics):
+            result = process_metric(
+                metric_path=metric_path,
+                config=config,
+                project_root=project_root,
+                task_manager=task_manager,
+                steps=step_list,
+                from_date=from_dt,
+                to_date=to_dt,
+                full_refresh=full_refresh,
+                force=force,
             )
-            summary["aborted"] = True
-            for _, skipped_config in metrics[index + 1 :]:
-                summary["metrics"].append(
-                    {
-                        "name": skipped_config.name,
-                        "status": "skipped",
-                        "steps_completed": [],
-                        "datapoints_loaded": 0,
-                        "anomalies_detected": 0,
-                        "alerts_sent": 0,
-                        "error": None,
-                    }
-                )
-            break
+            summary["metrics"].append(
+                {
+                    "name": config.name,
+                    "status": _status_str(result["status"]),
+                    "steps_completed": [s.value for s in result["steps_completed"]],
+                    "datapoints_loaded": result["datapoints_loaded"],
+                    "anomalies_detected": result["anomalies_detected"],
+                    "alerts_sent": result["alerts_sent"],
+                    "error": result["error"],
+                }
+            )
 
-        # Optional: emit a self-contained HTML report from the freshly-persisted
-        # internal tables (values + bands + anomalies + replayed alerts).
-        if report_path is not None:
-            try:
-                emit_metric_report(
-                    config=config,
-                    project_root=project_root,
-                    internal_manager=internal_manager,
-                    report_path=report_path,
-                    project_name=getattr(project_config, "name", None),
-                    project_loading_delay=getattr(project_config, "loading_delay", None),
-                    from_dt=from_dt,
-                    to_dt=to_dt,
+            # Project-level error alert was dispatched — stop processing the
+            # rest of the metrics. The DB / source is presumed unreachable;
+            # subsequent metrics would all fail with the same error.
+            if result.get("abort_run"):
+                click.echo(
+                    click.style(
+                        "✗ Aborting run after project error alert. " "Remaining metrics skipped.",
+                        fg="red",
+                        bold=True,
+                    )
                 )
-            except Exception as report_error:  # never fail the run on a report
-                click.echo(click.style(f"  │ Report skipped: {report_error}", fg="yellow"))
+                summary["aborted"] = True
+                for _, skipped_config in metrics[index + 1 :]:
+                    summary["metrics"].append(
+                        {
+                            "name": skipped_config.name,
+                            "status": "skipped",
+                            "steps_completed": [],
+                            "datapoints_loaded": 0,
+                            "anomalies_detected": 0,
+                            "alerts_sent": 0,
+                            "error": None,
+                        }
+                    )
+                break
 
-    failed = any(m["status"] == "failed" for m in summary["metrics"])
-    return 1 if (failed or summary["aborted"]) else 0
+            # Optional: emit a self-contained HTML report from the freshly-persisted
+            # internal tables (values + bands + anomalies + replayed alerts).
+            if report_path is not None:
+                try:
+                    emit_metric_report(
+                        config=config,
+                        project_root=project_root,
+                        internal_manager=internal_manager,
+                        report_path=report_path,
+                        project_name=getattr(project_config, "name", None),
+                        project_loading_delay=getattr(project_config, "loading_delay", None),
+                        from_dt=from_dt,
+                        to_dt=to_dt,
+                    )
+                except Exception as report_error:  # never fail the run on a report
+                    click.echo(click.style(f"  │ Report skipped: {report_error}", fg="yellow"))
+
+        failed = any(m["status"] == "failed" for m in summary["metrics"])
+        return 1 if (failed or summary["aborted"]) else 0
+    finally:
+        # Close every pooled hybrid-mode SOURCE manager (never db_manager
+        # itself — this function owns that connection's lifecycle, and it
+        # was never explicitly closed here either, before or after hybrid
+        # mode existed). Duck-typed lookup: a test double standing in for
+        # TaskManager need not implement it.
+        close_sources = getattr(task_manager, "close_sources", None)
+        if close_sources is not None:
+            close_sources()
+
+
+def _validate_source_profiles(
+    metrics: list[tuple[Path, MetricConfig]],
+    project_config: ProjectConfig,
+    profiles_config: ProfilesConfig,
+) -> str | None:
+    """Cheap, connection-free check that every metric's RESOLVED
+    ``source_profile`` (hybrid mode) names a real profile.
+
+    Returns an error message naming every offending metric, or ``None`` when
+    every resolved name is either unset (no hybrid override) or a known
+    profile. Runs before any database manager is built.
+    """
+    project_source_profile = getattr(project_config, "source_profile", None)
+    known_profiles = getattr(profiles_config, "profiles", {}) or {}
+    unknown: dict[str, str] = {}
+    for _, config in metrics:
+        name = resolve_source_profile(
+            getattr(config, "source_profile", None), project_source_profile
+        )
+        if name is not None and name not in known_profiles:
+            unknown[config.name] = name
+    if not unknown:
+        return None
+    details = ", ".join(f"{m} -> '{p}'" for m, p in sorted(unknown.items()))
+    available = ", ".join(sorted(known_profiles.keys()))
+    return (
+        f"Unknown source_profile referenced by metric(s): {details}. "
+        f"Available profiles: {available}"
+    )
 
 
 def _resolve_report_path(report_path: str, project_root: Path, metric_name: str) -> Path:

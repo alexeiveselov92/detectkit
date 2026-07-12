@@ -21,10 +21,15 @@ class _LoadStepMixin(_TaskManagerBase):
         full_refresh: bool,
     ) -> dict[str, int]:
         """Execute the LOAD step end-to-end (resume → batch → save)."""
+        # Hybrid mode: the metric's SQL may run against a different
+        # (SOURCE) profile than the one holding _dtk_* state; save() below
+        # always goes through self.internal (state), untouched either way.
+        source_manager, source_profile_name = self._resolve_source_manager(config)
         loader = MetricLoader(
             config=config,
-            db_manager=self.db_manager,
+            db_manager=source_manager,
             internal_manager=self.internal,
+            source_profile_name=source_profile_name,
         )
 
         if full_refresh:

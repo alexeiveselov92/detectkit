@@ -26,7 +26,7 @@ writer](databases-duckdb.md#single-writer-one-process-at-a-time) before
 relying on it for anything beyond local use or CI.
 
 Install everything at once with `detectkit[all-db]` (every state backend plus
-the Snowflake source driver, DuckDB included).
+the Snowflake and BigQuery source drivers, DuckDB included).
 
 ## Source-only backends (hybrid mode)
 
@@ -43,6 +43,13 @@ from), never as a place to store state:
   resume with a 60-second minimum, hybrid mode (read from Snowflake, keep state
   in a cheap local database) is the only way to use it — see its guide and the
   [Hybrid Mode guide](./hybrid-mode.md).
+- **[BigQuery](./databases-bigquery.md)** — Google's serverless warehouse. A
+  `type: bigquery` profile can only be a metric source; detectkit refuses it as
+  a state profile with a clear error. Because on-demand queries bill a 10 MiB
+  minimum of bytes processed per referenced table, frequent small monitoring
+  queries are disproportionately expensive — hybrid mode (read from BigQuery,
+  keep state in a cheap local database) is the way to use it — see its guide and
+  the [Hybrid Mode guide](./hybrid-mode.md).
 
 ## How detectkit uses the database
 
@@ -77,6 +84,8 @@ any of this; detectkit picks the right strategy per backend.
   before using it alongside a long-running `dtk ui`.
 - **[Snowflake](./databases-snowflake.md)** — **source-only** (hybrid mode);
   runs a metric's load SQL, never holds detectkit state.
+- **[BigQuery](./databases-bigquery.md)** — **source-only** (hybrid mode);
+  runs a metric's load SQL, never holds detectkit state.
 
 Only the **connection** and the **SQL dialect of your metric queries** differ
 between backends — detectors, alerting, the CLI and the project layout are
@@ -89,8 +98,9 @@ extras.
 By default, one profile does everything: it runs your metric SQL *and* holds
 every `_dtk_*` table. **Hybrid mode** splits the two — a metric's SQL runs
 against one profile (the source, e.g. a billed-per-query warehouse like
-[Snowflake](./databases-snowflake.md)) while all `_dtk_*` state stays in a
-separate, cheaper profile (e.g. a local DuckDB file). Source-only backends such
-as Snowflake can be used *only* this way. See the [Hybrid Mode
+[Snowflake](./databases-snowflake.md) or [BigQuery](./databases-bigquery.md))
+while all `_dtk_*` state stays in a separate, cheaper profile (e.g. a local
+DuckDB file). Source-only backends such as Snowflake and BigQuery can be used
+*only* this way. See the [Hybrid Mode
 guide](./hybrid-mode.md) for the full config, what runs where, and the
 operational caveats.

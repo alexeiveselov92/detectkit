@@ -7,7 +7,9 @@
 // silhouette in DuckDB's own yellow) rather than official logo paths — same
 // "small, hand-readable SVG" treatment as the other three. Snowflake (a
 // source-only hybrid-mode backend, hence the title hint) is likewise a
-// hand-drawn 6-armed snowflake stroke in its brand blue.
+// hand-drawn 6-armed snowflake stroke in its brand blue. BigQuery (also
+// source-only, same title hint) is a hand-drawn segmented query-circle in
+// Google blue.
 ---
 
 <div class="db-badges">
@@ -61,5 +63,16 @@
       </svg>
     </span>
     Snowflake
+  </span>
+
+  <span class="db-badge" style="--db-chip:#4285F4;--db-name:#4285F4" title="source-only (hybrid mode)">
+    <span class="db-chip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="10.5" cy="10.5" r="6.3"></circle>
+        <path d="M10.5 4.2v12.6M4.2 10.5h12.6"></path>
+        <path d="M15.1 15.1 20 20"></path>
+      </svg>
+    </span>
+    BigQuery
   </span>
 </div>

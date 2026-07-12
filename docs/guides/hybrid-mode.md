@@ -28,9 +28,10 @@ connected to for everything else.
 **Any** profile can be a source — a full state-capable backend (ClickHouse,
 PostgreSQL, MySQL/MariaDB, DuckDB) doubles as one. Some backends are
 **source-only**: they can *only* be a `source_profile`, never hold state.
-[Snowflake](databases-snowflake.md) (`type: snowflake`) is the first — pointing
-`--profile` / `default_profile` at it is refused with a clear error (see
-[Fail-fast below](#fail-fast-validation)).
+[Snowflake](databases-snowflake.md) (`type: snowflake`) and
+[BigQuery](databases-bigquery.md) (`type: bigquery`) are the two today —
+pointing `--profile` / `default_profile` at either is refused with a clear error
+(see [Fail-fast below](#fail-fast-validation)).
 
 Set it at the **project level** (`detectkit_project.yml`) when most metrics
 share one warehouse, and/or at the **metric level** to override it for a
@@ -147,6 +148,58 @@ alerting:
 See the [Snowflake guide](databases-snowflake.md) for key-pair setup, the
 UTC session pin, and the uppercase column-folding note.
 
+### A BigQuery source
+
+Because [BigQuery](databases-bigquery.md) is source-only, hybrid mode is the
+only way to use it: the metric's SQL runs on BigQuery while state lives in a
+local DuckDB file.
+
+```yaml
+# profiles.yml
+default_profile: state
+
+profiles:
+  state:                          # holds every _dtk_* table
+    type: duckdb
+    path: "./detectkit.duckdb"
+    internal_schema: detectkit
+    data_schema: main
+
+  bigquery_wh:                    # source-only: metric SQL runs here, nothing else
+    type: bigquery
+    project: my-analytics-project                        # GCP project billed for queries
+    credentials_json_path: "/etc/detectkit/bq-sa.json"   # unset -> Application Default Credentials
+    location: EU                                          # optional job location
+    dataset: analytics                                   # optional default dataset
+    settings:
+      maximum_bytes_billed: 1000000000                   # optional cost guardrail
+```
+
+```yaml
+# metrics/orders_per_min.yml
+name: orders_per_min
+interval: 1min
+source_profile: bigquery_wh       # this metric's load SQL runs on BigQuery
+query: |
+  SELECT
+    TIMESTAMP_TRUNC(created_at, MINUTE) AS timestamp,
+    COUNT(*) AS value
+  FROM orders
+  WHERE created_at >= '{{ dtk_start_time }}'
+    AND created_at <  '{{ dtk_end_time }}'
+  GROUP BY 1
+  ORDER BY 1
+detectors:
+  - type: mad
+    params: { threshold: 3.0 }
+alerting:
+  enabled: true
+  channels: [mattermost_ops]
+```
+
+See the [BigQuery guide](databases-bigquery.md) for credential setup, the
+`TIMESTAMP`-vs-`DATETIME` note, and the `maximum_bytes_billed` cost guardrail.
+
 > Don't confuse `source_profile` with the metric-level `profile:` field.
 > `profile:` predates hybrid mode, is unrelated to it, and is not applied at
 > runtime by `dtk run` today (it's only round-tripped by the `dtk autotune`
@@ -199,9 +252,10 @@ instead of surfacing deep inside whichever metric's load step happens to hit
 it first.
 
 Pointing `--profile` / `default_profile` (the **state** profile) at a
-source-only type such as `snowflake` is refused the same way, with a clear
-error — a source-only backend can never hold `_dtk_*` state, so it's rejected
-up front rather than failing mid-run when detectkit tries to create a table.
+source-only type such as `snowflake` or `bigquery` is refused the same way, with
+a clear error — a source-only backend can never hold `_dtk_*` state, so it's
+rejected up front rather than failing mid-run when detectkit tries to create a
+table.
 
 ## Operational notes
 
@@ -231,7 +285,7 @@ up front rather than failing mid-run when detectkit tries to create a table.
   credentials are allowed to reach, or grant `CREATE`. On DuckDB, setting
   `read_only: true` on the source profile skips this DDL entirely — the
   cleanest choice for a source you only ever read from. **Source-only types
-  (Snowflake) run no DDL at all**: they connect and read, need no
+  (Snowflake, BigQuery) run no DDL at all**: they connect and read, need no
   `internal_*`/`data_*` locations, and never create anything on the
   warehouse.
 - **A DuckDB source is still subject to the single-writer rule.** If the

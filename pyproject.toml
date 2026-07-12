@@ -45,15 +45,19 @@ mysql = ["pymysql>=1.0.0"]
 # is identical to `mysql` — it just names the dependency for MariaDB users.
 mariadb = ["pymysql>=1.0.0"]
 duckdb = ["duckdb>=1.1"]
-# Source-only backend: valid only as a hybrid-mode `source_profile`
+# Source-only backends: valid only as a hybrid-mode `source_profile`
 # (read queries; _dtk_* state cannot live there).
 snowflake = ["snowflake-connector-python>=3.12"]
+# google-cloud-bigquery's CORE deps stay pyarrow-free (pyarrow rides its
+# `pandas`/`bqstorage` extras, which detectkit does not need).
+bigquery = ["google-cloud-bigquery>=3.15"]
 all-db = [
     "clickhouse-driver>=0.2.0",
     "psycopg2-binary>=2.9.0",
     "pymysql>=1.0.0",
     "duckdb>=1.1",
     "snowflake-connector-python>=3.12",
+    "google-cloud-bigquery>=3.15",
 ]
 
 # Advanced detectors
@@ -79,6 +83,7 @@ all = [
     "pymysql>=1.0.0",
     "duckdb>=1.1",
     "snowflake-connector-python>=3.12",
+    "google-cloud-bigquery>=3.15",
     "prophet>=1.1.0",
     "timesfm>=0.1.0",
     "sqlglot>=20.0",
@@ -191,6 +196,7 @@ module = [
     "psycopg2.*",
     "pymysql.*",
     "snowflake.*",
+    "google.*",
 ]
 ignore_missing_imports = true
 

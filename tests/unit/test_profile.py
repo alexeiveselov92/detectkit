@@ -699,3 +699,94 @@ class TestSourceOnlyProfiles:
         manager = config.create_source_manager("warehouse")
         assert isinstance(manager, FakeSnowflakeSourceManager)
         assert captured["account"] == "a"
+
+
+class TestBigQuerySourceOnlyProfile:
+    """BigQuery — the second source-only profile type (valid as a hybrid
+    source, refused as state)."""
+
+    def test_bigquery_type_accepted(self):
+        profile = ProfileConfig(type="bigquery", project="my-proj")
+        assert profile.type == "bigquery"
+
+    def test_invalid_type_message_lists_bigquery(self):
+        """The allowed-types list in the error message includes bigquery."""
+        with pytest.raises(ValueError, match="bigquery"):
+            ProfileConfig(type="invalid", host="localhost", port=9000)
+
+    def test_no_port_required(self):
+        """BigQuery connects by project — no port needed."""
+        profile = ProfileConfig(type="bigquery", project="my-proj")
+        assert profile.port is None
+
+    def test_project_missing_raises(self):
+        with pytest.raises(ValueError, match="project"):
+            ProfileConfig(type="bigquery")
+
+    def test_no_credentials_is_valid_adc(self):
+        """No key file is a valid config — Application Default Credentials."""
+        profile = ProfileConfig(type="bigquery", project="my-proj")
+        assert profile.credentials_json_path is None
+
+    def test_create_manager_refuses_source_only(self):
+        """BigQuery cannot hold state — create_manager() names the state types."""
+        profile = ProfileConfig(type="bigquery", project="my-proj")
+        with pytest.raises(ValueError, match="source-only") as exc:
+            profile.create_manager()
+        assert "duckdb" in str(exc.value)
+        assert "clickhouse" in str(exc.value)
+
+    def test_create_source_manager_dispatch_is_mocked(self, monkeypatch):
+        """``create_source_manager()`` dispatches "bigquery" to
+        BigQuerySourceManager with the exact kwargs forwarded."""
+        import detectkit.database.bigquery_manager as bq_mod
+
+        captured: dict = {}
+
+        class FakeBigQuerySourceManager:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        monkeypatch.setattr(bq_mod, "BigQuerySourceManager", FakeBigQuerySourceManager)
+
+        profile = ProfileConfig(
+            type="bigquery",
+            project="my-proj",
+            credentials_json_path="/sa.json",
+            location="EU",
+            dataset="analytics",
+            api_endpoint="http://localhost:9050",
+            settings={"maximum_bytes_billed": 10_000_000},
+        )
+
+        manager = profile.create_source_manager()
+
+        assert isinstance(manager, FakeBigQuerySourceManager)
+        assert captured["project"] == "my-proj"
+        assert captured["credentials_json_path"] == "/sa.json"
+        assert captured["location"] == "EU"
+        assert captured["dataset"] == "analytics"
+        assert captured["api_endpoint"] == "http://localhost:9050"
+        assert captured["settings"] == {"maximum_bytes_billed": 10_000_000}
+
+    def test_profiles_config_create_source_manager_resolves_by_name(self, monkeypatch):
+        import detectkit.database.bigquery_manager as bq_mod
+
+        captured: dict = {}
+
+        class FakeBigQuerySourceManager:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        monkeypatch.setattr(bq_mod, "BigQuerySourceManager", FakeBigQuerySourceManager)
+
+        config = ProfilesConfig(
+            profiles={
+                "state": ProfileConfig(type="duckdb", path="./s.duckdb"),
+                "warehouse": ProfileConfig(type="bigquery", project="my-proj"),
+            }
+        )
+
+        manager = config.create_source_manager("warehouse")
+        assert isinstance(manager, FakeBigQuerySourceManager)
+        assert captured["project"] == "my-proj"

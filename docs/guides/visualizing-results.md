@@ -29,7 +29,8 @@ detector comparisons.
 > `dtk autotune`.
 
 > **Database note.** The examples use ClickHouse SQL, but detectkit runs on
-> ClickHouse, PostgreSQL and MySQL — the `_dtk_*` tables exist on all three. The
+> ClickHouse, PostgreSQL, MySQL/MariaDB and DuckDB — the `_dtk_*` tables exist
+> on every state backend. The
 > *shape* of every query is portable; only a few things are dialect-specific
 > (date/time bucketing, interval literals, JSON extraction, and dedup: ClickHouse
 > needs `FINAL` to collapse `ReplacingMergeTree` versions, while PostgreSQL/MySQL

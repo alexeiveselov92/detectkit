@@ -29,22 +29,23 @@ class ProfileConfig(BaseModel):
       duckdb) can hold detectkit state (the ``_dtk_*`` tables) — and, since
       state managers also expose ``execute_query``, double as hybrid-mode
       sources.
-    - **Source-only backends** (``SOURCE_ONLY_TYPES``: snowflake) implement
-      only connect + read query. They are valid **only** as a metric/project
-      ``source_profile``; :meth:`create_manager` refuses them as a state
-      profile with a clear error.
+    - **Source-only backends** (``SOURCE_ONLY_TYPES``: snowflake, bigquery)
+      implement only connect + read query. They are valid **only** as a
+      metric/project ``source_profile``; :meth:`create_manager` refuses them
+      as a state profile with a clear error.
 
     Attributes:
         type: Database type ("clickhouse", "postgres", "mysql", "mariadb",
-            "duckdb"; source-only: "snowflake")
+            "duckdb"; source-only: "snowflake", "bigquery")
         host: Database host (unused for DuckDB — it is an in-process, file-backed
-            database with no network endpoint — and for Snowflake, which
-            connects by `account`)
-        port: Database port (unused for DuckDB/Snowflake; required for every
-            other backend)
-        user: Database user (unused for DuckDB; required explicitly for Snowflake)
-        password: Database password (unused for DuckDB; for Snowflake either
-            `password` or `private_key_path` must be set)
+            database with no network endpoint — and for Snowflake/BigQuery,
+            which connect by `account` / `project`)
+        port: Database port (unused for DuckDB/Snowflake/BigQuery; required
+            for every other backend)
+        user: Database user (unused for DuckDB/BigQuery; required explicitly
+            for Snowflake)
+        password: Database password (unused for DuckDB/BigQuery; for Snowflake
+            either `password` or `private_key_path` must be set)
         database: Connection-target database (PostgreSQL/MySQL/MariaDB; the
             session default database for Snowflake; unused for DuckDB — use
             `path` instead)
@@ -57,6 +58,15 @@ class ProfileConfig(BaseModel):
         private_key_path: Path to a PEM private key for Snowflake key-pair
             auth (recommended for service accounts)
         private_key_passphrase: Passphrase of the private key, if encrypted
+        project: GCP project id billed for the queries (BigQuery only)
+        credentials_json_path: Path to a service-account JSON key file
+            (BigQuery only; unset -> Application Default Credentials)
+        location: Job location, e.g. "EU" (BigQuery only; unset -> inferred
+            from the referenced datasets)
+        dataset: Default dataset for unqualified table names in load queries
+            (BigQuery only)
+        api_endpoint: API endpoint override — the BigQuery emulator or a
+            private endpoint (BigQuery only)
         internal_database: Database/schema for internal tables
         internal_schema: Schema for internal tables (PostgreSQL/DuckDB only)
         data_database: Database for user data tables
@@ -76,10 +86,10 @@ class ProfileConfig(BaseModel):
     )
     # Source-only backends: connect + execute_query only (no DDL/upserts/
     # locks); valid ONLY as a metric/project `source_profile` (hybrid mode).
-    SOURCE_ONLY_TYPES: ClassVar[frozenset[str]] = frozenset({"snowflake"})
-    # Backends with no network port to validate (in-process file DB; an
-    # account-resolved cloud driver).
-    _PORTLESS_TYPES: ClassVar[frozenset[str]] = frozenset({"duckdb", "snowflake"})
+    SOURCE_ONLY_TYPES: ClassVar[frozenset[str]] = frozenset({"snowflake", "bigquery"})
+    # Backends with no network port to validate (in-process file DB;
+    # account/project-resolved cloud drivers).
+    _PORTLESS_TYPES: ClassVar[frozenset[str]] = frozenset({"duckdb", "snowflake", "bigquery"})
 
     type: str = Field(..., description="Database type")
     host: str = Field(default="localhost", description="Database host (unused for DuckDB)")
@@ -139,6 +149,34 @@ class ProfileConfig(BaseModel):
     private_key_passphrase: str | None = Field(
         default=None,
         description="Passphrase of the private key, when it is encrypted (Snowflake only)",
+    )
+
+    # BigQuery-only (source-only backend). host/port/user/password are
+    # meaningless for it: the client resolves the endpoint from `project` and
+    # authenticates via a service-account key file or ADC.
+    project: str | None = Field(
+        default=None,
+        description="GCP project id billed for the queries, e.g. 'my-project' (BigQuery only)",
+    )
+    credentials_json_path: str | None = Field(
+        default=None,
+        description="Path to a service-account JSON key file (BigQuery only; "
+        "unset -> Application Default Credentials)",
+    )
+    location: str | None = Field(
+        default=None,
+        description="Job location, e.g. 'EU' (BigQuery only; unset -> inferred "
+        "from the referenced datasets)",
+    )
+    dataset: str | None = Field(
+        default=None,
+        description="Default dataset for unqualified table names in load queries (BigQuery only)",
+    )
+    api_endpoint: str | None = Field(
+        default=None,
+        description="API endpoint override (BigQuery only) — a plain-http endpoint "
+        "(the BigQuery emulator) uses anonymous credentials when no key file is "
+        "set; https endpoints (regional/private) authenticate normally",
     )
 
     # Internal location for _dtk_* tables
@@ -212,6 +250,23 @@ class ProfileConfig(BaseModel):
             raise ValueError(
                 "snowflake profiles must set 'password' or 'private_key_path' "
                 "(key-pair auth — recommended for service accounts)"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_bigquery_fields(self) -> "ProfileConfig":
+        """BigQuery profiles need an explicit GCP project id.
+
+        Auth needs nothing further: `credentials_json_path` when set, else
+        Application Default Credentials (gcloud ADC / attached service
+        account / Workload Identity).
+        """
+        if self.type != "bigquery":
+            return self
+        if not self.project:
+            raise ValueError(
+                "bigquery profiles must set 'project' (the GCP project id billed "
+                "for the queries, e.g. 'my-project')"
             )
         return self
 
@@ -408,6 +463,19 @@ class ProfileConfig(BaseModel):
                 database=self.database,
                 schema=self.schema_name,
                 role=self.role,
+                settings=self.settings,
+            )
+        if self.type == "bigquery":
+            from detectkit.database.bigquery_manager import BigQuerySourceManager
+
+            # Guaranteed by `_validate_bigquery_fields` at construction time.
+            assert self.project is not None
+            return BigQuerySourceManager(
+                project=self.project,
+                credentials_json_path=self.credentials_json_path,
+                location=self.location,
+                dataset=self.dataset,
+                api_endpoint=self.api_endpoint,
                 settings=self.settings,
             )
         return self.create_manager()

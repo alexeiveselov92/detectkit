@@ -5,6 +5,36 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.65.0] - 2026-07-12
+
+### Added
+- **BigQuery as a source-only backend** (#142). `type: bigquery` joins
+  `snowflake` in `SOURCE_ONLY_TYPES`: valid only as a hybrid-mode
+  `source_profile` (the metric's load SQL runs on BigQuery, all `_dtk_*`
+  state stays in the state profile), refused as a state profile /
+  `--profile` with the same clear error. The profile takes `project`
+  (required — the GCP project billed for queries), `credentials_json_path`
+  (a service-account JSON key file; unset → **Application Default
+  Credentials**: gcloud ADC, an attached service account, or Workload
+  Identity), optional `location`, `dataset` (a default dataset so
+  unqualified table names resolve), `api_endpoint` (the BigQuery emulator
+  or a private/regional endpoint — a plain-`http://` endpoint without a key
+  file switches to anonymous credentials, `https://` endpoints authenticate
+  normally), and `settings` mapping to `QueryJobConfig` attributes
+  (e.g. `maximum_bytes_billed` as a cost guardrail; unknown keys are
+  rejected instead of silently ignored). Because constructing the client
+  performs no network I/O, the manager runs a free `SELECT 1` probe at
+  hybrid-pool build — with **bounded retries** (the client library's
+  defaults would retry connection errors for 10+ minutes; the probe caps
+  at 30s and load queries at 120s/600s), so a bad project, credentials or
+  an unreachable endpoint fails fast instead of stalling the run. `TIMESTAMP` results come back tz-aware UTC (handled
+  by the loader since v0.62.0); column aliases keep their case (no
+  Snowflake-style folding). New `[bigquery]` extra
+  (`google-cloud-bigquery>=3.15`, pyarrow-free core), also in `all-db` /
+  `all`. Covered by unit tests plus an integration test against the real
+  goccy/bigquery-emulator Docker image — the same no-GCP-account path the
+  docs describe. See the [BigQuery guide](docs/guides/databases-bigquery.md).
+
 ## [0.64.0] - 2026-07-12
 
 ### Added

@@ -65,6 +65,7 @@ export default defineConfig({
                 { label: 'MySQL', link: '/guides/databases-mysql/' },
                 { label: 'DuckDB', link: '/guides/databases-duckdb/' },
                 { label: 'Snowflake', link: '/guides/databases-snowflake/' },
+                { label: 'BigQuery', link: '/guides/databases-bigquery/' },
                 { label: 'Hybrid mode', link: '/guides/hybrid-mode/' },
               ],
             },

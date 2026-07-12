@@ -80,8 +80,8 @@ metric's **load** step ever connects to it — detect/alert and every other
 command don't — though every `dtk run` fail-fast validates the resolved name
 up front regardless of `--steps` (a typo exits 1 before any pipeline work).
 The `source_profile` may point at a **source-only** warehouse profile such as
-`snowflake` (usable *only* as a source, never for `_dtk_*` state — see
-`project.md`), which is exactly the case hybrid mode is built for.
+`snowflake` or `bigquery` (usable *only* as a source, never for `_dtk_*` state
+— see `project.md`), which is exactly the case hybrid mode is built for.
 See the [Hybrid Mode guide](https://dtk.pipelab.dev/guides/hybrid-mode/).
 
 `ai_context` is **OSI-compatible grounding** you can add to any metric with **no

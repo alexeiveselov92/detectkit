@@ -5,7 +5,8 @@ This guide will walk you through creating your first detectkit project and monit
 ## Prerequisites
 
 - detectkit installed ([Installation Guide](installation.md))
-- Database connection (ClickHouse, PostgreSQL, or MySQL)
+- Database connection (ClickHouse, PostgreSQL, MySQL/MariaDB, or DuckDB — a
+  single local file, no server needed)
 - Basic SQL knowledge
 
 ## Fastest start: set up with an AI assistant

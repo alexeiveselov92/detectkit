@@ -70,7 +70,7 @@ dtk run --select cpu_usage
 
 ### Guides
 - **[Configuration](guides/configuration.md)** - Complete configuration reference
-- **[Databases](guides/databases.md)** - Per-backend breakdown (ClickHouse, PostgreSQL, MySQL/MariaDB, DuckDB)
+- **[Databases](guides/databases.md)** - Per-backend breakdown (ClickHouse, PostgreSQL, MySQL/MariaDB, DuckDB; Snowflake and BigQuery as source-only hybrid-mode backends)
 - **[Hybrid mode](guides/hybrid-mode.md)** - Load metric SQL from one database while `_dtk_*` state lives in another
 - **[Detectors](guides/detectors.md)** - Choosing and configuring detectors
 - **[Auto-tuning](guides/autotuning.md)** - Let `dtk autotune` pick the detector, params and seasonality for you
@@ -208,15 +208,21 @@ Works with your existing data warehouse — all backends are first-class:
 - **DuckDB** - `detectkit[duckdb]` (in-process, single file, no server or
   credentials — the fastest way to try detectkit; one read-write connection
   at a time, see the [DuckDB guide](guides/databases-duckdb.md))
+- **Snowflake** - source-only (hybrid mode), `detectkit[snowflake]` — runs a
+  metric's load SQL, never holds `_dtk_*` state
+  ([Snowflake guide](guides/databases-snowflake.md))
+- **BigQuery** - source-only (hybrid mode), `detectkit[bigquery]` — runs a
+  metric's load SQL, never holds `_dtk_*` state
+  ([BigQuery guide](guides/databases-bigquery.md))
 
 Only the connection and the SQL dialect of your metric queries differ; detectors,
 alerting and the CLI are identical. See the [Databases guide](guides/databases.md)
 for the per-backend breakdown.
 
 **Hybrid mode:** a metric's `source_profile` can point its load query at a
-*different* profile's database — e.g. a billed warehouse — while every
-`_dtk_*` table still lives in your regular state profile. See the
-[Hybrid mode guide](guides/hybrid-mode.md).
+*different* profile's database — e.g. a billed warehouse like Snowflake or
+BigQuery — while every `_dtk_*` table still lives in your regular state
+profile. See the [Hybrid mode guide](guides/hybrid-mode.md).
 
 ## Architecture
 

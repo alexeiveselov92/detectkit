@@ -48,6 +48,11 @@ referenced as a hybrid-mode [`source_profile`](hybrid-mode.md), never as the
 state profile — see the [Snowflake profile](#snowflake-profile-source-only)
 below and the [Snowflake guide](databases-snowflake.md).
 
+**BigQuery** (`type: bigquery`) is likewise a **source-only** backend: it can
+only be referenced as a hybrid-mode [`source_profile`](hybrid-mode.md), never as
+the state profile — see the [BigQuery profile](#bigquery-profile-source-only)
+below and the [BigQuery guide](databases-bigquery.md).
+
 #### ClickHouse Profile
 
 ```yaml
@@ -222,6 +227,49 @@ profiles:
 
 There is **no `host` / `port`** — Snowflake connects through its account-based
 endpoint.
+
+#### BigQuery Profile (source-only)
+
+BigQuery is a **source-only** backend — a `type: bigquery` profile is valid
+**only** as a hybrid-mode [`source_profile`](hybrid-mode.md); detectkit refuses
+to store `_dtk_*` state in it. See the [BigQuery
+guide](databases-bigquery.md) for the full walkthrough, including credential
+setup and the `TIMESTAMP` / cost-guardrail notes.
+
+```yaml
+profiles:
+  bigquery_wh:
+    type: bigquery
+    project: my-analytics-project                        # GCP project billed for queries
+    credentials_json_path: "/etc/detectkit/bq-sa.json"   # service-account key (optional)
+    location: EU                                         # optional job location
+    dataset: analytics                                   # optional default dataset
+    settings:
+      maximum_bytes_billed: 1000000000                   # optional cost guardrail
+```
+
+**Required fields**:
+- `type`: Must be `"bigquery"`
+- `project`: GCP project id billed for the queries (e.g. `my-analytics-project`)
+
+**Optional fields**:
+- `credentials_json_path`: Path to a service-account JSON key file. Unset →
+  **Application Default Credentials** (gcloud ADC, an attached service account,
+  or Workload Identity)
+- `location`: Job location (e.g. `EU`); unset → BigQuery infers it from the
+  referenced datasets
+- `dataset`: Default dataset so unqualified table names in the query resolve
+- `api_endpoint`: API endpoint override — for the BigQuery emulator (e.g.
+  `http://localhost:9050`) or a private/regional endpoint; a plain-`http://`
+  endpoint without a key file switches auth to anonymous credentials (the
+  emulator path), while `https://` endpoints authenticate normally via key
+  file or ADC
+- `settings`: Extra `QueryJobConfig` attributes applied to every query (e.g.
+  `maximum_bytes_billed`, `labels`); unknown attribute names are rejected at
+  connect
+
+There is **no `host` / `port` / `user` / `password`** — BigQuery connects
+through the Google client with the `project` and credentials above.
 
 ### Alert Channels
 

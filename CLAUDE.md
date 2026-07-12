@@ -3,7 +3,7 @@
 **detectkit** is a Python library + CLI (`dtk`) for monitoring time-series
 metrics with anomaly detection and multi-channel alerting. It is dbt-like:
 metrics are YAML + SQL run through a `load → detect → alert` pipeline.
-numpy-first (no pandas in core logic), ClickHouse / PostgreSQL / MySQL / MariaDB / DuckDB backends + Snowflake (source-only hybrid source), Python 3.10+.
+numpy-first (no pandas in core logic), ClickHouse / PostgreSQL / MySQL / MariaDB / DuckDB backends + Snowflake / BigQuery (source-only hybrid sources), Python 3.10+.
 
 > **Using detectkit, not hacking on it?** See the [README](README.md), the
 > [docs](docs/), and `dtk init-claude` (which sets up assistant context inside
@@ -76,11 +76,31 @@ rendered on the docs site under **For developers**). Read the relevant one:
   backends double as sources). Valid **only** as a metric/project
   `source_profile` (hybrid mode: its load SQL runs on Snowflake, all `_dtk_*`
   state stays in a full state backend); `ProfileConfig.STATE_TYPES` vs
-  `SOURCE_ONLY_TYPES` split — `create_manager()` refuses it as state, the pool
-  builds it via `create_source_manager()`. `SnowflakeSourceManager`
-  (`snowflake_manager.py`): eager connect, key-pair (recommended) or password
-  auth, session `TIMEZONE` pinned UTC (`settings` override wins), all-uppercase
-  result columns folded to lowercase for the loader.
+  `SOURCE_ONLY_TYPES` split (`{snowflake, bigquery}`) — `create_manager()`
+  refuses it as state, the pool builds it via `create_source_manager()`.
+  `SnowflakeSourceManager` (`snowflake_manager.py`): eager connect, key-pair
+  (recommended) or password auth, session `TIMEZONE` pinned UTC (`settings`
+  override wins), all-uppercase result columns folded to lowercase for the loader.
+- **BigQuery** (`type: bigquery`, extra `[bigquery]`) is the **second**
+  source-only backend on that same `SourceDatabaseManager` seam — valid **only**
+  as a metric/project `source_profile` (hybrid mode: load SQL runs on BigQuery,
+  all `_dtk_*` state stays in a full state backend), `create_manager()` refuses
+  it as state, the pool builds it via `create_source_manager()`.
+  `BigQuerySourceManager` (`bigquery_manager.py`): eager connect via a free
+  `SELECT 1` probe (0 bytes on on-demand billing → fails fast on a bad
+  `project` / credentials / `settings` typo; retries are bounded — probe 30s,
+  load queries 120s/600s — so an unreachable endpoint can't stall the run on
+  the client library's 10+-minute connection-error retry defaults); auth is a
+  `credentials_json_path` service-account key or **Application Default
+  Credentials** (a plain-`http://` `api_endpoint` without a key file — the
+  emulator path — uses anonymous credentials; `https://` endpoint overrides
+  authenticate normally);
+  `dataset` → the job's `default_dataset`, `settings` apply to each query's
+  `QueryJobConfig` (a non-`QueryJobConfig` key is rejected at the probe);
+  `TIMESTAMP` results are tz-aware UTC (loader converts) and there is **no**
+  column folding (aliases keep case). Source-only for billing: on-demand queries
+  bill a **10 MiB minimum** of bytes processed per referenced table, so keep
+  state in a cheap local DB and cap scans with `settings: {maximum_bytes_billed: …}`.
 - User-facing docs are in `docs/`. The context that `dtk init-claude` ships to
   users lives in `detectkit/cli/assets/claude/` — **keep both in sync on every
   release** (see the contributing rule's release checklist).

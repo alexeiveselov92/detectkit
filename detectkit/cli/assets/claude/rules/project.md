@@ -58,8 +58,8 @@ profile whose database runs metric SQL, while *every* `_dtk_*` table
 else. A per-metric `source_profile` overrides it (`metrics.md`); resolves
 **metric → project → unset**, same precedence as `loading_delay`. Unset on
 both = today's behavior (one profile does everything). The source profile can
-be a full backend **or** a **source-only** type like `snowflake` (valid only
-here, never as the state profile). Only the LOAD step's
+be a full backend **or** a **source-only** type (`snowflake`, `bigquery`) —
+valid only here, never as the state profile. Only the LOAD step's
 metric-SQL query is affected — detect/alert and every other command
 (`dtk autotune`/`tune`/`ui`/`clean`/`unlock`) only ever touch the state
 profile. A source-side failure raises `SourceDatabaseError` (message leads
@@ -140,14 +140,14 @@ alert_channels:
 ### Database profiles
 
 > ClickHouse, PostgreSQL, MySQL, MariaDB and DuckDB are all supported as
-> **state** backends (they hold the `_dtk_*` tables); **Snowflake** is
-> **source-only** — see its block below.
+> **state** backends (they hold the `_dtk_*` tables); **Snowflake** and
+> **BigQuery** are **source-only** — see their blocks below.
 > ClickHouse/MySQL/MariaDB use two *databases*; PostgreSQL connects to one
 > `database` and uses two *schemas*; DuckDB is a single *file* (or `:memory:`
 > for tests) holding two *schemas*.
 > `dtk init --db-type {clickhouse,postgres,mysql,mariadb}` scaffolds the right
-> shape — DuckDB and Snowflake profiles are written by hand (not yet a
-> `--db-type` choice).
+> shape — DuckDB, Snowflake and BigQuery profiles are written by hand (not yet
+> a `--db-type` choice).
 
 **ClickHouse**:
 ```yaml
@@ -249,6 +249,38 @@ profiles:
 > note: every query resumes the warehouse with a **60-second minimum bill**, so
 > hybrid mode (load from Snowflake, keep cheap local state) is the point.
 > `pip install 'detectkit[snowflake]'`.
+
+**BigQuery** (**source-only** — hybrid mode; runs a metric's load SQL, never
+holds `_dtk_*` state):
+```yaml
+profiles:
+  warehouse:
+    type: bigquery
+    project: my-analytics-project    # required — GCP project id billed for the queries
+    credentials_json_path: /etc/detectkit/bq-sa.json   # optional — service-account JSON key file
+    #                                # (unset -> Application Default Credentials)
+    location: EU                     # optional — job location (e.g. EU / US)
+    dataset: analytics               # optional — default dataset so unqualified table names resolve
+    api_endpoint: null               # optional — endpoint override; plain-http (the emulator) -> anonymous
+    #                                # auth when no key file; https endpoints authenticate normally
+    settings:                        # optional — extra QueryJobConfig attributes applied to every query
+      maximum_bytes_billed: 1000000000
+```
+> **Source-only**: a `bigquery` profile is valid **only** as a metric's or the
+> project's `source_profile` (hybrid mode) — `dtk run` refuses it as a state
+> profile (`--profile`/`default_profile`), so pair it with a full backend
+> (DuckDB/Postgres/ClickHouse) that holds the `_dtk_*` tables. See `metrics.md`
+> and the [Hybrid Mode guide](https://dtk.pipelab.dev/guides/hybrid-mode/).
+> Auth: `credentials_json_path` (a service-account key file) when set, else
+> **Application Default Credentials** (gcloud ADC / an attached service account
+> / Workload Identity); host/port/user/password are unused. Timestamps: a
+> BigQuery `TIMESTAMP` column comes back tz-aware UTC (handled by the loader),
+> `DATETIME` comes back naive — prefer `TIMESTAMP` (or a cast) for the metric's
+> timestamp column. Billing note: on-demand queries bill a **10 MiB minimum**
+> of bytes processed per query per referenced table, so frequent small
+> monitoring queries are disproportionately expensive — load from BigQuery,
+> keep cheap local state; `settings: {maximum_bytes_billed: ...}` caps what a
+> single query may scan. `pip install 'detectkit[bigquery]'`.
 
 ### Alert channels
 

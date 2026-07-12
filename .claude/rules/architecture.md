@@ -37,7 +37,7 @@ run summary on stdout while human logs go to stderr.
   and command — stays on the state profile: the `TaskManager` keeps a lazy
   one-connection-per-source-profile pool (shared across metrics, built via
   `profiles_config.create_source_manager(name)` — so a source may be a full
-  backend or a source-only type like Snowflake — closed at
+  backend or a source-only type like Snowflake / BigQuery — closed at
   run end via `close_sources()`; a failed source connection is cached, not
   retried per metric), `_load_step` threads the pooled manager into
   `MetricLoader` as its `db_manager`, and the loader wraps only the source
@@ -92,6 +92,7 @@ detectkit/
 │   ├── mysql_manager.py         # MySQLDatabaseManager (pymysql)
 │   ├── duckdb_manager.py        # DuckDBDatabaseManager (in-process file DB + DB-API adapter)
 │   ├── snowflake_manager.py     # SnowflakeSourceManager (source-only; key-pair/password auth, UTC session, col folding)
+│   ├── bigquery_manager.py      # BigQuerySourceManager (source-only; key-file/ADC/anonymous auth, SELECT 1 probe, no col folding)
 │   ├── tables.py                # TableModel factories for all _dtk_* tables
 │   └── internal_tables/         # InternalTablesManager: per-table mixins over the manager
 ├── loaders/
@@ -231,7 +232,7 @@ so every full backend doubles as a source. This lets a **source-only** backend
 that can *never* hold `_dtk_*` state (no DDL / upsert / lock methods) still be a
 metric's `source_profile`. `ProfileConfig` splits the types into
 `STATE_TYPES = {clickhouse, postgres, mysql, mariadb, duckdb}` and
-`SOURCE_ONLY_TYPES = {snowflake}` (allowed `type` = the union): `create_manager()`
+`SOURCE_ONLY_TYPES = {snowflake, bigquery}` (allowed `type` = the union): `create_manager()`
 **refuses** a source-only type (`"Profile type 'snowflake' is source-only: …"`),
 while the new `create_source_manager()` (on both `ProfileConfig` and
 `ProfilesConfig`, keyed by profile name) is the pool's construction seam
@@ -254,6 +255,38 @@ while the new `create_source_manager()` (on both `ProfileConfig` and
   pass through unchanged. Source-only: valid only as a `source_profile`, never as
   state (billing: each query resumes the warehouse with a 60-second minimum, the
   reason hybrid mode keeps state in a cheap local DB).
+- `bigquery_manager.py` (`BigQuerySourceManager`, extra `[bigquery]` →
+  `google-cloud-bigquery`) — the second source-only backend. Eager connect: a
+  `bigquery.Client(...)` alone does no I/O, so construction runs a free
+  `SELECT 1` **probe** (no table references, 0 bytes processed on on-demand
+  billing) so a bad `project` / credentials / `settings` typo fails fast at
+  hybrid-pool build; retries are **bounded** (probe 30s with job-retry off;
+  load queries 120s request-retry / 600s job-retry) because the client
+  library's defaults treat connection errors as transient and would retry an
+  unreachable endpoint for 10+ minutes — a failed probe also closes the
+  just-built client so nothing leaks into the pool's cached error. **Auth
+  resolution** — `credentials_json_path` (a service-account JSON key file)
+  when set, else **Application Default Credentials** (gcloud ADC / an attached
+  service account / Workload Identity); a plain-`http://` `api_endpoint`
+  *without* a key file — the BigQuery-emulator path — switches to **anonymous**
+  credentials so no ADC lookup is attempted (an `https://` override — regional
+  `*.rep.googleapis.com`, Private Service Connect — authenticates normally
+  via key file/ADC). `dataset`
+  becomes the job's `default_dataset` (unqualified table names in the load SQL
+  resolve against it); each `settings` key is applied to a per-query
+  `QueryJobConfig` and must name a real `QueryJobConfig` property — a typo would
+  otherwise be a silently-ignored attribute, so it is **rejected** at the probe
+  (`maximum_bytes_billed`, `labels`, …). BigQuery `TIMESTAMP` columns come back
+  **tz-aware UTC** (the loader converts to naive UTC since v0.62.0); `DATETIME`
+  comes back naive and is taken verbatim (recommend `TIMESTAMP` or a cast for the
+  metric's `timestamp` column). **No** column-name folding (unlike Snowflake,
+  BigQuery preserves alias case, so `SELECT ts AS timestamp` reaches the loader
+  unchanged). Source-only: valid only as a `source_profile`, never as state
+  (billing: on-demand queries bill a **10 MiB minimum** of bytes processed per
+  referenced table, so frequent small monitoring queries are disproportionately
+  expensive — the reason hybrid mode loads from BigQuery and keeps state in a
+  cheap local DB; a `settings: {maximum_bytes_billed: …}` guardrail caps a single
+  query).
 
 The `TableModel` carries a `version_column` (the last-writer-wins key encoded as
 `ReplacingMergeTree(<col>)` on ClickHouse and driving the version-aware upsert on

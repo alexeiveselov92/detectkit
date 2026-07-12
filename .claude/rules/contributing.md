@@ -14,7 +14,8 @@ detectkit/
 │   │   └── assets/claude # AI-assistant context shipped by `dtk init-claude`
 │   ├── config/           # Pydantic config models & loaders
 │   ├── core/             # Interval parsing, dataclasses, table models
-│   ├── database/         # Database managers (ClickHouse, Postgres, MySQL/MariaDB, DuckDB)
+│   ├── database/         # Database managers (ClickHouse, Postgres, MySQL/MariaDB, DuckDB
+│   │                     #   + source-only Snowflake/BigQuery for hybrid mode)
 │   ├── loaders/          # Metric data loading + gap filling
 │   ├── detectors/        # Anomaly detectors (statistical/ + factory)
 │   ├── alerting/         # Alert orchestration + channels
@@ -38,7 +39,8 @@ database driver you work against (extra names are defined in `pyproject.toml`
 under `[project.optional-dependencies]`):
 
 ```bash
-# dev tooling + ClickHouse driver (other extras: postgres, mysql, mariadb, duckdb, all-db)
+# dev tooling + ClickHouse driver (other extras: postgres, mysql, mariadb,
+# duckdb, snowflake, bigquery — the last two source-only — and all-db)
 pip install -e ".[dev,clickhouse]"
 
 # install the git hooks

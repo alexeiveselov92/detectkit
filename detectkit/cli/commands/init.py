@@ -127,11 +127,14 @@ _COMMENTED_EXAMPLES = {
     "duckdb": """  # Example DuckDB profile (in-process, single-file; no host/port/user/password)
   # duckdb_dev:
   #   type: duckdb
-  #   path: ./detectkit.duckdb   # or ':memory:' for a transient, tests-only DB
+  #   path: ./detectkit.duckdb   # or ':memory:' (transient, tests-only), or
+  #   #                          # 'md:<database>' for MotherDuck (cloud; add
+  #   #                          # motherduck_token: "{{ env_var('MOTHERDUCK_TOKEN') }}")
   #   internal_schema: detectkit
   #   data_schema: main
-  #   # Only ONE read-write connection at a time — don't point a scheduled
-  #   # `dtk run` and a long-lived `dtk ui` at the same file simultaneously.
+  #   # Only ONE read-write connection at a time (local files; md: paths are
+  #   # served and don't have this limit) — don't point a scheduled `dtk run`
+  #   # and a long-lived `dtk ui` at the same local file simultaneously.
 """,
 }
 

@@ -464,3 +464,83 @@ class TestInternalTablesManagerSmoke:
             assert recent[1]["is_anomaly_flags"] == [False]
         finally:
             mgr.close()
+
+
+# ── MotherDuck (`md:` paths) — connect-seam tests, no cloud round trip ────────
+# The real MotherDuck attach needs the `motherduck` extension + network + a
+# token (covered by the env-gated tests/integration/test_motherduck.py); what
+# is unit-testable is the connect seam: how `md:` paths change the config dict
+# and the strict-probe read-only forcing.
+
+
+class _FakeRaw:
+    """Minimal stand-in for duckdb.DuckDBPyConnection (connect seam only)."""
+
+    def __init__(self) -> None:
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class TestMotherDuckConnectSeam:
+    def _capture_connect(self, monkeypatch) -> dict:
+        import detectkit.database.duckdb_manager as mod
+
+        captured: dict = {}
+
+        def fake_connect(path, read_only=False, config=None):
+            captured.update(path=path, read_only=read_only, config=config)
+            return _FakeRaw()
+
+        monkeypatch.setattr(mod.duckdb, "connect", fake_connect)
+        return captured
+
+    def test_token_threaded_into_config_for_md_path(self, monkeypatch):
+        captured = self._capture_connect(monkeypatch)
+        DuckDBDatabaseManager(
+            path="md:analytics", motherduck_token="tok-123", ensure_locations=False
+        )
+        assert captured["path"] == "md:analytics"
+        assert captured["config"]["motherduck_token"] == "tok-123"
+
+    def test_settings_win_over_token_field_on_collision(self, monkeypatch):
+        captured = self._capture_connect(monkeypatch)
+        DuckDBDatabaseManager(
+            path="md:analytics",
+            motherduck_token="from-field",
+            settings={"motherduck_token": "from-settings"},
+            ensure_locations=False,
+        )
+        assert captured["config"]["motherduck_token"] == "from-settings"
+
+    def test_token_ignored_for_local_paths(self, monkeypatch, tmp_path):
+        captured = self._capture_connect(monkeypatch)
+        DuckDBDatabaseManager(
+            path=str(tmp_path / "x.duckdb"),
+            motherduck_token="tok-123",
+            ensure_locations=False,
+        )
+        assert "motherduck_token" not in (captured["config"] or {})
+
+    def test_strict_probe_does_not_force_read_only_for_md(self, monkeypatch):
+        """MotherDuck has no read-only attach, and there is no local file a
+        connect could create — the ensure_locations=False probe must not
+        force read_only for md: paths (it still runs no DDL)."""
+        captured = self._capture_connect(monkeypatch)
+        DuckDBDatabaseManager(path="md:analytics", ensure_locations=False)
+        assert captured["read_only"] is False
+
+    def test_strict_probe_still_forces_read_only_for_local_files(self, monkeypatch, tmp_path):
+        captured = self._capture_connect(monkeypatch)
+        DuckDBDatabaseManager(path=str(tmp_path / "x.duckdb"), ensure_locations=False)
+        assert captured["read_only"] is True
+
+    def test_explicit_read_only_on_md_passes_through(self, monkeypatch):
+        """Deliberate semantics: an explicit read_only=True on an md: path is
+        passed through (MotherDuck rejects it loudly at connect) rather than
+        silently dropped — silently opening read-write when the user asked
+        for a read-only guarantee would be worse. Docs say: leave it unset."""
+        captured = self._capture_connect(monkeypatch)
+        DuckDBDatabaseManager(path="md:analytics", read_only=True)
+        assert captured["read_only"] is True

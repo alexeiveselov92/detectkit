@@ -9,10 +9,30 @@ internal/data *locations* are DuckDB **schemas** inside that one file,
 created with ``CREATE SCHEMA IF NOT EXISTS`` (``main`` always exists and is
 never explicitly created).
 
+**MotherDuck.** The same manager also speaks `MotherDuck
+<https://motherduck.com/>`_ — DuckDB's serverless cloud service — through the
+same ``duckdb`` client: a ``path`` of the form ``md:<database>`` attaches the
+named MotherDuck database (the ``motherduck`` core extension autoloads on
+first use; the first connect downloads it, so it needs network access). Auth
+is a service token, passed as the ``motherduck_token`` connect config (the
+profile's ``motherduck_token`` field) — when unset, the extension itself
+falls back to a ``motherduck_token`` environment variable. Everything below
+the connect is identical: same SQL surface, same ``ON CONFLICT`` upsert, same
+internal-tables flow. The **local-file operational caveats do not apply** to
+``md:`` paths — MotherDuck is a served database, so multiple processes
+(`dtk ui` + a concurrently spawned `dtk run`) can hold connections at once;
+the single-writer rule below is a property of local files only. One
+asymmetry: MotherDuck does not support DuckDB's ``read_only=True`` attach
+flag, so the strict read-only probe (``ensure_locations=False``) skips the
+forced read-only for ``md:`` paths — its purpose there (preventing a missing
+local *file* from being created as a connect side effect) doesn't apply to a
+served database; the probe still runs no DDL.
+
 **Operational model — read this before pointing a scheduled `dtk run` and a
-long-lived `dtk ui` at the same file.** A DuckDB file is held read-write by
-**one process at a time**: a second *process* attempting a read-write attach
-fails. (Within the single writing process DuckDB itself allows further
+long-lived `dtk ui` at the same file.** (Local files only — ``md:`` paths
+are served and have no single-writer rule.) A DuckDB file is held read-write
+by **one process at a time**: a second *process* attempting a read-write
+attach fails. (Within the single writing process DuckDB itself allows further
 connections — they share the cached database instance and may write
 concurrently under MVCC with optimistic-conflict errors, and a same-process
 ``read_only=True`` attach fails on the config mismatch rather than the lock —
@@ -188,21 +208,29 @@ class DuckDBDatabaseManager(SQLDatabaseManager):
 
     Args:
         path: Path to the DuckDB database file (created if it doesn't exist),
-            or the literal string ``":memory:"`` for a transient in-process
-            database. ``:memory:`` is **tests/preview-only** — its state is
-            not persisted to disk and is lost when the process exits, which
-            breaks detectkit's resume-from-last-timestamp idempotency across
-            runs; use a real file path for anything but a one-off test.
+            the literal string ``":memory:"`` for a transient in-process
+            database, or ``"md:<database>"`` for a MotherDuck cloud database
+            (see the module docstring). ``:memory:`` is **tests/preview-only**
+            — its state is not persisted to disk and is lost when the process
+            exits, which breaks detectkit's resume-from-last-timestamp
+            idempotency across runs; use a real file path (or ``md:``) for
+            anything but a one-off test.
         internal_schema: Schema for internal ``_dtk_*`` tables.
         data_schema: Schema for user data tables. Defaults to ``"main"``,
             DuckDB's always-present default schema.
-        read_only: Open the file read-only. Required when another process
-            already holds the file read-write (DuckDB allows many concurrent
-            *readers*, never a reader alongside a writer). A read-only
-            connection cannot create schemas/tables, so it assumes the
-            internal/data schemas already exist.
+        read_only: Open the file read-only (local files only — MotherDuck
+            does not support a read-only attach). Required when another
+            process already holds the file read-write (DuckDB allows many
+            concurrent *readers*, never a reader alongside a writer). A
+            read-only connection cannot create schemas/tables, so it assumes
+            the internal/data schemas already exist.
+        motherduck_token: MotherDuck service token, sent as the
+            ``motherduck_token`` connect config for ``md:`` paths (ignored
+            for local paths). Unset -> the ``motherduck`` extension falls
+            back to the ``motherduck_token`` environment variable.
         settings: Extra ``duckdb.connect`` ``config`` options (e.g.
-            ``{"memory_limit": "512MB"}``).
+            ``{"memory_limit": "512MB"}``); merged over the token, so an
+            explicit ``settings["motherduck_token"]`` wins.
         ensure_locations: When False, skip creating the internal/data
             schemas as a side effect of connecting (a strict read-only
             probe — see
@@ -235,6 +263,7 @@ class DuckDBDatabaseManager(SQLDatabaseManager):
         internal_schema: str = "detectkit",
         data_schema: str = "main",
         read_only: bool = False,
+        motherduck_token: str | None = None,
         settings: dict[str, Any] | None = None,
         ensure_locations: bool = True,
     ) -> None:
@@ -245,9 +274,12 @@ class DuckDBDatabaseManager(SQLDatabaseManager):
         if not path:
             raise ValueError(
                 "DuckDBDatabaseManager requires a non-empty `path` (a database file "
-                "path, or ':memory:' for a transient, tests/preview-only in-process "
-                "database whose state is lost between runs)."
+                "path, ':memory:' for a transient, tests/preview-only in-process "
+                "database whose state is lost between runs, or 'md:<database>' for "
+                "a MotherDuck cloud database)."
             )
+        self._is_motherduck = path.startswith("md:")
+        self._motherduck_token = motherduck_token
         # `ensure_locations=False` is a strict read-only PROBE (see
         # `SQLDatabaseManager.__init__`): skipping `_ensure_locations()` is
         # not enough on its own for DuckDB, because a plain read-write
@@ -258,7 +290,12 @@ class DuckDBDatabaseManager(SQLDatabaseManager):
         # place, and DuckDB rejects a read-only in-memory connection outright
         # (`CatalogException: Cannot launch in-memory database in read-only
         # mode!`), so forcing it there would break rather than protect.
-        self._read_only = True if (not ensure_locations and path != ":memory:") else read_only
+        # "md:" paths are exempted for the same shape of reason: there is no
+        # local file to create as a connect side effect (MotherDuck is a
+        # served database), and MotherDuck does not support the read-only
+        # attach flag — the probe still runs no DDL.
+        force_read_only = not ensure_locations and path != ":memory:" and not self._is_motherduck
+        self._read_only = True if force_read_only else read_only
         # Kept separately (and typed `str`, not `str | None`) from the base
         # class's `self._database` so `_connect()` doesn't need to narrow an
         # Optional it knows — by the ValueError check above — can't be None.
@@ -275,7 +312,13 @@ class DuckDBDatabaseManager(SQLDatabaseManager):
         )
 
     def _connect(self) -> Any:
-        raw = duckdb.connect(self._path, read_only=self._read_only, config=self._settings or {})
+        config = dict(self._settings or {})
+        if self._is_motherduck and self._motherduck_token:
+            # `settings` merges over the token (an explicit
+            # settings["motherduck_token"] wins), mirroring the Snowflake
+            # manager's settings-over-pin precedence.
+            config = {"motherduck_token": self._motherduck_token, **config}
+        raw = duckdb.connect(self._path, read_only=self._read_only, config=config)
         return _DuckDBConnectionAdapter(raw)
 
     def _ensure_locations(self) -> None:

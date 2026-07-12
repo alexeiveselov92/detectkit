@@ -131,14 +131,15 @@ def _resolve_duckdb_path(profile_config: ProfileConfig, project_root: Path) -> P
     would land wherever the launcher happened to start the process, and could
     even *create* a stray state file there. Every other project-relative path
     in detectkit (metrics/, incidents/, …) is resolved against the project
-    root, so a relative DuckDB ``path`` should be too. ``":memory:"`` and an
+    root, so a relative DuckDB ``path`` should be too. ``":memory:"``,
+    ``"md:..."`` (a MotherDuck database name, not a filesystem path) and an
     already-absolute path pass through unchanged. Returns a **copy**
     (``model_copy``) — the original ``ProfileConfig``/``ProfilesConfig`` is
     shared state (e.g. reused by ``get_server_info``) and must not be mutated.
     """
     if profile_config.type != "duckdb" or not profile_config.path:
         return profile_config
-    if profile_config.path == ":memory:":
+    if profile_config.path == ":memory:" or profile_config.path.startswith("md:"):
         return profile_config
     raw_path = Path(profile_config.path)
     if raw_path.is_absolute():

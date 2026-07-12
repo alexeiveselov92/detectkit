@@ -161,8 +161,11 @@ profiles:
 DuckDB is an **in-process, single-file** database — there's no host, port,
 user or password, just a file `path` (or `:memory:`). Internal/data tables
 live in **schemas** inside that one file, same location model as PostgreSQL.
+The same profile type also attaches **MotherDuck** (DuckDB's serverless cloud)
+when `path` is `"md:<database>"` — a full state backend over the same client.
 See the [DuckDB guide](databases-duckdb.md) for the full walkthrough,
-including the **single read-write connection at a time** caveat before
+including the [MotherDuck section](databases-duckdb.md#motherduck) and the
+**single read-write connection at a time** caveat (local files only) before
 pointing a scheduled `dtk run` and a long-lived `dtk ui` at the same file.
 
 ```yaml
@@ -173,18 +176,33 @@ profiles:
 
     internal_schema: detectkit     # schema for _dtk_* tables (auto-created)
     data_schema: main              # schema for your data queries (DuckDB's default schema)
+
+  cloud_state:
+    type: duckdb
+    path: "md:detectkit"                              # MotherDuck cloud database
+    motherduck_token: "{{ env_var('MOTHERDUCK_TOKEN') }}"
+    internal_schema: detectkit
+    data_schema: main
 ```
 
 **Required fields**:
 - `type`: Must be `"duckdb"`
-- `path`: Database file path (created if it doesn't exist), or the literal
-  `":memory:"` (transient — tests/preview only, state is lost on exit)
+- `path`: Database file path (created if it doesn't exist), the literal
+  `":memory:"` (transient — tests/preview only, state is lost on exit), or
+  `"md:<database>"` to attach a [MotherDuck](databases-duckdb.md#motherduck)
+  cloud database
 
 **Optional fields**:
 - `internal_schema` (default: `"detectkit"`) - Schema for `_dtk_*` tables (detectkit creates it)
 - `data_schema` (default: `"main"`) - Schema for data queries
-- `read_only` (default: `false`) - Open the file read-only; required when
-  another process already holds it read-write
+- `motherduck_token`: MotherDuck service token for `md:` paths (env-interpolated,
+  like every secret — e.g. `"{{ env_var('MOTHERDUCK_TOKEN') }}"`); ignored for
+  local file paths. Unset, the `motherduck` extension falls back to a
+  `motherduck_token` **environment variable**. See the
+  [MotherDuck section](databases-duckdb.md#motherduck)
+- `read_only` (default: `false`) - Open a **local** file read-only; required when
+  another process already holds it read-write. Local-files-only — MotherDuck
+  (`md:` paths) is served and doesn't take DuckDB's read-only attach flag
 - `settings`: Extra `duckdb.connect(..., config=...)` options (e.g. `memory_limit`)
 
 #### Snowflake Profile (source-only)

@@ -49,8 +49,11 @@ class ProfileConfig(BaseModel):
         database: Connection-target database (PostgreSQL/MySQL/MariaDB; the
             session default database for Snowflake; unused for DuckDB — use
             `path` instead)
-        path: Path to the DuckDB database file, or ":memory:" for a transient
-            in-process database (DuckDB only)
+        path: Path to the DuckDB database file, ":memory:" for a transient
+            in-process database, or "md:<database>" for a MotherDuck cloud
+            database (DuckDB only)
+        motherduck_token: MotherDuck service token for "md:" paths (DuckDB
+            only; unset -> the extension reads the motherduck_token env var)
         account: Snowflake account identifier (e.g. "myorg-myaccount")
         warehouse: Snowflake virtual warehouse to run load queries on
         role: Snowflake role for the session
@@ -106,19 +109,28 @@ class ProfileConfig(BaseModel):
         default=None, description="Database to connect to (PostgreSQL/MySQL/MariaDB)"
     )
 
-    # DuckDB-only: the database file path (or ":memory:"). host/port/user/
-    # password/database above are simply ignored for this backend rather than
-    # rejected, since e.g. `host` always carries its "localhost" default.
+    # DuckDB-only: the database file path (or ":memory:", or "md:<database>"
+    # for MotherDuck). host/port/user/password/database above are simply
+    # ignored for this backend rather than rejected, since e.g. `host` always
+    # carries its "localhost" default.
     path: str | None = Field(
         default=None,
-        description="Database file path, or ':memory:' for a transient in-process database (DuckDB only)",
+        description="Database file path, ':memory:' for a transient in-process "
+        "database, or 'md:<database>' for a MotherDuck cloud database (DuckDB only)",
     )
     read_only: bool = Field(
         default=False,
         description=(
-            "Open the database read-only (DuckDB only) — lets a reader profile "
-            "coexist with the one process holding the file read-write"
+            "Open the database read-only (DuckDB local files only — MotherDuck "
+            "has no read-only attach) — lets a reader profile coexist with the "
+            "one process holding the file read-write"
         ),
+    )
+    motherduck_token: str | None = Field(
+        default=None,
+        description="MotherDuck service token for 'md:' paths (DuckDB only; "
+        "env-interpolated — unset falls back to the motherduck_token "
+        "environment variable read by the extension itself)",
     )
 
     # Snowflake-only (source-only backend). host/port are meaningless for it:
@@ -419,14 +431,15 @@ class ProfileConfig(BaseModel):
             if not self.path:
                 raise ValueError(
                     "DuckDB profiles must set 'path' (the database file path, "
-                    "or ':memory:' for a transient, tests/preview-only "
-                    "in-process database)"
+                    "':memory:' for a transient, tests/preview-only in-process "
+                    "database, or 'md:<database>' for MotherDuck)"
                 )
             return DuckDBDatabaseManager(
                 path=self.path,
                 internal_schema=self.get_internal_location(),
                 data_schema=self.get_data_location(),
                 read_only=self.read_only,
+                motherduck_token=self.motherduck_token,
                 settings=self.settings,
                 ensure_locations=ensure_locations,
             )

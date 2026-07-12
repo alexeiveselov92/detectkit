@@ -81,7 +81,10 @@ any of this; detectkit picks the right strategy per backend.
 - **[DuckDB](./databases-duckdb.md)** — no server, no credentials; a single
   local file. The fastest way to try detectkit or run it in CI, but only one
   process can write to the file at a time — see its single-writer caveat
-  before using it alongside a long-running `dtk ui`.
+  before using it alongside a long-running `dtk ui`. A `path: "md:<database>"`
+  attaches [MotherDuck](./databases-duckdb.md#motherduck) — DuckDB's serverless
+  cloud — as a full state backend through the same profile type (served, so the
+  single-writer caveat doesn't apply); see the DuckDB guide.
 - **[Snowflake](./databases-snowflake.md)** — **source-only** (hybrid mode);
   runs a metric's load SQL, never holds detectkit state.
 - **[BigQuery](./databases-bigquery.md)** — **source-only** (hybrid mode);

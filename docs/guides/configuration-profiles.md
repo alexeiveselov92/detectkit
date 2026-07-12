@@ -30,8 +30,9 @@ stays in another — see the [Hybrid Mode guide](hybrid-mode.md).
 
 ### Database Profiles
 
-ClickHouse, PostgreSQL, MySQL, MariaDB, and DuckDB are all fully supported.
-The connection fields differ per backend (ClickHouse/MySQL/MariaDB use
+ClickHouse, PostgreSQL, MySQL, MariaDB, and DuckDB are all fully supported as
+**state** backends (they hold `_dtk_*` state and can also run metric SQL). The
+connection fields differ per backend (ClickHouse/MySQL/MariaDB use
 **databases**; PostgreSQL and DuckDB use **schemas** — PostgreSQL connects to
 a `database`, DuckDB opens a file at `path`). See the per-backend [Databases
 guide](databases.md) for a focused walkthrough of each. MariaDB uses the
@@ -41,6 +42,11 @@ auto-detected at connect. See the [MySQL guide](databases-mysql.md#mariadb)
 for the MariaDB-specific notes, and the [DuckDB
 guide](databases-duckdb.md#single-writer-one-process-at-a-time) for its
 single-writer caveat.
+
+**Snowflake** (`type: snowflake`) is a **source-only** backend: it can only be
+referenced as a hybrid-mode [`source_profile`](hybrid-mode.md), never as the
+state profile — see the [Snowflake profile](#snowflake-profile-source-only)
+below and the [Snowflake guide](databases-snowflake.md).
 
 #### ClickHouse Profile
 
@@ -175,6 +181,47 @@ profiles:
 - `read_only` (default: `false`) - Open the file read-only; required when
   another process already holds it read-write
 - `settings`: Extra `duckdb.connect(..., config=...)` options (e.g. `memory_limit`)
+
+#### Snowflake Profile (source-only)
+
+Snowflake is a **source-only** backend — a `type: snowflake` profile is valid
+**only** as a hybrid-mode [`source_profile`](hybrid-mode.md); detectkit refuses
+to store `_dtk_*` state in it. See the [Snowflake
+guide](databases-snowflake.md) for the full walkthrough, including key-pair
+setup and the UTC/column-folding notes.
+
+```yaml
+profiles:
+  snowflake_wh:
+    type: snowflake
+    account: "ab12345.eu-central-1"      # Snowflake account identifier
+    user: DETECTKIT_SVC
+    private_key_path: "./keys/detectkit_rsa_key.p8"   # key-pair auth (recommended)
+    private_key_passphrase: "{{ env_var('SNOWFLAKE_KEY_PASSPHRASE') }}"
+    warehouse: MONITORING_WH             # optional
+    database: ANALYTICS                  # optional
+    schema: PUBLIC                       # optional (session schema)
+    role: DETECTKIT_ROLE                 # optional
+```
+
+**Required fields**:
+- `type`: Must be `"snowflake"`
+- `account`: Snowflake account identifier (e.g. `ab12345.eu-central-1`)
+- `user`: Login name (must be set explicitly)
+- `private_key_path` **or** `password`: key-pair auth (recommended) or password
+
+**Optional fields**:
+- `private_key_passphrase`: Passphrase for the PEM key (env-interpolatable)
+- `warehouse`: Virtual warehouse to run queries on
+- `database`: Default database for the session
+- `schema`: Default schema for the session (the YAML key `schema` maps to the
+  session schema)
+- `role`: Role to assume for the session
+- `settings`: Extra Snowflake session parameters (merged over detectkit's — e.g.
+  `{TIMEZONE: "..."}` to override the UTC session pin)
+
+There is **no `host` / `port`** — Snowflake connects through its account-based
+endpoint.
 
 ### Alert Channels
 

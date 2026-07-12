@@ -3,7 +3,7 @@
 **detectkit** is a Python library + CLI (`dtk`) for monitoring time-series
 metrics with anomaly detection and multi-channel alerting. It is dbt-like:
 metrics are YAML + SQL run through a `load → detect → alert` pipeline.
-numpy-first (no pandas in core logic), ClickHouse / PostgreSQL / MySQL / MariaDB / DuckDB backends, Python 3.10+.
+numpy-first (no pandas in core logic), ClickHouse / PostgreSQL / MySQL / MariaDB / DuckDB backends + Snowflake (source-only hybrid source), Python 3.10+.
 
 > **Using detectkit, not hacking on it?** See the [README](README.md), the
 > [docs](docs/), and `dtk init-claude` (which sets up assistant context inside
@@ -70,6 +70,17 @@ rendered on the docs site under **For developers**). Read the relevant one:
   upsert. The file is held read-write by **one process at a time** — `dtk ui`
   open + a spawned `dtk run` on the same file conflict (run-then-look). Real
   engine runs in the unit suite, no Docker.
+- **Snowflake** (`type: snowflake`, extra `[snowflake]`) is a **source-only**
+  backend behind a minimal `SourceDatabaseManager` seam (`database/source_manager.py`
+  — `execute_query` + `close`; `BaseDatabaseManager` subclasses it so full
+  backends double as sources). Valid **only** as a metric/project
+  `source_profile` (hybrid mode: its load SQL runs on Snowflake, all `_dtk_*`
+  state stays in a full state backend); `ProfileConfig.STATE_TYPES` vs
+  `SOURCE_ONLY_TYPES` split — `create_manager()` refuses it as state, the pool
+  builds it via `create_source_manager()`. `SnowflakeSourceManager`
+  (`snowflake_manager.py`): eager connect, key-pair (recommended) or password
+  auth, session `TIMEZONE` pinned UTC (`settings` override wins), all-uppercase
+  result columns folded to lowercase for the loader.
 - User-facing docs are in `docs/`. The context that `dtk init-claude` ships to
   users lives in `detectkit/cli/assets/claude/` — **keep both in sync on every
   release** (see the contributing rule's release checklist).

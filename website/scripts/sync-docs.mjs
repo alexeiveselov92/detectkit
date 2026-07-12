@@ -34,6 +34,7 @@ const PAGES = [
   { src: 'docs/guides/databases-postgres.md', dest: 'guides/databases-postgres.md' },
   { src: 'docs/guides/databases-mysql.md', dest: 'guides/databases-mysql.md' },
   { src: 'docs/guides/databases-duckdb.md', dest: 'guides/databases-duckdb.md' },
+  { src: 'docs/guides/databases-snowflake.md', dest: 'guides/databases-snowflake.md' },
   { src: 'docs/guides/hybrid-mode.md', dest: 'guides/hybrid-mode.md' },
   { src: 'docs/guides/detectors.md', dest: 'guides/detectors.md' },
   { src: 'docs/guides/autotuning.md', dest: 'guides/autotuning.md' },

@@ -12,16 +12,17 @@ The manager is database-agnostic and provides generic operations:
 - get_last_timestamp(): Get last timestamp for a metric
 """
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from datetime import datetime
 from typing import Any
 
 import numpy as np
 
 from detectkit.core.models import TableModel
+from detectkit.database.source_manager import SourceDatabaseManager
 
 
-class BaseDatabaseManager(ABC):
+class BaseDatabaseManager(SourceDatabaseManager):
     """
     Universal database manager interface.
 
@@ -30,6 +31,10 @@ class BaseDatabaseManager(ABC):
 
     Internal table management is handled by higher-level classes that
     use these generic methods.
+
+    Extends :class:`SourceDatabaseManager` (the minimal read-only
+    execute_query + close contract), so every full backend is automatically
+    usable as a hybrid-mode source profile.
 
     Key Design Principles:
     1. Universal methods (not table-specific)

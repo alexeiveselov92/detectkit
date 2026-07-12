@@ -35,7 +35,9 @@ run summary on stdout while human logs go to stderr.
   metric → project → unset like `loading_delay`) the load query runs against a
   *different* profile's database while `_dtk_*` state — and every other stage
   and command — stays on the state profile: the `TaskManager` keeps a lazy
-  one-connection-per-source-profile pool (shared across metrics, closed at
+  one-connection-per-source-profile pool (shared across metrics, built via
+  `profiles_config.create_source_manager(name)` — so a source may be a full
+  backend or a source-only type like Snowflake — closed at
   run end via `close_sources()`; a failed source connection is cached, not
   retried per metric), `_load_step` threads the pooled manager into
   `MetricLoader` as its `db_manager`, and the loader wraps only the source
@@ -82,12 +84,14 @@ detectkit/
 │   ├── interval.py              # Interval parser ("10min"/"1h"/"1d"/seconds)
 │   └── models.py                # ColumnDefinition, TableModel (DB-agnostic DDL spec)
 ├── database/
-│   ├── manager.py               # BaseDatabaseManager (generic, table_name-keyed interface)
+│   ├── source_manager.py        # SourceDatabaseManager ABC (minimal hybrid-source contract: execute_query + close)
+│   ├── manager.py               # BaseDatabaseManager (generic, table_name-keyed interface; subclasses SourceDatabaseManager)
 │   ├── clickhouse_manager.py    # ClickHouseDatabaseManager
 │   ├── _sql_manager.py          # SQLDatabaseManager (shared base for Postgres/MySQL)
 │   ├── postgres_manager.py      # PostgresDatabaseManager (psycopg2)
 │   ├── mysql_manager.py         # MySQLDatabaseManager (pymysql)
 │   ├── duckdb_manager.py        # DuckDBDatabaseManager (in-process file DB + DB-API adapter)
+│   ├── snowflake_manager.py     # SnowflakeSourceManager (source-only; key-pair/password auth, UTC session, col folding)
 │   ├── tables.py                # TableModel factories for all _dtk_* tables
 │   └── internal_tables/         # InternalTablesManager: per-table mixins over the manager
 ├── loaders/
@@ -216,6 +220,40 @@ Four backends implement this interface:
 backend from `type`; PostgreSQL additionally requires a `database` connect-target,
 DuckDB a `path` (`port` is optional only for DuckDB — a per-type validator
 enforces it for the server backends).
+
+### The source-only seam (hybrid mode)
+
+`detectkit/database/source_manager.py` defines `SourceDatabaseManager`, a
+minimal ABC — just `execute_query(query, params=None) -> list[dict]` and
+`close()` — that captures the **only** contract hybrid mode needs from a source
+DB (run a metric's load SQL, return rows). `BaseDatabaseManager` subclasses it,
+so every full backend doubles as a source. This lets a **source-only** backend
+that can *never* hold `_dtk_*` state (no DDL / upsert / lock methods) still be a
+metric's `source_profile`. `ProfileConfig` splits the types into
+`STATE_TYPES = {clickhouse, postgres, mysql, mariadb, duckdb}` and
+`SOURCE_ONLY_TYPES = {snowflake}` (allowed `type` = the union): `create_manager()`
+**refuses** a source-only type (`"Profile type 'snowflake' is source-only: …"`),
+while the new `create_source_manager()` (on both `ProfileConfig` and
+`ProfilesConfig`, keyed by profile name) is the pool's construction seam
+(`orchestration/task_manager/_base.py`) — it routes a full type through
+`create_manager()` and a source-only type to its dedicated source manager.
+
+- `snowflake_manager.py` (`SnowflakeSourceManager`, extra `[snowflake]` →
+  `snowflake-connector-python`) — the first source-only backend. Eager connect
+  (a bad profile fails fast on pool build); **key-pair** auth (`private_key_path`
+  PEM + optional `private_key_passphrase`, first-class and recommended since
+  Snowflake retires single-factor service-account passwords through 2026) **or**
+  `password`. The session `TIMEZONE` is pinned to **UTC** in the connect
+  `session_parameters` (a user `settings` dict merges over it — explicit choice
+  wins), because Snowflake's `TIMESTAMP_LTZ` / `CURRENT_TIMESTAMP` otherwise
+  coerce via the session default `America/Los_Angeles`; tz-aware UTC results are
+  handled by the loader (since v0.62.0). Snowflake uppercases unquoted
+  identifiers, so an all-uppercase result column is **folded to lowercase** in the
+  returned row dicts (`name.lower() if name.isupper() else name`) — the loader
+  reads `row["timestamp"]` / `row["value"]`; deliberately-quoted mixed-case names
+  pass through unchanged. Source-only: valid only as a `source_profile`, never as
+  state (billing: each query resumes the warehouse with a 60-second minimum, the
+  reason hybrid mode keeps state in a cheap local DB).
 
 The `TableModel` carries a `version_column` (the last-writer-wins key encoded as
 `ReplacingMergeTree(<col>)` on ClickHouse and driving the version-aware upsert on

@@ -5,6 +5,30 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.64.0] - 2026-07-12
+
+### Added
+- **Source-only backend seam + Snowflake as the first source-only backend**
+  (#141). Profile types now split into two classes: **state-capable**
+  (`clickhouse`, `postgres`, `mysql`, `mariadb`, `duckdb` — hold `_dtk_*` state
+  and can also run metric SQL) and **source-only** (`snowflake`), which may be
+  referenced only as a hybrid-mode `source_profile` and never store state. A
+  new `ProfileConfig.create_source_manager()` builds the minimal
+  `SourceDatabaseManager` contract (`execute_query` + `close`) — full backends
+  double as sources, while `create_manager()` **refuses** a source-only type as
+  a state profile with a clear error, and `dtk run` rejects a source-only
+  `--profile` / `default_profile` up front. Snowflake connects via the
+  `snowflake-connector-python` driver (the new `[snowflake]` extra, also in
+  `all-db` / `all`) with **key-pair authentication** (PEM `private_key_path` +
+  optional `private_key_passphrase`, the recommended path as Snowflake retires
+  password-only service-account sign-in through 2026) or a password; the session
+  `TIMEZONE` is pinned to **UTC** (a user `settings: {TIMEZONE: ...}` merges over
+  it) so `TIMESTAMP_LTZ` / `CURRENT_TIMESTAMP` don't shift through the account
+  default, and all-uppercase result column names are folded to lowercase so
+  `SELECT ... AS value` works without quoting. No tables are ever created on
+  Snowflake — the source contract is read-only. Covered by fakesnow-backed CI
+  tests. See the [Snowflake guide](docs/guides/databases-snowflake.md).
+
 ## [0.63.0] - 2026-07-12
 
 ### Added

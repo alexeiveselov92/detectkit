@@ -45,11 +45,15 @@ mysql = ["pymysql>=1.0.0"]
 # is identical to `mysql` — it just names the dependency for MariaDB users.
 mariadb = ["pymysql>=1.0.0"]
 duckdb = ["duckdb>=1.1"]
+# Source-only backend: valid only as a hybrid-mode `source_profile`
+# (read queries; _dtk_* state cannot live there).
+snowflake = ["snowflake-connector-python>=3.12"]
 all-db = [
     "clickhouse-driver>=0.2.0",
     "psycopg2-binary>=2.9.0",
     "pymysql>=1.0.0",
     "duckdb>=1.1",
+    "snowflake-connector-python>=3.12",
 ]
 
 # Advanced detectors
@@ -74,6 +78,7 @@ all = [
     "psycopg2-binary>=2.9.0",
     "pymysql>=1.0.0",
     "duckdb>=1.1",
+    "snowflake-connector-python>=3.12",
     "prophet>=1.1.0",
     "timesfm>=0.1.0",
     "sqlglot>=20.0",
@@ -185,6 +190,7 @@ module = [
     "requests.*",
     "psycopg2.*",
     "pymysql.*",
+    "snowflake.*",
 ]
 ignore_missing_imports = true
 

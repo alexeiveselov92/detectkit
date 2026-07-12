@@ -111,7 +111,11 @@ class _TaskManagerBase:
                 raise ValueError(
                     "no profiles configuration available to resolve source " f"profile '{name}'"
                 )
-            manager = self.profiles_config.create_manager(name)
+            # create_source_manager, not create_manager: a source profile may
+            # be a source-only backend (e.g. Snowflake) that has no state
+            # machinery at all; full backends route through create_manager
+            # inside it unchanged.
+            manager = self.profiles_config.create_source_manager(name)
         except Exception as exc:
             err = SourceDatabaseError(name, exc)
             self._source_managers[name] = err

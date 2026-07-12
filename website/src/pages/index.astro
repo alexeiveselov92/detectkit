@@ -383,6 +383,197 @@ const emailPanelHtml = (sev: 'anomaly' | 'recovery') =>
   emailCardHtml(sev) +
   '</div>';
 
+// Discord — dark chat surface (its own backdrop, like Telegram's wallpaper,
+// since the embed's own dark fill differs from the message-list background
+// around it), the brand bot avatar + a BOT tag, one status-colored embed.
+// Embeds have no "Show more" fold, so the verbose tail that folds on
+// Slack/Mattermost instead rides in a compact inline field grid
+// (discord.py's `_fields`); detector params ride in the description as a
+// fenced code block. Field values render plain (no backticks) — only the
+// Value/Expected line is bold+code, mirroring `_build_description` exactly.
+const discordFieldsHtml = (sev: 'anomaly' | 'recovery') => {
+  const d = ALERT[sev];
+  const fields = d.tail.filter(([k]) => k !== 'Parameters');
+  return (
+    '<div class="pfd-fields">' +
+    fields
+      .map(([k, v]) => `<div class="pfd-field"><div class="pfd-fk">${k}</div><div class="pfd-fv">${v}</div></div>`)
+      .join('') +
+    '</div>'
+  );
+};
+
+const discordEmbedHtml = (sev: 'anomaly' | 'recovery') => {
+  const d = ALERT[sev];
+  const valueLine = d.top.map(([k, v]) => `<strong>${k}</strong> <code>${v}</code>`).join(' · ');
+  const paramsHtml =
+    sev === 'anomaly'
+      ? `<div class="pfd-plabel"><strong>Parameters</strong></div><pre class="pfd-pblock">${d.params}</pre>`
+      : '';
+  return (
+    '<div class="pfd-embed">' +
+    '<div class="pfd-bar"></div>' +
+    '<div class="pfd-content">' +
+    `<a class="pfd-title" href="${dashUrl}">${d.title}</a>` +
+    `<div class="pfd-desc">${ruleLead(sev)}</div>` +
+    `<div class="pfd-desc">${valueLine}</div>` +
+    `<div class="pfd-desc"><strong>Links</strong> ${d.links}</div>` +
+    paramsHtml +
+    discordFieldsHtml(sev) +
+    `<div class="pfd-footer">${logoSvg(13, '3px')}<span>detectkit · payments</span><span class="pfd-fdot">•</span><span>12:04</span></div>` +
+    '</div></div>'
+  );
+};
+
+const discordPanelHtml = (sev: 'anomaly' | 'recovery') =>
+  '<div class="pfd-msg">' +
+  logoSvg(38, '50%') +
+  '<div class="pfd-body">' +
+  '<div class="pfd-head">' +
+  '<span class="pfd-name">detectkit</span><span class="pfd-tag">BOT</span><span class="pfd-time">Today at 12:04</span>' +
+  '</div>' +
+  discordEmbedHtml(sev) +
+  '</div></div>';
+
+// Microsoft Teams — light chrome, posted under the Power Automate
+// **Workflows** app's own identity (a generic app icon — deliberately no
+// detectkit branding/avatar on this path, see teams.py's docstring): an
+// Adaptive Card with a colored headline TextBlock, a monospace Rule line, a
+// FactSet mirroring the webhook tail, and Action.OpenUrl buttons.
+const teamsFactsHtml = (sev: 'anomaly' | 'recovery') => {
+  const d = ALERT[sev];
+  const facts = sev === 'anomaly' ? d.tail.filter(([k]) => k !== 'Parameters') : d.tail;
+  return (
+    '<div class="pft-facts">' +
+    [...d.top, ...facts]
+      .map(([k, v]) => `<div class="pft-fact"><div class="pft-fk">${k}</div><div class="pft-fv">${v}</div></div>`)
+      .join('') +
+    '</div>'
+  );
+};
+
+const teamsPanelHtml = (sev: 'anomaly' | 'recovery') => {
+  const d = ALERT[sev];
+  const flowIcon =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="#68769c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+    '<circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/>' +
+    '<path d="M7.9 7.3 10.5 16M16.1 7.3 13.5 16M8.4 6h7.2"/></svg>';
+  return (
+    '<div class="pft-msg">' +
+    `<div class="pft-avatar">${flowIcon}</div>` +
+    '<div class="pft-body">' +
+    '<div class="pft-head"><span class="pft-name">Workflows</span><span class="pft-tag">APP</span><span class="pft-time">12:04</span></div>' +
+    '<div class="pft-card">' +
+    `<div class="pft-title">${d.title}</div>` +
+    `<div class="pft-lead">${d.lead}</div>` +
+    `<div class="pft-rule">Rule: ${d.rule}</div>` +
+    teamsFactsHtml(sev) +
+    (sev === 'anomaly' ? `<div class="pft-params">${d.params}</div>` : '') +
+    '<div class="pft-actions">' +
+    `<a class="pft-btn" href="${dashUrl}">Dashboard</a>` +
+    `<a class="pft-btn" href="${helpUrl}">How to read this alert</a>` +
+    '</div>' +
+    '<div class="pft-foot">detectkit · payments</div>' +
+    '</div></div></div>'
+  );
+};
+
+// Google Chat — light Cards v2 card; the card has no color bar (the status
+// dot in the title is the only color cue), so the header carries the brand
+// avatar + "detectkit · payments" subtitle instead. The Rule line is bold
+// label + PLAIN text (not a code chip) — googlechat.py's `rule_line` never
+// wraps it in `<code>`, an honest quirk kept here. decoratedText-style
+// evidence rows, then a button row.
+const gchatRowsHtml = (sev: 'anomaly' | 'recovery') => {
+  const d = ALERT[sev];
+  const rows = sev === 'anomaly' ? d.tail.filter(([k]) => k !== 'Parameters') : d.tail;
+  return (
+    '<div class="pfg-rows">' +
+    [...d.top, ...rows]
+      .map(([k, v]) => `<div class="pfg-row"><div class="pfg-rk">${k}</div><div class="pfg-rv">${v}</div></div>`)
+      .join('') +
+    '</div>'
+  );
+};
+
+const gchatPanelHtml = (sev: 'anomaly' | 'recovery') => {
+  const d = ALERT[sev];
+  return (
+    '<div class="pfg-card">' +
+    '<div class="pfg-head">' +
+    logoSvg(32, '50%') +
+    '<div class="pfg-headtext">' +
+    `<div class="pfg-title">${d.title}</div>` +
+    '<div class="pfg-sub">detectkit · payments</div>' +
+    '</div></div>' +
+    '<div class="pfg-sec">' +
+    `<div class="pfg-lead">${d.lead}<br><strong>Rule</strong> ${d.rule}</div>` +
+    '</div>' +
+    '<div class="pfg-sec">' +
+    gchatRowsHtml(sev) +
+    (sev === 'anomaly'
+      ? `<div class="pfg-params"><strong>Parameters</strong><br>${d.params}</div>`
+      : '') +
+    '</div>' +
+    '<div class="pfg-sec pfg-actions">' +
+    `<a class="pfg-btn" href="${dashUrl}">Dashboard</a>` +
+    `<a class="pfg-btn" href="${helpUrl}">How to read this alert</a>` +
+    '</div>' +
+    '</div>'
+  );
+};
+
+// ntfy — the app delivers a push notification, not a branded card: no color
+// bar, no bot avatar, no status dot (ntfy.py strips it) — the kind's TAG
+// EMOJI is the only status cue, leading the title. The body is the plain-text
+// default template verbatim (lead + Rule + evidence lines), and a priority
+// line surfaces ntfy's real per-kind default (p4 anomaly/error, p3 else).
+const ntfyTagEmoji: Record<'anomaly' | 'recovery', string> = { anomaly: '🚨', recovery: '✅' };
+const ntfyBellSvg =
+  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#317F6F" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>' +
+  '<path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+
+const ntfyBodyText = (sev: 'anomaly' | 'recovery') => {
+  const d = ALERT[sev];
+  const val = (label: string) => (d.tail.find(([k]) => k === label) ?? ['', ''])[1];
+  const value = d.top[0][1];
+  const expected = d.top[1][1];
+  const lines = [d.lead, `Rule: ${d.rule}`, '', `Value: ${value} | Expected: ${expected}`];
+  if (sev === 'anomaly') {
+    lines.push(`Quorum: ${val('Quorum')}`);
+    lines.push(`Severity: ${val('Severity')}`);
+    lines.push(`Anomaly began: ${val('Anomaly began')} | Latest reading: ${val('Latest reading')}`);
+    lines.push(`Detectors: ${val('Detectors')}`);
+    lines.push(`Parameters: ${d.params}`);
+  } else {
+    lines.push(
+      `Anomaly began: ${val('Anomaly began')} | Alert fired: ${val('Alert fired')} | Recovered: ${val('Recovered')}`
+    );
+    lines.push(`Detectors: ${val('Detectors')}`);
+  }
+  lines.push('', `Dashboard: ${dashUrl}`, `How to read this alert: ${helpUrl}`, '', '@oncall_engineer');
+  return lines.join('\n');
+};
+
+const ntfyPanelHtml = (sev: 'anomaly' | 'recovery') => {
+  const d = ALERT[sev];
+  const title = d.title.slice(d.title.indexOf(' ') + 1); // strip the leading status-dot emoji
+  const priority = sev === 'anomaly' ? 'Priority 4 · high' : 'Priority 3 · default';
+  return (
+    '<div class="pfn-msg">' +
+    '<div class="pfn-app">' +
+    `<span class="pfn-appicon">${ntfyBellSvg}</span>` +
+    '<span class="pfn-appname">ntfy</span>' +
+    '<span class="pfn-when">now</span>' +
+    '</div>' +
+    `<div class="pfn-title">${ntfyTagEmoji[sev]} ${title}</div>` +
+    `<div class="pfn-body">${ntfyBodyText(sev)}</div>` +
+    `<div class="pfn-meta">${priority}</div>` +
+    '</div>'
+  );
+};
+
 // ---- Detectors explainer: five "corridors of normal", each shown on the
 // metric shape it is built for (mad = noisy, zscore = clean bell, iqr = skewed,
 // autoreg = patterned, manual = hard-bounded). A rolling-median corridor is
@@ -1195,6 +1386,10 @@ const dxExplainer = (() => {
         <input class="pf-radio" type="radio" name="platform" id="pf-mattermost" />
         <input class="pf-radio" type="radio" name="platform" id="pf-telegram" />
         <input class="pf-radio" type="radio" name="platform" id="pf-email" />
+        <input class="pf-radio" type="radio" name="platform" id="pf-discord" />
+        <input class="pf-radio" type="radio" name="platform" id="pf-teams" />
+        <input class="pf-radio" type="radio" name="platform" id="pf-gchat" />
+        <input class="pf-radio" type="radio" name="platform" id="pf-ntfy" />
         <input class="pf-radio" type="radio" name="severity" id="sev-anomaly" checked />
         <input class="pf-radio" type="radio" name="severity" id="sev-recovery" />
         <div class="pf-controls">
@@ -1203,6 +1398,10 @@ const dxExplainer = (() => {
             <label for="pf-mattermost"><ChannelIcon name="mattermost" />Mattermost</label>
             <label for="pf-telegram"><ChannelIcon name="telegram" />Telegram</label>
             <label for="pf-email"><ChannelIcon name="email" />Email</label>
+            <label for="pf-discord"><ChannelIcon name="discord" />Discord</label>
+            <label for="pf-teams"><ChannelIcon name="teams" />Teams</label>
+            <label for="pf-gchat"><ChannelIcon name="googlechat" />Google Chat</label>
+            <label for="pf-ntfy"><ChannelIcon name="ntfy" />ntfy</label>
           </div>
           <div class="pf-sev">
             <label for="sev-anomaly">Anomaly</label>
@@ -1212,9 +1411,11 @@ const dxExplainer = (() => {
         <p class="pf-note">
           The same alert, posted by detectkit to each channel — rendered as that channel formats it: one
           folding attachment on Slack/Mattermost (its verbose tail collapses behind “Show more”), escaped
-          HTML on Telegram, a branded card in email. Five more channels — <strong>Discord</strong>,
-          <strong>Microsoft Teams</strong>, <strong>Google Chat</strong>, <strong>ntfy</strong> and a
-          generic <strong>webhook</strong> — render the same alert natively everywhere else.
+          HTML on Telegram, a branded card in email, an inline field grid on Discord (embeds don't fold),
+          an Adaptive Card on Microsoft Teams (posted under the flow's own identity — no detectkit
+          branding), a Cards v2 card on Google Chat, and a push notification on ntfy. A generic
+          <strong>webhook</strong> (with an attachments payload Rocket.Chat accepts as-is, plus
+          <code>json</code> / <code>alertmanager</code> formats) covers everything else.
           Each leads with the project name (<code>[payments]</code>) so several projects can share one
           channel while keeping the brand bot identity. The <code>dashboard_url</code> below becomes a
           first-class link on every channel.
@@ -1240,6 +1441,26 @@ const dxExplainer = (() => {
             <div class="pf-panel pf-email-panel">
               <div class="sev-anomaly-only" set:html={emailPanelHtml('anomaly')}></div>
               <div class="sev-recovery-only" set:html={emailPanelHtml('recovery')}></div>
+            </div>
+            <!-- Discord — one embed, dark chrome, inline field grid instead of a fold -->
+            <div class="pf-panel pf-discord-panel">
+              <div class="sev-anomaly-only" set:html={discordPanelHtml('anomaly')}></div>
+              <div class="sev-recovery-only" set:html={discordPanelHtml('recovery')}></div>
+            </div>
+            <!-- Microsoft Teams — Adaptive Card via Workflows, posts under the flow's identity -->
+            <div class="pf-panel pf-teams-panel">
+              <div class="sev-anomaly-only" set:html={teamsPanelHtml('anomaly')}></div>
+              <div class="sev-recovery-only" set:html={teamsPanelHtml('recovery')}></div>
+            </div>
+            <!-- Google Chat — Cards v2, brand avatar in the header, no color bar -->
+            <div class="pf-panel pf-gchat-panel">
+              <div class="sev-anomaly-only" set:html={gchatPanelHtml('anomaly')}></div>
+              <div class="sev-recovery-only" set:html={gchatPanelHtml('recovery')}></div>
+            </div>
+            <!-- ntfy — a phone push notification, tag emoji as the status cue -->
+            <div class="pf-panel pf-ntfy-panel">
+              <div class="sev-anomaly-only" set:html={ntfyPanelHtml('anomaly')}></div>
+              <div class="sev-recovery-only" set:html={ntfyPanelHtml('recovery')}></div>
             </div>
           </div>
         </div>

@@ -176,6 +176,16 @@ quotes in SQL.
 - Metric value column (default name: `value`)
 - Optional seasonality columns (declare them in `query_columns.seasonality`)
 
+Returned timestamps must already be **bucketed to the metric's interval
+grid** (`toStartOfInterval` / `time_bucket` / `date_trunc`, matching
+`interval`) — gap filling maps each row onto the grid by exact timestamp
+match, and the grid's phase comes from `loading_start_time` (or the first
+`--from`). A query that returns unbucketed or differently-phased
+timestamps (e.g. `:28` past the hour against a grid phased at `:00`) can
+land every row off-grid, which loads as a silently all-`NULL` batch; if a
+whole batch misses the grid like this, detectkit logs a one-time warning
+naming both phases.
+
 **Example**:
 ```sql
 SELECT

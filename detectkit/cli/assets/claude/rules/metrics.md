@@ -119,6 +119,14 @@ The query must return a **timestamp** column and a numeric **value** column
 (default names `timestamp` / `value`; remap via `query_columns`). It may also
 return seasonality columns (declare them in `query_columns.seasonality`).
 
+Returned timestamps must already be **bucketed to the interval grid**
+(`toStartOfInterval` / `time_bucket` / `date_trunc`) — gap filling maps rows
+onto the grid by exact match, and the grid's phase comes from
+`loading_start_time`. A batch that returns rows on a different phase (e.g.
+`:28` past the hour vs a grid phased at `:00`) can land 100% off-grid and
+load as silently all-`NULL`; detectkit logs a one-time warning naming both
+phases when that happens.
+
 ## Seasonality features
 
 Two ways to provide seasonality keys that detectors group by:

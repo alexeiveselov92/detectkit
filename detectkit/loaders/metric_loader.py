@@ -9,6 +9,7 @@ Loads time-series data from databases with:
 - Integration with InternalTablesManager
 """
 
+import logging
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -20,6 +21,30 @@ from detectkit.loaders.errors import SourceDatabaseError
 from detectkit.loaders.query_template import QueryTemplate
 from detectkit.utils.datetime_utils import now_utc_naive, to_naive_utc
 from detectkit.utils.json_utils import json_dumps_sorted
+
+logger = logging.getLogger(__name__)
+
+
+def _format_offset_seconds(seconds: int) -> str:
+    """Render an offset-within-interval (seconds) as a human clock offset.
+
+    Used to describe a grid/source "phase" without assuming a particular
+    interval unit: ``0`` -> ``":00"``, ``1680`` -> ``":28"`` (28 minutes),
+    ``90`` -> ``":01:30"``, ``3661`` -> ``"1:01:01"``.
+    """
+    hours, remainder = divmod(int(seconds), 3600)
+    minutes, secs = divmod(remainder, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    if secs:
+        return f":{minutes:02d}:{secs:02d}"
+    return f":{minutes:02d}"
+
+
+def _format_datetime64(ts: np.datetime64) -> str:
+    """Render a datetime64 as ``YYYY-MM-DD HH:MM:SS`` (naive UTC convention)."""
+    dt: datetime = ts.astype("datetime64[s]").astype(datetime)
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
 class MetricLoader:
@@ -76,6 +101,9 @@ class MetricLoader:
         self.internal_manager = internal_manager
         self.source_profile_name = source_profile_name
         self.query_template = QueryTemplate()
+        # Emitted at most once per loader instance (one instance per metric
+        # per run) - see _check_grid_alignment.
+        self._warned_grid_misalignment = False
 
     def load(
         self,
@@ -246,6 +274,7 @@ class MetricLoader:
             timestamp_array, value_array = self._fill_gaps(
                 timestamp_array, value_array, from_date, to_date, interval_seconds
             )
+            self._check_grid_alignment(original_timestamps, timestamp_array, interval_seconds)
 
             # Realign query-provided seasonality to the gap-filled grid.
             # Gap rows can appear ANYWHERE in the range and _fill_gaps also
@@ -422,6 +451,60 @@ class MetricLoader:
         )
 
         return full_timestamps, filled_values
+
+    def _check_grid_alignment(
+        self,
+        original_timestamps: np.ndarray,
+        grid_timestamps: np.ndarray,
+        interval_seconds: int,
+    ) -> None:
+        """Warn once if a non-empty query result landed entirely off the grid.
+
+        ``_fill_gaps`` maps source rows onto the gap-filled grid by exact
+        timestamp match. If the query returns rows bucketed to a different
+        grid "phase" than ``loading_start_time`` establishes (e.g. rows at
+        :28 past the hour against a 10min grid phased at :00), NONE of them
+        match and the batch loads as silently 100% NULL - no error, no
+        partial data, just an empty-looking series. Partial alignment is not
+        the trap this guards against (some rows landing is normal, e.g. a
+        source with occasional off-grid duplicates), so this only fires when
+        the overlap is exactly zero. Observability only - does not change
+        what gets loaded.
+        """
+        if self._warned_grid_misalignment:
+            return
+        if len(original_timestamps) == 0 or len(grid_timestamps) == 0:
+            return
+        if np.any(np.isin(original_timestamps, grid_timestamps)):
+            return
+
+        self._warned_grid_misalignment = True
+
+        grid_phase_seconds = int(
+            grid_timestamps[0].astype("datetime64[s]").astype(np.int64) % interval_seconds
+        )
+        source_offsets = (
+            original_timestamps.astype("datetime64[s]").astype(np.int64) % interval_seconds
+        )
+        offsets, counts = np.unique(source_offsets, return_counts=True)
+        source_phase_seconds = int(offsets[int(np.argmax(counts))])
+
+        sample_ts = original_timestamps[0]
+        nearest_ts = grid_timestamps[int(np.argmin(np.abs(grid_timestamps - sample_ts)))]
+
+        logger.warning(
+            "%s: query returned %d row(s) but none align with the metric's %s grid "
+            "(grid phase %s, source phase %s). e.g. source row %s vs nearest grid "
+            "slot %s. Bucket the query's timestamps (toStartOfInterval / time_bucket "
+            "/ date_trunc) or set loading_start_time to match the source phase.",
+            self.config.name,
+            len(original_timestamps),
+            self.config.interval,
+            _format_offset_seconds(grid_phase_seconds),
+            _format_offset_seconds(source_phase_seconds),
+            _format_datetime64(sample_ts),
+            _format_datetime64(nearest_ts),
+        )
 
     def _extract_seasonality(
         self,

@@ -223,6 +223,119 @@ class TestGapFilling:
         assert not np.any(np.isnan(data["value"]))
 
 
+class TestGridAlignmentWarning:
+    """Test the grid-misalignment warning (issue #136)."""
+
+    def test_fully_misaligned_rows_warn_once_per_instance(
+        self, metric_loader, mock_db_manager, caplog
+    ):
+        """All rows off the 10min grid (phase :08 vs :00) -> one loud warning
+        naming both phases; a second load() on the same instance stays quiet."""
+        mock_db_manager.execute_query.return_value = [
+            {"timestamp": datetime(2026, 7, 12, 8, 28, 0), "value": 1.0},
+            {"timestamp": datetime(2026, 7, 12, 8, 38, 0), "value": 2.0},
+            {"timestamp": datetime(2026, 7, 12, 8, 48, 0), "value": 3.0},
+        ]
+
+        with caplog.at_level("WARNING"):
+            data = metric_loader.load(
+                from_date=datetime(2026, 7, 12, 8, 0, 0),
+                to_date=datetime(2026, 7, 12, 9, 0, 0),
+                fill_gaps=True,
+            )
+
+        # Grid-filled series is entirely NaN - the silent-100%-NULL trap.
+        assert len(data["timestamp"]) == 6
+        assert np.all(np.isnan(data["value"]))
+
+        warnings = [r for r in caplog.records if "align with the metric" in r.getMessage()]
+        assert len(warnings) == 1
+        message = warnings[0].getMessage()
+        assert "test_metric" in message
+        assert "3 row" in message
+        assert "10min" in message
+        assert "grid phase :00" in message
+        assert "source phase :08" in message
+        assert "2026-07-12 08:28:00" in message
+        assert "loading_start_time" in message
+
+        caplog.clear()
+
+        # Second load() on the same instance must not warn again.
+        mock_db_manager.execute_query.return_value = [
+            {"timestamp": datetime(2026, 7, 12, 9, 28, 0), "value": 4.0},
+        ]
+        with caplog.at_level("WARNING"):
+            metric_loader.load(
+                from_date=datetime(2026, 7, 12, 9, 0, 0),
+                to_date=datetime(2026, 7, 12, 10, 0, 0),
+                fill_gaps=True,
+            )
+        assert not [r for r in caplog.records if "align with the metric" in r.getMessage()]
+
+    def test_aligned_rows_do_not_warn(self, metric_loader, mock_db_manager, caplog):
+        """Rows landing on the grid are the normal case - no warning."""
+        mock_db_manager.execute_query.return_value = [
+            {"timestamp": datetime(2024, 1, 1, 0, 0), "value": 0.5},
+            {"timestamp": datetime(2024, 1, 1, 0, 10), "value": 0.6},
+        ]
+
+        with caplog.at_level("WARNING"):
+            metric_loader.load(
+                from_date=datetime(2024, 1, 1, 0, 0),
+                to_date=datetime(2024, 1, 1, 0, 30),
+                fill_gaps=True,
+            )
+
+        assert not [r for r in caplog.records if "align with the metric" in r.getMessage()]
+
+    def test_partially_misaligned_rows_do_not_warn(self, metric_loader, mock_db_manager, caplog):
+        """Some rows on-grid, some off-grid is not the silent-100%-NULL trap."""
+        mock_db_manager.execute_query.return_value = [
+            {"timestamp": datetime(2024, 1, 1, 0, 0), "value": 0.5},  # on-grid
+            {"timestamp": datetime(2024, 1, 1, 0, 28), "value": 0.6},  # off-grid
+        ]
+
+        with caplog.at_level("WARNING"):
+            metric_loader.load(
+                from_date=datetime(2024, 1, 1, 0, 0),
+                to_date=datetime(2024, 1, 1, 1, 0),
+                fill_gaps=True,
+            )
+
+        assert not [r for r in caplog.records if "align with the metric" in r.getMessage()]
+
+    def test_empty_result_does_not_warn(self, metric_loader, mock_db_manager, caplog):
+        """No rows at all is a separate (unloud) case, not this warning."""
+        mock_db_manager.execute_query.return_value = []
+
+        with caplog.at_level("WARNING"):
+            metric_loader.load(
+                from_date=datetime(2024, 1, 1, 0, 0),
+                to_date=datetime(2024, 1, 1, 1, 0),
+                fill_gaps=True,
+            )
+
+        assert not [r for r in caplog.records if "align with the metric" in r.getMessage()]
+
+    def test_misaligned_rows_do_not_warn_when_fill_gaps_disabled(
+        self, metric_loader, mock_db_manager, caplog
+    ):
+        """fill_gaps=False never maps onto a grid, so there is nothing to warn about."""
+        mock_db_manager.execute_query.return_value = [
+            {"timestamp": datetime(2026, 7, 12, 8, 28, 0), "value": 1.0},
+        ]
+
+        with caplog.at_level("WARNING"):
+            metric_loader.load(
+                from_date=datetime(2026, 7, 12, 8, 0, 0),
+                to_date=datetime(2026, 7, 12, 9, 0, 0),
+                fill_gaps=False,
+            )
+
+        assert not [r for r in caplog.records if "align with the metric" in r.getMessage()]
+
+
 class TestSeasonalityExtraction:
     """Test seasonality feature extraction."""
 

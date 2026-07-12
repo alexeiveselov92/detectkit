@@ -5,6 +5,32 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.63.0] - 2026-07-12
+
+### Added
+- **Loader warning on a fully grid-misaligned batch** (#136). Gap-filling
+  matches source rows to the metric's time grid by exact timestamp, so a
+  query whose timestamps sit on a different grid *phase* (e.g. rows at `:28`
+  against a `10min` grid phased at `:00` by `loading_start_time`) used to
+  load 100% NULL silently — reading as "my data is gone". The loader now
+  emits a one-time warning per metric per run when a batch returned rows but
+  **none** landed on the grid, naming the interval, the grid phase and the
+  observed source phase, a concrete source-row-vs-nearest-grid-slot example,
+  and the fix (bucket the query's timestamps with
+  `toStartOfInterval`/`time_bucket`/`date_trunc`, or align
+  `loading_start_time` with the source phase). Partial alignment, empty
+  results, and `fill_gaps=False` never warn; what gets loaded is unchanged.
+  The query contract note in the metrics guide now spells out the
+  grid-bucketing requirement.
+- **Landing: all four wave-1 channels joined the alert-preview selector**
+  (#130) — the "same alert on every channel" demo now renders Discord
+  (status-colored embed with the inline field grid), Microsoft Teams
+  (Adaptive Card posted under the flow's identity — no branding, honestly),
+  Google Chat (Cards v2 with the brand header) and ntfy (a push notification
+  with the tag-emoji status cue and per-kind priority) alongside
+  Slack/Mattermost/Telegram/Email, in both anomaly and recovery states,
+  mirroring the real channel modules' default output. Website-only change.
+
 ## [0.62.1] - 2026-07-12
 
 ### Fixed

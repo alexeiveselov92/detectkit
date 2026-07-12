@@ -5,6 +5,38 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.62.1] - 2026-07-12
+
+### Fixed
+- **Documentation refresh across every surface** — closed the gaps left by the
+  v0.58–v0.62 feature wave:
+  - Corrected the documented **DuckDB version floor to 1.1+** (was wrongly
+    "0.10+" in the databases overview, the DuckDB guide, and the installation
+    page — duckdb < 1.1 breaks the alert step's list-parameter query).
+  - Installation page now documents the **`[mcp]` extra** and the `[all]`
+    extra's real contents (all DB drivers + Prophet/TimesFM + OSI interop +
+    MCP SDK).
+  - The internal-tables reference now describes all **five** backends
+    (MariaDB and DuckDB were missing from its backend/dedup notes).
+  - CLI reference: `dtk init --db-type` (clickhouse/postgres/mysql/mariadb)
+    is now documented with an example.
+  - Docs index: the Guides list gained the missing **Databases** and
+    **Hybrid mode** entries, and hybrid mode is now introduced in the
+    Database Support section.
+  - README: `detectkit[duckdb]` install example; the `dtk init-claude` bullet
+    now says **five** skills (was "three").
+  - `dtk init-claude` assets: the overview rule now names all five backends;
+    the CLI rule's Scheduling section now surfaces the composite
+    **GitHub Action**.
+  - Contributor rules: project-layout tree gained the `ui/` and `mcp/`
+    packages and the MariaDB/DuckDB backends; dev-setup extras list now
+    includes `mariadb`, `duckdb`, `osi`, `mcp`.
+  - Landing page: the hero "Works with" badges now include **MariaDB** and
+    **DuckDB**, and the "Alerts to" badges now include **Discord, Microsoft
+    Teams, Google Chat and ntfy** (the icon set was never extended when the
+    wave-1 channels shipped in v0.59.0).
+  - GitHub Action guide examples pin to the current release tag.
+
 ## [0.62.0] - 2026-07-12
 
 ### Added

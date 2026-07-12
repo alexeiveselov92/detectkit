@@ -4,7 +4,9 @@
 // "logo in a chip" treatment, but on the light chip the channel marks need
 // (ChannelIcon.astro): Slack's mark is four-color and Telegram's plane is a
 // cut-out, so the chip stays light. Names take each platform's brand color;
-// Webhook is the generic catch-all channel in the neutral slate.
+// Webhook is the generic catch-all channel in the neutral slate. Discord/
+// Teams/Google Chat/ntfy are the "channels wave 1" additions — same
+// treatment, each named in its own brand color.
 import ChannelIcon from './ChannelIcon.astro';
 ---
 
@@ -14,4 +16,8 @@ import ChannelIcon from './ChannelIcon.astro';
   <span class="ch-badge" style="--ch-name:#26A5E4"><ChannelIcon name="telegram" />Telegram</span>
   <span class="ch-badge" style="--ch-name:var(--clay-700)"><ChannelIcon name="email" />Email</span>
   <span class="ch-badge" style="--ch-name:#5A7A8C"><ChannelIcon name="webhook" />Webhook</span>
+  <span class="ch-badge" style="--ch-name:#5865F2"><ChannelIcon name="discord" />Discord</span>
+  <span class="ch-badge" style="--ch-name:#6264A7"><ChannelIcon name="teams" />Teams</span>
+  <span class="ch-badge" style="--ch-name:#00AC47"><ChannelIcon name="googlechat" />Google Chat</span>
+  <span class="ch-badge" style="--ch-name:#317F6F"><ChannelIcon name="ntfy" />ntfy</span>
 </div>

@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run detectkit
-        uses: alexeiveselov92/detectkit@v0.62.0   # pin to a released tag
+        uses: alexeiveselov92/detectkit@v0.62.1   # pin to a released tag
         env:
           CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
           MATTERMOST_WEBHOOK_URL: ${{ secrets.MATTERMOST_WEBHOOK_URL }}
@@ -87,7 +87,7 @@ step's own pass/fail:
 ```yaml
 - name: Run detectkit
   id: dtk
-  uses: alexeiveselov92/detectkit@v0.62.0
+  uses: alexeiveselov92/detectkit@v0.62.1
   continue-on-error: true   # don't fail the job here — we'll decide below
   with:
     select: "tag:critical"
@@ -116,7 +116,7 @@ counters, timing, and the exit code, as one JSON document. Pull it apart with
 ```yaml
 - name: Run detectkit
   id: dtk
-  uses: alexeiveselov92/detectkit@v0.62.0
+  uses: alexeiveselov92/detectkit@v0.62.1
   with:
     select: "*"
 
@@ -151,7 +151,7 @@ GitHub Actions applies a step's `env:` context to a composite action's
 
 ```yaml
 - name: Run detectkit
-  uses: alexeiveselov92/detectkit@v0.62.0
+  uses: alexeiveselov92/detectkit@v0.62.1
   env:
     CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
     MATTERMOST_WEBHOOK_URL: ${{ secrets.MATTERMOST_WEBHOOK_URL }}

@@ -69,6 +69,10 @@ Name of the project to create.
 **`--target-dir`, `-d`** (default: `.`)
 Directory to create project in.
 
+**`--db-type`** (default: `clickhouse`)
+Database backend to scaffold the dev/prod profiles and example query for.
+One of `clickhouse`, `postgres`, `mysql`, `mariadb`.
+
 #### Examples
 
 Create project in current directory:
@@ -79,6 +83,11 @@ dtk init my_monitoring
 Create project in specific directory:
 ```bash
 dtk init analytics --target-dir /opt/projects
+```
+
+Scaffold for a MariaDB backend:
+```bash
+dtk init my_monitoring --db-type mariadb
 ```
 
 #### Created Structure

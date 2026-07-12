@@ -28,7 +28,7 @@
 - **Hybrid mode** — read metric SQL from a billed-per-query warehouse while all pipeline state lives in a cheap local database
 - **Idempotent** — resume from interruptions, no duplicate processing
 - **CLI** — `dtk init`, `dtk run --select`, `dtk unlock`, `dtk clean`, tag-based selectors
-- **AI-native onboarding** — `dtk init-claude` sets up Claude Code context (CLAUDE.md + rules + three skills) so an assistant can scaffold metrics, configure databases, and file feedback upstream
+- **AI-native onboarding** — `dtk init-claude` sets up Claude Code context (CLAUDE.md + rules + five skills) so an assistant can scaffold metrics, configure databases, and file feedback upstream
 
 ## Installation
 
@@ -40,6 +40,7 @@ With database drivers:
 
 ```bash
 pip install detectkit[clickhouse]   # ClickHouse
+pip install detectkit[duckdb]       # DuckDB - single file, no server
 pip install detectkit[all-db]       # All databases
 ```
 

@@ -9,9 +9,21 @@
 // Mattermost/Telegram/Email use their single brand color; the Telegram plane
 // is the logo's own cut-out, so the chip must stay light. Webhook is the
 // generic catch-all channel — a neutral link glyph in the pipeline-error
-// slate (--st-error), since it has no platform brand of its own.
+// slate (--st-error), since it has no platform brand of its own. Discord/
+// Teams/Google Chat/ntfy (the "channels wave 1" set) predate the brand guide,
+// so their marks are hand-simplified glyphs in each platform's real brand
+// color rather than official logo paths.
 interface Props {
-  name: 'slack' | 'mattermost' | 'telegram' | 'email' | 'webhook';
+  name:
+    | 'slack'
+    | 'mattermost'
+    | 'telegram'
+    | 'email'
+    | 'webhook'
+    | 'discord'
+    | 'teams'
+    | 'googlechat'
+    | 'ntfy';
 }
 const { name } = Astro.props;
 ---
@@ -69,6 +81,49 @@ const { name } = Astro.props;
       >
         <rect x="2" y="4.5" width="20" height="15" rx="2.5" />
         <path d="m3 6 9 6 9-6" />
+      </svg>
+    )
+  }
+  {
+    name === 'discord' && (
+      <svg viewBox="0 0 24 24" fill="#5865F2" aria-hidden="true">
+        <path d="M12 3c-4.5 0-7.5 2.7-7.5 8.2 0 4.4 2.2 7.6 4.6 9 .5.3.9-.1.7-.6-.2-.5-.4-1-.5-1.5.4.1.8.1 1.2.1h3c.4 0 .8 0 1.2-.1-.1.5-.3 1-.5 1.5-.2.5.2.9.7.6 2.4-1.4 4.6-4.6 4.6-9C19.5 5.7 16.5 3 12 3z" />
+        <circle cx="9" cy="11.5" r="1.3" fill="#fff" />
+        <circle cx="15" cy="11.5" r="1.3" fill="#fff" />
+      </svg>
+    )
+  }
+  {
+    name === 'teams' && (
+      <svg viewBox="0 0 24 24" fill="#6264A7" aria-hidden="true">
+        <rect x="3" y="5" width="14" height="10" rx="3" />
+        <path d="M6 15v3l4-3z" />
+        <circle cx="8" cy="10" r="1.6" fill="#fff" />
+        <circle cx="12.5" cy="10" r="1.6" fill="#fff" />
+      </svg>
+    )
+  }
+  {
+    name === 'googlechat' && (
+      <svg viewBox="0 0 24 24" fill="#00AC47" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="13" rx="4" />
+        <path d="M7 17v4l5-4z" />
+      </svg>
+    )
+  }
+  {
+    name === 'ntfy' && (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#317F6F"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
       </svg>
     )
   }

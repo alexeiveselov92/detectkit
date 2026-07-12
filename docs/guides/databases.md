@@ -10,7 +10,7 @@ first-class, fully working targets:
 | **Install extra** | `detectkit[clickhouse]` | `detectkit[postgres]` | `detectkit[mysql]` / `detectkit[mariadb]` | `detectkit[duckdb]` |
 | **Driver** | `clickhouse-driver` | `psycopg2-binary` | `pymysql` | `duckdb` |
 | **Default port** | `9000` (native) | `5432` | `3306` | — (in-process, no server) |
-| **Min version** | 20.3+ | 12+ | MySQL 8.0+, MariaDB 10.4+ | 0.10+ |
+| **Min version** | 20.3+ | 12+ | MySQL 8.0+, MariaDB 10.4+ | 1.1+ |
 | **Location model** | two **databases** | one database, two **schemas** | two **databases** | one file, two **schemas** |
 | **`profiles.yml` location fields** | `internal_database`, `data_database` | `database` + `internal_schema`, `data_schema` | `internal_database`, `data_database` | `path` + `internal_schema`, `data_schema` |
 | **Internal dedup** | `ReplacingMergeTree` (version-collapse) | enforced PK + `ON CONFLICT` upsert | enforced PK + `ON DUPLICATE KEY UPDATE` (MariaDB: `VALUES()` form) | enforced PK + `ON CONFLICT` upsert (same shape as PostgreSQL) |

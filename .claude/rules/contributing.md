@@ -14,7 +14,7 @@ detectkit/
 │   │   └── assets/claude # AI-assistant context shipped by `dtk init-claude`
 │   ├── config/           # Pydantic config models & loaders
 │   ├── core/             # Interval parsing, dataclasses, table models
-│   ├── database/         # Database managers (ClickHouse, Postgres, MySQL)
+│   ├── database/         # Database managers (ClickHouse, Postgres, MySQL/MariaDB, DuckDB)
 │   ├── loaders/          # Metric data loading + gap filling
 │   ├── detectors/        # Anomaly detectors (statistical/ + factory)
 │   ├── alerting/         # Alert orchestration + channels
@@ -22,7 +22,9 @@ detectkit/
 │   ├── autotune/         # `dtk autotune` engine (seasonality/detector/grid search)
 │   ├── reporting/        # Self-contained HTML reports (`dtk run/autotune --report`)
 │   ├── tuning/           # `dtk tune` interactive manual tuning (write-back in place)
+│   ├── ui/               # `dtk ui` project-wide monitoring cockpit
 │   ├── semantic/         # OSI (Open Semantic Interchange) interop (`dtk osi` import/export)
+│   ├── mcp/              # `dtk mcp` read-only MCP server
 │   └── utils/            # Numpy/stats helpers, env interpolation
 ├── tests/                # Unit (numpy/mock) + integration (testcontainers)
 ├── benchmarks/           # Offline public-dataset benchmark harness (dev tooling, not in the wheel)
@@ -36,15 +38,15 @@ database driver you work against (extra names are defined in `pyproject.toml`
 under `[project.optional-dependencies]`):
 
 ```bash
-# dev tooling + ClickHouse driver (other extras: postgres, mysql, all-db)
+# dev tooling + ClickHouse driver (other extras: postgres, mysql, mariadb, duckdb, all-db)
 pip install -e ".[dev,clickhouse]"
 
 # install the git hooks
 pre-commit install
 ```
 
-Other extras: `prophet`, `timesfm`, `advanced-detectors`, `all`, and
-`integration` (testcontainers for Docker-backed integration tests).
+Other extras: `prophet`, `timesfm`, `advanced-detectors`, `osi`, `mcp`, `all`,
+and `integration` (testcontainers for Docker-backed integration tests).
 
 The `dtk` console script is wired in `pyproject.toml`
 (`[project.scripts] dtk = "detectkit.cli.main:cli"`).

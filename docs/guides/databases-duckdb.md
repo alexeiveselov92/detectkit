@@ -23,8 +23,12 @@ below before pointing a scheduled `dtk run` and `dtk ui` at the same file.
 ## Install
 
 ```bash
-pip install "detectkit[duckdb]"   # driver: duckdb 0.10+ (bundles the engine, nothing else to install)
+pip install "detectkit[duckdb]"   # driver: duckdb 1.1+ (bundles the engine, nothing else to install)
 ```
+
+DuckDB **1.1** is the floor because the alert step's `timestamp IN
+%(timestamps)s` list-parameter query only parses from duckdb 1.1 — an older
+version raises a syntax error at that query.
 
 ## profiles.yml
 

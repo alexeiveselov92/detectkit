@@ -458,6 +458,13 @@ fail their step when `dtk run` / `dtk autotune` / `dtk clean` exits non-zero
 (see "Exit codes" above), and can additionally parse `dtk run --json`'s stdout
 summary for per-metric detail.
 
+On GitHub Actions specifically, detectkit ships a ready-made composite action
+instead of hand-rolling those steps: `uses: alexeiveselov92/detectkit@vX.Y.Z`
+installs detectkit from PyPI and runs `dtk run` / `dtk autotune` / `dtk clean`
+in a given project directory. It surfaces the 0/1/2 exit-code contract (see
+"Exit codes" above) as the job's own outcome, and exposes the
+`dtk run --json` summary as an action output for downstream steps to consume.
+
 ## Troubleshooting
 
 - **"Metric not found"** — selector doesn't match. Use the bare name

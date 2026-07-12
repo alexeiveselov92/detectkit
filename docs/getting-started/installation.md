@@ -6,7 +6,7 @@ This guide covers installing detectkit and its dependencies.
 
 - **Python**: 3.10 or higher
 - **pip**: Latest version recommended
-- **Database**: ClickHouse (20.3+), PostgreSQL (12+), MySQL (8.0+), MariaDB (10.4+), or DuckDB (0.10+) — all fully supported (DuckDB needs no server at all)
+- **Database**: ClickHouse (20.3+), PostgreSQL (12+), MySQL (8.0+), MariaDB (10.4+), or DuckDB (1.1+) — all fully supported (DuckDB needs no server at all)
 
 ## Basic Installation
 
@@ -104,7 +104,7 @@ Or install the driver manually:
 pip install duckdb
 ```
 
-**Supported versions**: DuckDB 0.10+. The `duckdb` package bundles the full
+**Supported versions**: DuckDB 1.1+. The `duckdb` package bundles the full
 engine, so there's nothing else to install or run. See the [DuckDB
 guide](../guides/databases-duckdb.md) for the profile shape and its
 single-writer operational caveat (a DuckDB file supports only one read-write
@@ -161,10 +161,22 @@ Install both Prophet and TimesFM (no database drivers):
 pip install detectkit[advanced-detectors]
 ```
 
+### MCP server
+
+```bash
+pip install detectkit[mcp]
+```
+
+`dtk mcp` is a strictly read-only [Model Context Protocol](https://modelcontextprotocol.io)
+stdio server that gives an AI assistant read access to a project's `_dtk_*`
+state — metric configs, datapoints, detections, replayed alert history, and
+autotune runs. See the [MCP guide](../guides/mcp.md) for the full walkthrough.
+
 ### Everything
 
 The `[all]` extra installs **everything** — all four database drivers
-(including DuckDB) plus Prophet and TimesFM, not just the advanced detectors:
+(including DuckDB), Prophet and TimesFM, the [OSI interop](../guides/osi.md)
+dependency (`sqlglot`), and the [MCP server](../guides/mcp.md) SDK:
 
 ```bash
 pip install detectkit[all]

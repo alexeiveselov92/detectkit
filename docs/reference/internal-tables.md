@@ -11,13 +11,14 @@ See the [Profiles configuration](../guides/configuration-profiles.md) for where
 these live. All tables are auto-created on first run (`ensure_tables()`, idempotent).
 
 > **Database note.** Column types below are shown ClickHouse-flavored, but
-> detectkit runs on ClickHouse, PostgreSQL and MySQL — all six tables exist on
-> all three backends with portable-equivalent types. The primary keys are
-> enforced on every backend; the storage **engines** (`ReplacingMergeTree` /
-> `MergeTree`) are ClickHouse-specific. On ClickHouse, reads of a
-> `ReplacingMergeTree` table need `FINAL` to collapse superseded versions, while
-> PostgreSQL/MySQL enforce the primary key so a plain `SELECT` is already
-> deduplicated.
+> detectkit runs on ClickHouse, PostgreSQL, MySQL/MariaDB and DuckDB — all six
+> tables exist on all five backends with portable-equivalent types. The primary
+> keys are enforced on every backend; the storage **engines**
+> (`ReplacingMergeTree` / `MergeTree`) are ClickHouse-specific. On ClickHouse,
+> reads of a `ReplacingMergeTree` table need `FINAL` to collapse superseded
+> versions, while the SQL backends (PostgreSQL/MySQL/MariaDB/DuckDB) enforce the
+> primary key directly, so a plain `SELECT` is already deduplicated (DuckDB uses
+> the same PostgreSQL-shaped version-aware `ON CONFLICT` upsert).
 
 Every table is keyed by `metric_name`, so deleting a metric's YAML leaves orphan
 rows that [`dtk clean`](cli.md#dtk-clean) prunes (except `_dtk_autotune_runs`,
@@ -167,7 +168,8 @@ Dedup is by **primary key + `INSERT IGNORE` semantics**. For the append tables
 (`_dtk_datapoints`, `_dtk_detections`, `_dtk_alert_states`, `_dtk_autotune_runs`)
 this is reinforced by `ReplacingMergeTree`, which collapses duplicate keys by the
 version column (`created_at` / `updated_at`). On ClickHouse you must read with
-`FINAL` to see the collapsed result; PostgreSQL/MySQL enforce the key directly.
+`FINAL` to see the collapsed result; the SQL backends
+(PostgreSQL/MySQL/MariaDB/DuckDB) enforce the key directly.
 Every pipeline stage also resumes from the last persisted timestamp, so re-running
 `dtk run` never reprocesses or double-writes.
 

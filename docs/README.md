@@ -70,6 +70,8 @@ dtk run --select cpu_usage
 
 ### Guides
 - **[Configuration](guides/configuration.md)** - Complete configuration reference
+- **[Databases](guides/databases.md)** - Per-backend breakdown (ClickHouse, PostgreSQL, MySQL/MariaDB, DuckDB)
+- **[Hybrid mode](guides/hybrid-mode.md)** - Load metric SQL from one database while `_dtk_*` state lives in another
 - **[Detectors](guides/detectors.md)** - Choosing and configuring detectors
 - **[Auto-tuning](guides/autotuning.md)** - Let `dtk autotune` pick the detector, params and seasonality for you
 - **[Tuning by hand](guides/tuning.md)** - Interactively tune a detector on its real data and write it back (`dtk tune`, the manual sibling of autotune)
@@ -210,6 +212,11 @@ Works with your existing data warehouse — all backends are first-class:
 Only the connection and the SQL dialect of your metric queries differ; detectors,
 alerting and the CLI are identical. See the [Databases guide](guides/databases.md)
 for the per-backend breakdown.
+
+**Hybrid mode:** a metric's `source_profile` can point its load query at a
+*different* profile's database — e.g. a billed warehouse — while every
+`_dtk_*` table still lives in your regular state profile. See the
+[Hybrid mode guide](guides/hybrid-mode.md).
 
 ## Architecture
 

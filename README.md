@@ -24,7 +24,7 @@
 - **@mentions** — tag users/groups in alerts, each channel formats natively
 - **Alert lifecycle** — consecutive anomalies, fraction-of-window rule (`anomaly_window` + `min_anomaly_share`), cooldown, recovery notifications, no-data alerts
 - **Project-level error alerts** — catch DB outages and pipeline crashes once per run
-- **Database agnostic** — ClickHouse, PostgreSQL, MySQL
+- **Database agnostic** — ClickHouse, PostgreSQL, MySQL/MariaDB, DuckDB (no server needed)
 - **Idempotent** — resume from interruptions, no duplicate processing
 - **CLI** — `dtk init`, `dtk run --select`, `dtk unlock`, `dtk clean`, tag-based selectors
 - **AI-native onboarding** — `dtk init-claude` sets up Claude Code context (CLAUDE.md + rules + three skills) so an assistant can scaffold metrics, configure databases, and file feedback upstream

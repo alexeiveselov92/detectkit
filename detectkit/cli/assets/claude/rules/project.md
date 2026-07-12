@@ -116,10 +116,12 @@ alert_channels:
 
 ### Database profiles
 
-> ClickHouse, PostgreSQL, MySQL and MariaDB are all fully supported.
+> ClickHouse, PostgreSQL, MySQL, MariaDB and DuckDB are all supported.
 > ClickHouse/MySQL/MariaDB use two *databases*; PostgreSQL connects to one
-> `database` and uses two *schemas*.
-> `dtk init --db-type {clickhouse,postgres,mysql,mariadb}` scaffolds the right shape.
+> `database` and uses two *schemas*; DuckDB is a single *file* (or `:memory:`
+> for tests) holding two *schemas*.
+> `dtk init --db-type {clickhouse,postgres,mysql,mariadb}` scaffolds the right
+> shape — DuckDB profiles are written by hand (not yet a `--db-type` choice).
 
 **ClickHouse**:
 ```yaml
@@ -172,6 +174,25 @@ mariadb` instead of `type: mysql`. The vendor (MySQL vs MariaDB) is
 auto-detected at connect (`SELECT VERSION()`), so MariaDB gets its own
 `VALUES()`-form upsert instead of MySQL 8.0.19's row-alias form.
 `pip install 'detectkit[mariadb]'`.
+
+**DuckDB** (embedded, single file; two schemas like PostgreSQL):
+```yaml
+profiles:
+  prod:
+    type: duckdb
+    path: /var/lib/detectkit/warehouse.duckdb   # required — file path, or ":memory:"
+    internal_schema: detectkit     # optional — _dtk_* tables (default: "detectkit")
+    data_schema: main              # optional — data queries (default: "main")
+    read_only: false               # optional (default: false)
+    settings: {}                   # optional — extra duckdb.connect() config options
+```
+> Single-writer: DuckDB allows only **one** read-write connection to the file
+> at a time — a `dtk ui`/`dtk tune` session left open will clash with a
+> separately spawned `dtk run` against the same file. Point a read-only
+> consumer at it with `read_only: true`.
+> `path: ":memory:"` has no on-disk state, so resume/idempotency breaks across
+> process restarts — use it for tests/scratch only, never a real project.
+> `pip install 'detectkit[duckdb]'`.
 
 ### Alert channels
 

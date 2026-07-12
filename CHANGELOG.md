@@ -5,6 +5,34 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.60.0] - 2026-07-12
+
+### Added
+- **DuckDB backend** (`type: duckdb`, `pip install detectkit[duckdb]`,
+  duckdb >= 1.1). An in-process, single-file analytical database — no server,
+  no credentials; the fastest way to run detectkit locally, in CI, or on a
+  laptop. The profile takes `path` (the database file; `:memory:` works for
+  one-off tests but breaks resume between runs) plus optional
+  `internal_schema` / `data_schema` / `read_only`. Implemented as a
+  `SQLDatabaseManager` subclass behind a small DB-API adapter (DuckDB's
+  Python API takes `$name`/`?` placeholders and autocommits, so the adapter
+  translates `%(name)s` and manages lazy explicit transactions), with the
+  PostgreSQL-shaped version-aware `ON CONFLICT` upsert mirroring
+  `ReplacingMergeTree` last-writer-wins semantics. The version floor is 1.1
+  because the alert step's `IN`-list parameter query only parses from
+  duckdb 1.1 (verified against real 0.10 / 1.0 / 1.1 engines). Operational
+  model, documented in the new DuckDB guide: the file is held **read-write by
+  one process at a time** (readers coexist only with `read_only: true`), so
+  a long-lived `dtk ui` and a concurrently spawned `dtk run` against the same
+  file conflict — run-then-look. Real-engine tests run in the unit suite (no
+  Docker) including an end-to-end internal-tables round trip.
+
+### Changed
+- `ProfileConfig.port` is now optional and enforced **per backend type**: the
+  server backends (clickhouse/postgres/mysql/mariadb) still require it (with a
+  clearer "port is required for database type 'x'" error), while DuckDB
+  profiles omit it entirely.
+
 ## [0.59.0] - 2026-07-12
 
 ### Added

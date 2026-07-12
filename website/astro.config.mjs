@@ -63,6 +63,7 @@ export default defineConfig({
                 { label: 'ClickHouse', link: '/guides/databases-clickhouse/' },
                 { label: 'PostgreSQL', link: '/guides/databases-postgres/' },
                 { label: 'MySQL', link: '/guides/databases-mysql/' },
+                { label: 'DuckDB', link: '/guides/databases-duckdb/' },
               ],
             },
             {

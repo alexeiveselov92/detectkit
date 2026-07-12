@@ -26,14 +26,17 @@ alert_channels:
 
 ### Database Profiles
 
-ClickHouse, PostgreSQL, MySQL, and MariaDB are all fully supported. The
-connection fields differ per backend (ClickHouse/MySQL/MariaDB use
-**databases**; PostgreSQL connects to a `database` and uses **schemas**). See
-the per-backend [Databases guide](databases.md) for a focused walkthrough of
-each. MariaDB uses the MySQL backend — set `type: mariadb` (an alias with
-identical fields) or keep `type: mysql` against a MariaDB server; either way
-the vendor is auto-detected at connect. See the [MySQL
-guide](databases-mysql.md#mariadb) for the MariaDB-specific notes.
+ClickHouse, PostgreSQL, MySQL, MariaDB, and DuckDB are all fully supported.
+The connection fields differ per backend (ClickHouse/MySQL/MariaDB use
+**databases**; PostgreSQL and DuckDB use **schemas** — PostgreSQL connects to
+a `database`, DuckDB opens a file at `path`). See the per-backend [Databases
+guide](databases.md) for a focused walkthrough of each. MariaDB uses the
+MySQL backend — set `type: mariadb` (an alias with identical fields) or keep
+`type: mysql` against a MariaDB server; either way the vendor is
+auto-detected at connect. See the [MySQL guide](databases-mysql.md#mariadb)
+for the MariaDB-specific notes, and the [DuckDB
+guide](databases-duckdb.md#single-writer-one-process-at-a-time) for its
+single-writer caveat.
 
 #### ClickHouse Profile
 
@@ -137,6 +140,37 @@ profiles:
 - `password`: Password (default: empty string)
 - `database`: Optional default database for the connection
 - `settings`: Extra `pymysql.connect` keyword arguments
+
+#### DuckDB Profile
+
+DuckDB is an **in-process, single-file** database — there's no host, port,
+user or password, just a file `path` (or `:memory:`). Internal/data tables
+live in **schemas** inside that one file, same location model as PostgreSQL.
+See the [DuckDB guide](databases-duckdb.md) for the full walkthrough,
+including the **single read-write connection at a time** caveat before
+pointing a scheduled `dtk run` and a long-lived `dtk ui` at the same file.
+
+```yaml
+profiles:
+  dev:
+    type: duckdb
+    path: "./detectkit.duckdb"     # file path (created if it doesn't exist), or ":memory:"
+
+    internal_schema: detectkit     # schema for _dtk_* tables (auto-created)
+    data_schema: main              # schema for your data queries (DuckDB's default schema)
+```
+
+**Required fields**:
+- `type`: Must be `"duckdb"`
+- `path`: Database file path (created if it doesn't exist), or the literal
+  `":memory:"` (transient — tests/preview only, state is lost on exit)
+
+**Optional fields**:
+- `internal_schema` (default: `"detectkit"`) - Schema for `_dtk_*` tables (detectkit creates it)
+- `data_schema` (default: `"main"`) - Schema for data queries
+- `read_only` (default: `false`) - Open the file read-only; required when
+  another process already holds it read-write
+- `settings`: Extra `duckdb.connect(..., config=...)` options (e.g. `memory_limit`)
 
 ### Alert Channels
 

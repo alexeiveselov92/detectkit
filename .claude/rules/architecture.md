@@ -5,7 +5,7 @@ automatic anomaly detection. It is built around a three-stage pipeline —
 **load → detect → alert** — driven by a dbt-like CLI (`dtk`) over YAML configs.
 Core principles: **numpy-first** (no pandas in core logic; only in optional
 helpers), **database-agnostic** (a generic manager interface with ClickHouse,
-PostgreSQL and MySQL backends), **idempotent / resumable** (every stage resumes from the
+PostgreSQL, MySQL/MariaDB and DuckDB backends), **idempotent / resumable** (every stage resumes from the
 last persisted timestamp), **modular** (small focused files, packages split into
 mixins so nothing grows past ~250 lines), and **type-safe** (pydantic configs +
 type hints throughout).
@@ -74,6 +74,7 @@ detectkit/
 │   ├── _sql_manager.py          # SQLDatabaseManager (shared base for Postgres/MySQL)
 │   ├── postgres_manager.py      # PostgresDatabaseManager (psycopg2)
 │   ├── mysql_manager.py         # MySQLDatabaseManager (pymysql)
+│   ├── duckdb_manager.py        # DuckDBDatabaseManager (in-process file DB + DB-API adapter)
 │   ├── tables.py                # TableModel factories for all _dtk_* tables
 │   └── internal_tables/         # InternalTablesManager: per-table mixins over the manager
 ├── loaders/
@@ -144,7 +145,7 @@ interface of **generic** operations keyed by `table_name` — it deliberately do
 - `final_modifier` — dedup-read modifier (`" FINAL"` on ClickHouse, `""` elsewhere)
 - `internal_location` / `data_location` properties + `get_full_table_name(...)`
 
-Three backends implement this interface:
+Four backends implement this interface:
 
 - `clickhouse_manager.py` (`ClickHouseDatabaseManager`) — native protocol via
   `clickhouse-driver`. Auto-creates the internal/data databases on connect.
@@ -167,9 +168,27 @@ Three backends implement this interface:
   a detected MariaDB server falls back to the pre-8.0.19 `VALUES()` upsert form
   (the row-alias form is MySQL-only); `type: mariadb` is an identical profile
   alias for clarity.
+- `duckdb_manager.py` (`DuckDBDatabaseManager`, duckdb >= 1.1) — an
+  **in-process single-file** backend (no server/credentials; profile takes
+  `path` — or `:memory:`, tests-only since it breaks resume — plus optional
+  `read_only`). DuckDB's Python API takes `$name`/`?` placeholders and
+  autocommits, so a small **DB-API adapter** (placeholder translation
+  `%(name)s → $name`, lazy explicit transactions, cursor context manager)
+  lets the shared `SQLDatabaseManager` flow and every internal-tables query
+  run unmodified; `delete_rows` is overridden (DuckDB reports DELETE counts
+  as a result row, not `rowcount`). Upsert is the PostgreSQL `ON CONFLICT`
+  shape with the same version guard. The floor is 1.1 because the alert
+  step's `timestamp IN %(timestamps)s` list-parameter query only parses from
+  duckdb 1.1. Operationally the file is held read-write by **one process at
+  a time** (readers need `read_only=True`), so `dtk ui`'s long-lived server
+  conflicts with a concurrently spawned `dtk run` — run-then-look; the real
+  engine runs in the unit suite (`tests/unit/test_duckdb_manager.py`, no
+  Docker).
 
 `ProfileConfig.create_manager()` (`detectkit/config/profile.py`) builds the right
-backend from `type`; PostgreSQL additionally requires a `database` connect-target.
+backend from `type`; PostgreSQL additionally requires a `database` connect-target,
+DuckDB a `path` (`port` is optional only for DuckDB — a per-type validator
+enforces it for the server backends).
 
 The `TableModel` carries a `version_column` (the last-writer-wins key encoded as
 `ReplacingMergeTree(<col>)` on ClickHouse and driving the version-aware upsert on

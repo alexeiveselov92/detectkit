@@ -37,6 +37,21 @@ def test_init_mariadb_profile_validates_and_uses_mysql_shape(tmp_path):
     assert dev.get_data_location() == "analytics"
 
 
+@pytest.mark.parametrize("db_type", ["clickhouse", "postgres", "mysql", "mariadb"])
+def test_init_scaffold_carries_commented_duckdb_example(tmp_path, db_type):
+    """Every scaffold ships a commented duckdb example, and the file with the
+    commented block present still parses."""
+    from detectkit.config.profile import ProfilesConfig
+
+    run_init("demo", str(tmp_path), db_type=db_type)
+    profiles_path = tmp_path / "demo" / "profiles.yml"
+    text = profiles_path.read_text()
+    assert "type: duckdb" in text
+    # The example is commented out, not an active profile.
+    assert all(line.lstrip().startswith("#") for line in text.splitlines() if "duckdb" in line)
+    ProfilesConfig.from_yaml(profiles_path)
+
+
 def test_init_example_metric_is_valid(tmp_path):
     run_init("demo", str(tmp_path), db_type="clickhouse")
     metric_path = tmp_path / "demo" / "metrics" / "example_cpu_usage.yml"

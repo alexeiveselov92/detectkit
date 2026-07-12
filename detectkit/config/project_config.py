@@ -139,6 +139,8 @@ class ProjectConfig(BaseModel):
         tables: Default table names
         timeouts: Operation timeouts
         default_profile: Default database profile to use
+        source_profile: Default hybrid-mode source profile (see
+            MetricConfig.source_profile)
 
     Example YAML:
         ```yaml
@@ -222,6 +224,19 @@ class ProjectConfig(BaseModel):
             "Default data-maturity delay before the newest interval is trusted "
             "as complete (duration string like '10min' or seconds). Per-metric "
             "loading_delay overrides it; 0 on a metric opts out."
+        ),
+    )
+    # Project-wide default source profile for hybrid mode (see
+    # MetricConfig.source_profile). Useful when most metrics read from the
+    # same source database that differs from where _dtk_* state lives. A
+    # per-metric source_profile overrides it; unset on both means every
+    # metric's SQL runs through the active state profile (today's behavior).
+    source_profile: str | None = Field(
+        default=None,
+        description=(
+            "Default profiles.yml profile whose database runs metric SQL "
+            "(hybrid mode); _dtk_* state stays in the active (state) "
+            "profile. Per-metric source_profile overrides it."
         ),
     )
 

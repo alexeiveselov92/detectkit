@@ -395,3 +395,58 @@ class TestLoadAndSave:
 
         with pytest.raises(ValueError, match="No existing data"):
             metric_loader.load_and_save()
+
+
+class TestSourceDatabaseErrorWrapping:
+    """Hybrid mode: a source query failure is wrapped only when a
+    source_profile_name was actually passed to the loader."""
+
+    def test_query_failure_wrapped_when_source_profile_name_set(
+        self, metric_config, mock_db_manager, mock_internal_manager
+    ):
+        from detectkit.loaders.errors import SourceDatabaseError
+
+        mock_db_manager.execute_query.side_effect = ConnectionError("source unreachable")
+        loader = MetricLoader(
+            metric_config,
+            mock_db_manager,
+            mock_internal_manager,
+            source_profile_name="warehouse",
+        )
+
+        with pytest.raises(SourceDatabaseError) as exc_info:
+            loader.load(from_date=datetime(2024, 1, 1), to_date=datetime(2024, 1, 1, 1))
+
+        assert exc_info.value.profile_name == "warehouse"
+        assert isinstance(exc_info.value.original, ConnectionError)
+        assert "source database (profile 'warehouse')" in str(exc_info.value)
+        assert "source unreachable" in str(exc_info.value)
+        # The original exception chains through (`raise ... from exc`).
+        assert exc_info.value.__cause__ is exc_info.value.original
+
+    def test_query_failure_not_wrapped_without_source_profile_name(
+        self, metric_loader, mock_db_manager
+    ):
+        """The default (no hybrid mode) leaves the raw exception untouched —
+        the query ran through the same connection as state, so there's
+        nothing to disambiguate."""
+        mock_db_manager.execute_query.side_effect = ConnectionError("db down")
+
+        with pytest.raises(ConnectionError, match="db down"):
+            metric_loader.load(from_date=datetime(2024, 1, 1), to_date=datetime(2024, 1, 1, 1))
+
+    def test_non_query_failure_not_wrapped_even_with_source_profile_name(
+        self, metric_config, mock_db_manager, mock_internal_manager
+    ):
+        """A failure that isn't the execute_query call (e.g. a missing
+        required column) stays a plain exception even in hybrid mode."""
+        mock_db_manager.execute_query.return_value = [{"timestamp": datetime(2024, 1, 1)}]
+        loader = MetricLoader(
+            metric_config,
+            mock_db_manager,
+            mock_internal_manager,
+            source_profile_name="warehouse",
+        )
+
+        with pytest.raises(ValueError, match="must return 'value' column"):
+            loader.load(from_date=datetime(2024, 1, 1), to_date=datetime(2024, 1, 1, 1))

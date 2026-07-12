@@ -11,6 +11,7 @@ keep them in sync. Detectors are covered in `detectors.md`, alerting in
 name: api_response_time        # required, unique across the project
 description: API p95 latency   # optional, shown in alerts
 profile: prod                  # optional, overrides project default_profile
+source_profile: warehouse      # optional — hybrid mode: source-DB profile for THIS metric's SQL (see below)
 enabled: true                  # optional, false → skipped by `dtk run`
 tags: [critical, api]          # optional, used by `--select tag:<t>`
 ai_context:                    # optional — OSI-compatible grounding (descriptive only)
@@ -66,6 +67,19 @@ false_alert_budget: 0.3        # optional — `dtk tune` target false-alert rate
 `(0, 1]`) the `dtk tune` cockpit gently flags when exceeded. It overrides the
 project-wide default; unset → project, then a built-in `0.5`. Tuning-only — it never
 affects the load/detect/alert pipeline.
+
+`source_profile` is **hybrid mode** for this one metric: the `profiles.yml`
+profile whose database runs *this metric's* SQL query, while `_dtk_*` state
+(datapoints, detections, task locks, alert state) stays in the active
+**state** profile — the one `dtk run` is already connected to for everything
+else. Overrides the project-wide `source_profile` (`project.md`); resolves
+**metric → project → unset** (unset on both = today's behavior — one profile
+for everything). Not the same field as `profile` above (`profile` is dead —
+not applied at runtime by `dtk run`; `source_profile` is live). Only the
+metric's **load** step ever connects to it — detect/alert and every other
+command don't — though every `dtk run` fail-fast validates the resolved name
+up front regardless of `--steps` (a typo exits 1 before any pipeline work).
+See the [Hybrid Mode guide](https://dtk.pipelab.dev/guides/hybrid-mode/).
 
 `ai_context` is **OSI-compatible grounding** you can add to any metric with **no
 OSI model needed** — the metric's business meaning (`instructions`), alternative

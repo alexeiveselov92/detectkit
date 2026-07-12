@@ -24,6 +24,10 @@ alert_channels:
     # ... channel-specific settings
 ```
 
+A metric or project can also reference a *second* profile by name via
+`source_profile` to read metric SQL from one database while `_dtk_*` state
+stays in another — see the [Hybrid Mode guide](hybrid-mode.md).
+
 ### Database Profiles
 
 ClickHouse, PostgreSQL, MySQL, MariaDB, and DuckDB are all fully supported.

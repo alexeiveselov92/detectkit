@@ -16,6 +16,7 @@ import numpy as np
 from detectkit.config.metric_config import MetricConfig
 from detectkit.database.internal_tables import InternalTablesManager
 from detectkit.database.manager import BaseDatabaseManager
+from detectkit.loaders.errors import SourceDatabaseError
 from detectkit.loaders.query_template import QueryTemplate
 from detectkit.utils.datetime_utils import now_utc_naive, to_naive_utc
 from detectkit.utils.json_utils import json_dumps_sorted
@@ -50,18 +51,30 @@ class MetricLoader:
         config: MetricConfig,
         db_manager: BaseDatabaseManager,
         internal_manager: InternalTablesManager,
+        source_profile_name: str | None = None,
     ):
         """
         Initialize metric loader.
 
         Args:
             config: Metric configuration
-            db_manager: Database manager for executing queries
+            db_manager: Database manager for executing the metric's SQL. In
+                hybrid mode this is a SOURCE-profile manager, distinct from
+                the manager holding _dtk_* state; ``internal_manager`` below
+                always talks to state.
             internal_manager: Internal tables manager for saving data
+            source_profile_name: Name of the source profile *db_manager*
+                belongs to, when it differs from the active state profile
+                (hybrid mode). ``None`` (the default) means *db_manager* IS
+                the state manager, so a query failure is indistinguishable
+                from a state failure and is left unwrapped. When set, a
+                query failure is wrapped in :class:`SourceDatabaseError` so
+                it can be told apart from a state-database failure.
         """
         self.config = config
         self.db_manager = db_manager
         self.internal_manager = internal_manager
+        self.source_profile_name = source_profile_name
         self.query_template = QueryTemplate()
 
     def load(
@@ -121,8 +134,15 @@ class MetricLoader:
             interval_seconds=interval_seconds,
         )
 
-        # Execute query
-        results = self.db_manager.execute_query(rendered_query)
+        # Execute query. In hybrid mode (source_profile_name set) a failure
+        # here is wrapped so it reads as "source database down", not an
+        # indistinguishable state-database failure.
+        try:
+            results = self.db_manager.execute_query(rendered_query)
+        except Exception as exc:
+            if self.source_profile_name is not None:
+                raise SourceDatabaseError(self.source_profile_name, exc) from exc
+            raise
 
         if not results:
             # No data - return empty arrays

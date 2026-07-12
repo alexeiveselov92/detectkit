@@ -65,3 +65,12 @@ between backends — detectors, alerting, the CLI and the project layout are
 identical. See [Profiles](./configuration-profiles.md) for the full field
 reference and [Installation](../getting-started/installation.md) for the driver
 extras.
+
+## Reading from one backend, storing state in another
+
+By default, one profile does everything: it runs your metric SQL *and* holds
+every `_dtk_*` table. **Hybrid mode** splits the two — a metric's SQL runs
+against one profile (the source, e.g. a billed-per-query warehouse) while all
+`_dtk_*` state stays in a separate, cheaper profile (e.g. a local DuckDB
+file). See the [Hybrid Mode guide](./hybrid-mode.md) for the full config,
+what runs where, and the operational caveats.

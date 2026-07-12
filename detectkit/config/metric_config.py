@@ -627,6 +627,8 @@ class MetricConfig(BaseModel):
         description: Optional metric description (supports multi-line text)
         tags: Optional list of tags for metric selection (e.g., ["critical", "api"])
         profile: Profile name to use (overrides default_profile from project config)
+        source_profile: Hybrid mode — profile whose database runs this metric's
+            SQL, while _dtk_* state stays in the active (state) profile
         query: Inline SQL query (mutually exclusive with query_file)
         query_file: Path to SQL file (mutually exclusive with query)
         query_columns: Column name mapping for query results
@@ -683,6 +685,22 @@ class MetricConfig(BaseModel):
     )
     profile: str | None = Field(
         default=None, description="Profile name to use (overrides default_profile)"
+    )
+    # Hybrid mode: run this metric's SQL against a different database than the
+    # one holding _dtk_* state. Unlike `profile` above (which is dead — only
+    # round-tripped by autotune's config emitter), this is live: the load step
+    # resolves it to a pooled `ProfilesConfig.create_manager(...)` and executes
+    # the metric's query through it, while every other step (detect/alert) and
+    # save_datapoints itself keep using the active state profile. Falls back to
+    # ProjectConfig.source_profile, then None (= use the state profile).
+    source_profile: str | None = Field(
+        default=None,
+        description=(
+            "profiles.yml profile whose database runs this metric's SQL; "
+            "_dtk_* state stays in the active (state) profile. Falls back to "
+            "the project-level source_profile, then to the state profile "
+            "itself."
+        ),
     )
     query: str | None = Field(default=None, description="Inline SQL query")
     query_file: Path | None = Field(default=None, description="Path to SQL file")
@@ -1052,6 +1070,24 @@ def resolve_loading_delay_seconds(
             continue
         return loading_delay_to_seconds(value)
     return 0
+
+
+def resolve_source_profile(
+    metric_source_profile: str | None, project_source_profile: str | None
+) -> str | None:
+    """Resolve the profiles.yml profile that should run a metric's SQL:
+    metric -> project -> ``None``.
+
+    ``None`` means "run the SQL through the same connection detectkit is
+    already using for ``_dtk_*`` state" — i.e. hybrid mode is off for this
+    metric and the meaning of ``dtk run --profile`` / ``default_profile`` is
+    unchanged. The first configured value wins, mirroring
+    :func:`resolve_loading_delay_seconds`'s metric -> project precedence.
+    """
+    for value in (metric_source_profile, project_source_profile):
+        if value is not None:
+            return value
+    return None
 
 
 def resolve_grid_phase_seconds(loading_start_time: str | None, interval_seconds: int) -> int:

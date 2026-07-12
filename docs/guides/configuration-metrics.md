@@ -119,6 +119,26 @@ rejected.
 #### `profile` (string, optional)
 Database profile to use for this metric. Overrides `default_profile` from project config.
 
+#### `source_profile` (string, optional)
+
+**Hybrid mode**: the `profiles.yml` profile whose database runs *this
+metric's* SQL query, while all `_dtk_*` state (datapoints, detections, task
+locks, alert state) stays in the active **state** profile — the one `dtk run`
+is already connected to for everything else. Overrides the project-level
+[`source_profile`](configuration.md#source_profile-string-optional); unset on
+both means this metric's SQL runs through the state profile itself, like
+every other step.
+
+```yaml
+name: api_errors
+source_profile: warehouse   # only this metric's load step reads from `warehouse`
+```
+
+Not to be confused with `profile` above — `source_profile` is the live
+hybrid-mode field; `profile` is unrelated and not applied at runtime by `dtk
+run` today. See the [Hybrid Mode guide](hybrid-mode.md) for the full config
+example, what runs where, and error semantics.
+
 #### `enabled` (boolean, default: true)
 Whether metric is active. Disabled metrics are skipped by `dtk run`.
 
@@ -749,4 +769,5 @@ This is a trade-off, not a free lunch:
 
 - [Detectors Guide](detectors.md) - Detector-specific configuration
 - [Alerting Guide](alerting.md) - Alert channels and templates
+- [Hybrid Mode](hybrid-mode.md) - Reading metric SQL from a different profile than `_dtk_*` state
 - [CLI Reference](../reference/cli.md) - Command-line options

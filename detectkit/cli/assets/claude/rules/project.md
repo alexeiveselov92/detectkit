@@ -33,6 +33,7 @@ timeouts:                      # per-step, seconds
 alert_help_url: null           # optional, see below — "How to read this alert" link
 false_alert_budget: null       # optional — `dtk tune` target FDR (0,1]; per-metric override wins
 loading_delay: null            # optional — default data-maturity delay; per-metric override wins
+source_profile: null           # optional — hybrid mode: default source-DB profile; per-metric override wins
 
 error_alerting:                # optional, see below
   enabled: false
@@ -49,6 +50,26 @@ finishes a few minutes after each interval closes. A per-metric `loading_delay`
 overrides it (`0` opts that metric out); see `metrics.md` for the full
 load/no-data behavior and the detection-latency trade-off. Only set this
 project-wide when your metrics genuinely share the same upstream schedule.
+
+`source_profile` is **hybrid mode**: a project-wide default `profiles.yml`
+profile whose database runs metric SQL, while *every* `_dtk_*` table
+(datapoints, detections, task locks, alert state) stays in the active
+**state** profile — the one `dtk run` is already connected to for everything
+else. A per-metric `source_profile` overrides it (`metrics.md`); resolves
+**metric → project → unset**, same precedence as `loading_delay`. Unset on
+both = today's behavior (one profile does everything). Only the LOAD step's
+metric-SQL query is affected — detect/alert and every other command
+(`dtk autotune`/`tune`/`ui`/`clean`/`unlock`) only ever touch the state
+profile. A source-side failure raises `SourceDatabaseError` (message leads
+with `source database (profile '<name>'): ...`), distinct from a plain
+exception for a state-side failure — useful for telling a warehouse outage
+apart from a state-DB outage in `error_alerting`'s `{error_type}` /
+`{error_message}`. `dtk run` validates every resolved `source_profile` name
+against `profiles.yml` before opening any connection (unknown name → exit
+`1`, no partial run). Full config example + operational caveats (connecting a
+profile always runs `CREATE DATABASE`/`SCHEMA IF NOT EXISTS` for its own
+`internal_*` location too, even a source-only one) in the [Hybrid Mode
+guide](https://dtk.pipelab.dev/guides/hybrid-mode/).
 
 ### `alert_help_url` — "How to read this alert" link
 

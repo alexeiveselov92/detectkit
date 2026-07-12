@@ -44,6 +44,14 @@ rendered on the docs site under **For developers**). Read the relevant one:
   payload — documented recipe). All render from the shared `build_context`
   seam in the uniform `description → Rule → Value/Expected → links → tail`
   order.
+- **Hybrid mode:** `source_profile` (metric → project → unset) runs a
+  metric's **load** SQL against a different profile's database while all
+  `_dtk_*` state stays in the state profile (`--profile`/`default_profile`,
+  meaning unchanged) — the warehouse unlock. Lazy one-connection-per-source
+  pool on the TaskManager (failures cached; closed at run end);
+  `SourceDatabaseError` distinguishes source-down from state-down in error
+  alerts; `dtk run` fail-fast validates resolved names (typo → exit 1, no
+  paging); autotune/tune/ui/clean/unlock are state-only and untouched.
 - **DuckDB** is a first-class backend (`type: duckdb`, profile takes `path` —
   or `:memory:`, tests-only — + optional `read_only`; duckdb **>= 1.1**, the
   alert step's `IN`-list query needs it): an in-process single-file DB behind

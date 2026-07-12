@@ -236,3 +236,24 @@ Only set this project-wide when your metrics genuinely share one upstream
 schedule — otherwise configure it per metric. See the
 [Configuring Metrics guide](configuration-metrics.md#loading_delay-string-or-int-optional)
 for the full behavior and the detection-latency trade-off it introduces.
+
+#### `source_profile` (string, optional)
+
+**Hybrid mode**: a project-wide default `profiles.yml` profile whose database
+runs metric SQL, while all `_dtk_*` state (datapoints, detections, task
+locks, alert state) stays in the active **state** profile — the one `dtk run`
+is already connected to for everything else. A per-metric
+[`source_profile`](configuration-metrics.md#source_profile-string-optional)
+overrides it; unset on both means every metric's SQL runs through the state
+profile itself (today's behavior, unchanged).
+
+```yaml
+# detectkit_project.yml
+source_profile: warehouse
+```
+
+Useful when most metrics read from the same source database that differs
+from where you want `_dtk_*` state to live — typically a warehouse that bills
+per query/compute, paired with a cheap local state database. See the
+[Hybrid Mode guide](hybrid-mode.md) for the full config example, what runs
+where, and the operational caveats.

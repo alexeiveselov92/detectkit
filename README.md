@@ -24,7 +24,7 @@
 - **@mentions** — tag users/groups in alerts, each channel formats natively
 - **Alert lifecycle** — consecutive anomalies, fraction-of-window rule (`anomaly_window` + `min_anomaly_share`), cooldown, recovery notifications, no-data alerts
 - **Project-level error alerts** — catch DB outages and pipeline crashes once per run
-- **Database agnostic** — ClickHouse, PostgreSQL, MySQL/MariaDB, DuckDB (no server needed); Snowflake and BigQuery as hybrid-mode sources
+- **Database agnostic** — ClickHouse, PostgreSQL, MySQL/MariaDB, DuckDB (no server needed, incl. MotherDuck cloud paths); Snowflake and BigQuery as hybrid-mode sources
 - **Hybrid mode** — read metric SQL from a billed-per-query warehouse while all pipeline state lives in a cheap local database
 - **Idempotent** — resume from interruptions, no duplicate processing
 - **CLI** — `dtk init`, `dtk run --select`, `dtk unlock`, `dtk clean`, tag-based selectors
@@ -40,7 +40,7 @@ With database drivers:
 
 ```bash
 pip install detectkit[clickhouse]   # ClickHouse
-pip install detectkit[duckdb]       # DuckDB - single file, no server
+pip install detectkit[duckdb]       # DuckDB - single file, no server (also MotherDuck md: paths)
 pip install detectkit[snowflake]    # Snowflake - source-only (hybrid mode)
 pip install detectkit[bigquery]     # BigQuery - source-only (hybrid mode)
 pip install detectkit[all-db]       # All databases

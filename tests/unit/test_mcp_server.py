@@ -592,6 +592,15 @@ class TestResolveRelativeDuckdbPath:
             if ctx.internal is not None:
                 ctx.internal._manager.close()  # noqa: SLF001
 
+    def test_motherduck_path_passes_through_unmangled(self, tmp_path: Path) -> None:
+        """An `md:` path is a MotherDuck database name, not a filesystem path —
+        absolutizing it against the project root would break the attach."""
+        from detectkit.mcp.context import _resolve_duckdb_path
+
+        profile = ProfileConfig(type="duckdb", path="md:analytics", motherduck_token="tok")
+        resolved = _resolve_duckdb_path(profile, tmp_path)
+        assert resolved.path == "md:analytics"
+
 
 class TestQueryDatapointsClamp:
     """FINDING C: a wide ``from_ts`` must not materialize more than ``limit`` needs."""

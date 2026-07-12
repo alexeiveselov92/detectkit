@@ -90,7 +90,7 @@ detectkit/
 │   ├── _sql_manager.py          # SQLDatabaseManager (shared base for Postgres/MySQL)
 │   ├── postgres_manager.py      # PostgresDatabaseManager (psycopg2)
 │   ├── mysql_manager.py         # MySQLDatabaseManager (pymysql)
-│   ├── duckdb_manager.py        # DuckDBDatabaseManager (in-process file DB + DB-API adapter)
+│   ├── duckdb_manager.py        # DuckDBDatabaseManager (in-process file DB + DB-API adapter; md: paths = MotherDuck cloud)
 │   ├── snowflake_manager.py     # SnowflakeSourceManager (source-only; key-pair/password auth, UTC session, col folding)
 │   ├── bigquery_manager.py      # BigQuerySourceManager (source-only; key-file/ADC/anonymous auth, SELECT 1 probe, no col folding)
 │   ├── tables.py                # TableModel factories for all _dtk_* tables
@@ -215,7 +215,28 @@ Four backends implement this interface:
   a time** (readers need `read_only=True`), so `dtk ui`'s long-lived server
   conflicts with a concurrently spawned `dtk run` — run-then-look; the real
   engine runs in the unit suite (`tests/unit/test_duckdb_manager.py`, no
-  Docker).
+  Docker). The same manager also speaks **MotherDuck** (DuckDB's serverless
+  cloud) through the same `duckdb` client — no new profile type or pip extra
+  (rides `[duckdb]`): a `path` of the form `md:<database>` attaches the named
+  cloud database (the `motherduck` core extension autoloads on first `md:`
+  use — the first connect downloads it, so it needs network access), authed by
+  the optional `motherduck_token` profile field passed as the connect config
+  (unset → the extension falls back to a `motherduck_token` environment
+  variable; an explicit `settings.motherduck_token` wins, the settings-over-pin
+  precedent). Everything below the connect is identical (same SQL surface, same
+  `ON CONFLICT` upsert, same internal-tables flow), so it is a **full,
+  state-capable** backend (`_dtk_*` tables can live on MotherDuck) that also
+  doubles as a hybrid-mode source like any full backend. The local-file
+  single-writer caveats **do not apply** to `md:` paths — MotherDuck is a
+  *served* database, so `dtk ui` and a concurrently spawned `dtk run` against
+  the same cloud database coexist (run-then-look is local-files-only). One
+  asymmetry: MotherDuck has no `read_only=True` attach, so `read_only` is a
+  local-files-only knob, and the strict read-only probe
+  (`ensure_locations=False`) skips the forced read-only for `md:` — its purpose
+  there (preventing a missing local *file* being created on connect) doesn't
+  apply to a served database (the probe still runs no DDL). Tested by
+  connect-seam unit tests plus an env-gated real-account smoke
+  (`tests/integration/test_motherduck.py`, needs `MOTHERDUCK_TOKEN`).
 
 `ProfileConfig.create_manager()` (`detectkit/config/profile.py`) builds the right
 backend from `type`; PostgreSQL additionally requires a `database` connect-target,

@@ -69,7 +69,19 @@ rendered on the docs site under **For developers**). Read the relevant one:
   over the shared SQL manager, PostgreSQL-shaped version-aware `ON CONFLICT`
   upsert. The file is held read-write by **one process at a time** — `dtk ui`
   open + a spawned `dtk run` on the same file conflict (run-then-look). Real
-  engine runs in the unit suite, no Docker.
+  engine runs in the unit suite, no Docker. **MotherDuck** rides the same
+  `type: duckdb` (no new type/extra): a `path: "md:<database>"` attaches
+  DuckDB's cloud service through the same client (the `motherduck` extension
+  autoloads on first `md:` use — first connect downloads it, needs network),
+  authed by an optional env-interpolated `motherduck_token` field (sent as the
+  connect config; unset → the extension's own `motherduck_token` env var; an
+  explicit `settings.motherduck_token` wins). It stays a **full state-capable**
+  backend (same SQL/upsert; `_dtk_*` can live there; also a hybrid source). Two
+  `md:`-only asymmetries: it's a **served** database, so the single-writer /
+  run-then-look caveat is **local-files-only** (`dtk ui` + a spawned `dtk run`
+  coexist), and it has no `read_only=True` attach, so `read_only` is a
+  local-files-only knob (the MCP strict probe skips the forced read-only for
+  `md:`).
 - **Snowflake** (`type: snowflake`, extra `[snowflake]`) is a **source-only**
   backend behind a minimal `SourceDatabaseManager` seam (`database/source_manager.py`
   — `execute_query` + `close`; `BaseDatabaseManager` subclasses it so full

@@ -201,23 +201,32 @@ auto-detected at connect (`SELECT VERSION()`), so MariaDB gets its own
 `VALUES()`-form upsert instead of MySQL 8.0.19's row-alias form.
 `pip install 'detectkit[mariadb]'`.
 
-**DuckDB** (embedded, single file; two schemas like PostgreSQL):
+**DuckDB** (embedded, single file; two schemas like PostgreSQL — or
+**MotherDuck**, DuckDB's cloud, via a `md:` path):
 ```yaml
 profiles:
   prod:
     type: duckdb
-    path: /var/lib/detectkit/warehouse.duckdb   # required — file path, or ":memory:"
+    path: /var/lib/detectkit/warehouse.duckdb   # required — file path, ":memory:",
+    #                                             # or "md:<database>" for MotherDuck
     internal_schema: detectkit     # optional — _dtk_* tables (default: "detectkit")
     data_schema: main              # optional — data queries (default: "main")
-    read_only: false               # optional (default: false)
+    read_only: false               # optional (default: false; local files only)
+    motherduck_token: "{{ env_var('MOTHERDUCK_TOKEN') }}"  # optional — only for "md:" paths
     settings: {}                   # optional — extra duckdb.connect() config options
 ```
-> Single-writer: DuckDB allows only **one** read-write connection to the file
-> at a time — a `dtk ui`/`dtk tune` session left open will clash with a
-> separately spawned `dtk run` against the same file. Point a read-only
-> consumer at it with `read_only: true`.
+> Single-writer (**local files only**): a local DuckDB file allows only **one**
+> read-write connection at a time — a `dtk ui`/`dtk tune` session left open will
+> clash with a separately spawned `dtk run` against the same file. Point a
+> read-only consumer at it with `read_only: true`. A `md:<database>` MotherDuck
+> path is a **served** database with no single-writer rule — `dtk ui` and a
+> spawned `dtk run` coexist, and `read_only` doesn't apply.
 > `path: ":memory:"` has no on-disk state, so resume/idempotency breaks across
 > process restarts — use it for tests/scratch only, never a real project.
+> `motherduck_token` (env-interpolated) authenticates `md:` paths; unset, the
+> `motherduck` extension falls back to a `motherduck_token` environment
+> variable (lowercase — the extension's own lookup name). MotherDuck is a full
+> state backend — `_dtk_*` tables can live there — and needs no extra beyond
 > `pip install 'detectkit[duckdb]'`.
 
 **Snowflake** (**source-only** — hybrid mode; runs a metric's load SQL, never

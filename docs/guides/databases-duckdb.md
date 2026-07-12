@@ -51,10 +51,11 @@ profiles:
 
 | Field | Required | Notes |
 |---|---|---|
-| `path` | yes | database file path (created if it doesn't exist), or the literal `:memory:` |
+| `path` | yes | database file path (created if it doesn't exist), the literal `:memory:`, or `md:<database>` for [MotherDuck](#motherduck) |
 | `internal_schema` | no | default `detectkit` — schema for `_dtk_*` tables (auto-created) |
 | `data_schema` | no | default `main` — schema your metric source tables live in |
-| `read_only` | no | default `false` — open the file read-only; see [Single writer](#single-writer-one-process-at-a-time) |
+| `read_only` | no | default `false` — open the file read-only; local files only (leave unset for `md:` — MotherDuck has no read-only attach); see [Single writer](#single-writer-one-process-at-a-time) |
+| `motherduck_token` | no | MotherDuck service token for `md:` paths (env-interpolated; ignored for local paths); see [MotherDuck](#motherduck) |
 | `settings` | no | extra `duckdb.connect(..., config=...)` options, e.g. `memory_limit` |
 
 There is no `host` / `port` / `user` / `password` — DuckDB has no server to
@@ -131,8 +132,73 @@ concurrent access on your behalf.
 
 If you need a live pipeline and a live cockpit open at the same time, use one
 of the server-backed backends ([ClickHouse](databases-clickhouse.md),
-[PostgreSQL](databases-postgres.md), [MySQL](databases-mysql.md)) instead —
-DuckDB is best suited to local iteration, not an always-on deployment.
+[PostgreSQL](databases-postgres.md), [MySQL](databases-mysql.md)) — or
+**MotherDuck** (below), DuckDB's own served cloud, which lifts the
+single-writer restriction while keeping the same profile type and SQL.
+
+## MotherDuck
+
+[MotherDuck](https://motherduck.com/) is DuckDB's serverless cloud service — a
+hosted, always-on DuckDB you connect to over the network instead of a local
+file. It is **not a new backend or profile type**: the existing `type: duckdb`
+profile simply learns cloud paths. Set `path` to `"md:<database>"` and
+detectkit attaches that MotherDuck database through the same `duckdb` client —
+so it rides the same [`detectkit[duckdb]`](#install) extra, with **no separate
+driver** to install.
+
+```yaml
+profiles:
+  cloud_state:
+    type: duckdb
+    path: "md:detectkit"                              # MotherDuck database (not a local file)
+    motherduck_token: "{{ env_var('MOTHERDUCK_TOKEN') }}"
+    internal_schema: detectkit
+    data_schema: main
+```
+
+Because it's the same manager below the connect, everything else is identical
+to a local DuckDB file: the same SQL surface, the same version-aware
+`ON CONFLICT` upsert, the same `_dtk_*` internal tables. **It is a full,
+state-capable backend** — detectkit's own state can live on MotherDuck — and,
+like every full backend, it can also serve as a
+[hybrid-mode](hybrid-mode.md) `source_profile`.
+
+**Authentication.** MotherDuck auth is a service token. detectkit sends the
+profile's `motherduck_token` field as the `motherduck_token` connect config
+(it's env-interpolated like every secret in `profiles.yml`, so keep the raw
+token out of the file — `"{{ env_var('MOTHERDUCK_TOKEN') }}"`). The field is
+**ignored for local file paths**. When it's unset, the `motherduck` extension
+itself falls back to a `motherduck_token` **environment variable**, so exporting
+`MOTHERDUCK_TOKEN` and omitting the field also works. An explicit
+`settings.motherduck_token` wins over the field (the same settings-over-profile
+precedence Snowflake uses).
+
+**The single-writer caveat does not apply.** MotherDuck is a *served* database,
+not a local file, so the [run-then-look](#single-writer-one-process-at-a-time)
+rule above is lifted for `md:` paths: `dtk ui` and a concurrently spawned
+`dtk run` (or `dtk autotune` / `dtk clean`) against the same MotherDuck database
+can hold connections at once, exactly like the server-backed backends. The
+single read-write connection per process is a property of local DuckDB files
+only.
+
+**Extension autoload / network.** The `motherduck` core extension **autoloads
+on first `md:` use** — the very first connect *downloads* it, so an initial
+connection needs network access (subsequent connects reuse the cached
+extension). Every query then runs against the remote database, so a MotherDuck
+profile depends on connectivity the way a warehouse backend does, unlike a
+fully local file.
+
+**`read_only` asymmetry.** MotherDuck does **not** support DuckDB's
+`read_only=True` attach flag, so the [`read_only`](#profilesyml) profile field
+is **local-files-only** — leave it unset on `md:` paths. An explicit
+`read_only: true` is deliberately passed through and fails loudly at connect
+(silently opening read-write when you asked for a read-only guarantee would be
+worse). This also
+means the [MCP server](mcp.md)'s strict read-only probe (which forces a
+`read_only` attach on local files to guarantee it can't create a missing file
+as a connect side effect) **skips the forced read-only for MotherDuck**: that
+concern — an accidental local *file* creation — doesn't exist for a served
+database, and the probe still runs no DDL and no writes against it.
 
 ## `:memory:`
 

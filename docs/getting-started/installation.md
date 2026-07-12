@@ -105,10 +105,14 @@ pip install duckdb
 ```
 
 **Supported versions**: DuckDB 1.1+. The `duckdb` package bundles the full
-engine, so there's nothing else to install or run. See the [DuckDB
-guide](../guides/databases-duckdb.md) for the profile shape and its
-single-writer operational caveat (a DuckDB file supports only one read-write
-connection at a time — important if you also run `dtk ui`).
+engine, so there's nothing else to install or run. **MotherDuck** (DuckDB's
+serverless cloud) rides this same `[duckdb]` extra — a `path: "md:<database>"`
+attaches it through the same client, no separate driver to install. See the
+[DuckDB guide](../guides/databases-duckdb.md) for the profile shape, the
+[MotherDuck section](../guides/databases-duckdb.md#motherduck), and the
+single-writer operational caveat (a local DuckDB file supports only one
+read-write connection at a time — important if you also run `dtk ui`; it does
+**not** apply to served `md:` paths).
 
 ### Snowflake (source-only)
 

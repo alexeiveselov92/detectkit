@@ -5,6 +5,28 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.66.0] - 2026-07-13
+
+### Added
+- **MotherDuck support via the DuckDB backend** (#143). The existing
+  `type: duckdb` profile learns cloud paths: `path: "md:<database>"`
+  attaches a MotherDuck database through the same `duckdb` client (the
+  `motherduck` core extension autoloads on first use), authenticated by
+  the new optional `motherduck_token` profile field (env-interpolated;
+  unset → the extension falls back to the `motherduck_token` environment
+  variable; an explicit `settings` key wins on collision). Unlike the
+  source-only warehouses, this is a **full state-capable backend** — the
+  `_dtk_*` tables can live on MotherDuck with the same `ON CONFLICT`
+  upsert — and the local-file single-writer caveats do **not** apply to
+  `md:` paths (a served database: `dtk ui` and a concurrently spawned
+  `dtk run` coexist). MotherDuck has no read-only attach, so `read_only`
+  is a local-files-only knob and the MCP server's strict connect probe
+  skips the forced read-only for `md:` paths (it still runs no DDL — the
+  forcing exists to stop a missing local *file* being created on connect,
+  which cannot happen on a served database). No new extra — rides
+  `detectkit[duckdb]`. Covered by connect-seam unit tests plus an
+  env-gated real-account smoke test (`MOTHERDUCK_TOKEN`).
+
 ## [0.65.0] - 2026-07-12
 
 ### Added

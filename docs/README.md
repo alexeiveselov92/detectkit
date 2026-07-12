@@ -207,7 +207,10 @@ Works with your existing data warehouse — all backends are first-class:
   mariadb` alias, vendor auto-detected at connect)
 - **DuckDB** - `detectkit[duckdb]` (in-process, single file, no server or
   credentials — the fastest way to try detectkit; one read-write connection
-  at a time, see the [DuckDB guide](guides/databases-duckdb.md))
+  at a time for local files, see the [DuckDB guide](guides/databases-duckdb.md)).
+  The same backend also speaks **MotherDuck** — point `path` at
+  `md:<database>` to attach a served cloud database (a full, state-capable
+  backend; the single-writer rule applies to local files only)
 - **Snowflake** - source-only (hybrid mode), `detectkit[snowflake]` — runs a
   metric's load SQL, never holds `_dtk_*` state
   ([Snowflake guide](guides/databases-snowflake.md))

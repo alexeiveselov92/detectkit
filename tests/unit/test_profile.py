@@ -701,6 +701,32 @@ class TestSourceOnlyProfiles:
         assert captured["account"] == "a"
 
 
+class TestMotherDuckProfile:
+    """MotherDuck rides the DuckDB backend: `path: md:<db>` + motherduck_token."""
+
+    def test_md_path_accepted(self):
+        profile = ProfileConfig(type="duckdb", path="md:analytics", motherduck_token="tok")
+        assert profile.path == "md:analytics"
+        assert profile.motherduck_token == "tok"
+
+    def test_create_manager_threads_token(self, monkeypatch):
+        import detectkit.database.duckdb_manager as duck_mod
+
+        captured: dict = {}
+
+        class FakeDuckDBDatabaseManager:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        monkeypatch.setattr(duck_mod, "DuckDBDatabaseManager", FakeDuckDBDatabaseManager)
+
+        profile = ProfileConfig(type="duckdb", path="md:analytics", motherduck_token="tok-1")
+        manager = profile.create_manager()
+        assert isinstance(manager, FakeDuckDBDatabaseManager)
+        assert captured["path"] == "md:analytics"
+        assert captured["motherduck_token"] == "tok-1"
+
+
 class TestBigQuerySourceOnlyProfile:
     """BigQuery — the second source-only profile type (valid as a hybrid
     source, refused as state)."""

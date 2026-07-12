@@ -6,7 +6,7 @@ This guide covers installing detectkit and its dependencies.
 
 - **Python**: 3.10 or higher
 - **pip**: Latest version recommended
-- **Database**: ClickHouse (20.3+), PostgreSQL (12+), MySQL (8.0+), or MariaDB (10.4+) — all fully supported
+- **Database**: ClickHouse (20.3+), PostgreSQL (12+), MySQL (8.0+), MariaDB (10.4+), or DuckDB (0.10+) — all fully supported (DuckDB needs no server at all)
 
 ## Basic Installation
 
@@ -89,13 +89,34 @@ mariadb` in `profiles.yml` (an alias for `type: mysql` — the actual vendor is
 auto-detected at connect). See the [MySQL guide →
 MariaDB](../guides/databases-mysql.md#mariadb).
 
+### DuckDB
+
+DuckDB is an **in-process, single-file** database — no server to run, no
+credentials to set up:
+
+```bash
+pip install detectkit[duckdb]
+```
+
+Or install the driver manually:
+
+```bash
+pip install duckdb
+```
+
+**Supported versions**: DuckDB 0.10+. The `duckdb` package bundles the full
+engine, so there's nothing else to install or run. See the [DuckDB
+guide](../guides/databases-duckdb.md) for the profile shape and its
+single-writer operational caveat (a DuckDB file supports only one read-write
+connection at a time — important if you also run `dtk ui`).
+
 ### Multiple Databases
 
 Install drivers for all databases you'll use:
 
 ```bash
-pip install detectkit[clickhouse,postgres,mysql,mariadb]
-# or the shorthand:
+pip install detectkit[clickhouse,postgres,mysql,mariadb,duckdb]
+# or the shorthand (includes all four, DuckDB included):
 pip install detectkit[all-db]
 ```
 
@@ -142,8 +163,8 @@ pip install detectkit[advanced-detectors]
 
 ### Everything
 
-The `[all]` extra installs **everything** — all database drivers plus
-Prophet and TimesFM, not just the advanced detectors:
+The `[all]` extra installs **everything** — all four database drivers
+(including DuckDB) plus Prophet and TimesFM, not just the advanced detectors:
 
 ```bash
 pip install detectkit[all]

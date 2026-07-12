@@ -3,7 +3,7 @@
 **detectkit** is a Python library + CLI (`dtk`) for monitoring time-series
 metrics with anomaly detection and multi-channel alerting. It is dbt-like:
 metrics are YAML + SQL run through a `load → detect → alert` pipeline.
-numpy-first (no pandas in core logic), ClickHouse / PostgreSQL / MySQL / MariaDB backends, Python 3.10+.
+numpy-first (no pandas in core logic), ClickHouse / PostgreSQL / MySQL / MariaDB / DuckDB backends, Python 3.10+.
 
 > **Using detectkit, not hacking on it?** See the [README](README.md), the
 > [docs](docs/), and `dtk init-claude` (which sets up assistant context inside
@@ -44,6 +44,14 @@ rendered on the docs site under **For developers**). Read the relevant one:
   payload — documented recipe). All render from the shared `build_context`
   seam in the uniform `description → Rule → Value/Expected → links → tail`
   order.
+- **DuckDB** is a first-class backend (`type: duckdb`, profile takes `path` —
+  or `:memory:`, tests-only — + optional `read_only`; duckdb **>= 1.1**, the
+  alert step's `IN`-list query needs it): an in-process single-file DB behind
+  a small DB-API adapter (`%(name)s → $name` translation, lazy transactions)
+  over the shared SQL manager, PostgreSQL-shaped version-aware `ON CONFLICT`
+  upsert. The file is held read-write by **one process at a time** — `dtk ui`
+  open + a spawned `dtk run` on the same file conflict (run-then-look). Real
+  engine runs in the unit suite, no Docker.
 - User-facing docs are in `docs/`. The context that `dtk init-claude` ships to
   users lives in `detectkit/cli/assets/claude/` — **keep both in sync on every
   release** (see the contributing rule's release checklist).

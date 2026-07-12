@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from detectkit.database.clickhouse_manager import ClickHouseDatabaseManager
 from detectkit.database.manager import BaseDatabaseManager
@@ -23,29 +23,51 @@ class ProfileConfig(BaseModel):
     environment (dev, prod, etc.).
 
     Attributes:
-        type: Database type ("clickhouse", "postgres", "mysql", "mariadb")
-        host: Database host
-        port: Database port
-        user: Database user
-        password: Database password
+        type: Database type ("clickhouse", "postgres", "mysql", "mariadb", "duckdb")
+        host: Database host (unused for DuckDB — it is an in-process, file-backed
+            database with no network endpoint)
+        port: Database port (unused for DuckDB; required for every other backend)
+        user: Database user (unused for DuckDB)
+        password: Database password (unused for DuckDB)
+        database: Connection-target database (PostgreSQL/MySQL/MariaDB; unused
+            for DuckDB — use `path` instead)
+        path: Path to the DuckDB database file, or ":memory:" for a transient
+            in-process database (DuckDB only)
         internal_database: Database/schema for internal tables
-        internal_schema: Schema for internal tables (PostgreSQL only)
+        internal_schema: Schema for internal tables (PostgreSQL/DuckDB only)
         data_database: Database for user data tables
-        data_schema: Schema for user data (PostgreSQL only)
+        data_schema: Schema for user data (PostgreSQL/DuckDB only)
         settings: Additional database-specific settings
     """
 
     type: str = Field(..., description="Database type")
-    host: str = Field(default="localhost", description="Database host")
-    port: int = Field(..., description="Database port")
-    user: str = Field(default="default", description="Database user")
-    password: str = Field(default="", description="Database password")
+    host: str = Field(default="localhost", description="Database host (unused for DuckDB)")
+    # No default: required for every backend except DuckDB (enforced below by
+    # `_validate_port_required`, since DuckDB has no network port at all).
+    port: int | None = Field(default=None, description="Database port (unused for DuckDB)")
+    user: str = Field(default="default", description="Database user (unused for DuckDB)")
+    password: str = Field(default="", description="Database password (unused for DuckDB)")
 
     # Connection-target database. Required for PostgreSQL (the database to
     # connect to, inside which internal_schema/data_schema live); optional for
-    # MySQL/MariaDB; unused for ClickHouse.
+    # MySQL/MariaDB; unused for ClickHouse and DuckDB.
     database: str | None = Field(
         default=None, description="Database to connect to (PostgreSQL/MySQL/MariaDB)"
+    )
+
+    # DuckDB-only: the database file path (or ":memory:"). host/port/user/
+    # password/database above are simply ignored for this backend rather than
+    # rejected, since e.g. `host` always carries its "localhost" default.
+    path: str | None = Field(
+        default=None,
+        description="Database file path, or ':memory:' for a transient in-process database (DuckDB only)",
+    )
+    read_only: bool = Field(
+        default=False,
+        description=(
+            "Open the database read-only (DuckDB only) — lets a reader profile "
+            "coexist with the one process holding the file read-write"
+        ),
     )
 
     # Internal location for _dtk_* tables
@@ -53,14 +75,16 @@ class ProfileConfig(BaseModel):
         default=None, description="Database for internal tables (ClickHouse/MySQL/MariaDB)"
     )
     internal_schema: str | None = Field(
-        default=None, description="Schema for internal tables (PostgreSQL)"
+        default=None, description="Schema for internal tables (PostgreSQL/DuckDB)"
     )
 
     # Data location for user tables
     data_database: str | None = Field(
         default=None, description="Database for user data tables (ClickHouse/MySQL/MariaDB)"
     )
-    data_schema: str | None = Field(default=None, description="Schema for user data (PostgreSQL)")
+    data_schema: str | None = Field(
+        default=None, description="Schema for user data (PostgreSQL/DuckDB)"
+    )
 
     settings: dict[str, Any] = Field(
         default_factory=dict, description="Additional database settings"
@@ -70,7 +94,7 @@ class ProfileConfig(BaseModel):
     @classmethod
     def validate_type(cls, v: str) -> str:
         """Validate database type."""
-        allowed_types = {"clickhouse", "postgres", "mysql", "mariadb"}
+        allowed_types = {"clickhouse", "postgres", "mysql", "mariadb", "duckdb"}
         if v not in allowed_types:
             raise ValueError(
                 f"Invalid database type: {v}. " f"Allowed types: {', '.join(allowed_types)}"
@@ -79,11 +103,20 @@ class ProfileConfig(BaseModel):
 
     @field_validator("port")
     @classmethod
-    def validate_port(cls, v: int) -> int:
-        """Validate port number."""
+    def validate_port(cls, v: int | None) -> int | None:
+        """Validate port number (when set — DuckDB profiles may omit it)."""
+        if v is None:
+            return v
         if not (1 <= v <= 65535):
             raise ValueError(f"Port must be between 1 and 65535, got {v}")
         return v
+
+    @model_validator(mode="after")
+    def _validate_port_required(self) -> "ProfileConfig":
+        """Every backend but DuckDB needs a port; DuckDB has no network endpoint."""
+        if self.type != "duckdb" and self.port is None:
+            raise ValueError(f"port is required for database type '{self.type}'")
+        return self
 
     def get_internal_location(self) -> str:
         """
@@ -107,6 +140,10 @@ class ProfileConfig(BaseModel):
             if not self.internal_database:
                 raise ValueError("internal_database must be set for MySQL/MariaDB")
             return self.internal_database
+        elif self.type == "duckdb":
+            # Mirrors DuckDBDatabaseManager's own default (unlike PostgreSQL,
+            # an unset internal_schema doesn't need to be an error here).
+            return self.internal_schema or "detectkit"
         else:
             raise ValueError(f"Unsupported database type: {self.type}")
 
@@ -132,6 +169,10 @@ class ProfileConfig(BaseModel):
             if not self.data_database:
                 raise ValueError("data_database must be set for MySQL/MariaDB")
             return self.data_database
+        elif self.type == "duckdb":
+            # Mirrors DuckDBDatabaseManager's own default data_schema ("main",
+            # DuckDB's always-present default schema).
+            return self.data_schema or "main"
         else:
             raise ValueError(f"Unsupported database type: {self.type}")
 
@@ -144,10 +185,14 @@ class ProfileConfig(BaseModel):
 
         Raises:
             ValueError: If the database type is unsupported, or required
-                connection fields (e.g. PostgreSQL ``database``) are missing
+                connection fields (e.g. PostgreSQL ``database``, DuckDB
+                ``path``) are missing
             ImportError: If the backend's driver is not installed
         """
         if self.type == "clickhouse":
+            # `port` is guaranteed non-None here by `_validate_port_required`
+            # (every type but "duckdb" requires it at construction time).
+            assert self.port is not None
             return ClickHouseDatabaseManager(
                 host=self.host,
                 port=self.port,
@@ -165,6 +210,7 @@ class ProfileConfig(BaseModel):
                     "PostgreSQL profiles must set 'database' (the database to "
                     "connect to, inside which internal_schema/data_schema live)"
                 )
+            assert self.port is not None
             return PostgresDatabaseManager(
                 host=self.host,
                 port=self.port,
@@ -180,6 +226,7 @@ class ProfileConfig(BaseModel):
             # connect time and adjusts the upsert SQL it generates accordingly.
             from detectkit.database.mysql_manager import MySQLDatabaseManager
 
+            assert self.port is not None
             return MySQLDatabaseManager(
                 host=self.host,
                 port=self.port,
@@ -188,6 +235,26 @@ class ProfileConfig(BaseModel):
                 database=self.database,
                 internal_database=self.get_internal_location(),
                 data_database=self.get_data_location(),
+                settings=self.settings,
+            )
+        elif self.type == "duckdb":
+            # In-process, file-backed database: host/port/user/password/database
+            # are meaningless for it and are simply not read here (rather than
+            # rejected — `host`/`user`/`password` always carry non-empty
+            # defaults, so rejecting them would punish every duckdb profile).
+            from detectkit.database.duckdb_manager import DuckDBDatabaseManager
+
+            if not self.path:
+                raise ValueError(
+                    "DuckDB profiles must set 'path' (the database file path, "
+                    "or ':memory:' for a transient, tests/preview-only "
+                    "in-process database)"
+                )
+            return DuckDBDatabaseManager(
+                path=self.path,
+                internal_schema=self.get_internal_location(),
+                data_schema=self.get_data_location(),
+                read_only=self.read_only,
                 settings=self.settings,
             )
         else:

@@ -124,6 +124,15 @@ _COMMENTED_EXAMPLES = {
   #   internal_database: detectkit
   #   data_database: analytics
 """,
+    "duckdb": """  # Example DuckDB profile (in-process, single-file; no host/port/user/password)
+  # duckdb_dev:
+  #   type: duckdb
+  #   path: ./detectkit.duckdb   # or ':memory:' for a transient, tests-only DB
+  #   internal_schema: detectkit
+  #   data_schema: main
+  #   # Only ONE read-write connection at a time — don't point a scheduled
+  #   # `dtk run` and a long-lived `dtk ui` at the same file simultaneously.
+""",
 }
 
 # Timestamp-bucketing expression for the example metric query, per dialect.
@@ -351,7 +360,10 @@ timeouts:
     # live under a top-level 'profiles:' mapping). The active dev/prod profiles
     # are scaffolded for the chosen --db-type; the other backends are included
     # as commented examples. See the per-database docs for connection details.
-    other_backends = [t for t in ("clickhouse", "postgres", "mysql") if t != db_type]
+    # "duckdb" is not a `--db-type` choice (there is no active/prod scaffold
+    # for it — an in-process file DB has no separate dev/prod endpoints), so
+    # it always shows up as a commented example, unlike the other backends.
+    other_backends = [t for t in ("clickhouse", "postgres", "mysql", "duckdb") if t != db_type]
     commented = "\n".join(_COMMENTED_EXAMPLES[t] for t in other_backends)
     profiles_config = (
         "# Database connection profiles\n\n"

@@ -61,6 +61,15 @@ class TestProfileConfig:
                 port=9000,
             )
 
+    def test_invalid_type_message_lists_duckdb(self):
+        """The allowed-types list in the error message includes duckdb."""
+        with pytest.raises(ValueError, match="duckdb"):
+            ProfileConfig(
+                type="invalid",
+                host="localhost",
+                port=9000,
+            )
+
     def test_mariadb_profile(self):
         """MariaDB is a first-class alias of the MySQL profile shape."""
         profile = ProfileConfig(
@@ -74,6 +83,129 @@ class TestProfileConfig:
         assert profile.type == "mariadb"
         assert profile.get_internal_location() == "detectk"
         assert profile.get_data_location() == "analytics"
+
+    def test_duckdb_profile_no_port_required(self):
+        """DuckDB is an in-process file DB — no port is required."""
+        profile = ProfileConfig(type="duckdb", path="./detectkit.duckdb")
+
+        assert profile.type == "duckdb"
+        assert profile.port is None
+
+    def test_duckdb_profile_location_defaults(self):
+        """Unset internal_schema/data_schema fall back to DuckDB's own defaults."""
+        profile = ProfileConfig(type="duckdb", path="./detectkit.duckdb")
+
+        assert profile.get_internal_location() == "detectkit"
+        assert profile.get_data_location() == "main"
+
+    def test_duckdb_profile_location_overrides(self):
+        """Explicit internal_schema/data_schema are honored over the defaults."""
+        profile = ProfileConfig(
+            type="duckdb",
+            path="./detectkit.duckdb",
+            internal_schema="dtk_internal",
+            data_schema="dtk_data",
+        )
+
+        assert profile.get_internal_location() == "dtk_internal"
+        assert profile.get_data_location() == "dtk_data"
+
+    def test_duckdb_missing_path_raises(self):
+        """DuckDB profiles must set 'path' (create_manager() names the field)."""
+        profile = ProfileConfig(type="duckdb")
+
+        with pytest.raises(ValueError, match="'path'"):
+            profile.create_manager()
+
+    def test_duckdb_ignores_unused_connection_fields(self):
+        """host/user/password (always non-empty defaults) don't block a duckdb profile."""
+        profile = ProfileConfig(
+            type="duckdb",
+            path="./detectkit.duckdb",
+            host="localhost",
+            user="default",
+            password="unused",
+            database="unused",
+        )
+
+        assert profile.type == "duckdb"
+        assert profile.path == "./detectkit.duckdb"
+
+    def test_duckdb_create_manager(self, tmp_path):
+        """DuckDB manager is built from a profile (real engine, no mocking)."""
+        pytest.importorskip("duckdb")
+
+        profile = ProfileConfig(type="duckdb", path=str(tmp_path / "profile_test.duckdb"))
+
+        manager = profile.create_manager()
+        try:
+            assert type(manager).__name__ == "DuckDBDatabaseManager"
+        finally:
+            manager.close()
+
+    def test_duckdb_create_manager_dispatch_is_mocked(self, monkeypatch):
+        """``create_manager()`` dispatches "duckdb" to DuckDBDatabaseManager.
+
+        Deterministic version of the test above: the manager class itself is
+        mocked so this asserts the dispatch (no real driver needed) and the
+        exact kwargs passed through.
+        """
+        import detectkit.database.duckdb_manager as duckdb_mod
+
+        captured: dict = {}
+
+        class FakeDuckDBDatabaseManager:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        monkeypatch.setattr(duckdb_mod, "DuckDBDatabaseManager", FakeDuckDBDatabaseManager)
+
+        profile = ProfileConfig(
+            type="duckdb",
+            path="./detectkit.duckdb",
+            settings={"memory_limit": "512MB"},
+        )
+        manager = profile.create_manager()
+
+        assert isinstance(manager, FakeDuckDBDatabaseManager)
+        assert captured["path"] == "./detectkit.duckdb"
+        assert captured["internal_schema"] == "detectkit"
+        assert captured["data_schema"] == "main"
+        assert captured["settings"] == {"memory_limit": "512MB"}
+        assert captured["read_only"] is False
+        # host/port/user/password/database are not passed through at all.
+        assert "host" not in captured
+        assert "port" not in captured
+        assert "user" not in captured
+        assert "password" not in captured
+
+    def test_duckdb_read_only_passes_through(self, monkeypatch):
+        """``read_only: true`` in the profile reaches the manager constructor."""
+        import detectkit.database.duckdb_manager as duckdb_mod
+
+        captured: dict = {}
+
+        class FakeDuckDBDatabaseManager:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        monkeypatch.setattr(duckdb_mod, "DuckDBDatabaseManager", FakeDuckDBDatabaseManager)
+
+        profile = ProfileConfig(type="duckdb", path="./detectkit.duckdb", read_only=True)
+        profile.create_manager()
+
+        assert captured["read_only"] is True
+        assert "database" not in captured
+
+    def test_non_duckdb_missing_port_raises(self):
+        """Every backend except DuckDB requires a port."""
+        with pytest.raises(ValueError, match="port is required"):
+            ProfileConfig(
+                type="clickhouse",
+                host="localhost",
+                internal_database="detectk_internal",
+                data_database="analytics",
+            )
 
     def test_invalid_port(self):
         """Test error on invalid port."""

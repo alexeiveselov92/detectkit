@@ -44,7 +44,13 @@ mysql = ["pymysql>=1.0.0"]
 # MariaDB is served by the same MySQLDatabaseManager (pymysql), so this extra
 # is identical to `mysql` — it just names the dependency for MariaDB users.
 mariadb = ["pymysql>=1.0.0"]
-all-db = ["clickhouse-driver>=0.2.0", "psycopg2-binary>=2.9.0", "pymysql>=1.0.0"]
+duckdb = ["duckdb>=1.1"]
+all-db = [
+    "clickhouse-driver>=0.2.0",
+    "psycopg2-binary>=2.9.0",
+    "pymysql>=1.0.0",
+    "duckdb>=1.1",
+]
 
 # Advanced detectors
 prophet = ["prophet>=1.1.0"]
@@ -61,6 +67,7 @@ all = [
     "clickhouse-driver>=0.2.0",
     "psycopg2-binary>=2.9.0",
     "pymysql>=1.0.0",
+    "duckdb>=1.1",
     "prophet>=1.1.0",
     "timesfm>=0.1.0",
     "sqlglot>=20.0",

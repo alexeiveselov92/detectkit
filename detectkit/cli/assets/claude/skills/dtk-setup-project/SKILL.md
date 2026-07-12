@@ -50,13 +50,17 @@ side by side, ask which one to set up.
 
 ## Step 1 — Pick the database backend
 
-**ClickHouse, PostgreSQL, MySQL and MariaDB are all fully supported.** Ask
+**ClickHouse, PostgreSQL, MySQL, MariaDB and DuckDB are all supported.** Ask
 which one the project uses (default to ClickHouse if unsure). `dtk init
 --db-type {clickhouse,postgres,mysql,mariadb}` scaffolds `profiles.yml` for the
-chosen backend. The location fields differ:
+chosen backend (DuckDB isn't a `--db-type` choice yet — write its profile by
+hand; see `project.md`). The location fields differ:
 - **ClickHouse** / **MySQL** / **MariaDB** — two *databases*: `internal_database` / `data_database`.
 - **PostgreSQL** — connect to a `database` (must already exist), then two
   *schemas*: `internal_schema` / `data_schema`.
+- **DuckDB** — a single **file** (`path`, or `":memory:"` for tests only),
+  then two *schemas*: `internal_schema` / `data_schema`. No host/port/user/
+  password — it's an embedded, single-writer database (see `project.md`).
 
 `type: mariadb` is an identical profile alias to `type: mysql` (same location
 fields; the vendor is auto-detected at connect). The metric query SQL dialect

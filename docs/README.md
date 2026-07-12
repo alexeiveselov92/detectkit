@@ -78,6 +78,8 @@ dtk run --select cpu_usage
 - **[Visualizing results](guides/visualizing-results.md)** - Build dashboards/charts on the `_dtk_*` tables in any BI tool
 - **[Project UI](guides/project-ui.md)** - Project-wide monitoring cockpit — overview, pipeline control, metric management
 - **[Semantic layer (OSI)](guides/osi.md)** - `ai_context` KPI grounding on any metric (no OSI model needed); plus `dtk osi` import/export as a forward bridge to a governed OSI semantic layer
+- **[MCP server](guides/mcp.md)** - Read-only `dtk mcp` server so an AI assistant can query a project's metrics, alerts and autotune history directly
+- **[GitHub Action](guides/github-action.md)** - Run `dtk run`/`autotune`/`clean` as a CI check or scheduled job with a maintained composite action
 
 ### Reference
 - **[CLI Reference](reference/cli.md)** - Command-line interface documentation
@@ -350,6 +352,15 @@ dtk ui
 # can help create metrics, tune detectors and run the pipeline. The content
 # ships with detectkit and is idempotent — re-run it after upgrading.
 dtk init-claude
+```
+
+### AI Assistant Access (Read-Only)
+
+```bash
+# Serve a read-only MCP server so an AI assistant can query metric configs,
+# loaded data, detector results, replayed alerts and autotune history —
+# without granting it write access to the pipeline. See the MCP Guide.
+dtk mcp --project-dir /path/to/project
 ```
 
 [Full CLI Reference →](reference/cli.md)

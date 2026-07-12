@@ -1,0 +1,247 @@
+name: detectkit
+description: >-
+  Run a detectkit metric-monitoring pipeline (load/detect/alert, autotune, or
+  clean) in CI or on a schedule — installs detectkit from PyPI and fails the
+  job on a real pipeline failure via detectkit's exit-code contract.
+author: alexeiveselov92
+branding:
+  icon: activity
+  color: orange
+
+# This action installs detectkit from PyPI (pinned via `version`, or the
+# action's own tag for the workflow syntax itself) — it does NOT install the
+# checked-out detectkit repository. Point it at your own project directory
+# with `project-dir` (a directory containing detectkit_project.yml).
+
+inputs:
+  command:
+    description: >-
+      detectkit subcommand to run: "run", "autotune", or "clean". Any other
+      value fails the step immediately (exit code 2) without invoking dtk.
+    required: false
+    default: run
+  select:
+    description: >-
+      Metric selector passed as `--select` (metric name, path pattern, or
+      `tag:<name>`). `dtk run`/`dtk autotune` require a selector; `dtk clean`
+      accepts either a selector (drift mode) or `--orphaned-metrics` (GC
+      mode) via `extra-args` — set `select: ""` to use the latter, since a
+      non-empty `select` and `--orphaned-metrics` conflict.
+    required: false
+    default: "*"
+  steps:
+    description: >-
+      Comma-separated pipeline steps passed as `--steps` (e.g. "load,detect"
+      or "load,detect,alert"). Empty (default) omits the flag, so `dtk run`
+      uses its own default (load,detect,alert). Only meaningful for
+      `command: run`; ignored (with a warning) for autotune/clean.
+    required: false
+    default: ""
+  profile:
+    description: >-
+      Profile name passed as `--profile` (default: the project's
+      `default_profile` in detectkit_project.yml / profiles.yml).
+    required: false
+    default: ""
+  project-dir:
+    description: >-
+      Directory containing detectkit_project.yml and profiles.yml, relative
+      to the workflow's working directory (usually the checked-out repo).
+    required: false
+    default: "."
+  version:
+    description: >-
+      detectkit PyPI version spec. A bare version ("0.61.0") is pinned
+      exactly (`detectkit==0.61.0`); a string starting with a pip operator
+      (">=0.60,<0.62", "~=0.61") is used as-is. Empty (default) installs the
+      latest release.
+    required: false
+    default: ""
+  extras:
+    description: >-
+      Comma-separated pip extras to install alongside detectkit, e.g.
+      "clickhouse" or "duckdb,mysql" (see the Databases guide for the full
+      list). Empty (default) installs the bare package with no database
+      driver — set this to whatever backend your profiles.yml points at.
+    required: false
+    default: ""
+  python-version:
+    description: Python version for actions/setup-python (detectkit requires 3.10+).
+    required: false
+    default: "3.12"
+  json-summary:
+    description: >-
+      For `command: run` only: pass `--json` to capture the machine-readable
+      run summary into the `summary`/`summary-path` outputs (human-readable
+      logs still print to the job log via stderr either way). `autotune` and
+      `clean` have no `--json` flag, so this has no effect on them.
+    required: false
+    default: "true"
+  extra-args:
+    description: >-
+      Extra raw arguments appended to the dtk command line, parsed with real
+      shell quoting (e.g. "--full-refresh --force", or "--orphaned-metrics
+      --execute --yes" for `dtk clean` with `select: ""`) — quote a value
+      that contains spaces, e.g. extra-args: '--from "2026-01-01 00:00:00"'.
+    required: false
+    default: ""
+
+outputs:
+  exit-code:
+    description: >-
+      The dtk command's exit code as a string: "0" success, "1" failure
+      (a metric failed, the run aborted, a startup/config/DB error, or the
+      selector matched nothing), "2" usage error.
+    value: ${{ steps.dtk.outputs.exit-code }}
+  summary:
+    description: >-
+      The raw `dtk run --json` summary document (only when `command: run`
+      and `json-summary: true`); empty otherwise.
+    value: ${{ steps.dtk.outputs.summary }}
+  summary-path:
+    description: >-
+      Path to the saved copy of the summary document on the runner (only
+      when `command: run` and `json-summary: true`); empty otherwise.
+    value: ${{ steps.dtk.outputs.summary-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install detectkit
+      shell: bash
+      env:
+        DTK_VERSION: ${{ inputs.version }}
+        DTK_EXTRAS: ${{ inputs.extras }}
+      run: |
+        set -euo pipefail
+
+        pkg="detectkit"
+        if [ -n "${DTK_EXTRAS}" ]; then
+          pkg="detectkit[${DTK_EXTRAS}]"
+        fi
+        if [ -n "${DTK_VERSION}" ]; then
+          case "${DTK_VERSION}" in
+            ==*|\>=*|\<=*|!=*|~=*|\<*|\>*)
+              pkg="${pkg}${DTK_VERSION}"
+              ;;
+            *)
+              pkg="${pkg}==${DTK_VERSION}"
+              ;;
+          esac
+        fi
+
+        python -m pip install --upgrade pip
+        echo "Installing: ${pkg}"
+        pip install "${pkg}"
+        dtk --version
+
+    - name: Run dtk
+      id: dtk
+      shell: bash
+      env:
+        DTK_COMMAND: ${{ inputs.command }}
+        DTK_SELECT: ${{ inputs.select }}
+        DTK_STEPS: ${{ inputs.steps }}
+        DTK_PROFILE: ${{ inputs.profile }}
+        DTK_PROJECT_DIR: ${{ inputs.project-dir }}
+        DTK_JSON_SUMMARY: ${{ inputs.json-summary }}
+        DTK_EXTRA_ARGS: ${{ inputs.extra-args }}
+      run: |
+        # Not `set -e`: a real dtk failure is expected here and must be
+        # captured (not short-circuited) so we can still set outputs before
+        # exiting with dtk's own code — that's the whole exit-code contract.
+        set -uo pipefail
+
+        rc=0
+        summary_path=""
+
+        case "${DTK_COMMAND}" in
+          run|autotune|clean) ;;
+          *)
+            echo "::error::Invalid command '${DTK_COMMAND}' — must be one of: run, autotune, clean" >&2
+            rc=2
+            ;;
+        esac
+
+        if [ "${rc}" -eq 0 ]; then
+          args=("${DTK_COMMAND}")
+
+          if [ -n "${DTK_SELECT}" ]; then
+            args+=("--select" "${DTK_SELECT}")
+          fi
+
+          if [ -n "${DTK_STEPS}" ]; then
+            if [ "${DTK_COMMAND}" = "run" ]; then
+              args+=("--steps" "${DTK_STEPS}")
+            else
+              echo "::warning::'steps' input is ignored for command '${DTK_COMMAND}' (only 'run' takes --steps)"
+            fi
+          fi
+
+          if [ -n "${DTK_PROFILE}" ]; then
+            args+=("--profile" "${DTK_PROFILE}")
+          fi
+
+          want_json="false"
+          if [ "${DTK_COMMAND}" = "run" ] && [ "${DTK_JSON_SUMMARY}" = "true" ]; then
+            want_json="true"
+            args+=("--json")
+          fi
+
+          if [ -n "${DTK_EXTRA_ARGS}" ]; then
+            # Parsed with real shell quoting (not plain word-splitting), so a
+            # quoted value with spaces round-trips correctly, e.g.
+            # extra-args: '--from "2026-01-01 00:00:00"' becomes exactly two
+            # args: --from and "2026-01-01 00:00:00". extra-args is under the
+            # workflow author's own control (same trust level as any other
+            # `with:` input), so eval here parses shell syntax, it doesn't
+            # execute arbitrary commands from it.
+            eval "extra_args_array=(${DTK_EXTRA_ARGS})"
+            args+=("${extra_args_array[@]}")
+          fi
+
+          echo "Running: dtk ${args[*]}  (in ${DTK_PROJECT_DIR})"
+
+          if [ "${want_json}" = "true" ]; then
+            summary_path="${RUNNER_TEMP}/dtk-summary.json"
+            # dtk --json writes the machine-readable summary to stdout and
+            # all human-readable logs to stderr (uncaptured here, so they
+            # still stream straight into the job log).
+            (cd "${DTK_PROJECT_DIR}" && dtk "${args[@]}") 1>"${summary_path}"
+            rc=$?
+          else
+            (cd "${DTK_PROJECT_DIR}" && dtk "${args[@]}")
+            rc=$?
+          fi
+        fi
+
+        echo "exit-code=${rc}" >> "${GITHUB_OUTPUT}"
+
+        # Random delimiter (GitHub's recommended pattern for multiline
+        # outputs) so nothing in the JSON payload can collide with it.
+        delim="dtk_summary_$(python3 -c 'import uuid; print(uuid.uuid4().hex)')"
+
+        if [ -n "${summary_path}" ] && [ -s "${summary_path}" ]; then
+          echo "summary-path=${summary_path}" >> "${GITHUB_OUTPUT}"
+        else
+          echo "summary-path=" >> "${GITHUB_OUTPUT}"
+        fi
+
+        {
+          echo "summary<<${delim}"
+          if [ -n "${summary_path}" ] && [ -s "${summary_path}" ]; then
+            cat "${summary_path}"
+            echo
+          fi
+          echo "${delim}"
+        } >> "${GITHUB_OUTPUT}"
+
+        # Preserve dtk's real exit code as this step's (and so the job's)
+        # outcome — the whole point of the 0/1/2 contract is that a failing
+        # metric fails the job, not just prints red text.
+        exit "${rc}"

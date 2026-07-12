@@ -1,0 +1,55 @@
+name: action-smoke
+
+# Smoke-tests the composite action (action.yml) against the self-contained
+# example project in examples/action-smoke/ (DuckDB, no external database).
+#
+# IMPORTANT: this installs detectkit from PyPI (version: "" = latest
+# release), NOT the library code checked out on this branch/commit — it
+# validates the ACTION's mechanics (install, flag wiring, exit-code
+# preservation, --json summary capture), not unreleased library behavior.
+# Library changes are covered by tests/unit via ci.yml.
+
+on:
+  pull_request:
+    paths:
+      - "action.yml"
+      - "examples/action-smoke/**"
+      - ".github/workflows/action-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Composite action smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the action against the example project
+        id: dtk
+        uses: ./
+        with:
+          project-dir: examples/action-smoke
+          extras: duckdb
+          version: ""
+          command: run
+          steps: load,detect
+
+      - name: Assert the JSON summary and exit code
+        shell: bash
+        env:
+          DTK_SUMMARY: ${{ steps.dtk.outputs.summary }}
+          DTK_EXIT_CODE: ${{ steps.dtk.outputs.exit-code }}
+        run: |
+          set -euo pipefail
+
+          echo "${DTK_EXIT_CODE}"
+          [ "${DTK_EXIT_CODE}" = "0" ]
+
+          echo "${DTK_SUMMARY}" | tee "${RUNNER_TEMP}/dtk-summary.json"
+          echo "${DTK_SUMMARY}" | jq -e '.schema_version == 1'
+          echo "${DTK_SUMMARY}" | jq -e '.status == "success"'
+
+          echo "OK: exit-code=0, schema_version=1, status=success"

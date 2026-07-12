@@ -51,6 +51,11 @@ class SQLDatabaseManager(BaseDatabaseManager):
             database to connect to, inside which the schemas live); optional for
             MySQL (which addresses tables as ``database.table``).
         settings: Extra driver-specific connection options.
+        ensure_locations: When False, skip the ``_ensure_locations()`` call
+            that otherwise runs DDL (``CREATE SCHEMA``/``CREATE DATABASE``)
+            as a side effect of connecting — a strict read-only probe (used
+            by the read-only MCP server, which must never run DDL at
+            startup).
     """
 
     #: Maps the canonical column kind to a native SQL type. Subclasses override.
@@ -69,6 +74,7 @@ class SQLDatabaseManager(BaseDatabaseManager):
         data_location: str = "public",
         database: str | None = None,
         settings: dict[str, Any] | None = None,
+        ensure_locations: bool = True,
     ) -> None:
         self._host = host
         self._port = port
@@ -83,7 +89,8 @@ class SQLDatabaseManager(BaseDatabaseManager):
         self._table_meta: dict[str, tuple[list[str], str | None]] = {}
 
         self._conn: Any = self._connect()
-        self._ensure_locations()
+        if ensure_locations:
+            self._ensure_locations()
 
     # ── dialect hooks (subclasses override) ─────────────────────────────────
 
@@ -153,7 +160,7 @@ class SQLDatabaseManager(BaseDatabaseManager):
         if col.default is None:
             return ""
         d = col.default
-        if isinstance(d, (int, float)):
+        if isinstance(d, int | float):
             return f" DEFAULT {d}"
         if isinstance(d, str) and d.lstrip("-").isdigit():
             return f" DEFAULT {d}"

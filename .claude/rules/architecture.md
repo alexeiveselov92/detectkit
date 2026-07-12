@@ -139,8 +139,21 @@ detectkit/
 │   ├── query_gen.py             # OSI expr → ClickHouse/Cube series SQL (sqlglot; additive allowlist + hard-refuse)
 │   ├── importer.py              # OSI metric → native MetricConfig scaffold (`dtk osi import`)
 │   └── exporter.py              # MetricConfig → OSI fragment + custom_extensions[detectkit] (`dtk osi export`)
+├── mcp/                         # `dtk mcp` read-only MCP server (isolated; pipeline never imports it)
+│   ├── context.py               # McpContext: project load + no-DDL managers + session --select scope
+│   ├── tools.py                 # the 10 read-only tools (list/get/status/query/replay/history/incidents)
+│   ├── serialize.py             # ISO-8601 + numpy→JSON-safe conversion at the tool boundary
+│   └── server.py / errors.py    # FastMCP wiring (lazy `mcp` SDK import) + friendly extra-missing error
 └── utils/                       # datetime, json (sorted/orjson), env interpolation, stats
 ```
+
+A root-level **`action.yml`** (composite GitHub Action) wraps the CLI for CI:
+installs detectkit from PyPI, runs `dtk run`/`autotune`/`clean` in the given
+project dir, preserves the 0/1/2 exit-code contract as the job outcome and
+exposes the `dtk run --json` summary as an output. Self-contained example in
+`examples/action-smoke/` (DuckDB, series synthesized in SQL) + a smoke
+workflow; `uses: alexeiveselov92/detectkit@<tag>` resolves it — the vX.Y.Z
+release tags double as action versions.
 
 ## Database layer
 
@@ -1322,6 +1335,30 @@ sqlglot is the optional `[osi]` extra, imported lazily in `query_gen`; the core
 library and the rest of the CLI never import it. Deferred (needs the user's Cube
 pilot + a live-dependency decision): a *runtime* `osi_source` binding where
 detectkit itself resolves OSI at load time. See `project_osi_detectkit_integration`.
+
+## MCP server (`dtk mcp`)
+
+`detectkit/mcp/` is a strictly **read-only** Model Context Protocol stdio
+server over the project's `_dtk_*` state — an AI assistant connects and asks
+"which metrics fired this week and why" against real pipeline data. Same
+isolation contract as `semantic/`: the pipeline never imports it (guarded by
+`tests/unit/test_mcp_isolation.py`, subprocess-probed so the check can't
+pollute `sys.modules` for later tests), and the `mcp` SDK (extra `[mcp]`,
+pinned `>=1.27,<2` — SDK v2 renames FastMCP to MCPServer) is a lazy import
+raising a friendly install hint. Read-only is *enforced*: managers are built
+with `create_manager(ensure_locations=False)` (skips every backend's
+connect-time `CREATE DATABASE/SCHEMA`; DuckDB opens `read_only=True`, a
+missing state file degrades to a friendly "run `dtk run` first" instead of
+creating it), `ensure_tables()` is never called, and there are no
+write/DDL/subprocess code paths. `McpContext` resolves the project via
+`--project-dir` → `DETECTKIT_PROJECT_DIR` → cwd (MCP clients pass no cwd, so
+relative DuckDB profile paths are absolutized against the project root), and
+the startup `--select` is an access-control scope — tools refuse metric names
+outside it. Tools reuse the existing read seams verbatim
+(`build_metric_row`, `record_from_row`/`replay_alert_events`,
+`load_datapoints`/`load_detections` with fetch-clamped windows,
+`get_autotune_runs`, the labels readers); one long-lived connection behind a
+`threading.Lock`, mirroring `dtk ui`'s `db_lock`.
 
 ## Idempotency & locking
 

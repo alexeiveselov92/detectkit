@@ -1,0 +1,15 @@
+# Minimal detectkit project used by the GitHub Action smoke workflow
+# (.github/workflows/action-smoke.yml) — and, doubling as a readable example,
+# by anyone trying the composite action against a self-contained project with
+# no external database. State lives in a local DuckDB file (see profiles.yml);
+# the one metric here synthesizes its own series with DuckDB's generate_series
+# rather than reading from a real table, so the whole project runs with
+# nothing to provision.
+name: action-smoke
+version: "1.0"
+
+paths:
+  metrics: metrics
+  sql: sql
+
+default_profile: ci

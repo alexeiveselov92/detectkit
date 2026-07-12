@@ -5,6 +5,50 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.62.0] - 2026-07-12
+
+### Added
+- **MCP server** (`dtk mcp`, `pip install detectkit[mcp]`) — a strictly
+  **read-only** [Model Context Protocol](https://modelcontextprotocol.io)
+  stdio server over the project's `_dtk_*` state, so an AI assistant
+  (Claude Code / Claude Desktop / any MCP client) can answer "which metrics
+  fired this week and why" against real pipeline data. Ten tools:
+  `list_metrics` (dtk selectors work), `get_metric` (config incl. SQL and
+  `ai_context`; channel *names* only — never channel params/secrets),
+  `get_metric_status` / `get_project_status` (the same overview rows
+  `dtk ui` shows), `query_datapoints` / `query_detections` (newest-first,
+  bounded fetch with hard caps), `replay_alerts` (the same pure replay seam
+  reports use — never `_dtk_alert_states`), `get_autotune_history`,
+  `get_incidents`, `get_server_info`. Read-only is enforced, not promised:
+  managers are constructed with the new `ensure_locations=False` (no
+  `CREATE DATABASE/SCHEMA` on connect), `ensure_tables()` is never called,
+  and the server contains no write/DDL/subprocess code paths. Project
+  resolution: `--project-dir` → `DETECTKIT_PROJECT_DIR` → cwd; a `--select`
+  given at startup scopes which metrics every tool may see. Isolated like
+  the OSI layer: the pipeline never imports `detectkit/mcp/`, and the `mcp`
+  SDK (pinned `>=1.27,<2`) is a lazy, guarded import. New guide:
+  `docs/guides/mcp.md`.
+- **GitHub Action** — a composite action at the repo root wrapping the CLI:
+  `uses: alexeiveselov92/detectkit@v0.62.0` installs detectkit from PyPI and
+  runs `dtk run`/`autotune`/`clean` in your project directory, preserving
+  the 0/1/2 exit-code contract as the job outcome and exposing the
+  `dtk run --json` summary as an action output for downstream gating. Ships
+  with a self-contained DuckDB example (`examples/action-smoke/`) and a
+  smoke workflow. New guide: `docs/guides/github-action.md`.
+- `ProfileConfig.create_manager(ensure_locations=False)` — construct any
+  backend manager without its connect-time `CREATE DATABASE`/`CREATE SCHEMA`
+  side effects (DuckDB opens read-only), for read-only consumers.
+
+### Fixed
+- **Loader crash on tz-aware source timestamps** (#135): a metric whose SQL
+  returns timezone-aware timestamps (DuckDB `now()`/`TIMESTAMPTZ`,
+  PostgreSQL `timestamptz`) crashed the load step with "can't compare
+  offset-naive and offset-aware datetimes". Timestamps are now converted to
+  the naive-UTC convention at the loader boundary. As part of this,
+  `to_naive_utc` now genuinely converts an aware datetime to UTC (a no-op
+  for already-UTC values) instead of just stripping tzinfo — a non-UTC
+  aware timestamp previously kept its local wall-clock time silently.
+
 ## [0.61.0] - 2026-07-12
 
 ### Added

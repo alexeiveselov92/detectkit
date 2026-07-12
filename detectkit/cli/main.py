@@ -592,5 +592,61 @@ from detectkit.cli.commands.osi import osi as _osi_group  # noqa: E402
 cli.add_command(_osi_group)
 
 
+# MCP (Model Context Protocol) server — a self-contained, READ-ONLY command
+# (`dtk mcp`), unlike `dtk osi` a single command rather than a group. Isolated
+# from the load/detect/alert pipeline: nothing in load/detect/alert imports
+# detectkit.mcp, and this module only imports click at load time — the mcp SDK
+# (the optional `[mcp]` extra) and detectkit.mcp.server are imported lazily,
+# inside the command body.
+@cli.command()
+@click.option(
+    "--project-dir",
+    default=None,
+    help=(
+        "Project directory (searched upward for detectkit_project.yml). "
+        "Default: $DETECTKIT_PROJECT_DIR, else search upward from the current "
+        "directory. An MCP client passes no cwd, so at least one of these must "
+        "resolve."
+    ),
+)
+@click.option(
+    "--select",
+    "-s",
+    default="*",
+    show_default=True,
+    help="Selector scoping which metrics the server exposes (metric name, path, or tag)",
+)
+@click.option(
+    "--profile",
+    help="Profile to use (default: from project config)",
+)
+def mcp(project_dir: str | None, select: str, profile: str | None) -> None:
+    """
+    Serve a read-only Model Context Protocol (MCP) server over stdio.
+
+    Exposes a detectkit project to an MCP client (an IDE assistant, a desktop
+    app, a cloud agent): metric configs, loaded datapoints, detector results,
+    replayed alert history, autotune runs, and labeled incidents. Nothing in
+    this server writes to the database or the filesystem — no config edits,
+    no label writes, no pipeline runs, no schema creation. It never calls
+    `ensure_tables()`; a project with no data yet answers tool calls with a
+    clear "run `dtk run` first" error instead of creating tables.
+
+    `--select` scopes the whole session: every tool that names a metric
+    refuses one outside this set, and list/status tools intersect their own
+    selector with it. Needs the `[mcp]` extra: pip install 'detectkit[mcp]'.
+
+    Examples:
+        # Expose every metric in the project the current directory is inside
+        dtk mcp
+
+        # Scope to one tag, from a project the client doesn't cd into
+        dtk mcp --project-dir /opt/monitoring --select "tag:critical"
+    """
+    from detectkit.cli.commands.mcp import run_mcp
+
+    run_mcp(project_dir=project_dir, select=select, profile=profile)
+
+
 if __name__ == "__main__":
     cli()

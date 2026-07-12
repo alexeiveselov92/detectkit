@@ -18,6 +18,7 @@ Run all commands from a project directory (the one containing
 | `dtk clean --select <sel>` | Prune internal data that no longer matches the config |
 | `dtk osi import <model>` | Scaffold a native metric from an OSI semantic-model metric (see "OSI interop") |
 | `dtk osi export` | Publish metrics into an OSI fragment (config in `custom_extensions[detectkit]`) |
+| `dtk mcp` | Serve a **read-only** MCP server for an AI assistant (metrics, data, alerts, autotune history — no writes) |
 | `dtk --version` | Show installed detectkit version |
 
 ## Selectors (`--select` / `-s`)
@@ -375,6 +376,40 @@ dtk osi export -o semantic/detectkit.osi.yml                  # publish back to 
 The `dtk ui` metric Builder's **From OSI** sub-tab does the import
 interactively (paste a model, pick a metric/target, Compile) through the
 same code path — see "Managing metrics from the UI" above.
+
+## `dtk mcp`
+
+A **read-only** [Model Context Protocol](https://modelcontextprotocol.io)
+server, exposing a project to *another* AI assistant (an MCP client — Claude
+Code, Claude Desktop, an IDE extension) rather than being one itself. It is a
+separate, additive command (needs `pip install 'detectkit[mcp]'`) that
+contains **zero write paths**: no config edits, no label writes, no pipeline
+runs, no schema creation. Ten tools: `list_metrics`, `get_metric`,
+`get_metric_status`, `get_project_status`, `query_datapoints`,
+`query_detections`, `replay_alerts` (reconstructs the alert timeline the same
+way `dtk run --report` does — never reads `_dtk_alert_states`, never
+dispatches), `get_autotune_history`, `get_incidents`, `get_server_info`.
+Channel connection details/secrets in `profiles.yml` are never exposed —
+`get_metric` lists alerting channels by name only.
+
+```bash
+dtk mcp --project-dir /abs/path/to/project [--select <sel>] [--profile NAME]
+```
+
+- `--project-dir` — resolved before `$DETECTKIT_PROJECT_DIR` before the
+  current directory (an MCP client passes no cwd, so at least one must
+  resolve; each mechanism searches upward for `detectkit_project.yml`).
+- `--select` — scopes the whole session: every tool that names a metric
+  refuses one outside this set (an access-control boundary, not just a
+  default).
+
+This is a **different thing** from the generic database MCP CLAUDE.md
+recommends you (the assistant working in this repo) optionally connect to for
+your own read access to the project's DB — `dtk mcp` answers in detectkit's
+own terms (replayed alert decisions, detector identity, labeled incidents),
+not raw SQL, and it's for exposing *this* project to a *separate* assistant
+session/client (e.g. Claude Desktop), not something you need to launch or
+connect to yourself. `dtk mcp --help` has the full flag reference.
 
 ## Common workflows
 

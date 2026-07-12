@@ -44,6 +44,16 @@ rendered on the docs site under **For developers**). Read the relevant one:
   payload — documented recipe). All render from the shared `build_context`
   seam in the uniform `description → Rule → Value/Expected → links → tail`
   order.
+- **MCP server:** `dtk mcp` (extra `[mcp]`, SDK pinned `>=1.27,<2`) — a
+  strictly read-only MCP stdio server over `_dtk_*` (10 tools: list/get
+  metric+status, bounded query_datapoints/detections, replay_alerts via the
+  pure replay seam, autotune history, incidents, server info). Read-only is
+  enforced: `create_manager(ensure_locations=False)`, no `ensure_tables`, no
+  write paths; startup `--select` scopes tool access; isolated like
+  `semantic/` (pipeline never imports it). **GitHub Action:** root
+  `action.yml` (composite) — PyPI install + `dtk run` with the 0/1/2
+  exit-code contract as job outcome + the `--json` summary as an output;
+  example in `examples/action-smoke/`.
 - **Hybrid mode:** `source_profile` (metric → project → unset) runs a
   metric's **load** SQL against a different profile's database while all
   `_dtk_*` state stays in the state profile (`--profile`/`default_profile`,

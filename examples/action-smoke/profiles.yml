@@ -1,0 +1,11 @@
+# DuckDB needs no server, no credentials — just a file path. `state.duckdb`
+# is created on first run and is not committed (see .gitignore); the smoke
+# workflow starts from a clean file on every run.
+default_profile: ci
+
+profiles:
+  ci:
+    type: duckdb
+    path: ./state.duckdb
+    internal_schema: detectkit   # _dtk_* tables (auto-created)
+    data_schema: main            # unused here — the metric query has no source table

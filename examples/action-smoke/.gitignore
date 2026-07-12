@@ -1,0 +1,9 @@
+# Runtime state produced by the smoke run — never committed.
+state.duckdb
+state.duckdb.wal
+# The repo-root .gitignore ignores detectkit_project.yml / profiles.yml
+# repo-wide (a user's real project configs don't belong in the library repo);
+# this FIXTURE's configs are the exception — un-ignore them so `git add
+# examples/` actually picks them up.
+!detectkit_project.yml
+!profiles.yml

@@ -26,7 +26,14 @@ def now_utc_naive() -> datetime:
 
 
 def to_naive_utc(dt: datetime | None) -> datetime | None:
-    """Strip tzinfo from a UTC datetime, returning naive UTC.
+    """Normalize any datetime to naive UTC.
+
+    An aware datetime is genuinely CONVERTED to UTC first (a no-op for
+    already-UTC values, so e.g. ClickHouse's aware-UTC reads are unchanged) —
+    not just stripped of its tzinfo, which would silently keep a non-UTC
+    wall-clock time (the bug behind tz-aware source timestamps loading
+    shifted). A naive datetime is assumed to already be UTC and passes
+    through untouched.
 
     Args:
         dt: datetime object (aware or naive) or None
@@ -36,7 +43,9 @@ def to_naive_utc(dt: datetime | None) -> datetime | None:
     """
     if dt is None:
         return None
-    return dt.replace(tzinfo=None) if dt.tzinfo is not None else dt
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
 def to_aware_utc(dt: datetime | None) -> datetime | None:

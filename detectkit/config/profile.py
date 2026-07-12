@@ -176,9 +176,18 @@ class ProfileConfig(BaseModel):
         else:
             raise ValueError(f"Unsupported database type: {self.type}")
 
-    def create_manager(self) -> BaseDatabaseManager:
+    def create_manager(self, ensure_locations: bool = True) -> BaseDatabaseManager:
         """
         Create database manager from profile configuration.
+
+        Args:
+            ensure_locations: When False, skip creating the internal/data
+                database(s)/schema(s) as a side effect of connecting — a
+                strict read-only probe. For DuckDB this additionally forces
+                a read-only attach (see :class:`DuckDBDatabaseManager`), so
+                the connect itself can never create a missing state file.
+                Used by the read-only MCP server, which must never run DDL
+                at startup.
 
         Returns:
             Database manager instance
@@ -201,6 +210,7 @@ class ProfileConfig(BaseModel):
                 internal_database=self.get_internal_location(),
                 data_database=self.get_data_location(),
                 settings=self.settings,
+                ensure_locations=ensure_locations,
             )
         elif self.type == "postgres":
             from detectkit.database.postgres_manager import PostgresDatabaseManager
@@ -220,6 +230,7 @@ class ProfileConfig(BaseModel):
                 internal_schema=self.get_internal_location(),
                 data_schema=self.get_data_location(),
                 settings=self.settings,
+                ensure_locations=ensure_locations,
             )
         elif self.type in ("mysql", "mariadb"):
             # MariaDB is served by the same manager; it detects the vendor at
@@ -236,6 +247,7 @@ class ProfileConfig(BaseModel):
                 internal_database=self.get_internal_location(),
                 data_database=self.get_data_location(),
                 settings=self.settings,
+                ensure_locations=ensure_locations,
             )
         elif self.type == "duckdb":
             # In-process, file-backed database: host/port/user/password/database
@@ -256,6 +268,7 @@ class ProfileConfig(BaseModel):
                 data_schema=self.get_data_location(),
                 read_only=self.read_only,
                 settings=self.settings,
+                ensure_locations=ensure_locations,
             )
         else:
             raise ValueError(f"Unsupported database type: {self.type}")
@@ -351,18 +364,24 @@ class ProfilesConfig(BaseModel):
 
         return self.profiles[name]
 
-    def create_manager(self, profile_name: str | None = None) -> BaseDatabaseManager:
+    def create_manager(
+        self, profile_name: str | None = None, ensure_locations: bool = True
+    ) -> BaseDatabaseManager:
         """
         Create database manager for a profile.
 
         Args:
             profile_name: Profile name (if None, use default)
+            ensure_locations: Passed through to
+                :meth:`ProfileConfig.create_manager` — False for a strict
+                read-only probe that never runs DDL as a side effect of
+                connecting.
 
         Returns:
             Database manager instance
         """
         profile = self.get_profile(profile_name)
-        return profile.create_manager()
+        return profile.create_manager(ensure_locations=ensure_locations)
 
     def get_alert_channel_config(self, channel_name: str) -> dict[str, Any]:
         """

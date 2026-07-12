@@ -44,6 +44,9 @@ class MySQLDatabaseManager(SQLDatabaseManager):
         data_database: Database for user data tables.
         database: Optional default database for the connection.
         settings: Extra ``pymysql.connect`` keyword arguments.
+        ensure_locations: When False, skip creating the internal/data
+            databases as a side effect of connecting — a strict read-only
+            probe (see :class:`~detectkit.database._sql_manager.SQLDatabaseManager`).
     """
 
     _TYPE_MAP = {
@@ -72,6 +75,7 @@ class MySQLDatabaseManager(SQLDatabaseManager):
         data_database: str = "analytics",
         database: str | None = None,
         settings: dict[str, Any] | None = None,
+        ensure_locations: bool = True,
     ) -> None:
         if not PYMYSQL_AVAILABLE:
             raise ImportError(
@@ -86,6 +90,7 @@ class MySQLDatabaseManager(SQLDatabaseManager):
             data_location=data_database,
             database=database,
             settings=settings,
+            ensure_locations=ensure_locations,
         )
 
     def _connect(self) -> Any:

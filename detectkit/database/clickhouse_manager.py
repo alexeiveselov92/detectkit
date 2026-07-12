@@ -36,6 +36,10 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         internal_database: Database for internal tables (_dtk_*)
         data_database: Database for user data tables
         settings: Optional ClickHouse settings
+        ensure_locations: When False, skip creating the internal/data
+            databases as a side effect of connecting — a strict read-only
+            probe (used by the read-only MCP server, which must never run
+            DDL at startup).
     """
 
     def __init__(
@@ -47,6 +51,7 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         internal_database: str = "detectk_internal",
         data_database: str = "default",
         settings: dict[str, Any] | None = None,
+        ensure_locations: bool = True,
     ):
         """Initialize ClickHouse manager."""
         if not CLICKHOUSE_AVAILABLE:
@@ -67,8 +72,9 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
             settings=settings or {},
         )
 
-        # Ensure databases exist
-        self._ensure_databases()
+        # Ensure databases exist (skipped for a strict read-only probe).
+        if ensure_locations:
+            self._ensure_databases()
 
     def _ensure_databases(self) -> None:
         """Create internal and data databases if they don't exist."""
@@ -154,7 +160,7 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
         """Format default value for SQL."""
         if isinstance(value, str):
             return f"'{value}'"
-        elif isinstance(value, (int, float)):
+        elif isinstance(value, int | float):
             return str(value)
         elif value is None:
             return "NULL"
@@ -228,12 +234,12 @@ class ClickHouseDatabaseManager(BaseDatabaseManager):
                 value = data[col_name][i]
 
                 # Convert numpy types to Python types
-                if isinstance(value, (np.datetime64, np.timedelta64)):
+                if isinstance(value, np.datetime64 | np.timedelta64):
                     # Convert numpy datetime64 to Python datetime
                     value = self._convert_numpy_datetime(value)
                 elif isinstance(value, np.ndarray):
                     value = value.tolist()
-                elif isinstance(value, (np.integer, np.floating)):
+                elif isinstance(value, np.integer | np.floating):
                     value = value.item()
                 elif value is None or (isinstance(value, float) and np.isnan(value)):
                     value = None

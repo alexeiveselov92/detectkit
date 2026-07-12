@@ -94,6 +94,32 @@ class TestLoad:
         assert len(data["timestamp"]) == 0
         assert len(data["value"]) == 0
 
+    def test_load_coerces_tz_aware_timestamps_to_naive_utc(self, metric_loader, mock_db_manager):
+        """A source returning tz-aware timestamps (DuckDB now()/TIMESTAMPTZ,
+        PostgreSQL timestamptz) must load, not crash on the naive-vs-aware
+        comparison — values are converted to the naive-UTC convention."""
+        from datetime import timedelta as _td
+        from datetime import timezone as _tz
+
+        plus2 = _tz(_td(hours=2))
+        mock_db_manager.execute_query.return_value = [
+            # 02:00+02:00 == 00:00 UTC, 02:10+02:00 == 00:10 UTC
+            {"timestamp": datetime(2024, 1, 1, 2, 0, tzinfo=plus2), "value": 0.5},
+            {"timestamp": datetime(2024, 1, 1, 2, 10, tzinfo=plus2), "value": 0.6},
+            # Aware timestamp at/after to_date must still be filtered out.
+            {"timestamp": datetime(2024, 1, 1, 3, 0, tzinfo=_tz.utc), "value": 9.9},
+        ]
+
+        data = metric_loader.load(
+            from_date=datetime(2024, 1, 1, 0, 0),
+            to_date=datetime(2024, 1, 1, 1, 0),
+            fill_gaps=False,
+        )
+
+        assert len(data["timestamp"]) == 2
+        first = data["timestamp"][0]
+        assert first == np.datetime64("2024-01-01T00:00:00", "ms")
+
     def test_load_missing_timestamp_column(self, metric_loader, mock_db_manager):
         """Test error when query doesn't return timestamp."""
         mock_db_manager.execute_query.return_value = [

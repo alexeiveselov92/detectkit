@@ -120,6 +120,18 @@ for r in results:
         print(f"Anomaly at {r.timestamp}: {r.value}")
 ```
 
+## AI & automation
+
+- **[MCP server](docs/guides/mcp.md)** (`dtk mcp`) — a read-only [Model Context
+  Protocol](https://modelcontextprotocol.io) server so an AI assistant (Claude
+  Code, Claude Desktop, any MCP client) can query a project's metric configs,
+  loaded data, detector results, replayed alert history and autotune runs
+  directly — no write access to the pipeline.
+- **[GitHub Action](docs/guides/github-action.md)** — a composite action that
+  runs `dtk run`/`autotune`/`clean` as a CI check or scheduled job and gates
+  on detectkit's own exit-code contract, with the `--json` run summary wired
+  to step outputs.
+
 ## Documentation
 
 - **[dtk.pipelab.dev](https://dtk.pipelab.dev)** — full docs site, guides, reference, and a live in-browser playground
@@ -128,6 +140,8 @@ for r in results:
 - [Detectors Guide](docs/guides/detectors.md) — choosing the right detector
 - [Alerting Guide](docs/guides/alerting.md) — channels, mentions, cooldown, recovery
 - [Reading Alerts](docs/guides/reading-alerts.md) — what a received alert means (for stakeholders)
+- [MCP Guide](docs/guides/mcp.md) — read-only AI-assistant access with `dtk mcp`
+- [GitHub Action Guide](docs/guides/github-action.md) — run the pipeline in CI
 - [CLI Reference](docs/reference/cli.md) — command-line documentation
 - [Examples](docs/examples/) — real-world monitoring scenarios
 - [Changelog](CHANGELOG.md) — version history

@@ -172,7 +172,13 @@ class MetricLoader:
             # Filter by timestamp
             row_ts = row[timestamp_col]
             if isinstance(row_ts, datetime):
-                # Already datetime - compare directly
+                # Naive-UTC convention: a tz-aware timestamp from the source
+                # (DuckDB now()/TIMESTAMPTZ, PostgreSQL timestamptz) is
+                # converted — not rejected — so it compares cleanly with the
+                # naive-UTC window bounds and stores consistently downstream.
+                if row_ts.tzinfo is not None:
+                    row_ts = to_naive_utc(row_ts)
+                    row[timestamp_col] = row_ts
                 if row_ts >= to_date:
                     continue
             else:

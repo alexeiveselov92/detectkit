@@ -62,6 +62,12 @@ advanced-detectors = ["prophet>=1.1.0", "timesfm>=0.1.0"]
 # core library and the rest of the CLI never import sqlglot.
 osi = ["sqlglot>=20.0"]
 
+# Read-only Model Context Protocol server (`dtk mcp`). Optional: the core
+# library and the rest of the CLI never import the mcp SDK (see
+# detectkit/mcp/server.py's guarded, lazy import). SDK v2 renames FastMCP to
+# MCPServer — a migration point when bumping this ceiling.
+mcp = ["mcp>=1.27,<2"]
+
 # All extras
 all = [
     "clickhouse-driver>=0.2.0",
@@ -71,6 +77,7 @@ all = [
     "prophet>=1.1.0",
     "timesfm>=0.1.0",
     "sqlglot>=20.0",
+    "mcp>=1.27,<2",
 ]
 
 # Development dependencies

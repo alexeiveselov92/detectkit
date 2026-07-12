@@ -89,6 +89,8 @@ export default defineConfig({
             { label: 'Tuning (manual)', link: '/guides/tuning/' },
             { label: 'Project UI', link: '/guides/project-ui/' },
             { label: 'Semantic layer (OSI)', link: '/guides/osi/' },
+            { label: 'MCP server', link: '/guides/mcp/' },
+            { label: 'GitHub Action', link: '/guides/github-action/' },
             { label: 'Visualizing results', link: '/guides/visualizing-results/' },
           ],
         },

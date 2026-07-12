@@ -203,6 +203,18 @@ class DuckDBDatabaseManager(SQLDatabaseManager):
             internal/data schemas already exist.
         settings: Extra ``duckdb.connect`` ``config`` options (e.g.
             ``{"memory_limit": "512MB"}``).
+        ensure_locations: When False, skip creating the internal/data
+            schemas as a side effect of connecting (a strict read-only
+            probe — see
+            :class:`~detectkit.database._sql_manager.SQLDatabaseManager`)
+            **and** force a read-only attach regardless of ``read_only``,
+            for a real file path. Skipping schema creation alone is not
+            enough for DuckDB: a plain read-write ``duckdb.connect`` against
+            a *missing* file path creates that file as a side effect of
+            connecting, before any DDL runs — forcing ``read_only=True``
+            is what actually prevents that. ``":memory:"`` is exempted from
+            the forced read-only attach (it has no file to create, and
+            DuckDB rejects a read-only in-memory connection outright).
 
     Raises:
         ImportError: If the ``duckdb`` package is not installed.
@@ -224,6 +236,7 @@ class DuckDBDatabaseManager(SQLDatabaseManager):
         data_schema: str = "main",
         read_only: bool = False,
         settings: dict[str, Any] | None = None,
+        ensure_locations: bool = True,
     ) -> None:
         if not DUCKDB_AVAILABLE:
             raise ImportError(
@@ -235,7 +248,17 @@ class DuckDBDatabaseManager(SQLDatabaseManager):
                 "path, or ':memory:' for a transient, tests/preview-only in-process "
                 "database whose state is lost between runs)."
             )
-        self._read_only = read_only
+        # `ensure_locations=False` is a strict read-only PROBE (see
+        # `SQLDatabaseManager.__init__`): skipping `_ensure_locations()` is
+        # not enough on its own for DuckDB, because a plain read-write
+        # `duckdb.connect` against a MISSING file creates that file as a
+        # side effect of connecting, before any DDL runs. Force a read-only
+        # attach so the connect itself can never create the file/schemas.
+        # ":memory:" is exempted — it has no file to create in the first
+        # place, and DuckDB rejects a read-only in-memory connection outright
+        # (`CatalogException: Cannot launch in-memory database in read-only
+        # mode!`), so forcing it there would break rather than protect.
+        self._read_only = True if (not ensure_locations and path != ":memory:") else read_only
         # Kept separately (and typed `str`, not `str | None`) from the base
         # class's `self._database` so `_connect()` doesn't need to narrow an
         # Optional it knows — by the ValueError check above — can't be None.
@@ -248,6 +271,7 @@ class DuckDBDatabaseManager(SQLDatabaseManager):
             data_location=data_schema,
             database=path,
             settings=settings,
+            ensure_locations=ensure_locations,
         )
 
     def _connect(self) -> Any:

@@ -14,6 +14,7 @@ dtk autotune --select <sel>     # Auto-configure a metric's detector from data
 dtk tune --select <sel>         # Interactively tune a detector, write it back
 dtk ui [--select <sel>]         # Project-wide monitoring cockpit in the browser
 dtk osi import|export|compile   # OSI semantic-model interop
+dtk mcp                         # Read-only MCP server for AI assistants
 dtk test-alert <metric>         # Test alert channels
 dtk unlock --select <selector>  # Clear a stuck pipeline lock
 dtk clean --select <selector>   # Prune data that no longer matches configs
@@ -1462,6 +1463,99 @@ Re-run with --execute to apply.
 
 ---
 
+### `dtk mcp`
+
+Serve a **read-only** [Model Context Protocol](https://modelcontextprotocol.io)
+(MCP) server over stdio, exposing a project's metric configs, loaded
+datapoints, detector results, replayed alert history, autotune runs, and
+labeled incidents to an MCP client (Claude Code, Claude Desktop, an IDE
+extension, any MCP-capable client). A **separate, additive** command, the
+same isolation as [`dtk osi`](#dtk-osi): nothing in load/detect/alert imports
+it, so it can never affect a running project — and unlike every other
+command here, it contains **zero write paths**: no config edits, no label
+writes, no pipeline runs, no schema creation (`ensure_tables()` is never
+called). Needs the `[mcp]` extra:
+
+```bash
+pip install 'detectkit[mcp]'
+```
+
+#### Syntax
+
+```bash
+dtk mcp [OPTIONS]
+```
+
+#### Options
+
+**`--project-dir`** (optional)
+Project directory, searched upward for `detectkit_project.yml` (so pointing
+at a subdirectory still resolves). An MCP client passes no working directory,
+so at least one of `--project-dir` / `$DETECTKIT_PROJECT_DIR` / a known `cwd`
+must resolve — see [Project directory resolution](#project-directory-resolution).
+
+**`--select`, `-s`** (default: `*`)
+Selector scoping which metrics the server exposes — same semantics as
+`dtk run` (metric name, path pattern, or `tag:<name>`). This is an
+**access-control boundary**, not just a default: every tool that names a
+metric refuses one outside this set for the life of the session.
+
+**`--profile`** (optional)
+Profile to use (default: the project's `default_profile`).
+
+#### Project directory resolution
+
+In order, each mechanism searching upward from its starting point for
+`detectkit_project.yml`:
+
+1. `--project-dir <path>`
+2. `$DETECTKIT_PROJECT_DIR` environment variable
+3. The current working directory
+
+No match in any of the three → the server refuses to start with an error
+naming all three mechanisms it tried.
+
+#### Examples
+
+```bash
+# Expose every metric in the project the current directory is inside
+dtk mcp
+
+# Scope to one tag, from a project the client doesn't cd into
+dtk mcp --project-dir /opt/monitoring --select "tag:critical"
+```
+
+#### Tools
+
+Ten read-only tools: `list_metrics`, `get_metric`, `get_metric_status`,
+`get_project_status`, `query_datapoints`, `query_detections`,
+`replay_alerts`, `get_autotune_history`, `get_incidents`, `get_server_info`.
+`replay_alerts` reconstructs the alert timeline through the same pure replay
+engine `dtk run --report` uses — it never reads `_dtk_alert_states`
+(last-writer-wins state, not an event log) and never dispatches a
+notification. `get_metric`'s alerting blocks list channels by **name**
+only — connection details/secrets live in `profiles.yml`, which this server
+never reads. See the [MCP guide](../guides/mcp.md#tools) for the full
+parameter/return reference and client setup (Claude Code, Claude Desktop).
+
+#### Behavior
+
+- Table presence is probed once at startup (`tables_ready` in
+  `get_server_info`); on a project with no data yet, every data tool answers
+  with a clear "no data yet — run `dtk run` first" error instead of creating
+  schema or leaking a raw driver error.
+- One database connection for the whole session, serialized across tool
+  calls (the same rationale as `dtk ui`'s `db_lock`) — concurrent calls from
+  one client queue rather than race.
+- Takes **no** pipeline lock; a live `dtk run` and a live `dtk mcp` session
+  can coexist.
+
+See the [MCP guide](../guides/mcp.md) for the full walkthrough, including
+Claude Code / Claude Desktop setup snippets and the read-only guarantee in
+detail.
+
+---
+
 ## `dtk osi`
 
 Interop with [Open Semantic Interchange](https://github.com/open-semantic-interchange/OSI)
@@ -1548,8 +1642,8 @@ scheduler or CI step can gate on it directly instead of parsing logs:
 - "No datapoints loaded" for a metric is a **failure**
 
 Other commands (`dtk tune`, `dtk ui`, `dtk unlock`, `dtk init`,
-`dtk test-alert`, `dtk osi`) are unchanged — see each command's section above
-for how it reports success or failure.
+`dtk test-alert`, `dtk osi`, `dtk mcp`) are unchanged — see each command's
+section above for how it reports success or failure.
 
 `dtk run --json` (see above) also mirrors the exit code as the payload's
 `"exit_code"` field, for consumers that would rather branch on the JSON than
@@ -1557,9 +1651,13 @@ on `$?`.
 
 ## Environment Variables
 
-The CLI itself defines no special environment variables, but configuration
-files support environment-variable interpolation so secrets stay out of YAML.
-Both `${VAR}` and `{{ env_var('VAR') }}` syntaxes are supported:
+The only CLI-level environment variable is `$DETECTKIT_PROJECT_DIR`, a
+fallback project directory used by [`dtk mcp`](#dtk-mcp) (an MCP client
+generally launches it with no working directory of its own — see
+[Project directory resolution](#project-directory-resolution)); no other
+command reads it. Configuration files separately support
+environment-variable interpolation so secrets stay out of YAML. Both `${VAR}`
+and `{{ env_var('VAR') }}` syntaxes are supported:
 
 ```yaml
 # profiles.yml
@@ -1808,6 +1906,14 @@ The `|| true` keeps the step alive past `dtk run`'s own non-zero exit so the
 exit code alone, or query something finer than `.totals.failed` (a specific
 metric's status, an alert count) from the same `summary.json`.
 
+> **Prefer a maintained composite action over hand-rolling the above.**
+> detectkit ships its own [GitHub Action](../guides/github-action.md)
+> (`alexeiveselov92/detectkit@vX.Y.Z`) that wraps exactly this
+> install-then-run-then-gate sequence — pinned versions, `--json` output
+> already wired to step outputs, and `command: run|autotune|clean` support —
+> so a scheduled workflow doesn't need its own copy of the exit-code
+> plumbing. See the guide for inputs/outputs and a full example.
+
 ## Best Practices
 
 ### 1. Use Selectors Effectively
@@ -1914,4 +2020,6 @@ clickhouse-client --host=<host> --port=<port>
 - [Auto-tune Reference](autotune.md) - `dtk autotune` flags, labels schema, scoring metrics
 - [Project UI Guide](../guides/project-ui.md) - Project-wide live overview with `dtk ui`
 - [Alerting Guide](../guides/alerting.md) - Configure alerts
+- [MCP Guide](../guides/mcp.md) - Read-only AI-assistant access with `dtk mcp`
+- [GitHub Action Guide](../guides/github-action.md) - Run the pipeline in CI with the composite action
 - [Quickstart Guide](../getting-started/quickstart.md) - Getting started tutorial

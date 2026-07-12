@@ -1,0 +1,47 @@
+# Self-contained example metric: no source table, no warehouse — the query
+# synthesizes its own series with DuckDB's generate_series() over the load
+# window detectkit passes in, so this whole project runs with nothing to
+# provision. Swap the query for a real one (or a `query_file:`) against your
+# own data; everything else here — profile, detectors — is a normal detectkit
+# metric.
+name: example_series
+description: Synthetic series generated on the fly by DuckDB (no source data needed)
+
+query: |
+  SELECT
+    ts AS timestamp,
+    10
+      + 3 * sin(epoch(ts) / 3600.0)                  -- smooth hourly wave
+      + (random() - 0.5)                             -- small noise
+      AS value
+  FROM generate_series(
+    TIMESTAMP '{{ dtk_start_time }}',
+    TIMESTAMP '{{ dtk_end_time }}',
+    INTERVAL '{{ interval_seconds }} seconds'
+  ) AS t(ts)
+  WHERE ts < TIMESTAMP '{{ dtk_end_time }}'
+  ORDER BY ts
+
+interval: 10min
+
+# A few hours back is enough to give the detector a window to fill and keeps
+# every run (including the smoke workflow, which starts from a clean state
+# file each time) fast. Bump this forward occasionally so it doesn't drift
+# too far into the past.
+loading_start_time: "2026-07-12 02:00:00"
+loading_batch_size: 10000
+
+detectors:
+  - type: mad
+    params:
+      threshold: 3.0
+      window_size: 20
+      min_samples: 10
+
+# No `alerting:` block — alerting is opt-in per metric, and this fixture
+# should never try to send a real notification. See docs/guides/alerting.md
+# to wire up a channel for a real project.
+
+tags:
+  - example
+  - ci-smoke

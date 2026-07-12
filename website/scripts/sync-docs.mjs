@@ -40,6 +40,8 @@ const PAGES = [
   { src: 'docs/guides/tuning.md', dest: 'guides/tuning.md' },
   { src: 'docs/guides/project-ui.md', dest: 'guides/project-ui.md' },
   { src: 'docs/guides/osi.md', dest: 'guides/osi.md' },
+  { src: 'docs/guides/mcp.md', dest: 'guides/mcp.md' },
+  { src: 'docs/guides/github-action.md', dest: 'guides/github-action.md' },
   { src: 'docs/guides/alerting.md', dest: 'guides/alerting.md' },
   { src: 'docs/guides/alerting-channels.md', dest: 'guides/alerting-channels.md' },
   { src: 'docs/guides/reading-alerts.md', dest: 'guides/reading-alerts.md' },

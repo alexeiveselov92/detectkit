@@ -34,6 +34,9 @@ class PostgresDatabaseManager(SQLDatabaseManager):
         internal_schema: Schema for internal ``_dtk_*`` tables.
         data_schema: Schema for user data tables.
         settings: Extra ``psycopg2.connect`` keyword arguments.
+        ensure_locations: When False, skip creating the internal/data
+            schemas as a side effect of connecting — a strict read-only
+            probe (see :class:`~detectkit.database._sql_manager.SQLDatabaseManager`).
     """
 
     _TYPE_MAP = {
@@ -54,6 +57,7 @@ class PostgresDatabaseManager(SQLDatabaseManager):
         internal_schema: str = "detectkit",
         data_schema: str = "public",
         settings: dict[str, Any] | None = None,
+        ensure_locations: bool = True,
     ) -> None:
         if not PSYCOPG2_AVAILABLE:
             raise ImportError(
@@ -68,6 +72,7 @@ class PostgresDatabaseManager(SQLDatabaseManager):
             data_location=data_schema,
             database=database,
             settings=settings,
+            ensure_locations=ensure_locations,
         )
 
     def _connect(self) -> Any:

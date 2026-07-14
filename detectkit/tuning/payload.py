@@ -154,8 +154,14 @@ def seed_detector_params(dtype: str, params: dict[str, Any]) -> dict[str, Any]:
         ),
         "detrend": params.get("detrend") or "none",
         "stabilization": params.get("stabilization") or "none",
-        "seasonalityComponents": _normalize_seasonality_components(
-            params.get("seasonality_components")
+        # Seasonality is a windowed-detector concept (autoreg v1 rejects it;
+        # manual_bounds ignores it) — a stray key in a hand-edited config must
+        # not seed the cockpit's shared group selector through a detector that
+        # can never consume it.
+        "seasonalityComponents": (
+            _normalize_seasonality_components(params.get("seasonality_components"))
+            if dtype in _WINDOWED_TYPES
+            else None
         ),
         "minSamplesPerGroup": params.get(
             "min_samples_per_group", _MIN_SAMPLES_PER_GROUP_DEFAULT.get(dtype, 10)

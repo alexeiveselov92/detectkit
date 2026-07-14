@@ -539,6 +539,20 @@ def test_seed_detector_params_windowed_carries_default_lags():
     assert seed_detector_params("mad", {})["lags"] == 5
 
 
+def test_seed_detector_params_non_windowed_never_seeds_seasonality():
+    # Seasonality is a windowed concept: a stray seasonality_components key in a
+    # hand-edited autoreg/manual config (the running pipeline would reject or
+    # ignore it) must not seed the cockpit's shared group selector (issue #148).
+    stray = {"seasonality_components": ["hour", "day_of_week"]}
+    assert seed_detector_params("autoreg", stray)["seasonalityComponents"] is None
+    assert seed_detector_params("manual_bounds", stray)["seasonalityComponents"] is None
+    # ...while a windowed detector's own groups still seed normally.
+    assert seed_detector_params("mad", stray)["seasonalityComponents"] == [
+        ["hour"],
+        ["day_of_week"],
+    ]
+
+
 def test_seed_detector_params_window_default_is_per_type():
     # a bare `type: autoreg` config must open the cockpit at the window the
     # pipeline actually runs (AutoregDetector's default 200), not the windowed

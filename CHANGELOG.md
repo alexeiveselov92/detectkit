@@ -5,6 +5,36 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.66.1] - 2026-07-14
+
+### Fixed
+- **`dtk tune`: the seasonality warning no longer fires under an autoreg /
+  manual-bounds band** (#148). The cockpit's recompute parameters
+  deliberately capture *every* control's state — including the hidden
+  windowed-only knobs while `autoreg`/`manual_bounds` is selected, so a
+  detector-type switch round-trips without losing the windowed slot's
+  settings — which means presentational consumers must branch by detector
+  type. The "Seasonality inactive at this window … this is why the band
+  widened" warning didn't: with a leftover seasonality selection from a
+  previously-selected windowed detector it showed under an **autoreg**
+  band, wrongly implying that seasonality settings shape autoreg's
+  confidence intervals (autoreg has no seasonality machinery at all — v1
+  rejects `seasonality_components`; the band math, warm-up, and the Apply
+  write-back were never affected, matching the Python detector). The
+  warning now hides for the non-windowed detector types.
+- **`dtk tune` / landing chart: leftover smoothing no longer draws a false
+  processed-vs-ghost line split under autoreg / manual bounds** (#149).
+  Same leak class, found while adversarially verifying #148: the chart
+  keyed the metric-line rendering on `smoothing != none` alone, so a stale
+  `ema`/`sma` selection drew a ghost raw series plus a duplicate
+  "processed" line under detectors that never smooth. The split now also
+  requires a windowed detector type.
+- **`dtk tune`: a stray `seasonality_components` key on a hand-edited
+  autoreg/manual config no longer seeds the cockpit's shared seasonality
+  group selector** — `seed_detector_params` forces it to `None` for the
+  non-windowed types (the running pipeline rejects or ignores such a key
+  anyway). Cockpit bundle (`detectkit/tuning/assets/tune.js`) regenerated.
+
 ## [0.66.0] - 2026-07-13
 
 ### Added

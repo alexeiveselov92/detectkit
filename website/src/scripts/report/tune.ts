@@ -304,6 +304,13 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     return card;
   };
 
+  // Captures EVERY control's state — including windowed-only knobs while an
+  // autoreg/manual_bounds type is selected (their rows hide but the state must
+  // survive: editedParams round-trips through the slot picker and a later
+  // windowed re-seed restores it). Consumers that render or persist params must
+  // therefore branch by detector type (applyParams, updateSeasonWarn, the
+  // chart's smoothing ghost) rather than trust an inert field — nulling a field
+  // here instead would silently lose the windowed slot's setting (#148).
   const readParams = (): DetectorParams => ({
     type: detectorCtl.get() as DetectorType,
     threshold: thresholdCtl.get(),
@@ -527,6 +534,16 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   seasonWarn.style.display = 'none';
   stageFoot.appendChild(seasonWarn);
   const updateSeasonWarn = (params: DetectorParams): void => {
+    // Seasonality is a windowed-detector concept: autoreg (v1 rejects it) and
+    // manual_bounds never condition on seasonal keys, but their params still
+    // carry the hidden group selector's state (readParams deliberately captures
+    // every control so a slot/type round-trip can restore it). Without this
+    // guard the leaked value blamed the autoreg band's width on a seasonality
+    // fallback — machinery the detector doesn't even have (#148).
+    if (params.type === 'autoreg' || params.type === 'manual_bounds') {
+      seasonWarn.style.display = 'none';
+      return;
+    }
     const groups = params.seasonalityComponents;
     const card = seasonalCardinality(groups);
     const needed = params.minSamplesPerGroup * card;

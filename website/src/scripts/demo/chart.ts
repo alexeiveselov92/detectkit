@@ -586,8 +586,14 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     // single clay line is all that's needed.
     // Show the processed (smoothed) line as the active clay line only where the
     // band is the subject (tune mode / the landing demo); 'review'/'label' show the
-    // raw series so the anomaly dots sit on the real values.
-    if (params.smoothing !== 'none' && (!labeling || m() === 'tune')) {
+    // raw series so the anomaly dots sit on the real values. Only the windowed
+    // detectors smooth: autoreg/manual_bounds params can carry a leftover
+    // smoothing selection from the tune cockpit's hidden control (readParams
+    // captures every control so a type switch round-trips), but their
+    // processedValue is input_type-only — keying the ghost split on it would
+    // draw a duplicate "processed" line over a ghost raw series (#149).
+    const smooths = params.type !== 'autoreg' && params.type !== 'manual_bounds';
+    if (smooths && params.smoothing !== 'none' && (!labeling || m() === 'tune')) {
       drawSeries(series.values, rgba(clay, 0.28), 1.25);
       const processed = scored.map((p) => p.processedValue);
       drawSeries(processed, clay, 1.6);

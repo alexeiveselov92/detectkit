@@ -27,6 +27,57 @@
   padding: 0 24px;
 }
 
+/* ---------- theme (light = warm paper default, dark = terminal) ----------
+   The landing chrome reads from the brand tokens; dark mode remaps only the
+   page surfaces/text/borders. Terminal cards (--term-*) are already dark and
+   the realistic channel-preview cards keep their real-app colors. */
+.landing {
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+:root[data-theme='dark'] {
+  --paper: #1b1916;
+  --surface: #211e1a;
+  --ink: #fbf9f3;
+  --muted: #c9c2b4;
+  --faint: #8a8373;
+  --border: #332f29;
+}
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.theme-toggle:hover {
+  color: var(--ink);
+  border-color: var(--faint);
+}
+/* show the icon for the theme you'd switch TO */
+.theme-toggle .ico-sun {
+  display: none;
+}
+.theme-toggle .ico-moon {
+  display: block;
+}
+:root[data-theme='dark'] .theme-toggle .ico-sun {
+  display: block;
+}
+:root[data-theme='dark'] .theme-toggle .ico-moon {
+  display: none;
+}
+
 /* ---------- header / nav ---------- */
 .site-header {
   position: sticky;
@@ -1343,7 +1394,9 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--ink);
-  background: #fff;
+  /* token, not #fff — so it stays a readable recessed field in dark too
+     (dark: light text on a dark surface, not white-on-white) */
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 11px;
@@ -1668,12 +1721,12 @@
   border-radius: 14px;
   padding: 22px;
 }
-/* Discord needs the same treatment as Telegram: the embed's own dark fill
-   (#2b2d31) reads as "Discord" only against the darker message-list
-   background (#313338) around it, not the light demo card. */
+/* Discord in its LIGHT theme, so all channel previews read as consistent light
+   app screenshots (only Discord used to be dark, which stood out). The embed is
+   a white card with the accent bar on the shared warm light canvas. */
 .platform-demo:has(#pf-discord:checked) .pf-surface {
-  background: #313338;
-  border: 1px solid #26282c;
+  background: #f3f1ec;
+  border: 1px solid #e6e0d4;
   border-radius: 14px;
   padding: 22px;
 }
@@ -2133,7 +2186,7 @@
 .pfd-name {
   font-weight: 600;
   font-size: 15px;
-  color: #f2f3f5;
+  color: #060607;
 }
 .pfd-tag {
   font-size: 10px;
@@ -2146,11 +2199,12 @@
 }
 .pfd-time {
   font-size: 12px;
-  color: #949ba4;
+  color: #5c5e66;
 }
 .pfd-embed {
   display: flex;
-  background: #2b2d31;
+  background: #ffffff;
+  border: 1px solid #e3e5e8;
   border-radius: 4px;
   max-width: 480px;
   overflow: hidden;
@@ -2169,7 +2223,7 @@ a.pfd-title {
   display: inline-block;
   font-weight: 700;
   font-size: 14.5px;
-  color: #00a8fc;
+  color: #006ce7;
   text-decoration: none;
   margin-bottom: 6px;
 }
@@ -2179,38 +2233,38 @@ a.pfd-title:hover {
 .pfd-desc {
   font-size: 13px;
   line-height: 1.6;
-  color: #dbdee1;
+  color: #2e3338;
   margin-bottom: 8px;
 }
 .pfd-desc strong {
-  color: #f2f3f5;
+  color: #060607;
 }
 .pfd-desc code {
   font-family: var(--mono);
   font-size: 12px;
-  background: #1e1f22;
-  color: #dbdee1;
+  background: #e3e5e8;
+  color: #2e3338;
   padding: 1px 5px;
   border-radius: 4px;
 }
 .pfd-desc a {
-  color: #00a8fc;
+  color: #006ce7;
   text-decoration: none;
 }
 .pfd-plabel {
   font-size: 12px;
-  color: #f2f3f5;
+  color: #060607;
   margin-bottom: 3px;
 }
 .pfd-pblock {
   margin: 0 0 8px;
-  background: #1e1f22;
+  background: #e3e5e8;
   border-radius: 4px;
   padding: 8px 10px;
   font-family: var(--mono);
   font-size: 11.5px;
   line-height: 1.5;
-  color: #dbdee1;
+  color: #2e3338;
   white-space: pre-wrap;
   word-break: break-all;
 }
@@ -2223,12 +2277,12 @@ a.pfd-title:hover {
 .pfd-fk {
   font-size: 11px;
   font-weight: 700;
-  color: #f2f3f5;
+  color: #060607;
   margin-bottom: 2px;
 }
 .pfd-fv {
   font-size: 12.5px;
-  color: #dbdee1;
+  color: #2e3338;
 }
 .pfd-footer {
   display: flex;
@@ -2236,7 +2290,7 @@ a.pfd-title:hover {
   gap: 6px;
   margin-top: 10px;
   font-size: 11px;
-  color: #949ba4;
+  color: #5c5e66;
 }
 .pfd-footer svg {
   border-radius: 3px;
@@ -2522,11 +2576,14 @@ a.pfd-title:hover {
 .cta-band {
   position: relative;
   overflow: hidden;
-  background: var(--ink);
+  /* fixed terminal surface (theme-independent) so the band never inverts to a
+     white block in dark mode; a hairline keeps it distinct from the dark page */
+  background: var(--term-bg);
+  border: 1px solid var(--term-border);
   border-radius: 18px;
   padding: 60px 40px;
   text-align: center;
-  color: var(--surface);
+  color: var(--term-text);
   margin: 64px 0 0;
 }
 .cta-band .grid-bg {
@@ -2540,7 +2597,7 @@ a.pfd-title:hover {
   position: relative;
 }
 .cta-band h2 {
-  color: var(--surface);
+  color: #fbf9f3;
   font-size: clamp(28px, 3.6vw, 38px);
   letter-spacing: -0.03em;
   font-weight: 800;
@@ -2555,8 +2612,8 @@ a.pfd-title:hover {
   justify-content: center;
 }
 .cta-band .pip {
-  background: var(--surface);
-  color: var(--ink) !important;
+  background: #fbf9f3;
+  color: #1b1916 !important;
 }
 
 /* ---------- footer ---------- */
@@ -3684,3 +3741,779 @@ a.pfd-title:hover {
     margin-left: 0;
   }
 }
+
+/* ==========================================================================
+   New landing sections: quickstart · dtk mcp · hybrid mode · comparison ·
+   credibility. All token-driven so they render in both light and dark.
+   ========================================================================== */
+
+/* ---------- quickstart ---------- */
+.qs-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+.qs-head h2 {
+  margin: 0;
+}
+.qs-head .sub {
+  max-width: 46ch;
+  margin: 0;
+}
+.qs-term {
+  margin-top: 22px;
+}
+.qs-foot {
+  margin: 14px 0 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--faint);
+}
+.qs-foot a {
+  color: var(--clay-700);
+  font-weight: 600;
+  text-decoration: none;
+}
+.qs-foot a:hover {
+  color: var(--clay);
+}
+:root[data-theme='dark'] .qs-foot a {
+  color: var(--clay);
+}
+
+/* ---------- dtk mcp ---------- */
+.mcp-card {
+  margin-top: 24px;
+  max-width: 720px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px -40px rgba(0, 0, 0, 0.5);
+}
+.mcp-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.mcp-avatar {
+  display: inline-flex;
+}
+.mcp-who {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink);
+}
+.mcp-badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-green);
+  background: color-mix(in srgb, var(--accent-green) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-green) 30%, transparent);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+.mcp-body {
+  padding: 18px;
+}
+.mcp-user {
+  margin-left: auto;
+  width: fit-content;
+  max-width: 82%;
+  background: var(--clay);
+  color: #fbf9f3;
+  font-size: 14.5px;
+  font-weight: 500;
+  padding: 9px 14px;
+  border-radius: 14px 14px 4px 14px;
+  margin-bottom: 15px;
+}
+.mcp-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 15px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+}
+.mcp-tool {
+  color: var(--muted);
+  background: var(--paper);
+  border: 1px solid var(--border);
+  padding: 3px 9px;
+  border-radius: 6px;
+}
+.mcp-answer {
+  font-size: 14.5px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.mcp-row {
+  display: flex;
+  gap: 11px;
+  padding: 11px 0;
+  border-top: 1px solid var(--border);
+}
+.mcp-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  margin-top: 6px;
+}
+.mcp-dot.dot-anom {
+  background: var(--st-anomaly);
+}
+.mcp-dot.dot-nodata {
+  background: var(--st-nodata);
+}
+.mcp-metric {
+  font-size: 14px;
+  color: var(--ink);
+}
+.mcp-metric code {
+  font-weight: 700;
+}
+.mcp-state {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+  margin-left: 4px;
+}
+.mcp-state.open {
+  color: var(--st-anomaly);
+}
+.mcp-desc {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.mcp-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.mcp-note svg {
+  color: var(--accent-green);
+  flex: none;
+  margin-top: 3px;
+}
+.mcp-card code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+}
+
+/* ---------- hybrid mode ---------- */
+.hy-flow {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  margin-top: 24px;
+}
+.hy-node {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+.hy-node.hy-dtk {
+  border-color: var(--clay);
+  box-shadow: 0 0 0 1px var(--clay) inset;
+}
+.hy-node-t {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 14.5px;
+  color: var(--ink);
+}
+.hy-logo {
+  display: inline-flex;
+}
+.hy-node-b {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.hy-node-x {
+  font-size: 12px;
+  color: var(--faint);
+  margin-top: 8px;
+  line-height: 1.4;
+}
+.hy-arrow {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  color: var(--clay);
+  flex: none;
+}
+.hy-arrow span {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--faint);
+}
+.hy-yaml {
+  margin: 18px 0 0;
+  background: var(--term-bg);
+  border: 1px solid var(--term-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--term-text);
+  overflow-x: auto;
+}
+.hy-yaml .k {
+  color: #6cc0b6;
+}
+.hy-yaml .s {
+  color: #e7b45c;
+}
+.hy-yaml .c {
+  color: #7c766a;
+}
+
+/* ---------- comparison ---------- */
+.cmp-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 8px 13px;
+  border-radius: 9px;
+  margin-bottom: 22px;
+}
+.cmp-flag-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--st-error);
+}
+.cmp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.cmp-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 22px;
+}
+.cmp-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.cmp-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 9px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.cmp-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.cmp-desc {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--faint);
+  margin-top: 2px;
+}
+.cmp-them,
+.cmp-us {
+  font-size: 13.5px;
+  line-height: 1.5;
+  padding: 11px 14px;
+  border-radius: 10px;
+}
+.cmp-them {
+  color: var(--muted);
+  border: 1px solid var(--border);
+  margin-bottom: 9px;
+}
+.cmp-us {
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--clay) 30%, transparent);
+  background: color-mix(in srgb, var(--clay) 9%, transparent);
+}
+.cmp-tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-right: 8px;
+  color: var(--faint);
+}
+.cmp-us .cmp-tag {
+  color: var(--clay-700);
+}
+:root[data-theme='dark'] .cmp-us .cmp-tag {
+  color: var(--clay);
+}
+.cmp-note {
+  margin: 20px 0 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--faint);
+}
+
+/* ---------- credibility strip ---------- */
+.cred-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px 22px;
+  padding: 20px 24px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.cred-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.cred-item strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+.cred-item + .cred-item::before {
+  content: '·';
+  color: var(--faint);
+  margin-right: 10px;
+}
+
+/* ---------- responsive: new sections ---------- */
+@media (max-width: 820px) {
+  .cmp-grid {
+    grid-template-columns: 1fr;
+  }
+  .hy-flow {
+    flex-direction: column;
+  }
+  .hy-arrow {
+    transform: rotate(90deg);
+  }
+  .qs-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .qs-head .sub {
+    max-width: none;
+  }
+}
+
+/* ---------- channel previews are theme-immune app replicas ----------
+   The alert-preview cards faithfully mimic each platform's real UI, so they
+   render identically whatever the landing's theme is — a dark page never
+   recolors a Slack card, because a "dark Slack card" wouldn't look like Slack.
+   Two parts:
+   (1) light-UI apps get their own light canvas (mirroring the Telegram/Discord
+       surface treatment), so the whole preview reads as that light app instead
+       of a white card floating on the dark page (which also left the bot-name
+       line dark-on-dark); and
+   (2) the brand tokens + base text are pinned to their LIGHT values inside those
+       cards, so the dark page can't bleed in — chiefly via
+       `.landing a { color: inherit }`, which otherwise dragged the Slack/MM
+       attachment title (an <a>) to the page's near-white text = invisible. */
+.platform-demo:has(#pf-slack:checked) .pf-surface,
+.platform-demo:has(#pf-mattermost:checked) .pf-surface,
+.platform-demo:has(#pf-email:checked) .pf-surface,
+.platform-demo:has(#pf-gchat:checked) .pf-surface,
+.platform-demo:has(#pf-teams:checked) .pf-surface,
+.platform-demo:has(#pf-ntfy:checked) .pf-surface {
+  background: #f3f1ec;
+  border: 1px solid #e6e0d4;
+  border-radius: 14px;
+  padding: 22px;
+}
+.pf-slack-panel,
+.pf-mm-panel,
+.pf-email-panel,
+.pf-gchat-panel,
+.pf-teams-panel,
+.pf-tg-panel,
+.pf-ntfy-panel {
+  color: #1d1c1d;
+  --ink: #1b1916;
+  --muted: #6e675b;
+  --faint: #9a9384;
+  --surface: #fbf9f3;
+  --paper: #f5f1e8;
+  --border: #e6e0d4;
+}
+
+/* Source-only (hybrid-mode) backends get a small tag so they aren't mistaken
+   for full state backends. Snowflake / BigQuery only; MotherDuck is full. */
+.db-hybrid {
+  margin-left: 6px;
+  font-family: var(--mono);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--clay-700);
+  background: color-mix(in srgb, var(--clay) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--clay) 28%, transparent);
+  padding: 1px 5px;
+  border-radius: 5px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+:root[data-theme='dark'] .db-hybrid {
+  color: var(--clay);
+}
+
+/* ---------- channel previews: dark-theme sync ----------
+   Additive dark-mode counterparts for the alert-preview cards. Each app
+   (except Email, which always sends a light HTML card and must keep
+   representing that truthfully) gets its own faithful DARK theme when the
+   landing page itself is in dark mode; the light rules above are untouched
+   and still drive light-mode rendering. Every selector here is scoped under
+   `:root[data-theme='dark']`, so specificity/order safely overrides the
+   light-pinned values (including the `.landing a { color: inherit }` case
+   for the attachment/embed title links). */
+
+/* Slack + Mattermost share one markup (chat + att classes), so their dark
+   colors are written once; only the per-platform .pf-surface backdrop differs. */
+:root[data-theme='dark'] .platform-demo:has(#pf-slack:checked) .pf-surface {
+  background: #1a1d21;
+  border-color: #35373b;
+}
+:root[data-theme='dark'] .platform-demo:has(#pf-mattermost:checked) .pf-surface {
+  background: #1f2124;
+  border-color: #35373b;
+}
+:root[data-theme='dark'] .chat-name {
+  color: #d1d2d3;
+}
+:root[data-theme='dark'] .chat-tag {
+  background: #3a3d42;
+  color: #b6b7ba;
+}
+:root[data-theme='dark'] .chat-time {
+  color: #9a9b9e;
+}
+:root[data-theme='dark'] .att-mentions {
+  color: #d1d2d3;
+}
+:root[data-theme='dark'] .ment {
+  color: #1d9bd1;
+}
+:root[data-theme='dark'] .attachment {
+  background: #222529;
+  border-color: #35373b;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme='dark'] .att-title {
+  color: #1d9bd1;
+}
+:root[data-theme='dark'] .att-title .ext {
+  color: #9a9b9e;
+}
+:root[data-theme='dark'] .att-lead {
+  color: #d1d2d3;
+}
+:root[data-theme='dark'] .att-lead strong {
+  color: #e8e8e8;
+}
+:root[data-theme='dark'] .att-lead code {
+  background: #1a1d21;
+  color: #d1d2d3;
+}
+:root[data-theme='dark'] .att-line {
+  color: #d1d2d3;
+}
+:root[data-theme='dark'] .att-line .lk {
+  color: #9a9b9e;
+}
+:root[data-theme='dark'] .att-line code {
+  background: #1a1d21;
+  color: #d1d2d3;
+}
+:root[data-theme='dark'] .att-line a {
+  color: #1d9bd1;
+}
+:root[data-theme='dark'] .att-more > summary {
+  color: #1d9bd1;
+}
+:root[data-theme='dark'] .att-tail {
+  border-top-color: #35373b;
+}
+:root[data-theme='dark'] .att-footer {
+  color: #9a9b9e;
+}
+/* the token-pin block re-locks color/vars to light inside these cards
+   unconditionally; give the dark cards a matching fallback text color so
+   anything not explicitly restyled above still reads. */
+:root[data-theme='dark'] .pf-slack-panel,
+:root[data-theme='dark'] .pf-mm-panel {
+  color: #d1d2d3;
+}
+
+/* Telegram — its own dark navy chat wallpaper + bubble. */
+:root[data-theme='dark'] .platform-demo:has(#pf-telegram:checked) .pf-surface {
+  background: #0e1621;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  border-color: #0e1621;
+}
+:root[data-theme='dark'] .tg-bubble {
+  background: #182533;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme='dark'] .tg-text {
+  color: #f5f5f5;
+}
+:root[data-theme='dark'] .tg-text i {
+  color: #7d8b99;
+}
+:root[data-theme='dark'] .tg-text code {
+  background: #232e3c;
+  color: #e6e6e6;
+}
+:root[data-theme='dark'] .tg-text a {
+  color: #6ab3f3;
+}
+:root[data-theme='dark'] .tg-text .ment {
+  color: #6ab3f3;
+}
+:root[data-theme='dark'] .tg-meta {
+  color: #6d7f8f;
+}
+:root[data-theme='dark'] .pf-tg-panel {
+  color: #f5f5f5;
+}
+
+/* Discord — restore its real dark theme (the shared light canvas above is
+   skipped for Discord entirely; it gets its own dark backdrop here). */
+:root[data-theme='dark'] .platform-demo:has(#pf-discord:checked) .pf-surface {
+  background: #313338;
+  border-color: #313338;
+}
+:root[data-theme='dark'] .pfd-name {
+  color: #f2f3f5;
+}
+:root[data-theme='dark'] .pfd-time {
+  color: #949ba4;
+}
+:root[data-theme='dark'] .pfd-embed {
+  background: #2b2d31;
+  border-color: transparent;
+}
+:root[data-theme='dark'] a.pfd-title {
+  color: #00a8fc;
+}
+:root[data-theme='dark'] .pfd-desc {
+  color: #dbdee1;
+}
+:root[data-theme='dark'] .pfd-desc strong {
+  color: #f2f3f5;
+}
+:root[data-theme='dark'] .pfd-desc code {
+  background: #1e1f22;
+  color: #dbdee1;
+}
+:root[data-theme='dark'] .pfd-desc a {
+  color: #00a8fc;
+}
+:root[data-theme='dark'] .pfd-plabel {
+  color: #f2f3f5;
+}
+:root[data-theme='dark'] .pfd-pblock {
+  background: #1e1f22;
+  color: #dbdee1;
+}
+:root[data-theme='dark'] .pfd-fk {
+  color: #f2f3f5;
+}
+:root[data-theme='dark'] .pfd-fv {
+  color: #dbdee1;
+}
+:root[data-theme='dark'] .pfd-footer {
+  color: #949ba4;
+}
+/* Discord isn't part of the light-token-pin block (it already carries its
+   own hardcoded colors for every element above), so no panel-level
+   color/var fallback is needed here. */
+
+/* Microsoft Teams — Workflows webhook card in Teams' real dark chrome. */
+:root[data-theme='dark'] .platform-demo:has(#pf-teams:checked) .pf-surface {
+  background: #1f1f1f;
+  border-color: #3b3a39;
+}
+:root[data-theme='dark'] .pft-avatar {
+  background: #2d2c2c;
+}
+:root[data-theme='dark'] .pft-name {
+  color: #e6e6e6;
+}
+:root[data-theme='dark'] .pft-tag {
+  background: #3b3a39;
+  color: #c8c6c4;
+}
+:root[data-theme='dark'] .pft-time {
+  color: #a19f9d;
+}
+:root[data-theme='dark'] .pft-card {
+  background: #2d2c2c;
+  border-color: #3b3a39;
+}
+:root[data-theme='dark'] .pft-lead {
+  color: #e6e6e6;
+}
+:root[data-theme='dark'] .pft-rule {
+  color: #c8c6c4;
+}
+:root[data-theme='dark'] .pft-fk {
+  color: #a19f9d;
+}
+:root[data-theme='dark'] .pft-fv {
+  color: #e6e6e6;
+}
+:root[data-theme='dark'] .pft-params {
+  background: #1f1f1f;
+  color: #a19f9d;
+}
+:root[data-theme='dark'] .pft-btn {
+  color: #a6a7dc;
+  border-color: #484644;
+}
+:root[data-theme='dark'] .pft-btn:hover {
+  background: #3b3a39;
+}
+:root[data-theme='dark'] .pft-foot {
+  color: #8a8886;
+}
+:root[data-theme='dark'] .pf-teams-panel {
+  color: #e6e6e6;
+}
+
+/* Google Chat — Cards v2 in the app's dark surface. */
+:root[data-theme='dark'] .platform-demo:has(#pf-gchat:checked) .pf-surface {
+  background: #202124;
+  border-color: #3c4043;
+}
+:root[data-theme='dark'] .pfg-card {
+  background: #28292c;
+  border-color: #3c4043;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme='dark'] .pfg-head {
+  border-bottom-color: #3c4043;
+}
+:root[data-theme='dark'] .pfg-title {
+  color: #e3e3e3;
+}
+:root[data-theme='dark'] .pfg-sub {
+  color: #9aa0a6;
+}
+:root[data-theme='dark'] .pfg-sec {
+  border-bottom-color: #3c4043;
+}
+:root[data-theme='dark'] .pfg-lead {
+  color: #e3e3e3;
+}
+:root[data-theme='dark'] .pfg-lead strong {
+  color: #e3e3e3;
+}
+:root[data-theme='dark'] .pfg-rk {
+  color: #9aa0a6;
+}
+:root[data-theme='dark'] .pfg-rv {
+  color: #e3e3e3;
+}
+:root[data-theme='dark'] .pfg-params {
+  background: #202124;
+  color: #c8ccd0;
+}
+:root[data-theme='dark'] .pfg-btn {
+  color: #8ab4f8;
+  border-color: #5f6368;
+}
+:root[data-theme='dark'] .pfg-btn:hover {
+  background: #3c4043;
+}
+:root[data-theme='dark'] .pf-gchat-panel {
+  color: #e3e3e3;
+}
+
+/* ntfy — OS push notification card in dark mode. `.pfn-msg`/`.pfn-meta`
+   read their border off `var(--border)`, which the light-token-pin block
+   locks to a light hex on `.pf-ntfy-panel`; re-pin that one custom property
+   to a dark tone here instead of duplicating the border overrides. */
+:root[data-theme='dark'] .platform-demo:has(#pf-ntfy:checked) .pf-surface {
+  background: #111113;
+  border-color: #2c2c2e;
+}
+:root[data-theme='dark'] .pf-ntfy-panel {
+  color: #f5f5f7;
+  --border: #2c2c2e;
+}
+:root[data-theme='dark'] .pfn-msg {
+  background: #1c1c1e;
+  box-shadow: 0 6px 20px -8px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme='dark'] .pfn-app {
+  color: #98989f;
+}
+:root[data-theme='dark'] .pfn-appname {
+  color: #f5f5f7;
+}
+:root[data-theme='dark'] .pfn-title {
+  color: #f5f5f7;
+}
+:root[data-theme='dark'] .pfn-body {
+  color: #c7c7cc;
+}
+:root[data-theme='dark'] .pfn-meta {
+  color: #98989f;
+}
+
+/* Email is deliberately excluded: no `:root[data-theme='dark']` overrides
+   exist for .pf-email-panel/.email-*/.ec-* anywhere below — detectkit's real
+   alert email is a light HTML card, so the preview must stay light in both
+   page themes. */

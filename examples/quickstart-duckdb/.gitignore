@@ -1,0 +1,11 @@
+# Local DuckDB state + generated reports are created on first run.
+*.duckdb
+*.duckdb.wal
+reports/
+
+# The repo-root .gitignore ignores detectkit_project.yml / profiles.yml
+# repo-wide (a user's real project configs don't belong in the library repo);
+# this example's configs are the exception — un-ignore them so `git add
+# examples/` actually picks them up.
+!detectkit_project.yml
+!profiles.yml

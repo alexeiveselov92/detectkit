@@ -148,6 +148,33 @@ const claudeLines = [
 ];
 const claudeHtml = claudeLines.map((l) => `<div class="ln">${l}</div>`).join('');
 
+// ---- quickstart terminal: the honest DuckDB path. Verified end-to-end
+// against the real engine (duckdb 1.5): the metric synthesizes its own series
+// with generate_series() and one injected dip, so it runs on a fresh local
+// file with no source table; `dtk run --report` REPLAYS the fired alerts into
+// a self-contained HTML report (no channel dispatched → zero credentials).
+// Delivering a live notification needs a channel on top (ntfy needs no token).
+const cmt = (t) => sp(t, '#8A8373');
+const qsLines = [
+  sp('$', C.green) + ' pip install <span class="s">"detectkit[duckdb]"</span>',
+  cmt('  Successfully installed detectkit · duckdb · numpy · pydantic'),
+  '',
+  cmt('# 3 small files — no server, no account, no credentials:'),
+  cmt('#   detectkit_project.yml · profiles.yml (duckdb) · metrics/signups.yml'),
+  cmt('#   the metric builds its own series in SQL, with one injected dip.'),
+  '',
+  sp('$', C.green) + ' dtk run <span class="s">--select</span> signups <span class="s">--report</span>',
+  sp('  ┌─ LOAD', C.cyan, true) + '    ' + sp('└─ Loaded 213 datapoints', C.green),
+  sp('  ┌─ DETECT', C.cyan, true) + '  · mad   ' + sp('└─ Detected 8 anomalies', C.yellow),
+  sp('  ┌─ ALERT', C.cyan, true) + '   ' + cmt('(replayed into the report — nothing dispatched)'),
+  sp('  ✓ Pipeline completed successfully', C.green, true),
+  '  │ Report → ' + sp('reports/signups.html', C.def, true) + '  ' + sp('(8 anomalies, 8 alerts)', C.yellow),
+  '',
+  cmt('# open the report: the dip, the expected band, and the alerts it'),
+  cmt('# fires — fully offline. Add a channel to deliver it on a live run.'),
+];
+const qsHtml = qsLines.map((l) => `<div class="ln">${l}</div>`).join('');
+
 // ---- alert preview: each channel rendered the way detectkit actually emits
 // it, for both Anomaly and Recovery. Slack/Mattermost = one status-colored
 // webhook attachment whose whole body is a single text block ordered
@@ -798,6 +825,25 @@ const dxExplainer = (() => {
       href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <!-- Theme: set before paint to avoid a flash. Saved choice wins; first
+         visit follows the OS preference. The landing has both a warm-paper
+         (light) and a terminal (dark) theme, like the docs. -->
+    <script is:inline>
+      (function () {
+        try {
+          var saved = localStorage.getItem('dtk-theme');
+          var theme =
+            saved === 'light' || saved === 'dark'
+              ? saved
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+          document.documentElement.dataset.theme = theme;
+        } catch (e) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
   </head>
   <body class="landing">
     <!-- ===== header ===== -->
@@ -820,6 +866,15 @@ const dxExplainer = (() => {
             <a href="/changelog/">Changelog</a>
           </div>
           <div class="nav-right">
+            <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle light / dark theme" title="Toggle theme">
+              <svg class="ico-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+              <svg class="ico-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="4.2" />
+                <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8" />
+              </svg>
+            </button>
             <a class="ghost-link" href={repo}>GitHub</a>
             <a class="pip" href={pypi}>pip install detectkit</a>
           </div>
@@ -942,6 +997,36 @@ const dxExplainer = (() => {
       </div>
     </section>
 
+    <!-- ===== quickstart: nothing → a caught anomaly, on one local file ===== -->
+    <section class="wrap section">
+      <div class="eyebrow">quickstart</div>
+      <div class="qs-head">
+        <h2>From nothing to a caught anomaly<br />— on one local file.</h2>
+        <p class="sub">
+          DuckDB runs in-process — <strong>zero servers, zero credentials.</strong> Three small
+          files, one command, and <code>--report</code> renders the caught anomaly and the alerts
+          it fires into a self-contained HTML file. Wire a channel (<code>ntfy</code> needs no
+          token) when you want the notification delivered live.
+        </p>
+      </div>
+      <div class="term qs-term">
+        <div class="term-bar">
+          <span class="b" style="background:#E5675B"></span>
+          <span class="b" style="background:#E0A23B"></span>
+          <span class="b" style="background:#2E9E73"></span>
+          <span class="title">quickstart — bash</span>
+        </div>
+        <div class="body" set:html={qsHtml}></div>
+      </div>
+      <p class="qs-foot">
+        Runs on a fresh machine with nothing to provision — the full project is in
+        <a href={`${repo}/tree/main/examples/quickstart-duckdb`}>examples/quickstart-duckdb</a>.
+        Swap the profile for ClickHouse, Postgres, MySQL or a
+        <a href="/guides/hybrid-mode/">hybrid warehouse</a> when you're ready — the four commands
+        don't change. <a href="/guides/databases-duckdb/">DuckDB guide →</a>
+      </p>
+    </section>
+
     <!-- ===== AI-native onboarding (lead with it — it's a core differentiator) ===== -->
     <section class="wrap section">
       <div class="eyebrow">dtk init-claude</div>
@@ -965,6 +1050,66 @@ const dxExplainer = (() => {
           <span class="title">dtk init-claude</span>
         </div>
         <div class="body" set:html={claudeHtml}></div>
+      </div>
+    </section>
+
+    <!-- ===== dtk mcp: ask your pipeline what fired ===== -->
+    <section class="wrap section">
+      <div class="eyebrow">dtk mcp · read-only</div>
+      <h2>Ask your pipeline what fired — and why.</h2>
+      <p class="sub">
+        <code>dtk mcp</code> is a strictly read-only <a href="https://modelcontextprotocol.io"
+          >Model Context Protocol</a
+        >
+        server over your <code>_dtk_*</code> state. Point Claude Code, Claude Desktop or any MCP
+        client at it, and your assistant answers questions from the real pipeline — no writes, no
+        dashboards, no data leaving your infra. <a href="/guides/mcp/">MCP guide →</a>
+      </p>
+      <div class="mcp-card">
+        <div class="mcp-head">
+          <span class="mcp-avatar"><Logo size={22} /></span>
+          <span class="mcp-who">Your AI assistant</span>
+          <span class="mcp-badge">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2.2" /><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" /></svg>
+            dtk mcp · read-only
+          </span>
+        </div>
+        <div class="mcp-body">
+          <div class="mcp-user">Which metrics fired this week — and why?</div>
+          <div class="mcp-tools">
+            <span class="mcp-tools-label">called</span>
+            <span class="mcp-tool">list_metrics</span>
+            <span class="mcp-tool">replay_alerts</span>
+            <span class="mcp-tool">query_detections</span>
+          </div>
+          <div class="mcp-answer">Three metrics fired in the last 7 days:</div>
+          <div class="mcp-row">
+            <span class="mcp-dot dot-anom"></span>
+            <div>
+              <div class="mcp-metric"><code>signups</code> <span class="mcp-state">down · recovered</span></div>
+              <div class="mcp-desc">Dropped to 812 vs expected ≥ 1,150 on Jul 14, 12:00. <code>mad</code>, 6 intervals; back in range by 13:00.</div>
+            </div>
+          </div>
+          <div class="mcp-row">
+            <span class="mcp-dot dot-anom"></span>
+            <div>
+              <div class="mcp-metric"><code>checkout_error_rate</code> <span class="mcp-state open">up · still open</span></div>
+              <div class="mcp-desc">4.2% vs ≤ 1.1%. <code>autoreg</code> flagged a broken daily shape — wrong for the curve, not just the level.</div>
+            </div>
+          </div>
+          <div class="mcp-row">
+            <span class="mcp-dot dot-nodata"></span>
+            <div>
+              <div class="mcp-metric"><code>daily_active_users</code> <span class="mcp-state">no-data</span></div>
+              <div class="mcp-desc">No rows for 2h on Jul 12 — likely an upstream ETL gap, not a real drop.</div>
+            </div>
+          </div>
+          <div class="mcp-note">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+            Read live from project state — 10 read-only tools, zero write paths. The chat lives in
+            your MCP client; detectkit ships the server, not a UI.
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1470,6 +1615,123 @@ const dxExplainer = (() => {
       </div>
     </section>
 
+    <!-- ===== hybrid mode: your stack, your bill ===== -->
+    <section class="wrap section">
+      <div class="eyebrow">hybrid mode</div>
+      <h2>Your warehouse runs the SQL. A free local DB keeps the state.</h2>
+      <p class="sub">
+        Warehouses punish frequent small writes — Snowflake bills a 60-second minimum every time it
+        resumes; BigQuery a 10&nbsp;MiB minimum per query. So detectkit runs a metric's
+        <em>load</em> SQL on your warehouse, then keeps every
+        <code>_dtk_*</code> table — detections, alert state, resume cursors — in a cheap local
+        database. You monitor the warehouse without paying warehouse prices for the bookkeeping.
+        <a href="/guides/hybrid-mode/">Hybrid mode →</a>
+      </p>
+      <div class="hy-flow">
+        <div class="hy-node hy-src">
+          <div class="hy-node-t">Source · your warehouse</div>
+          <div class="hy-node-b">Snowflake · BigQuery · ClickHouse · …</div>
+          <div class="hy-node-x">runs the metric's load SQL</div>
+        </div>
+        <div class="hy-arrow" aria-hidden="true">
+          <svg width="46" height="18" viewBox="0 0 46 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9h38M33 3l7 6-7 6" /></svg>
+          <span>rows</span>
+        </div>
+        <div class="hy-node hy-dtk">
+          <div class="hy-node-t"><span class="hy-logo"><Logo size={18} /></span> detectkit</div>
+          <div class="hy-node-b">detect · alert · resume</div>
+          <div class="hy-node-x">no state written to the warehouse</div>
+        </div>
+        <div class="hy-arrow" aria-hidden="true">
+          <svg width="46" height="18" viewBox="0 0 46 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9h38M33 3l7 6-7 6" /></svg>
+          <span>state</span>
+        </div>
+        <div class="hy-node hy-state">
+          <div class="hy-node-t">State · a cheap local DB</div>
+          <div class="hy-node-b">DuckDB · Postgres · MySQL</div>
+          <div class="hy-node-x">all _dtk_* tables live here</div>
+        </div>
+      </div>
+      <pre class="hy-yaml"><span class="c"># metrics/revenue.yml — one line flips a metric into hybrid mode</span>
+<span class="k">source_profile</span>: <span class="s">snowflake_prod</span>   <span class="c"># load runs here; state stays on your --profile</span></pre>
+    </section>
+
+    <!-- ===== where detectkit fits (honest comparison) ===== -->
+    <section class="wrap section">
+      <div class="eyebrow">where it fits</div>
+      <h2>What detectkit is — and isn't.</h2>
+      <p class="sub">
+        Deliberately narrow: statistical anomaly detection and alerting for business metrics you
+        define in SQL. Here's how that differs from the neighbors — by <strong
+          >scope and deployment</strong
+        >, the things that actually vary.
+      </p>
+      <div class="cmp-flag">
+        <span class="cmp-flag-dot"></span>Not a data-observability platform — no lineage, catalog or schema-drift claims.
+      </div>
+      <div class="cmp-grid">
+        <div class="cmp-card">
+          <div class="cmp-top">
+            <span class="cmp-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" /><path d="M4 16h16" /></svg></span>
+            <div>
+              <div class="cmp-name">SaaS observability</div>
+              <div class="cmp-desc">data-quality clouds — Monte Carlo, Anomalo, Metaplane</div>
+            </div>
+          </div>
+          <div class="cmp-them"><span class="cmp-tag">them</span>Whole-warehouse platforms at $18k–$200k+/yr; monitoring runs in their cloud.</div>
+          <div class="cmp-us"><span class="cmp-tag">detectkit</span>Free, self-hosted, scoped to the metrics you pick — data never leaves your infra.</div>
+        </div>
+        <div class="cmp-card">
+          <div class="cmp-top">
+            <span class="cmp-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 6 4-14 2 8h6" /></svg></span>
+            <div>
+              <div class="cmp-name">Prometheus / Grafana</div>
+              <div class="cmp-desc">infra telemetry + static thresholds</div>
+            </div>
+          </div>
+          <div class="cmp-them"><span class="cmp-tag">them</span>Built for infra metrics; the anomaly add-ons (Grafana ML, vmanomaly) are paid.</div>
+          <div class="cmp-us"><span class="cmp-tag">detectkit</span>Statistical detection over arbitrary SQL business metrics — and it speaks Alertmanager's webhook.</div>
+        </div>
+        <div class="cmp-card">
+          <div class="cmp-top">
+            <span class="cmp-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8" /><path d="M21 12a9 9 0 1 1-6.2-8.5" /></svg></span>
+            <div>
+              <div class="cmp-name">dbt tests / Soda</div>
+              <div class="cmp-desc">build-time data-quality assertions</div>
+            </div>
+          </div>
+          <div class="cmp-them"><span class="cmp-tag">them</span>Pass/fail checks at build time — is this value null, unique, in range?</div>
+          <div class="cmp-us"><span class="cmp-tag">detectkit</span>Models the metric's time series — seasonality, trend, recency. Runs alongside your tests.</div>
+        </div>
+        <div class="cmp-card">
+          <div class="cmp-top">
+            <span class="cmp-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h10" /></svg></span>
+            <div>
+              <div class="cmp-name">TS detector libraries</div>
+              <div class="cmp-desc">detector toolkits — Darts, Merlion</div>
+            </div>
+          </div>
+          <div class="cmp-them"><span class="cmp-tag">them</span>Detector code you wire up, schedule and operate yourself.</div>
+          <div class="cmp-us"><span class="cmp-tag">detectkit</span>The whole pipeline around the detector — scheduling, state, alerting, a UI and tuning.</div>
+        </div>
+      </div>
+      <p class="cmp-note">
+        Compared on scope + deployment only — never maturity, support or star counts. The OSS corner
+        of this space is thin: most alternatives are either heavy platforms or unmaintained.
+      </p>
+    </section>
+
+    <!-- ===== credibility strip ===== -->
+    <section class="wrap">
+      <div class="cred-strip">
+        <span class="cred-item"><strong>NAB-benchmarked</strong> detectors</span>
+        <span class="cred-item">MIT licensed</span>
+        <span class="cred-item">numpy-only core · no pandas</span>
+        <span class="cred-item">your data never leaves your infra</span>
+        <span class="cred-item">live stars + downloads, omitted if a source is down</span>
+      </div>
+    </section>
+
     <!-- ===== CTA ===== -->
     <section class="wrap">
       <div class="cta-band">
@@ -1503,6 +1765,7 @@ const dxExplainer = (() => {
             <li><a href={docsHref}>Overview</a></li>
             <li><a href="/getting-started/quickstart/">Quickstart</a></li>
             <li><a href="/guides/configuration/">Configuration</a></li>
+            <li><a href="/guides/databases/">Databases</a></li>
             <li><a href="/reference/cli/">CLI reference</a></li>
           </ul>
         </div>
@@ -1511,9 +1774,11 @@ const dxExplainer = (() => {
           <ul>
             <li><a href="/guides/detectors/">Detectors</a></li>
             <li><a href="/guides/alerting/">Alerting</a></li>
+            <li><a href="/reference/autotune/">Auto-tuning</a></li>
             <li><a href="/guides/tuning/">Tuning cockpit</a></li>
-            <li><a href="/guides/project-ui/">Project UI</a></li>
-            <li><a href="/examples/">Examples</a></li>
+            <li><a href="/guides/hybrid-mode/">Hybrid mode</a></li>
+            <li><a href="/guides/mcp/">MCP server</a></li>
+            <li><a href="/guides/github-action/">GitHub Action</a></li>
             <li><a href="/changelog/">Changelog</a></li>
           </ul>
         </div>
@@ -1532,5 +1797,19 @@ const dxExplainer = (() => {
         <span>Built with Astro + Starlight</span>
       </div>
     </footer>
+    <script is:inline>
+      (function () {
+        var btn = document.getElementById('theme-toggle');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+          var root = document.documentElement;
+          var next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+          root.dataset.theme = next;
+          try {
+            localStorage.setItem('dtk-theme', next);
+          } catch (e) {}
+        });
+      })();
+    </script>
   </body>
 </html>

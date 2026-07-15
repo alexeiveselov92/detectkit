@@ -64,18 +64,26 @@
   color: var(--ink);
   border-color: var(--faint);
 }
-/* show the icon for the theme you'd switch TO */
-.theme-toggle .ico-sun {
-  display: none;
-}
+/* the icon reflects the current MODE (auto / light / dark); click cycles.
+   default (no mode attr) = auto. */
+.theme-toggle .ico-sun,
 .theme-toggle .ico-moon {
-  display: block;
-}
-:root[data-theme='dark'] .theme-toggle .ico-sun {
-  display: block;
-}
-:root[data-theme='dark'] .theme-toggle .ico-moon {
   display: none;
+}
+.theme-toggle .ico-auto {
+  display: block;
+}
+:root[data-theme-mode='light'] .theme-toggle .ico-auto {
+  display: none;
+}
+:root[data-theme-mode='light'] .theme-toggle .ico-sun {
+  display: block;
+}
+:root[data-theme-mode='dark'] .theme-toggle .ico-auto {
+  display: none;
+}
+:root[data-theme-mode='dark'] .theme-toggle .ico-moon {
+  display: block;
 }
 
 /* ---------- header / nav ---------- */

@@ -825,23 +825,22 @@ const dxExplainer = (() => {
       href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <!-- Theme: set before paint to avoid a flash. Saved choice wins; first
-         visit follows the OS preference. The landing has both a warm-paper
-         (light) and a terminal (dark) theme, like the docs. -->
+    <!-- Theme: set before paint to avoid a flash. Auto / Light / Dark, matching
+         the docs' theme control — mode is stored, `data-theme` is the resolved
+         look. Auto (the default) follows the OS preference and reacts live. -->
     <script is:inline>
       (function () {
+        var mq = window.matchMedia('(prefers-color-scheme: dark)');
+        var mode;
         try {
           var saved = localStorage.getItem('dtk-theme');
-          var theme =
-            saved === 'light' || saved === 'dark'
-              ? saved
-              : window.matchMedia('(prefers-color-scheme: dark)').matches
-                ? 'dark'
-                : 'light';
-          document.documentElement.dataset.theme = theme;
+          mode = saved === 'light' || saved === 'dark' || saved === 'auto' ? saved : 'auto';
         } catch (e) {
-          document.documentElement.dataset.theme = 'light';
+          mode = 'auto';
         }
+        var root = document.documentElement;
+        root.dataset.themeMode = mode;
+        root.dataset.theme = mode === 'auto' ? (mq.matches ? 'dark' : 'light') : mode;
       })();
     </script>
   </head>
@@ -866,13 +865,17 @@ const dxExplainer = (() => {
             <a href="/changelog/">Changelog</a>
           </div>
           <div class="nav-right">
-            <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle light / dark theme" title="Toggle theme">
-              <svg class="ico-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Theme: Auto, Light or Dark" title="Theme: Auto → Light → Dark">
+              <svg class="ico-auto" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="12" rx="2" />
+                <path d="M8 20h8M12 16v4" />
               </svg>
               <svg class="ico-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="4.2" />
                 <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8" />
+              </svg>
+              <svg class="ico-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
               </svg>
             </button>
             <a class="ghost-link" href={repo}>GitHub</a>
@@ -1801,14 +1804,27 @@ const dxExplainer = (() => {
       (function () {
         var btn = document.getElementById('theme-toggle');
         if (!btn) return;
-        btn.addEventListener('click', function () {
-          var root = document.documentElement;
-          var next = root.dataset.theme === 'dark' ? 'light' : 'dark';
-          root.dataset.theme = next;
+        var root = document.documentElement;
+        var mq = window.matchMedia('(prefers-color-scheme: dark)');
+        var order = ['auto', 'light', 'dark'];
+        function apply(mode) {
+          root.dataset.themeMode = mode;
+          root.dataset.theme = mode === 'auto' ? (mq.matches ? 'dark' : 'light') : mode;
           try {
-            localStorage.setItem('dtk-theme', next);
+            localStorage.setItem('dtk-theme', mode);
           } catch (e) {}
+        }
+        btn.addEventListener('click', function () {
+          var cur = root.dataset.themeMode || 'auto';
+          apply(order[(order.indexOf(cur) + 1) % order.length]);
         });
+        // In auto mode, follow the OS if it flips while the page is open.
+        var onChange = function () {
+          if ((root.dataset.themeMode || 'auto') === 'auto')
+            root.dataset.theme = mq.matches ? 'dark' : 'light';
+        };
+        if (mq.addEventListener) mq.addEventListener('change', onChange);
+        else if (mq.addListener) mq.addListener(onChange);
       })();
     </script>
   </body>

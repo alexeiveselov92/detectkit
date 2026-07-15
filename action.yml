@@ -1,8 +1,5 @@
 name: detectkit
-description: >-
-  Run a detectkit metric-monitoring pipeline (load/detect/alert, autotune, or
-  clean) in CI or on a schedule — installs detectkit from PyPI and fails the
-  job on a real pipeline failure via detectkit's exit-code contract.
+description: Run a detectkit metric-monitoring pipeline (run, autotune, or clean) in CI; fails the job on a real pipeline failure.
 author: alexeiveselov92
 branding:
   icon: activity

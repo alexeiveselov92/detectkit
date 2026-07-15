@@ -1,0 +1,7 @@
+default_profile: local
+profiles:
+  local:
+    type: duckdb
+    path: ./monitoring.duckdb
+    internal_schema: detectkit
+    data_schema: main

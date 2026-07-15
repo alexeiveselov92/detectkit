@@ -1,0 +1,13 @@
+name: quickstart
+version: "1.0"
+paths:
+  metrics: metrics
+default_profile: local
+
+# Alert channels referenced by name from a metric's alerting.channels.
+# ntfy needs no account or token — pick a hard-to-guess public topic and
+# subscribe at https://ntfy.sh/<topic> (or the ntfy app) to receive alerts.
+alert_channels:
+  ntfy_demo:
+    type: ntfy
+    topic: detectkit-quickstart-demo

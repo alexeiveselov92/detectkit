@@ -1,0 +1,38 @@
+name: signups
+description: Synthetic signups series (generated in SQL — no source table needed)
+
+query: |
+  SELECT
+    ts AS timestamp,
+    1200
+      + 120 * sin(epoch(ts) / 3600.0)
+      + (random() - 0.5) * 40
+      - CASE WHEN ts BETWEEN TIMESTAMP '2026-07-14 12:00:00'
+                         AND TIMESTAMP '2026-07-14 13:00:00'
+             THEN 520 ELSE 0 END
+      AS value
+  FROM generate_series(
+    TIMESTAMP '{{ dtk_start_time }}',
+    TIMESTAMP '{{ dtk_end_time }}',
+    INTERVAL '{{ interval_seconds }} seconds'
+  ) AS t(ts)
+  WHERE ts < TIMESTAMP '{{ dtk_end_time }}'
+  ORDER BY ts
+
+interval: 10min
+loading_start_time: "2026-07-14 00:00:00"
+loading_batch_size: 10000
+
+detectors:
+  - type: mad
+    params:
+      threshold: 3.0
+      window_size: 30
+      min_samples: 12
+
+alerting:
+  enabled: true
+  channels: [ntfy_demo]
+  min_detectors: 1
+  direction: any
+  consecutive_anomalies: 1

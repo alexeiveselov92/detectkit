@@ -205,12 +205,15 @@ pick accents with `status_color(alert_data)` so status reads from color.
    landing playground (which is itself a synthetic-data instance of the `dtk tune`
    cockpit), so run the parity checks (`npm run check` = demo-parity + tune-worker)
    to confirm the TS port still matches the Python detectors. **This is now
-   CI-enforced**: the `website` job (`.github/workflows/ci.yml`) regenerates the
-   golden vectors + every bundle and fails on any stale committed artifact via
-   `git diff --exit-code`, so a forgotten regeneration is caught in CI rather than
-   shipped stale — but running it locally first keeps the loop fast. (The golden
-   vectors themselves regenerate from the real Python detectors with
-   `python website/scripts/gen-demo-golden.py`.)
+   CI-enforced**: the `website` job (`.github/workflows/ci.yml`) runs the parity
+   checks (against the committed golden) + regenerates every bundle and fails on any
+   stale committed **bundle** via `git diff --exit-code`, so a forgotten bundle
+   regeneration is caught in CI rather than shipped stale — but running it locally
+   first keeps the loop fast. (The golden vectors are NOT byte-diffed in CI — their
+   numpy/LAPACK output can vary by a ULP across environments; regenerate them
+   locally from the real Python detectors with
+   `python website/scripts/gen-demo-golden.py` whenever a detector changes, and the
+   parity check will confirm the TS port still matches.)
 5. **Update the `dtk init-claude` assets** in `detectkit/cli/assets/claude/`
    (`rules/*.md`, `skills/*/SKILL.md`, `CLAUDE.section.md`) so a freshly-run
    `dtk init-claude` matches the shipped version. These assets are user-facing

@@ -69,26 +69,23 @@ jobs:
   website:
     # Gate the browser surfaces that ship in the wheel: the TS detector port
     # (report/tune/playground) must still match the real Python detectors, and the
-    # committed generated bundles (report.js / tune.js / ui.js) + golden.json must
-    # be in sync with their TypeScript / Python sources. These were release-checklist
-    # steps run by hand; making them a code-enforced gate is what keeps the landing
-    # playground — now a literal instance of the `dtk tune` cockpit — from silently
-    # drifting from the shipped product.
+    # committed generated bundles (report.js / tune.js / ui.js) must be in sync with
+    # their TypeScript sources. These were release-checklist steps run by hand;
+    # making them a code-enforced gate is what keeps the landing playground — now a
+    # literal instance of the `dtk tune` cockpit — from silently drifting from the
+    # shipped product.
+    #
+    # Parity runs against the COMMITTED golden.json (tolerant 1e-6), and the bundle
+    # freshness is a byte-exact diff of esbuild output (deterministic per pinned
+    # version). We deliberately do NOT regenerate + byte-diff golden.json here: it
+    # comes from numpy/LAPACK (autoreg uses lstsq), whose last-ULP output can vary by
+    # environment — a byte-diff would flake. Regenerating golden stays a local step
+    # (`python website/scripts/gen-demo-golden.py`); a stale golden that no longer
+    # matches the port is still caught by the parity check.
     name: Website bundles & detector parity
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-
-      - name: Install detectkit (for the golden generator)
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -101,30 +98,25 @@ jobs:
         working-directory: website
         run: npm ci
 
-      # Freeze the real Python detectors' output, then assert the TS port reproduces
-      # it (bands within a scale-aware 1e-6) and the tune worker's alert-fire semantics.
-      - name: Regenerate golden parity vectors
-        run: python website/scripts/gen-demo-golden.py
-
-      - name: Detector port parity (TS ↔ Python)
+      # Assert the TS port reproduces the committed golden (bands within a scale-aware
+      # 1e-6) and the tune worker's alert-fire semantics hold.
+      - name: Detector port parity (TS ↔ Python) + tune-worker semantics
         working-directory: website
         run: npm run check
 
       # Rebuild every committed bundle from source; the diff-guard below then fails
-      # if any shipped .js (or golden.json) was left stale relative to its source.
+      # if any shipped .js was left stale relative to its TypeScript.
       - name: Regenerate committed bundles (report / tune / ui)
         working-directory: website
         run: npm run build:bundles
 
-      - name: Fail if any committed artifact is stale
+      - name: Fail if any committed bundle is stale
         run: |
           git diff --stat -- \
-            website/src/scripts/demo/golden.json \
             detectkit/reporting/assets/report.js \
             detectkit/tuning/assets/tune.js \
             detectkit/ui/assets/ui.js
           git diff --exit-code -- \
-            website/src/scripts/demo/golden.json \
             detectkit/reporting/assets/report.js \
             detectkit/tuning/assets/tune.js \
             detectkit/ui/assets/ui.js

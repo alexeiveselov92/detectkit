@@ -133,9 +133,9 @@ rendered on the docs site under **For developers**). Read the relevant one:
   **playground** (`/playground/`) is a **literal instance of the `dtk tune`
   cockpit renderer** fed a *synthetic* metric (the three server hooks nulled = the
   `--no-serve` shape) via a small `playground/` adapter — not a separate demo — so
-  it evolves with the product; a `website` CI job regenerates the golden parity
-  vectors + all committed bundles (`build:bundles`) and fails on any stale
-  artifact, so it can't drift.
+  it evolves with the product; a `website` CI job runs the parity checks + all
+  committed bundles (`build:bundles`) and fails on any stale bundle, so it can't
+  drift.
 - **Manual tuning** lives in `detectkit/tuning/` (the `dtk tune` command): the
   human-in-the-loop sibling of `dtk autotune`. It serves an interactive view of a
   metric's real series (recomputing the band live via the **same** TS detector

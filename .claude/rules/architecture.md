@@ -1218,9 +1218,12 @@ only extra layer is a data-**generator** toolbar (rhythm / noise / trend / inter
   theme like everything else.
 
 The "playground can't drift from the product" property is then made hard by the
-`website` CI job (see the contributing rule): it regenerates the golden parity
-vectors + all committed bundles and fails on any stale artifact, converting what
-were manual release-checklist steps into a code-enforced gate.
+`website` CI job (see the contributing rule): it runs the parity checks (the TS
+port against the committed golden, tolerant 1e-6) + regenerates all committed
+bundles and fails on any stale bundle (`git diff --exit-code`), converting what
+were manual release-checklist steps into a code-enforced gate. (It does not
+byte-diff `golden.json` — that regenerates locally via `gen-demo-golden.py`; the
+parity check catches a golden that no longer matches the port.)
 
 ## Project UI (`dtk ui`)
 

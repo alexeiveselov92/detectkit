@@ -5,6 +5,28 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.66.3] - 2026-07-16
+
+### Fixed
+- **`dtk tune` cockpit now shows the confidence band wherever the detector
+  scores** — the same band the pipeline persists and a dashboard displays —
+  instead of hiding it over the detector's full warm-up context. The previous
+  behavior clipped the band to the *effective start* (`get_context_size`), which
+  for **autoreg** with its default-on `stabilization: clamp` is `2·window + lags`
+  points: on an hourly metric with a 20-day window that is a **40-day** blank
+  lead-in, so the chart looked bandless until an implausibly large window/view
+  was selected — even though the detector had already scored hundreds of points
+  (seasonality was a red herring; autoreg ignores it). The warm-up lead-in is now
+  only lightly **dimmed** with a "detection at full power →" divider, never
+  erased; the whole-chart "no band" overlay + inline warning now appear **only**
+  when the detector genuinely scored nothing (window below `min_samples`, Points
+  shown trimmed too low, or a view full of gaps), naming the concrete fixes.
+  The Window-size slider's explore cap is now a uniform half-of-shown for every
+  detector type (the old clamp-aware autoreg tightening is no longer needed).
+  `warmupRequirement` still equals the Python `get_context_size` (the HUD warm-up
+  stat and TS/Python parity are unchanged); only how the chart *renders* it
+  changed. Regenerated the committed `tune.js` bundle.
+
 ## [0.66.2] - 2026-07-16
 
 ### Changed

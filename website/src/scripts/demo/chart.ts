@@ -520,11 +520,16 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     drawThresholdPreview();
     drawIncidents();
 
-    // Effective-zone start: the first index where the detector runs at full
-    // power. Everything before it (the degraded warm-up lead-in) gets no band,
-    // no center line and no anomaly dots — only the dimming overlay + the
-    // context metric line. effTs is the divider timestamp (undefined if the
-    // whole series is in the effective zone).
+    // Warm-up marker boundary: the index where the detector reaches full power
+    // (effectiveStartIndex = get_context_size — the history an incremental
+    // pipeline run would use). We DIM this lead-in (step 6) but no longer erase
+    // it: the band/dots are drawn wherever the detector actually scored
+    // (scoredRuns skips unscored points on its own), so the cockpit shows the
+    // same band the pipeline persists and a Grafana view displays — instead of a
+    // blank chart whenever the shown window is shorter than an autoreg detector's
+    // 2·window+lags context (the reported "need a 40-day window to see the band"
+    // confusion). effTs is the divider timestamp (undefined once the whole view
+    // sits inside the lead-in).
     const n = scored.length;
     const eff = Math.min(effectiveStartIndex(series, params), n);
     const effTs = eff < n ? series.timestamps[eff] : undefined;
@@ -532,7 +537,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     // (the alerts are the subject there) and hidden in 'label' (incidents own the
     // chart). Zeroing the runs makes the corridor/center loops no-ops.
     const bMul = bandMul();
-    const runs = bandShown() ? scoredRuns(scored, eff) : [];
+    const runs = bandShown() ? scoredRuns(scored, 0) : [];
 
     // 2. confidence corridor — one filled polygon per contiguous scored run
     g.fillStyle = rgba(clay, 0.13 * bMul);
@@ -601,11 +606,12 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       drawSeries(series.values, clay, 1.5);
     }
 
-    // 5. anomaly markers (flagged dots) + missed-truth rings — effective zone only.
-    // Dots follow the mode: full in 'tune', dimmed in 'review' (alerts lead) and a
-    // touch dimmed in 'label' (still the lasso target).
+    // 5. anomaly markers (flagged dots) + missed-truth rings — drawn wherever the
+    // detector scored, in step with the band above, so a point poking outside a
+    // shown band always carries its dot. Dots follow the mode: full in 'tune',
+    // dimmed in 'review' (alerts lead) and a touch dimmed in 'label' (lasso target).
     const dMul = dotsMul();
-    for (let i = eff; i < n; i++) {
+    for (let i = 0; i < n; i++) {
       const p = scored[i];
       if (!p.scored || !isFinite(p.value)) continue;
       const X = px(p.timestamp);
@@ -629,20 +635,23 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
       }
     }
 
-    // 6. warm-up overlay: dim the lead-in + label where detection reaches full
-    // power. Drawn before the hover overlay so the window box stays crisp on top.
-    // When the effective start swallows the whole view (eff === n — e.g. autoreg
-    // with stabilization needs 2·window+lags and the trim shows less), the band
-    // and dots are all clipped away above, so dim the WHOLE plot with a centered
-    // explanation instead of silently showing a bare metric line.
+    // 6. warm-up overlay: dim the lead-in + a dashed divider labelling where
+    // detection reaches full power (get_context_size). Drawn before the hover
+    // overlay so the window box stays crisp on top. The band/dots are now drawn
+    // across this zone (dimmed by the fill), so the overlay MARKS the cold-start
+    // lead-in rather than erasing it. Only when the detector scored nothing at
+    // all (window below min_samples, or gaps spanning the whole view) is there
+    // truly no band — then dim the whole plot with the explanation instead of
+    // leaving a bare metric line.
     if (!labeling || m() === 'tune') {
-      if (n > 0 && eff >= n) {
+      const hasBand = runs.length > 0;
+      if (n > 0 && !hasBand) {
         drawFullWarmupOverlay(
           g,
           canvas,
           MARGINS,
           dpr,
-          'all shown points are detector warm-up — nothing to score yet',
+          'no band here — the detector scored nothing (window below min_samples, or gaps)',
         );
       } else if (effTs !== undefined) {
         drawWarmupOverlay(g, canvas, MARGINS, dpr, px, effTs, 'detection at full power →');
@@ -673,8 +682,9 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
 
     // 9. threshold-capture line + capture-window dimming, on top of the series.
     drawThresholdOverlay();
-    // 9b. lasso loop + the anomalies it currently encloses.
-    drawLasso(scored, eff, n);
+    // 9b. lasso loop + the anomalies it currently encloses (from the first scored
+    // point, so every dot the band shows is lasso-capturable).
+    drawLasso(scored, 0, n);
 
     g.restore();
 
@@ -1061,7 +1071,8 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     return inside;
   }
 
-  // The anomaly indices currently enclosed by the lasso loop (effective zone only).
+  // The anomaly indices currently enclosed by the lasso loop (from `eff`, which
+  // callers pass as 0 so every shown anomaly dot is capturable).
   function lassoCaptured(scored: ScoredPoint[], eff: number, n: number): number[] {
     const out: number[] = [];
     if (!lassoPath || lassoPath.length < 3) return out;
@@ -1116,8 +1127,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
     if (!data || !lassoPath) return;
     const { scored } = data;
     const n = scored.length;
-    const eff = Math.min(effectiveStartIndex(data.series, data.params), n);
-    const spans = lassoSpans(scored, lassoCaptured(scored, eff, n));
+    const spans = lassoSpans(scored, lassoCaptured(scored, 0, n));
     for (const [a, b] of spans) addCaptured(a, b);
     if (spans.length) emitIncidents();
   }
@@ -1278,8 +1288,7 @@ export function createChart(canvas: HTMLCanvasElement, opts: ChartOptions = {}):
   function emitLassoNow(): void {
     if (!data) return;
     const n = data.scored.length;
-    const eff = Math.min(effectiveStartIndex(data.series, data.params), n);
-    emitLasso(data.scored, eff, n);
+    emitLasso(data.scored, 0, n);
   }
 
   // ---- interaction ----------------------------------------------------------

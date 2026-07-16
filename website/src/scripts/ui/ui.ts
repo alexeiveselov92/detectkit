@@ -144,6 +144,15 @@ function render(boot: BootPayload, mount: HTMLElement): void {
   header.className = 'dtk-ui-header';
   root.appendChild(header);
 
+  // The toolbar is pinned to the top via CSS `position:sticky`; toggle a
+  // `.stuck` class so its divider + shadow appear only once it's actually
+  // pinned (not at rest at the very top). The document is the scroll container.
+  const onScroll = (): void => {
+    header.classList.toggle('stuck', window.scrollY > 4);
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
   const brand = document.createElement('div');
   brand.className = 'dtk-ui-brand';
   brand.innerHTML =

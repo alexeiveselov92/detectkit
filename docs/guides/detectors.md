@@ -43,15 +43,33 @@ Examples:
 
 **NO** → Continue to question 3
 
-### 3. Is your data normally distributed?
+### 3. Do anomalies look like broken *dynamics* rather than an unusual *level*?
+
+Some metrics move fast and have no stable "normal level", so a value can sit
+well inside the usual range yet still be wrong given the last few points — a
+sudden jump, a reversal, a step a level detector would wave through.
+
+Examples:
+- Queue depth / backlog
+- Request rate, in-flight count
+- Any fast-moving, non-seasonal series where *shape* matters more than *level*
+
+**YES** → Use [Autoreg](#autoreg-detector). It predicts each point from a short
+autoregressive fit on recent history and flags large residuals, catching shape
+breaks the level-based detectors miss. Pair it with a level detector
+(`mad`/`zscore`/`iqr`) via `min_detectors` for both level *and* shape coverage.
+
+**NO** → Continue to question 4
+
+### 4. Is your data normally distributed?
 
 **Test**: Create a histogram. Does it look like a bell curve?
 
 **YES** → Use [Z-Score](#z-score-detector)
 
-**NO** → Continue to question 4
+**NO** → Continue to question 5
 
-### 4. Does your data have outliers or heavy tails?
+### 5. Does your data have outliers or heavy tails?
 
 **YES** → Use [MAD](#mad-detector-basic) or [IQR](#iqr-detector)
 

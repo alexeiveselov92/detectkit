@@ -159,9 +159,14 @@
   border-radius: 9px;
   text-decoration: none;
   white-space: nowrap;
+  transition: background 0.15s ease;
 }
+/* clay accent on hover — a clear, on-brand change in BOTH themes (matches
+   .btn-primary:hover). The old hardcoded #000 was invisible in the light theme
+   (base bg is already the near-black --ink) and turned the button black in the
+   dark theme, where it blended into the dark surroundings. */
 .pip:hover {
-  background: #000;
+  background: var(--clay);
 }
 
 /* ---------- hero ---------- */
@@ -2622,6 +2627,12 @@ a.pfd-title:hover {
 .cta-band .pip {
   background: #fbf9f3;
   color: #1b1916 !important;
+}
+/* re-assert the clay hover — `.cta-band .pip` above ties `.pip:hover` on
+   specificity but wins on source order, so without this the band's install
+   button gets no hover feedback. */
+.cta-band .pip:hover {
+  background: var(--clay);
 }
 
 /* ---------- footer ---------- */

@@ -95,16 +95,17 @@ alerts): **Points shown**, the alert rule (**direction** + **consecutive
 anomalies** + the **anomaly_window**/**min_anomaly_share** fraction pair), and
 the **y = 0** reference-line toggle.
 
-**Warm-up matters when Points shown is trimmed low.** The band and anomaly
-dots only appear once the detector has enough trailing history to warm up —
-if you trim **Points shown** below that, the whole chart dims with an
-explanation ("all shown points are detector warm-up — nothing to score yet")
-and an inline warning names the exact point count still needed, with three
-fixes: raise **Points shown**, lower **Window size**, or turn
-**Stabilization** off. **Stabilization** roughly doubles the requirement —
-Autoreg needs close to `2 · window_size + lags` points at its defaults (over
-400) — so watch for this especially right after switching to Autoreg or
-turning stabilization on with a short **Points shown**.
+**The band shows wherever the detector scores** — the same band the pipeline
+persists and a dashboard displays — so the cockpit no longer hides it over the
+long autoreg warm-up (an earlier version blanked the chart whenever the shown
+window was shorter than `2 · window_size + lags`, which for an hourly metric with
+a 20-day window is 40 days — nothing to do with seasonality, which autoreg
+ignores). The cold-start lead-in is only lightly dimmed with a "detection at
+full power →" divider. You'll see a real "no band" warning **only** when the
+detector scored *nothing at all* — its **Window size** is below `min_samples`,
+**Points shown** is trimmed too low, or the shown window is full of gaps — and it
+names the fixes (raise **Window size** / **Points shown**, lower **Lags** /
+`min_samples`, or turn **Stabilization** off).
 
 ## Step 3 — The four modes (autotune is one of them)
 

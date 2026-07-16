@@ -935,21 +935,32 @@ count.
 
 **Warm-up honesty.** Each recompute posts both the clamped `eff`
 (`effectiveStartIndex`, capped to the shown series length) and the un-clamped
-`need` (`warmupRequirement` in `demo/detector.ts`), so the HUD's warm-up stat
-reports the true requirement instead of one silently capped to the shown
-length; when `need` exceeds the shown length, `chart.ts`'s
-`drawFullWarmupOverlay` dims the whole plot with a centered explanation and
-`tune.ts` shows an inline `warmupWarn` naming the exact shortfall plus three
-fixes (raise Points shown / lower Window size / turn Stabilization off). The
-Window-size slider's explore cap is clamp-aware — a third of the shown points
-for autoreg (its default-on stabilization needs `2·window+lags`) vs half for
-the windowed detectors, recomputed via `updateWindowReach` on trim or
-detector-type switch — and `seed_detector_params` now seeds `window_size` per
-type (`_WINDOW_SIZE_DEFAULT`, autoreg 200) so a bare `type: autoreg` config
-opens at its real default, not the windowed template's 100.
-`warmupRequirement`'s windowed branch also gained the `+window_size` clamp
-term `WindowedStatDetector.get_context_size()` already had, closing the old
-TS/Python asymmetry.
+`need` (`warmupRequirement` in `demo/detector.ts` — kept equal to the Python
+`get_context_size`), so the HUD's warm-up stat reports the true context
+requirement instead of one silently capped to the shown length. The band and
+anomaly dots are drawn **wherever the detector actually scores** — `chart.ts`'s
+corridor/center/dots start from the first scored point (`scoredRuns(scored, 0)`
++ the dot loop from `0`), not from `eff` — so the cockpit shows the same band the
+pipeline persists and a Grafana view displays. The `eff` warm-up zone is only
+**dimmed as a cold-start marker** (`drawWarmupOverlay`'s divider), never erased.
+This fixes the reported autoreg confusion where a metric whose shown window was
+shorter than `2·window+lags` rendered a **blank** chart even though the detector
+had already scored hundreds of points (autoreg ignores seasonality, so the wide
+warm-up — not the seasonal grouping — was the real cause). The inline
+`warmupWarn` now fires **only** when the detector scored *nothing at all* in the
+shown window (window below `min_samples`, too little shown history, or gaps
+spanning the view), naming the concrete fixes (raise Window size / Points shown,
+lower Lags/`min_samples`, turn Stabilization off); `drawFullWarmupOverlay` dims
+the plot only in that truly-blank case (`runs.length === 0`). The Window-size
+slider's explore cap is now a uniform half-of-shown for every detector type
+(`windowReachFor(shown)`) — the old clamp-aware autoreg tightening is gone, since
+the band no longer disappears when the warm-up exceeds the view.
+`seed_detector_params` seeds `window_size` per type (`_WINDOW_SIZE_DEFAULT`,
+autoreg 200) so a bare `type: autoreg` config opens at its real default, not the
+windowed template's 100. `warmupRequirement` still mirrors
+`get_context_size` on both branches (the windowed `+window_size` clamp term
+included), so `need` stays an honest context figure — the TS/Python parity the
+`check-tune-worker` test locks in.
 
 **The cockpit — chart-windshield + a mode-aware control rail.** `tune.ts` drives a
 **single** chart (the shared `demo/chart.ts` with `labeling:true` + a `mode`): the

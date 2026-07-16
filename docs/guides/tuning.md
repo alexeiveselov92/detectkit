@@ -126,21 +126,27 @@ a shorter period is enough, trimming it makes every knob-drag noticeably faster
 (and the period easier to read). Trimming only affects the live view — it never
 changes what **Apply** writes.
 
-### Warm-up: why the band can start late (or not appear at all)
+### Warm-up: why the band can start a little late (and when it won't appear)
 
-The chart hides the confidence band and anomaly dots over each detector's
-warm-up lead-in — the trailing history it needs before it can score its first
-point — so what you see matches what an incremental pipeline run would
-actually compute; the pipeline and the [HTML report](visualizing-results.md)
-always have a band for every point they score. Turning on **Stabilization**
-roughly doubles that requirement (Autoreg needs close to two window-lengths of
-history — the window size plus the lag order — at its default settings, over
-400 points), so an aggressively trimmed **Points shown** can leave nothing left
-to look at. When the shown window is *entirely* warm-up, the chart dims
-completely with a centered "all shown points are detector warm-up — nothing to
-score yet" message instead of a bare, bandless line, and an inline warning
-beneath the chart states the exact point count still needed with three fixes:
-raise **Points shown**, lower **Window size**, or turn **Stabilization** off.
+The chart draws the confidence band and anomaly dots **wherever the detector can
+score a point** — the same band the pipeline persists and the
+[HTML report](visualizing-results.md) shows. A detector needs some trailing
+history before its first score (its *warm-up lead-in*), so the band naturally
+begins a little way in; that lead-in is only lightly **dimmed**, with a
+"detection at full power →" divider, never hidden. This matters most for
+**Autoreg**, whose default-on **Stabilization** pushes its full-context figure to
+roughly two window-lengths plus the lag order (over 400 points at defaults) — but
+the band still appears as soon as the detector has enough points to fit (around
+`min_samples`), so an hourly metric no longer needs a 40-day window just to render
+a band. (Autoreg ignores seasonality entirely, so a seasonal grouping never
+affects when its band appears.)
+
+The chart dims completely, with a centered "no band here — the detector scored
+nothing" message, **only** when the detector genuinely produced no band in the
+shown window: its **Window size** is below `min_samples`, **Points shown** is
+trimmed too low, or the shown window is full of gaps. The inline warning beneath
+the chart then names the fixes — raise **Window size** / **Points shown**, lower
+**Lags** / `min_samples`, or turn **Stabilization** off.
 
 A **y = 0 line** toggle draws a horizontal reference line at zero and folds zero
 into the vertical scale, so a real-valued metric (one best read *relative to zero*)

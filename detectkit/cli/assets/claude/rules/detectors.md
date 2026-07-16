@@ -236,9 +236,11 @@ recency weighting gives an ongoing incident's points more weight), `detrend`,
 `smoothing`, `input_type` and seasonality groups, and is near-neutral on clean
 series. Enabling it is a hashed change — it produces a new `detector_id` and
 recomputes on the next run; existing configs that don't set it keep their ids.
-It also adds one extra `window_size` of warm-up context (`mad`/`zscore`/`iqr`
-and `autoreg` alike) — the `dtk tune` cockpit's visible band respects this,
-so with `clamp` on the band starts one window later than without it.
+It also adds one extra `window_size` of warm-up *context* (`mad`/`zscore`/`iqr`
+and `autoreg` alike) — this is how much trailing history the pipeline loads, not
+where a band appears: the `dtk tune` cockpit draws the band wherever the detector
+actually scores (as the pipeline persists it), only lightly dimming the cold-start
+lead-in, so `clamp` no longer blanks the cockpit chart on a short view.
 
 ## Feature compatibility
 

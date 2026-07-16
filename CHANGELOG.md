@@ -5,6 +5,33 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.66.2] - 2026-07-16
+
+### Changed
+- **The website playground is now a literal instance of the `dtk tune` cockpit**
+  running on a *synthetic* metric, not a bespoke demo. It reuses the shipped
+  cockpit renderer (`report/tune.ts`) verbatim via a synthetic-`TunePayload`
+  adapter (the three localhost server hooks nulled — exactly the
+  `dtk tune --no-serve` shape), so a visitor gets the real chart, detector
+  worker, four modes (Tune / Review / Label / Autotune), HUD, mode-aware rail
+  and live catch-rate/false-alert metrics — plus a small data-generator toolbar
+  (rhythm / noise / trend / interval / incident / size) and a one-click autoreg
+  **shape-break showcase** (a free-running pulse + a frozen-value pattern break
+  the windowed detectors miss and autoreg catches). The playground now also
+  honors the site's light / dark / auto theme. **No pip-package behavior
+  change:** the `dtk tune` renderer gained only additive, product-inert
+  extension points (an optional `onState` hook + a returned `{destroy, resize}`
+  handle; the shipped HTML calls `render(payload, mount)` unchanged).
+
+### Internal
+- **New `website` CI job** regenerates the golden detector-parity vectors (from
+  the real Python detectors) and every committed browser bundle (`report.js` /
+  `tune.js` / `ui.js`), then fails on any stale artifact via
+  `git diff --exit-code` — converting what were manual release-checklist steps
+  into a code-enforced gate so the playground/report/ui bundles can't ship out
+  of sync with their TypeScript. Added `build:bundles` (report + tune + ui) and
+  `build:ui-bundle` npm scripts.
+
 ## [0.66.1] - 2026-07-14
 
 ### Fixed

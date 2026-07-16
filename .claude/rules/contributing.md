@@ -194,23 +194,23 @@ pick accents with `status_color(alert_data)` so status reads from color.
 2. **Update `CHANGELOG.md`** — Keep a Changelog format; it is the authoritative
    record of behavior changes.
 3. **Update `docs/`** — keep user-facing guides/reference in sync with behavior.
-4. **Regenerate the report + tune + ui bundles** — if you changed the HTML
-   report's renderer TS (`website/src/scripts/core/canvas.ts`, `report/report.ts`,
-   or anything they pull in), rebuild the committed bundle with
-   `node website/scripts/gen-report-bundle.mjs` (esbuild) so
-   `detectkit/reporting/assets/report.js` matches the source. If you changed the
-   interactive tuning renderer (`website/src/scripts/report/tune.ts`, its
-   `report/tune/` modules, or the shared `demo/` detector/chart they reuse), also
-   rebuild
-   `node website/scripts/gen-tune-bundle.mjs` so
-   `detectkit/tuning/assets/tune.js` matches. If you changed the project-UI
-   cockpit renderer (`website/src/scripts/ui/*.ts`), rebuild
-   `node website/scripts/gen-ui-bundle.mjs` so `detectkit/ui/assets/ui.js`
-   matches — same generated-asset pattern as
-   `make-bot-icon.mjs`. The report/tune renderers share the detector
-   port with the landing playground, so run the demo parity check
-   (`npm run check:demo-parity`) to confirm the TS detector port still matches the
-   Python detectors.
+4. **Regenerate the report + tune + ui bundles** — if you changed any renderer TS
+   (`website/src/scripts/core/canvas.ts`, `report/report.ts`, `report/tune.ts` +
+   its `report/tune/` modules, `ui/*.ts`, or the shared `demo/` detector/chart they
+   reuse), rebuild the committed bundles so
+   `detectkit/{reporting,tuning,ui}/assets/*.js` match the source. Run them all with
+   `npm run build:bundles` (or individually: `build:report-bundle` /
+   `build:tune-bundle` / `build:ui-bundle`) — same generated-asset pattern as
+   `make-bot-icon.mjs`. The report/tune renderers share the detector port with the
+   landing playground (which is itself a synthetic-data instance of the `dtk tune`
+   cockpit), so run the parity checks (`npm run check` = demo-parity + tune-worker)
+   to confirm the TS port still matches the Python detectors. **This is now
+   CI-enforced**: the `website` job (`.github/workflows/ci.yml`) regenerates the
+   golden vectors + every bundle and fails on any stale committed artifact via
+   `git diff --exit-code`, so a forgotten regeneration is caught in CI rather than
+   shipped stale — but running it locally first keeps the loop fast. (The golden
+   vectors themselves regenerate from the real Python detectors with
+   `python website/scripts/gen-demo-golden.py`.)
 5. **Update the `dtk init-claude` assets** in `detectkit/cli/assets/claude/`
    (`rules/*.md`, `skills/*/SKILL.md`, `CLAUDE.section.md`) so a freshly-run
    `dtk init-claude` matches the shipped version. These assets are user-facing

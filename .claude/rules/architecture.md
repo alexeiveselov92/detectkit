@@ -749,9 +749,9 @@ dispatch, no state writes and no wall-clock (see the Alerting section).
 **Shared rendering core.** `assets/report.js` is a committed generated asset (the
 `bot-icon.png` generated-asset pattern) built by
 `website/scripts/gen-report-bundle.mjs` from the **same** framework-free
-TypeScript core (`website/src/scripts/core/canvas.ts`) that powers the website's
-interactive landing playground — so the report and the marketing demo render
-identically. The bundle ships in the wheel
+TypeScript core (`website/src/scripts/core/canvas.ts`) shared with the `dtk tune`
+cockpit and the website's interactive playground, so all three draw from one
+low-level rendering core. The bundle ships in the wheel
 (`[tool.setuptools.package-data]` `"detectkit.reporting" = ["assets/*.js"]` +
 MANIFEST.in) and must be regenerated when the renderer TS changes.
 
@@ -886,8 +886,9 @@ validate-before-write discipline and operate on the already-loaded
 `_dtk_datapoints`.
 
 The interactive recompute reuses the **same** framework-free TypeScript detector
-port (`website/src/scripts/demo/detector.ts`) + chart (`demo/chart.ts`) that
-power the landing playground — fed the real series instead of synthetic data. So
+port (`website/src/scripts/demo/detector.ts`) + chart (`demo/chart.ts`), fed the
+real series. (The website playground now runs this **whole** cockpit renderer on a
+*synthetic* series instead — see "The website playground" below.) So
 unlike the read-only `--report` (which replays *stored* detections),
 `dtk tune` recomputes detections client-side as the user moves a slider, with no
 DB round-trip. The renderer (`website/src/scripts/report/tune.ts`, the
@@ -898,12 +899,12 @@ config-text, formatters, styles, the worker client, the quality metrics) live in
 ships in the wheel — regenerate it when the renderer TS changes; the detector
 port is the parity-checked
 (`npm run check:demo-parity`) shared core. `demo/chart.ts` exposes an **opt-in
-`navigable` mode** (a `ChartOptions` flag the playground leaves off): when set,
+`navigable` mode** (a `ChartOptions` flag off by default): when set,
 the chart gains mouse-wheel zoom, drag-to-pan, double-click reset and a bottom
 **navigator strip** (full series + current-view window + alert ticks + an adaptive
-time axis). `dtk tune` turns it on so a dense metric can be zoomed region-by-region
-to inspect alert quality; the chart's other rendering is unchanged when the flag is
-off, so the landing demo is untouched. On top of the chart, `tune.ts` adds a
+time axis). `dtk tune` (and the website playground, which now runs this cockpit)
+turns it on so a dense metric can be zoomed region-by-region to inspect alert
+quality; the chart's other rendering is unchanged when the flag is off. On top of the chart, `tune.ts` adds a
 **"Points shown" trim slider** (re-slices the active series to the most-recent N
 points and re-posts to the worker, so recompute — cost ∝ points × window — speeds
 up; view-only, never written), a **legend**, per-control **ⓘ tooltips**, a
@@ -1176,6 +1177,50 @@ mode computes a config server-side but persists nothing — no run record,
 detector params changes the `detector_id`, so detections recompute under the new
 id on the next `dtk run` (the live preview is the TS approximation; the next real
 run is the source of truth).
+
+### The website playground
+
+The marketing site's interactive playground (`website/src/pages/playground.astro`)
+is **not a separate demo** — it is a **literal instance of this cockpit renderer**
+(`report/tune.ts`) fed a **synthetic** metric instead of a real `_dtk_datapoints`
+series. This is the "the playground is a continuation of the real product"
+contract, enforced structurally by shared imports rather than by convention: the
+same chart, detector worker, four modes (Tune / Review / Label / Autotune), HUD,
+mode-aware rail, live recall/FDR metrics and warm-up honesty the tool ships. The
+only extra layer is a data-**generator** toolbar (rhythm / noise / trend / interval
+/ incident / size) the real product doesn't need, plus a one-click autoreg
+"shape-break showcase".
+
+- `website/src/scripts/playground/payload.ts` — the one adapter: a synth `Series`
+  (`demo/synth.ts`) → the exact `TunePayload` the cockpit consumes, with the three
+  server hooks (`save_url` / `labels_save_url` / `autotune_url`) **nulled**. That is
+  precisely the `dtk tune --no-serve` shape, so every backend action degrades to its
+  offline form (Apply → a preview note, Save → a download, Autotune → a "needs the
+  live server" note) with no code path of its own. It sits ABOVE `demo/` (like
+  `report/`), so `demo/` stays the shared lower layer.
+- `website/src/scripts/playground/main.ts` — the composition root: reads the
+  generator toolbar, builds the payload, and (re)mounts the cockpit. Because the
+  cockpit builds its state once at mount, a data change **re-mounts** `render()`
+  (idempotent). Two **purely additive** extension points on `tune.ts` support this
+  without changing product behavior (the shipped HTML calls `render(payload, mount)`
+  with neither): an optional `hooks.onState` callback (so a regeneration carries the
+  user's tuned knobs across the re-mount) and a returned `{ destroy, resize }` handle
+  (`destroy` releases the worker + global listeners before each re-mount; `resize`
+  repaints the canvas on a live theme toggle — the canvas reads brand tokens off
+  `:root`, flipped per-theme by `landing.css`, so it re-themes for free).
+- The detector Web Worker is bundled to a string and injected as `__DTK_WORKER_SRC__`
+  by `astro.config.mjs` (`vite.define`) — the **same** define `gen-tune-bundle.mjs`
+  uses for the shipped bundle — so `tune.ts` runs byte-for-byte unmodified on the
+  site build.
+- The cockpit ships **light-only** (its injected stylesheet hardcodes light tokens);
+  the playground page retints `.dtk-tune` under `[data-theme='dark']` in its own
+  CSS (zero impact on the shipped bundle) so it honors the site's light/dark/auto
+  theme like everything else.
+
+The "playground can't drift from the product" property is then made hard by the
+`website` CI job (see the contributing rule): it regenerates the golden parity
+vectors + all committed bundles and fails on any stale artifact, converting what
+were manual release-checklist steps into a code-enforced gate.
 
 ## Project UI (`dtk ui`)
 

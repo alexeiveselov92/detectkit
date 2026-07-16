@@ -60,7 +60,24 @@ declare const __DTK_WORKER_SRC__: string;
 // Render
 // ---------------------------------------------------------------------------
 
-function render(payload: TunePayload, mount: HTMLElement): void {
+// Optional, purely-additive hooks. The shipped `dtk tune` HTML calls
+// render(payload, mount) with neither argument, so its behavior is unchanged; the
+// landing playground passes an `onState` callback (to preserve the tuned knobs
+// across a data-generator re-mount) and calls the returned `destroy()` before each
+// re-mount (to release the worker + global listeners rather than leak one per run).
+interface TuneHooks {
+  onState?: (s: {
+    params: DetectorParams;
+    windowPoints: number | null;
+    share: number | null;
+  }) => void;
+}
+
+function render(
+  payload: TunePayload,
+  mount: HTMLElement,
+  hooks?: TuneHooks,
+): { destroy: () => void; resize: () => void } {
   injectStyle();
   mount.classList.add(ROOT_CLASS);
   mount.innerHTML = '';
@@ -865,11 +882,12 @@ function render(payload: TunePayload, mount: HTMLElement): void {
   };
   // Esc backs out of whichever capture tool is active; routed through the setters
   // so the toggle/bar state stays in sync with the chart.
-  window.addEventListener('keydown', (ev) => {
+  const onKeydown = (ev: KeyboardEvent): void => {
     if (ev.key !== 'Escape') return;
     if (thActive) setThActive(false);
     else if (lassoActive) setLassoActive(false);
-  });
+  };
+  window.addEventListener('keydown', onKeydown);
   updateLassoUI = (info): void => {
     lassoInfo.textContent = info.active
       ? `${info.anomalies} anomal${info.anomalies === 1 ? 'y' : 'ies'} → ` +
@@ -912,6 +930,10 @@ function render(payload: TunePayload, mount: HTMLElement): void {
       // can write back every slot the user tuned, not just the one on screen.
       if (activeIndex != null) editedParams.set(activeIndex, params);
       spinner.classList.add('on');
+      // Report live state to an external driver (landing playground only) so a data
+      // regeneration can carry the tuned knobs across the re-mount. No-op in the
+      // shipped cockpit (no hooks passed).
+      hooks?.onState?.({ params, windowPoints: shareWindowPoints(), share: shareValue() });
     },
     onResult: (res: WorkerResult, params: DetectorParams): void => {
       spinner.classList.remove('on');
@@ -2018,11 +2040,32 @@ function render(payload: TunePayload, mount: HTMLElement): void {
     if (rafResize) cancelAnimationFrame(rafResize);
     rafResize = requestAnimationFrame(() => chart.resize());
   };
+  let resizeObserver: ResizeObserver | null = null;
   if (typeof ResizeObserver !== 'undefined') {
-    new ResizeObserver(refit).observe(chartWrap);
+    resizeObserver = new ResizeObserver(refit);
+    resizeObserver.observe(chartWrap);
   } else {
     window.addEventListener('resize', refit);
   }
+
+  // Teardown (additive; the shipped product mounts once and never calls this). The
+  // landing playground re-mounts render() on each data regeneration, so it calls
+  // destroy() first — releasing the worker, the global keydown listener and the
+  // resize observer — instead of leaking one set per regeneration.
+  return {
+    destroy: (): void => {
+      workerClient.destroy();
+      window.removeEventListener('keydown', onKeydown);
+      if (resizeObserver) resizeObserver.disconnect();
+      else window.removeEventListener('resize', refit);
+      if (rafResize) cancelAnimationFrame(rafResize);
+      chart.destroy();
+    },
+    // Force a repaint (the canvas reads brand tokens off :root at draw time, so a
+    // live theme toggle needs a nudge to re-read them). Additive; unused by the
+    // shipped product, which never changes theme after load.
+    resize: (): void => chart.resize(),
+  };
 }
 
 // Expose the global the inlined HTML bootstrap calls (mirrors __DTK_REPORT__).

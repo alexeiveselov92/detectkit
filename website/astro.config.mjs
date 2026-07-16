@@ -1,6 +1,30 @@
 // @ts-check
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import { build } from 'esbuild';
+
+// Bundle the `dtk tune` cockpit's detector Web Worker to a string and inject it as
+// __DTK_WORKER_SRC__ — the SAME esbuild `define` the shipped bundle uses
+// (scripts/gen-tune-bundle.mjs). The landing playground reuses report/tune.ts
+// verbatim (it spins the worker up from a Blob URL built from this string), so the
+// site build must supply the identifier too, or render() throws a ReferenceError
+// the first time it recomputes. esbuild ships transitively with astro/vite.
+const here = path.dirname(fileURLToPath(import.meta.url));
+const workerBuild = await build({
+  entryPoints: [path.join(here, 'src', 'scripts', 'report', 'tune.worker.ts')],
+  bundle: true,
+  write: false,
+  format: 'iife',
+  platform: 'browser',
+  target: 'es2019',
+  minify: true,
+  legalComments: 'none',
+  logLevel: 'silent',
+});
+const workerSrc = workerBuild.outputFiles?.[0]?.text;
+if (!workerSrc) throw new Error('astro.config: failed to bundle src/scripts/report/tune.worker.ts');
 
 // Brand fonts (mirrors the brand guide: Schibsted Grotesk + JetBrains Mono).
 const fontHead = [
@@ -18,6 +42,11 @@ const fontHead = [
 // https://astro.build/config
 export default defineConfig({
   site: 'https://dtk.pipelab.dev',
+  // Mirror the tune-bundle's worker-source injection so the playground (which
+  // imports report/tune.ts) can spin up the same detector worker.
+  vite: {
+    define: { __DTK_WORKER_SRC__: JSON.stringify(workerSrc) },
+  },
   integrations: [
     starlight({
       title: 'detectkit',

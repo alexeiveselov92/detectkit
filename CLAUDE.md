@@ -129,7 +129,13 @@ rendered on the docs site under **For developers**). Read the relevant one:
   into one self-contained HTML report per metric, sharing a framework-free JS
   rendering core with the website landing demo. The committed
   `assets/report.js` bundle ships in the wheel — regenerate it (and keep it in
-  sync on release) when the report renderer TS changes.
+  sync on release) when the report renderer TS changes. The website
+  **playground** (`/playground/`) is a **literal instance of the `dtk tune`
+  cockpit renderer** fed a *synthetic* metric (the three server hooks nulled = the
+  `--no-serve` shape) via a small `playground/` adapter — not a separate demo — so
+  it evolves with the product; a `website` CI job runs the parity checks + all
+  committed bundles (`build:bundles`) and fails on any stale bundle, so it can't
+  drift.
 - **Manual tuning** lives in `detectkit/tuning/` (the `dtk tune` command): the
   human-in-the-loop sibling of `dtk autotune`. It serves an interactive view of a
   metric's real series (recomputing the band live via the **same** TS detector

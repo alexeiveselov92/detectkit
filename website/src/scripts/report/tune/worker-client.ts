@@ -13,6 +13,10 @@ export interface TuneWorkerClient {
   recompute(): void;
   /** Immediate dispatch (first paint; programmatic re-seeds go through recompute). */
   runNow(): void;
+  /** Terminate the worker + release the blob URL / pending debounce. The shipped
+   * cockpit runs for the page lifetime and never calls this; the landing playground
+   * re-mounts the cockpit on each data regeneration, so it tears the old one down. */
+  destroy(): void;
 }
 
 export function createTuneWorkerClient(opts: {
@@ -99,5 +103,11 @@ export function createTuneWorkerClient(opts: {
     worker.postMessage({ type: 'series', series });
   };
 
-  return { postSeries, recompute, runNow };
+  const destroy = (): void => {
+    if (debounce) window.clearTimeout(debounce);
+    worker.terminate();
+    URL.revokeObjectURL(workerUrl);
+  };
+
+  return { postSeries, recompute, runNow, destroy };
 }

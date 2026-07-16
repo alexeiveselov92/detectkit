@@ -4,44 +4,11 @@ import '../styles/brand.css';
 import '../styles/landing.css';
 
 const repo = 'https://github.com/alexeiveselov92/detectkit';
-const title = 'detectkit playground — shape a metric, watch detection happen';
+const title = 'detectkit playground — the real tuning cockpit, on a metric you shape';
 const description =
-  "An interactive sandbox for detectkit's real anomaly detectors. Shape a synthetic metric, turn the detector's knobs, and see the corridor of normal, what gets flagged, and whether an alert would fire — all client-side.";
-
-// Each control carries a one-sentence, plain-language tooltip explaining what
-// the knob does. Rendered as a styled bubble on an "ⓘ" affordance (no native
-// title=), so it reads the same on every platform.
-const TIP = {
-  rhythm:
-    'The repeating shape of your metric — flat, a daily cycle, weekly, business-hours, spiky counts, or a free-running ~7h pulse that ignores the clock (try it with autoreg + pattern break).',
-  noise: 'How much random jitter sits on top of the rhythm — higher noise widens the normal band.',
-  trend: 'A slow upward or downward drift in the level over the whole series.',
-  interval: 'The spacing between points (the metric grid step), e.g. one point every hour.',
-  incident:
-    'The kind of problem to inject — a spike, dip, sustained step, slow drift, a cluster, or a pattern break — the value freezes mid-rhythm: normal in level, wrong in shape (the autoreg showcase — pairs best with the pulse rhythm).',
-  size: 'How large the injected incident is relative to normal — drag up to make it more obvious.',
-  detector:
-    'Which detector builds the corridor: mad (robust median), zscore (mean ± σ), iqr (quartile fences), autoreg (predicts each point from its previous values and flags dynamics breaks), or manual (fixed lower/upper thresholds, no window).',
-  threshold:
-    'How wide the corridor is, in spread units — higher means fewer flags, lower means more sensitive.',
-  window_size:
-    'How many recent points the corridor is computed from — longer is steadier, shorter adapts faster.',
-  weighting:
-    'Whether recent points count more than older ones when building the corridor (off, exponential, or linear).',
-  half_life: 'For exponential weighting: how many points back a point’s weight halves.',
-  detrend: 'Removes a local slope before judging a point, so a steady trend is not flagged as anomalous.',
-  smoothing:
-    'Smooths the series (EMA or SMA) before detection, so single-point noise does not trip the band.',
-  seasonality:
-    'Conditions the corridor on a seasonal key (hour, or hour+day-of-week) so each time-of-day has its own normal.',
-  consecutive:
-    'How many grid-adjacent flagged points in a row are needed before an alert actually fires.',
-  lags: 'Autoreg: how many immediately-preceding values predict the current one — more lags capture a longer local pattern.',
-  lower_bound: 'Manual: points below this line are flagged — the floor of the allowed range.',
-  upper_bound: 'Manual: points above this line are flagged — the ceiling of the allowed range.',
-};
-const tip = (key: keyof typeof TIP) =>
-  `<span class="dkx-tip" tabindex="0" aria-label="${TIP[key]}"><span class="dkx-tip-i">i</span><span class="dkx-tip-bubble">${TIP[key]}</span></span>`;
+  "An interactive sandbox that IS detectkit's real `dtk tune` cockpit — the same chart, detectors, " +
+  'modes and live catch-rate/false-alert metrics the tool ships — running on a synthetic metric you ' +
+  'shape in the browser. Nothing is sent anywhere.';
 ---
 
 <!doctype html>
@@ -64,8 +31,26 @@ const tip = (key: keyof typeof TIP) =>
       href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <!-- Theme: set before paint to avoid a flash. Auto / Light / Dark, matching the
+         landing + docs — mode is stored, `data-theme` is the resolved look. Auto (the
+         default) follows the OS preference and reacts live. -->
+    <script is:inline>
+      (function () {
+        var mq = window.matchMedia('(prefers-color-scheme: dark)');
+        var mode;
+        try {
+          var saved = localStorage.getItem('dtk-theme');
+          mode = saved === 'light' || saved === 'dark' || saved === 'auto' ? saved : 'auto';
+        } catch (e) {
+          mode = 'auto';
+        }
+        var root = document.documentElement;
+        root.dataset.themeMode = mode;
+        root.dataset.theme = mode === 'auto' ? (mq.matches ? 'dark' : 'light') : mode;
+      })();
+    </script>
   </head>
-  <body class="landing">
+  <body class="landing pg-body">
     <!-- ===== slim brand header ===== -->
     <header class="site-header">
       <nav class="wrap nav">
@@ -74,242 +59,314 @@ const tip = (key: keyof typeof TIP) =>
           <span>detectkit</span>
         </a>
         <div class="nav-right pg-nav-right">
-          <a class="ghost-link pg-back" href="/">← back to home</a>
+          <button
+            id="theme-toggle"
+            class="theme-toggle"
+            type="button"
+            aria-label="Theme: Auto, Light or Dark"
+            title="Theme: Auto → Light → Dark"
+          >
+            <svg class="ico-auto" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="12" rx="2" />
+              <path d="M8 20h8M12 16v4" />
+            </svg>
+            <svg class="ico-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="4.2" />
+              <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8" />
+            </svg>
+            <svg class="ico-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          </button>
+          <a class="ghost-link pg-back" href="/">← home</a>
           <a class="ghost-link" href={repo}>GitHub</a>
           <a class="pip" href="/getting-started/installation/">Get started</a>
         </div>
       </nav>
     </header>
 
-    <!-- ===== playground ===== -->
-    <main class="wrap pg-wrap">
-      <div class="eyebrow">interactive playground</div>
-      <h1 class="pg-h1">Shape a metric, then watch detection happen.</h1>
-      <p class="pg-intro">
-        Dial in a series that looks like one of yours, turn the detector's real knobs, and see the
-        <strong>corridor of normal</strong>, what gets flagged, and whether an <strong>alert</strong>
-        would fire. The math is the actual detectkit detector, ported to run entirely on this page —
-        nothing is sent anywhere.
-      </p>
+    <!-- ===== playground app: generator toolbar + the real cockpit ===== -->
+    <main class="pg-app">
+      <div class="pg-topbar">
+        <!-- data generator (the one thing the real product doesn't have) — a compact
+             single strip so the cockpit below still owns the full-height windshield. -->
+        <div class="pg-gen" id="pg-gen">
+          <span class="pg-lead">
+            <span class="eyebrow">playground</span>
+            the real <code>dtk&nbsp;tune</code> cockpit, on a metric you shape&nbsp;→
+          </span>
+          <span class="pg-field" title="The repeating shape of the metric. 'pulse' is a free-running ~7h cycle the calendar can't capture — the autoreg showcase.">
+            <span class="pg-k">rhythm</span>
+            <span class="pg-seg" data-control="rhythm">
+              <button data-v="flat">flat</button>
+              <button data-v="daily" class="on">daily</button>
+              <button data-v="weekly">weekly</button>
+              <button data-v="daily_weekly">daily+wk</button>
+              <button data-v="business_hours">business</button>
+              <button data-v="spiky_counts">spiky</button>
+              <button data-v="pulse">pulse</button>
+            </span>
+          </span>
 
-      <div id="dkx" class="dkx-card dkx-card-wide">
-        <!-- chart -->
-        <div class="dkx-chart">
-          <div class="dkx-legend">
-            <span><i class="dkx-sw dkx-sw-line"></i>metric</span>
-            <span><i class="dkx-sw dkx-sw-band"></i>expected range</span>
-            <span><i class="dkx-sw dkx-sw-anom"></i>flagged anomaly</span>
-            <span><i class="dkx-sw dkx-sw-miss"></i>injected (missed)</span>
-            <span><i class="dkx-sw dkx-sw-alert"></i>alert fires</span>
-            <span class="dkx-legend-hint">hover to see the window a point is judged by · scroll to zoom, drag to pan, double-click to reset</span>
-            <span id="dkx-smooth-note" class="dkx-legend-hint dkx-smooth-note hidden"></span>
-          </div>
-          <div class="dkx-plot">
-            <canvas id="dkx-canvas"></canvas>
-          </div>
-          <div id="dkx-readout" class="dkx-readout">hover a point to inspect its window &amp; verdict</div>
+          <span class="pg-field" title="The problem to inject. 'pattern break' freezes the value mid-rhythm — normal in level, wrong in shape (the autoreg showcase).">
+            <span class="pg-k">incident</span>
+            <span class="pg-seg" data-control="incident">
+              <button data-v="spike">spike</button>
+              <button data-v="dip">dip</button>
+              <button data-v="step">step</button>
+              <button data-v="drift">drift</button>
+              <button data-v="cluster" class="on">cluster</button>
+              <button data-v="pattern_break">pattern break</button>
+            </span>
+          </span>
+
+          <span class="pg-field" title="Grid step — the spacing between points.">
+            <span class="pg-k">interval</span>
+            <span class="pg-seg" data-control="interval">
+              <button data-v="10min">10min</button>
+              <button data-v="1h" class="on">1h</button>
+              <button data-v="1d">1d</button>
+            </span>
+          </span>
+
+          <span class="pg-field" title="Random jitter on top of the rhythm — higher noise widens the normal band.">
+            <span class="pg-k">noise</span>
+            <span class="pg-seg" data-control="noise">
+              <button data-v="low">low</button>
+              <button data-v="medium" class="on">medium</button>
+              <button data-v="high">high</button>
+            </span>
+          </span>
+
+          <span class="pg-field" title="A slow upward or downward drift over the whole series.">
+            <span class="pg-k">trend</span>
+            <span class="pg-seg" data-control="trend">
+              <button data-v="none" class="on">none</button>
+              <button data-v="up">up</button>
+              <button data-v="down">down</button>
+            </span>
+          </span>
+
+          <span class="pg-field" title="How large the injected incident is relative to normal.">
+            <span class="pg-k">size <b id="pg-size-val">60%</b></span>
+            <input id="pg-size" class="pg-range" type="range" min="0" max="100" step="1" value="60" />
+          </span>
+
+          <button id="pg-reseed" class="pg-btn" type="button" title="Draw a new random sample of the same shape.">↻ resample</button>
+          <button
+            id="pg-showcase"
+            class="pg-btn pg-btn-accent"
+            type="button"
+            title="One click: switch to autoreg on a free-running pulse with a frozen-value pattern break — the anomaly windowed detectors miss and autoreg catches."
+          >◹ shape-break showcase</button>
         </div>
-
-        <!-- scorecard -->
-        <div class="dkx-score">
-          <div class="dkx-stat"><div class="dkx-stat-v" id="dkx-stat-caught">—</div><div class="dkx-stat-k">caught</div></div>
-          <div class="dkx-stat"><div class="dkx-stat-v" id="dkx-stat-fp">—</div><div class="dkx-stat-k">false alarms</div></div>
-          <div class="dkx-stat"><div class="dkx-stat-v" id="dkx-stat-flagged">—</div><div class="dkx-stat-k">flagged pts</div></div>
-          <div class="dkx-stat"><div class="dkx-stat-v" id="dkx-stat-flagrate">—</div><div class="dkx-stat-k">flag rate</div></div>
-          <div class="dkx-stat"><div class="dkx-stat-v" id="dkx-stat-mcc">—</div><div class="dkx-stat-k">MCC</div></div>
-          <div id="dkx-alert" class="dkx-alert"></div>
-        </div>
-
-        <!-- controls -->
-        <div class="dkx-controls dkx-controls-3">
-          <!-- group 1 — your metric (data shaping) -->
-          <div class="dkx-group">
-            <div class="dkx-group-h">your metric</div>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">rhythm <Fragment set:html={tip('rhythm')} /></span>
-              <span class="dkx-seg" data-control="seasonality">
-                <button data-v="flat">flat</button>
-                <button data-v="daily" class="on">daily</button>
-                <button data-v="weekly">weekly</button>
-                <button data-v="daily_weekly">daily+wk</button>
-                <button data-v="business_hours">business</button>
-                <button data-v="spiky_counts">spiky</button>
-                <button data-v="pulse">pulse</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">noise <Fragment set:html={tip('noise')} /></span>
-              <span class="dkx-seg" data-control="noise">
-                <button data-v="low">low</button>
-                <button data-v="medium" class="on">medium</button>
-                <button data-v="high">high</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">trend <Fragment set:html={tip('trend')} /></span>
-              <span class="dkx-seg" data-control="trend">
-                <button data-v="none" class="on">none</button>
-                <button data-v="up">up</button>
-                <button data-v="down">down</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">interval <Fragment set:html={tip('interval')} /></span>
-              <span class="dkx-seg" data-control="interval">
-                <button data-v="10min">10min</button>
-                <button data-v="1h" class="on">1h</button>
-                <button data-v="1d">1d</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">incident <Fragment set:html={tip('incident')} /></span>
-              <span class="dkx-seg" data-control="anomaly">
-                <button data-v="spike">spike</button>
-                <button data-v="dip">dip</button>
-                <button data-v="step">step</button>
-                <button data-v="drift">drift</button>
-                <button data-v="cluster" class="on">cluster</button>
-                <button data-v="pattern_break">pattern break</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">size <b id="dkx-magnitude-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('size')} /></span>
-              <input id="dkx-magnitude" type="range" min="0" max="100" step="1" value="60" />
-            </label>
-
-            <button id="dkx-reseed" class="dkx-reseed" type="button">↻ new random sample</button>
-          </div>
-
-          <!-- group 2 — detector -->
-          <div class="dkx-group">
-            <div class="dkx-group-h">detector</div>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">detector <Fragment set:html={tip('detector')} /></span>
-              <span class="dkx-seg" data-control="detector">
-                <button data-v="mad" class="on">mad</button>
-                <button data-v="zscore">zscore</button>
-                <button data-v="iqr">iqr</button>
-                <button data-v="autoreg">autoreg</button>
-                <button data-v="manual_bounds">manual</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl hidden" id="dkx-lower-row">
-              <span class="dkx-ctl-k">lower_bound <b id="dkx-lower-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('lower_bound')} /></span>
-              <input id="dkx-lower" type="range" min="0" max="200" step="1" value="60" />
-            </label>
-
-            <label class="dkx-ctl hidden" id="dkx-upper-row">
-              <span class="dkx-ctl-k">upper_bound <b id="dkx-upper-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('upper_bound')} /></span>
-              <input id="dkx-upper" type="range" min="0" max="200" step="1" value="140" />
-            </label>
-
-            <label class="dkx-ctl" id="dkx-threshold-row">
-              <span class="dkx-ctl-k">threshold <b id="dkx-threshold-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('threshold')} /></span>
-              <input id="dkx-threshold" type="range" min="1" max="6" step="0.1" value="3" />
-            </label>
-
-            <label class="dkx-ctl" id="dkx-window-row">
-              <span class="dkx-ctl-k">window_size <b id="dkx-window-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('window_size')} /></span>
-              <input id="dkx-window" type="range" min="20" max="300" step="5" value="240" />
-            </label>
-
-            <label class="dkx-ctl hidden" id="dkx-lags-row">
-              <span class="dkx-ctl-k">lags <b id="dkx-lags-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('lags')} /></span>
-              <input id="dkx-lags" type="range" min="1" max="40" step="1" value="5" />
-            </label>
-
-            <label class="dkx-ctl" id="dkx-weights-row">
-              <span class="dkx-ctl-k">recency weighting <Fragment set:html={tip('weighting')} /></span>
-              <span class="dkx-seg" data-control="weights">
-                <button data-v="none" class="on">none</button>
-                <button data-v="exponential">exponential</button>
-                <button data-v="linear">linear</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl hidden" id="dkx-halflife-row">
-              <span class="dkx-ctl-k">half_life <b id="dkx-halflife-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('half_life')} /></span>
-              <input id="dkx-halflife" type="range" min="2" max="100" step="1" value="15" />
-            </label>
-
-            <label class="dkx-ctl" id="dkx-detrend-row">
-              <span class="dkx-ctl-k">detrend <Fragment set:html={tip('detrend')} /></span>
-              <span class="dkx-seg" data-control="detrend">
-                <button data-v="none" class="on">off</button>
-                <button data-v="linear">linear</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl" id="dkx-smoothing-row">
-              <span class="dkx-ctl-k">smoothing <Fragment set:html={tip('smoothing')} /></span>
-              <span class="dkx-seg" data-control="smoothing">
-                <button data-v="none" class="on">none</button>
-                <button data-v="ema">ema</button>
-                <button data-v="sma">sma</button>
-              </span>
-            </label>
-
-            <label class="dkx-ctl" id="dkx-conditioning-row">
-              <span class="dkx-ctl-k">seasonality grouping <Fragment set:html={tip('seasonality')} /></span>
-              <span class="dkx-seg" data-control="conditioning">
-                <button data-v="off">off</button>
-                <button data-v="hour" class="on">hour</button>
-                <button data-v="hour_dow">hour+dow</button>
-              </span>
-            </label>
-          </div>
-
-          <!-- group 3 — alerting -->
-          <div class="dkx-group dkx-group-alert">
-            <div class="dkx-group-h">alerting</div>
-
-            <label class="dkx-ctl">
-              <span class="dkx-ctl-k">consecutive_anomalies <b id="dkx-consecutive-val" class="dkx-ctl-v"></b> <Fragment set:html={tip('consecutive')} /></span>
-              <input id="dkx-consecutive" type="range" min="1" max="10" step="1" value="3" />
-            </label>
-
-            <p class="dkx-alert-help">
-              An alert fires only when this many <strong>grid-adjacent</strong> flagged points form a
-              run — so a single noisy blip never pages anyone. Each qualifying run is one alert,
-              marked with a ▼ on the chart.
-            </p>
-          </div>
-        </div>
-
-        <div class="dkx-config-row">
-          <span class="dkx-config-k">// effective config</span>
-          <code id="dkx-config"></code>
-        </div>
-
-        <div id="dkx-season-warn" class="dkx-season-warn" hidden></div>
       </div>
 
-      <p class="dx-foot">
-        // the same detector ports that run in production — windowed statistics (current point excluded
-        from its own window, NaN gaps skipped, seasonality &amp; recency applied per point), the autoreg
-        one-step forecast, and fixed manual bounds<br />
-        // detection runs only in the <strong>effective zone</strong> (past warm-up, dimmed on the
-        left); <strong>caught</strong> = injected incidents a flag landed on · <strong>flag rate</strong>
-        = share of judged points flagged · <strong>MCC</strong> = correlation of flags with the truth ·
-        the <strong>alert</strong> needs <code>consecutive_anomalies</code> grid-adjacent flags
-      </p>
-
-      <div class="pg-cta">
-        <a class="btn btn-primary" href="/getting-started/installation/">Get started for real</a>
-        <a class="btn btn-ghost" href="/guides/detectors/">Read the detectors guide</a>
-      </div>
+      <!-- the cockpit mounts here (report/tune.ts, fed the synthetic payload) -->
+      <div id="dkx-mount" class="pg-mount"></div>
     </main>
 
-    <script>
-      import '../scripts/demo/main.ts';
+    <!-- theme toggle (Auto → Light → Dark), mirrors the landing -->
+    <script is:inline>
+      (function () {
+        var btn = document.getElementById('theme-toggle');
+        if (!btn) return;
+        var root = document.documentElement;
+        var mq = window.matchMedia('(prefers-color-scheme: dark)');
+        var order = ['auto', 'light', 'dark'];
+        function apply(mode) {
+          root.dataset.themeMode = mode;
+          root.dataset.theme = mode === 'auto' ? (mq.matches ? 'dark' : 'light') : mode;
+          try {
+            localStorage.setItem('dtk-theme', mode);
+          } catch (e) {}
+        }
+        btn.addEventListener('click', function () {
+          var cur = root.dataset.themeMode || 'auto';
+          apply(order[(order.indexOf(cur) + 1) % order.length]);
+        });
+        var onChange = function () {
+          if ((root.dataset.themeMode || 'auto') === 'auto')
+            root.dataset.theme = mq.matches ? 'dark' : 'light';
+        };
+        if (mq.addEventListener) mq.addEventListener('change', onChange);
+        else if (mq.addListener) mq.addListener(onChange);
+      })();
     </script>
+
+    <script>
+      import '../scripts/playground/main.ts';
+    </script>
+
+    <style is:global>
+      /* Full-viewport app shell: slim header + generator toolbar + the cockpit
+         filling the rest. Brand tokens flip with the theme via landing.css, so the
+         toolbar + chart follow light/dark for free; the cockpit CHROME needs the
+         retint below (it hardcodes light tokens in its injected stylesheet). */
+      .pg-body {
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .pg-app {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .pg-topbar {
+        flex: 0 0 auto;
+        padding: 7px 20px 9px;
+        border-bottom: 1px solid var(--border);
+        background: var(--paper);
+      }
+      .pg-gen {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 7px 14px;
+      }
+      .pg-lead {
+        align-self: center;
+        max-width: 220px;
+        font-size: 12px;
+        line-height: 1.3;
+        color: var(--muted);
+      }
+      .pg-lead .eyebrow {
+        display: block;
+        margin-bottom: 1px;
+      }
+      .pg-lead code {
+        font-family: var(--sl-font-mono, monospace);
+        color: var(--clay);
+        font-size: 11.5px;
+      }
+      .pg-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .pg-k {
+        font-family: var(--sl-font-mono, monospace);
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--faint);
+      }
+      .pg-k b {
+        color: var(--clay);
+        font-weight: 700;
+      }
+      .pg-seg {
+        display: flex;
+        gap: 3px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 3px;
+      }
+      .pg-seg button {
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        font-family: inherit;
+        font-size: 12px;
+        padding: 4px 9px;
+        border-radius: 6px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .pg-seg button:hover {
+        color: var(--ink);
+      }
+      .pg-seg button.on {
+        background: var(--clay);
+        color: #fff;
+        font-weight: 600;
+      }
+      .pg-range {
+        width: 120px;
+        accent-color: var(--clay);
+        cursor: pointer;
+      }
+      .pg-btn {
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--ink);
+        border-radius: 8px;
+        padding: 7px 13px;
+        font-family: inherit;
+        font-size: 12.5px;
+        font-weight: 600;
+        cursor: pointer;
+        align-self: flex-end;
+      }
+      .pg-btn:hover {
+        border-color: var(--clay);
+        color: var(--clay-700);
+      }
+      .pg-btn-accent {
+        background: var(--clay);
+        border-color: var(--clay);
+        color: #fff;
+      }
+      .pg-btn-accent:hover {
+        background: var(--clay-700);
+        border-color: var(--clay-700);
+        color: #fff;
+      }
+      .pg-mount {
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+      /* Override the cockpit's 100dvh so it fills the app slot (not the viewport) and
+         spans the full width like the toolbar above it. */
+      .pg-mount .dtk-tune-root {
+        height: 100%;
+        max-width: none;
+        padding-top: 6px;
+      }
+      /* Keep the cockpit a single-screen windshield. The generator strip above
+         already names the metric shape, so the cockpit's own header ("your metric ·
+         N points · … rhythm") is redundant here — hide it, and slim the brand bar,
+         to give the chart back the vertical space it needs. */
+      .pg-mount .dtk-tune-header {
+        display: none;
+      }
+      .pg-body .nav {
+        height: 52px;
+      }
+
+      /* Dark: the cockpit chrome hardcodes light tokens in its injected stylesheet
+         (it ships light). Retint them so the rail/controls follow the page theme; the
+         chart already follows :root (canvas token() reads :root, flipped by landing.css).
+         Keep clay/green/anom, and fix the two boxes that use --ink as a DARK background. */
+      :root[data-theme='dark'] .dtk-tune {
+        --ink: #fbf9f3;
+        --muted: #c9c2b4;
+        --faint: #8a8373;
+        --paper: #1b1916;
+        --surface: #211e1a;
+        --border: #332f29;
+      }
+      :root[data-theme='dark'] .dtk-tune-cfg,
+      :root[data-theme='dark'] .dtk-tune-modes {
+        background: #100f0d;
+      }
+
+      /* Narrow screens: let the page scroll and the cockpit stack (its own media
+         query switches to height:auto — match it here so our override doesn't fight it). */
+      @media (max-width: 900px) {
+        .pg-body {
+          height: auto;
+          overflow: visible;
+        }
+        .pg-mount .dtk-tune-root {
+          height: auto;
+        }
+      }
+    </style>
   </body>
 </html>

@@ -332,7 +332,9 @@ function render(
     type: detectorCtl.get() as DetectorType,
     threshold: thresholdCtl.get(),
     windowSize: windowCtl.get(),
-    minSamples: seed.minSamples,
+    // Read from the live Min-samples knob (capped at the window); it exists for
+    // every detector but is inert for manual_bounds (which has no window).
+    minSamples: Math.round(minSamplesCtl.get()),
     inputType: seed.inputType,
     smoothing: smoothingCtl.get() as Smoothing,
     smoothingAlpha: seed.smoothingAlpha,
@@ -597,8 +599,8 @@ function render(
       const lags = Math.max(1, Math.round(params.lags ?? 5));
       const effMin = Math.max(params.minSamples, lags + 2);
       const fixes = [
-        'raise Window size / Points shown',
-        `lower Lags (${lags}) or min_samples (${params.minSamples})`,
+        'raise Points shown / Window size',
+        `lower “Min samples” (${params.minSamples}) or Lags (${lags})`,
       ];
       if (params.stabilization === 'clamp') fixes.push('turn Stabilization off');
       warmupWarn.textContent =
@@ -609,8 +611,8 @@ function render(
     } else {
       warmupWarn.textContent =
         `⚠ No band drawn: the detector scored 0 points in the shown window — the ` +
-        `${params.windowSize}-point window holds fewer than min_samples (${params.minSamples}) valid ` +
-        `points here. To get a band: raise Window size / Points shown, or lower min_samples.`;
+        `${params.windowSize}-point window holds fewer than “Min samples” (${params.minSamples}) valid ` +
+        `points here. To get a band: raise Points shown / Window size, or lower “Min samples”.`;
     }
     warmupWarn.style.display = '';
   };
@@ -1057,6 +1059,11 @@ function render(
         minSamplesPerGroupCtl.setMin(mspgFloor(nt));
         minSamplesPerGroupCtl.set(mspgDefault(nt));
       }
+      // Reset min_samples to the sane per-type default (30), clamped to the window
+      // — so switching to autoreg drops a windowed detector's (possibly huge)
+      // min_samples instead of carrying it over and blanking the band.
+      minSamplesCtl.setMax(Math.max(2, windowCtl.get()));
+      minSamplesCtl.set(Math.min(30, Math.max(2, windowCtl.get())));
       markActiveDirty();
       refreshVisibility();
       updateWindowReach();
@@ -1165,6 +1172,31 @@ function render(
   );
   tuneGroup.appendChild(lagsCtl.row);
 
+  // Min samples — the fewest valid points the window must hold before a point is
+  // scored (for autoreg, gap-free fit rows). Exposed as a knob because a config
+  // — often an autotune winner sized for a large window — can carry a min_samples
+  // so high that a smaller window or trimmed view can't collect it, so the band
+  // never appears, and previously there was no way to lower it in the cockpit.
+  // Capped at the window size (min_samples can never exceed the window — the max
+  // tracks the Window slider), floored at 2. Shown for every detector except
+  // manual_bounds (which has no window).
+  const minSamplesCtl = rangeControl(
+    'Min samples (fit points)',
+    {
+      min: 2,
+      max: Math.max(2, seed.windowSize),
+      step: 1,
+      value: Math.min(Math.max(2, seed.minSamples), Math.max(2, seed.windowSize)),
+      fmt: (v) => String(Math.round(v)),
+      hint: 'Fewest valid points the window must hold before a point is scored — for autoreg, ' +
+        'gap-free fit rows. Lower it if the band will not appear on a smaller window: an ' +
+        'autotuned config sized for a large window can set this too high to score on a shorter ' +
+        'view. Capped at the window size.',
+    },
+    detectorChanged,
+  );
+  tuneGroup.appendChild(minSamplesCtl.row);
+
   const weightsCtl = segControl(
     'Recency weighting',
     [
@@ -1212,6 +1244,10 @@ function render(
     const mx = Math.max(windowReachFor(series.timestamps.length), seed.windowSize, windowCtl.get());
     windowCtl.setMax(mx);
     halfLifeCtl.setMax(Math.max(mx, seed.halfLife ?? 0, halfLifeCtl.get()));
+    // min_samples can never exceed the window (Python + config-emitter clamp it);
+    // keep its cap on the live window value, so shrinking the window drags an
+    // over-large min_samples down with it instead of wedging the band to blank.
+    minSamplesCtl.setMax(Math.max(2, windowCtl.get()));
   };
 
   const detrendCtl = segControl(
@@ -1538,7 +1574,7 @@ function render(
   // seasonality) hidden for autoreg (v1 has none — the detector rejects
   // seasonality), lags for autoreg only, bounds for manual_bounds only.
   // Direction + consecutive + the anomaly-window pair (alert-layer) always show.
-  const bandRows = [thresholdCtl.row, windowCtl.row, stabilizationCtl.row];
+  const bandRows = [thresholdCtl.row, windowCtl.row, minSamplesCtl.row, stabilizationCtl.row];
   const windowedOnlyRows = [weightsCtl.row, detrendCtl.row, smoothingCtl.row];
   if (seasonalityRow) windowedOnlyRows.push(seasonalityRow);
   // The min-samples-per-group knob only exists for a seasonal metric; when it
@@ -1572,6 +1608,11 @@ function render(
     // the max first so .set() can't silently clamp (which would shrink what Apply writes).
     updateWindowReach();
     windowCtl.set(s.windowSize);
+    // min_samples cap tracks the seed's window (set AFTER windowCtl.set, since
+    // updateWindowReach ran against the pre-set window); clamp the value into
+    // [2, window] so a seed's min_samples never exceeds its own window.
+    minSamplesCtl.setMax(Math.max(2, s.windowSize));
+    minSamplesCtl.set(Math.min(Math.max(2, s.minSamples), Math.max(2, s.windowSize)));
     weightsCtl.set(s.windowWeights);
     if (s.windowWeights === 'exponential' && s.halfLife != null) halfLifeCtl.set(s.halfLife);
     detrendCtl.set(s.detrend);

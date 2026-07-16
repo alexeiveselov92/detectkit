@@ -5,6 +5,27 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.66.4] - 2026-07-16
+
+### Fixed
+- **`dtk tune`: autoreg `min_samples` no longer silently blanks the band, and it
+  now has a control.** An autotune winner sized for a large window can carry a
+  `min_samples` close to the window (e.g. `window_size=911`, `min_samples≈911`+),
+  which for autoreg means "needs a nearly-full gap-free window to score even one
+  point." When exploring a smaller window in the cockpit the scoring path used the
+  raw `min_samples` (while the emitted config clamped it to the window), so the
+  chart showed **no band** — with no knob to lower it. Now:
+  - the TS detector port clamps the effective `min_samples` into
+    `[lags + 2, window_size]` (matching the Python constructor's validation and the
+    config `dtk tune` emits), so `min_samples > window` can't wedge the preview to
+    blank and the live band matches what **Apply** would write;
+  - a **Min samples** control is added to the cockpit (shown for autoreg + the
+    windowed detectors, hidden for `manual_bounds`), capped at the window size (its
+    max tracks the Window slider) and reset to the type default on a detector
+    switch — so you can lower it and get a band on a sane window.
+
+  Regenerated `tune.js`.
+
 ## [0.66.3] - 2026-07-16
 
 ### Fixed

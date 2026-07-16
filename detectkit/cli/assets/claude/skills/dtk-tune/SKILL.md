@@ -114,7 +114,11 @@ Walk the user to the mode that fits what they want to do:
 - **Tune** — *turn the knobs.* The band leads. Adjust **detector type** (MAD /
   Z-Score / IQR, **Autoreg** = predicts each point from its previous values
   (**Lags** knob; the windowed-only knobs hide), or **Manual** = fixed
-  lower/upper bounds), **threshold**, **window size**, **recency weighting +
+  lower/upper bounds), **threshold**, **window size**, **min samples** (the
+  fewest valid points — gap-free fit rows for autoreg — before a point is
+  scored; capped at the window size, lower it if the band won't appear on a
+  smaller window — an autotuned config can set it too high to score on a short
+  view), **recency weighting +
   half-life**, **detrend**, **smoothing**, **seasonality groups**, and (for a
   seasonal metric) **min samples per group** — how many same-key points the
   window needs before a seasonal group gets its own band; lowering it keeps

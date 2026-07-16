@@ -61,6 +61,12 @@ In the browser you can adjust:
   readout shows the equivalent **wall-clock span** on the metric grid next to the
   point count (e.g. `2000 · 83d 8h`), so "how much history is this window" reads
   at a glance.
+- **Min samples** — the fewest valid points the window must hold before a point
+  is scored (for **Autoreg**, gap-free fit rows). It is **capped at the window
+  size** (min_samples can never exceed the window). Lower it if the band will not
+  appear on a smaller window: an autotuned config sized for a large window can set
+  `min_samples` high enough that a shorter window or trimmed view can't collect it,
+  so nothing scores.
 - **Recency weighting** + **half-life** — none / exponential / linear, with the
   half-life (in points) when exponential. Half-life also echoes its wall-clock
   span next to the point count.

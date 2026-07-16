@@ -628,9 +628,13 @@ function runAutoreg(series: Series, params: DetectorParams): ScoredPoint[] {
   const lags = Math.max(1, Math.round(params.lags ?? 5));
   const windowSize = params.windowSize;
   const threshold = params.threshold;
-  // The Python detector *rejects* min_samples < lags + 2 at construction; the
-  // port clamps instead so a mid-drag slider state can't wedge the worker.
-  const minSamples = Math.max(params.minSamples, lags + 2);
+  // The Python detector *rejects* min_samples outside [lags + 2, window_size] at
+  // construction; the port clamps into that range instead so a mid-drag slider
+  // state — or a seed whose min_samples exceeds a shrunk window (e.g. an autotune
+  // winner sized for a much larger window) — can't wedge the worker into scoring
+  // nothing. This matches the effective config the cockpit emits (config-text.ts)
+  // and keeps the live band consistent with what Apply would write.
+  const minSamples = Math.min(Math.max(params.minSamples, lags + 2), windowSize);
   const stabilize = params.stabilization === 'clamp';
 
   const processed = preprocessInput(values, params); // input_type only, no smoothing

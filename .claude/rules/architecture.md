@@ -453,7 +453,15 @@ into later history; detection flags are affine-invariant. Fully **autotunable**
 (via its `AxisSpec` — threshold/lags/stabilization/window axes only, see
 Auto-tuning below) and **tunable in the `dtk tune` cockpit** (a `runAutoreg`
 branch in the parity-checked TS port + a Lags knob; the windowed-only knobs
-hide).
+hide). The cockpit also exposes a **Min samples** knob (fit-rows floor, shown
+for autoreg + the windowed detectors, hidden for `manual_bounds`), because an
+autotune winner sized for a large window can carry a `min_samples` so high that
+a smaller window/view can't collect it (the band then never appears, and there
+was previously no way to lower it); the knob is **capped at the window size**
+(its max tracks the Window slider) and the TS port clamps the effective
+`min_samples` into `[lags + 2, window_size]` — mirroring the Python constructor's
+validation and the config the cockpit emits, so the live band matches what Apply
+would write instead of wedging to blank when `min_samples > window`.
 
 `detectkit/detectors/factory.py` (`DetectorFactory`) is the registry mapping
 type names to classes: `mad`, `zscore`, `iqr`, `manual_bounds`, `autoreg`,

@@ -5,6 +5,17 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.66.5] - 2026-07-16
+
+### Changed
+- **`dtk ui`: the top toolbar now stays pinned while you scroll the metrics.**
+  The header row — brand, window presets, refresh, **Run pipeline**, **New
+  metric** and the jobs (`idle`) chip — is now `position:sticky` at the top of
+  the viewport, so it stays reachable on a long, scrolled metrics table instead
+  of scrolling out of view. It looks unchanged at rest; once pinned it gains a
+  subtle divider + shadow (a `.stuck` class toggled on scroll) to lift it above
+  the content sliding underneath. Regenerated `ui.js`.
+
 ## [0.66.4] - 2026-07-16
 
 ### Fixed

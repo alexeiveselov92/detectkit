@@ -35,9 +35,22 @@ export function injectStyle(): void {
   flex-direction:column;gap:16px;}
 .dtk-ui-content{display:flex;flex-direction:column;gap:16px;}
 
-/* --- header ------------------------------------------------------------- */
-.dtk-ui-header{display:flex;align-items:center;justify-content:space-between;gap:14px;
-  flex-wrap:wrap;padding-bottom:2px;}
+/* --- header (sticky toolbar) --------------------------------------------------
+   Pins the brand + window/run/new/jobs toolbar to the top of the viewport so it
+   stays reachable while scrolling the metrics table. The document is the scroll
+   container (no ancestor sets overflow), so top:0 pins to the viewport; the
+   background matches the page so content scrolls cleanly beneath it. The
+   negative top margin cancels the root's top padding (pins flush, same resting
+   position as before) and the negative bottom margin cancels the root's flex
+   gap, so no page-bg strip shows between the bar and the content sliding under
+   it. The divider + shadow appear only once actually stuck (.stuck, toggled
+   from ui.ts on scroll), so the bar looks unchanged at rest. */
+.dtk-ui-header{position:sticky;top:0;z-index:30;background:var(--bg);
+  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  padding:14px 0;margin:-14px 0 -16px;border-bottom:1px solid transparent;
+  transition:box-shadow 0.18s ease,border-color 0.18s ease;}
+.dtk-ui-header.stuck{border-bottom-color:var(--border);
+  box-shadow:0 10px 24px -18px rgba(0,0,0,0.8);}
 .dtk-ui-brand{display:flex;align-items:center;gap:9px;}
 .dtk-ui-brand-dot{width:11px;height:11px;border-radius:3px;background:var(--clay);flex:0 0 auto;}
 .dtk-ui-brand-name{font-family:var(--mono);font-size:14px;color:var(--text-strong);

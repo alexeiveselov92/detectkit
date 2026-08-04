@@ -5,6 +5,49 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.67.0] - 2026-08-04
+
+### Added
+- **`dtk ui` Builder: `source_profile`, `suppress_until` and three more alerting
+  fields are now real form controls.** The Builder's
+  modeled-fields-plus-verbatim-passthrough invariant meant an unmodeled key was
+  never *lost* — but it also could never be *added*: setting one on a metric
+  created in the browser required switching to the YAML tab, and for the nested
+  alerting keys the only hint it existed was an anonymous `+N fields preserved`
+  chip. Now modeled:
+  - **`source_profile`** — a second profile picker in Basics, right below
+    `profile`, seeded from the same `form_meta.profiles` list. This is
+    [hybrid mode](docs/guides/hybrid-mode.md): the metric's load SQL runs on
+    another profile's database while all `_dtk_*` state stays on the state
+    profile. Source-only backends (Snowflake, BigQuery) are valid *only* there,
+    so a hybrid metric is now creatable start to finish in the browser.
+  - **`suppress_until`** — in the alerting section proper (not behind Advanced):
+    it's the operational mute you reach for during a known incident, with an
+    inline format check.
+  - **`links`** — a `{label: url}` pair-row editor under Advanced (add/remove
+    rows), next to the existing `dashboard_url`, with the same http(s)-only
+    check the server enforces.
+  - **`timezone`** and **`cooldown_reset_on_recovery`** — under Advanced;
+    the latter emits only an explicit `false`, so untouched configs stay
+    byte-identical.
+
+  The four `template_*` message bodies stay YAML-tab-only on purpose (multi-line
+  text a form renders badly), and still round-trip verbatim. Regenerated
+  `ui.js`.
+
+### Fixed
+- **A malformed `alerting.suppress_until` is now refused when the config loads,
+  instead of failing the metric mid-run.** It was an unvalidated string that the
+  alert step parsed with a strict `datetime.strptime(..., "%Y-%m-%d %H:%M:%S")`,
+  so a typo raised a `ValueError` in the middle of the alert step — and the
+  date-only form the docs' own examples use (`suppress_until: "2026-07-01"`) was
+  one of those typos. Parsing now lives in one seam,
+  `parse_suppress_until()` (`detectkit/config/metric_config.py`), shared by a new
+  `AlertConfig` field validator and the alert step: it accepts
+  `"YYYY-MM-DD HH:MM:SS"`, `"YYYY-MM-DD HH:MM"`, the ISO `T` form and a bare
+  `"YYYY-MM-DD"` (midnight UTC), and rejects everything else at load — including
+  at a `dtk ui` editor save, before anything is written.
+
 ## [0.66.5] - 2026-07-16
 
 ### Changed

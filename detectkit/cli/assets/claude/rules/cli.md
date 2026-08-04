@@ -258,10 +258,13 @@ exactly as if typed into a terminal.
 
 The cockpit header has a **New metric** button, and every metric row an
 **Edit** action; both open an editor overlay with **two tabs sharing one
-draft**: **Builder** — a structured form over the whole config (basics,
+draft**: **Builder** — a structured form over the whole config (basics —
+including both `profile` and the hybrid-mode `source_profile` as pickers —,
 schedule/loading, seasonality, minimal detector rows with type + 1-2 key
 params — fine-tuning belongs in `dtk tune` —, alerting with a channel
-multi-select seeded from `profiles.yml` channel names, `ai_context`; SQL in
+multi-select seeded from `profiles.yml` channel names, plus `suppress_until`
+and (under Advanced) `timezone` / `links` / `cooldown_reset_on_recovery`,
+`ai_context`; SQL in
 a syntax-highlighted pane, `query_file` paths read-only; a **From OSI**
 sub-tab compiles a pasted OSI semantic-model metric through the same code
 path as `dtk osi import`) — and **YAML**, the raw text, kept for whole-config
@@ -270,8 +273,9 @@ validates server-side first and blocks the switch on error; leaving an
 edited Builder re-emits the YAML. A debounced live-validation chip re-checks
 the draft while typing — showing the Builder's friendly checks while the
 YAML tab still mirrors the form, and a one-line `field — reason` summary of
-server errors otherwise. Keys the form doesn't model (`autotune:`, custom
-templates, unknown detector types/params, a multi-entry alerting list)
+server errors otherwise. Keys the form doesn't model (`autotune:`, `tables:`,
+custom `template_*` bodies, unknown detector types/params, a multi-entry
+alerting list)
 round-trip verbatim, listed under "Preserved fields". Create writes
 `metrics/[<folder>/]<name>.yml`; after a create, a **next-steps strip**
 offers **Load & detect** (`dtk run --steps load,detect` for just that metric

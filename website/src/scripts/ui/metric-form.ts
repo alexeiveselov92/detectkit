@@ -12,10 +12,11 @@
 //    merges them back on emit (see `seedDetectorRow` / `detectorRowToData`).
 //    A detector whose `type` isn't in the picker (prophet/timesfm/a future
 //    type) round-trips its whole entry verbatim — the row is read-only.
-//  - The alerting block keeps every subkey the rail doesn't render (templates,
-//    links, timezone, suppress_until, …) in `extraAlerting` and merges it
-//    back the same way. A seed with more than one alerting entry is treated
-//    as verbatim-passthrough end to end (edit it in the YAML tab instead).
+//  - The alerting block keeps every subkey the rail doesn't render (the four
+//    `template_*` strings — multi-line message bodies that belong in the YAML
+//    tab — and any future key) in `extraAlerting` and merges it back the same
+//    way. A seed with more than one alerting entry is treated as
+//    verbatim-passthrough end to end (edit it in the YAML tab instead).
 //  - Any top-level key the form doesn't model at all (`autotune`, `tables`,
 //    `false_alert_budget`, an unknown key) is carried in `topExtras` and
 //    re-emitted untouched, in its original seed order, right before `enabled`.
@@ -188,6 +189,82 @@ function buildChipInput(initial: string[], placeholder: string, onChange: () => 
   };
 }
 
+interface PairInputHandle {
+  el: HTMLElement;
+  /** Only fully-filled rows; a half-typed row is simply not emitted. */
+  get(): Record<string, string>;
+}
+
+/**
+ * A `{label: url}` map editor — one removable row per entry plus an "Add link"
+ * button. Rows are the state (not the emitted object), so two entries can share a
+ * blank label mid-typing without one silently clobbering the other.
+ */
+function buildPairInput(
+  initial: Record<string, string>,
+  keyPlaceholder: string,
+  valuePlaceholder: string,
+  onChange: () => void,
+): PairInputHandle {
+  const wrap = el('div', 'dtk-ui-pairs');
+  const rows: { key: HTMLInputElement; value: HTMLInputElement }[] = [];
+
+  function addRow(k: string, v: string): void {
+    const row = el('div', 'dtk-ui-pairrow');
+    const keyInput = document.createElement('input');
+    keyInput.type = 'text';
+    keyInput.className = 'dtk-ui-input dtk-ui-pairkey';
+    keyInput.placeholder = keyPlaceholder;
+    keyInput.value = k;
+    keyInput.oninput = onChange;
+    const valueInput = document.createElement('input');
+    valueInput.type = 'text';
+    valueInput.className = 'dtk-ui-input';
+    valueInput.placeholder = valuePlaceholder;
+    valueInput.value = v;
+    valueInput.oninput = onChange;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'dtk-ui-detrow-remove';
+    remove.textContent = '✕';
+    remove.title = 'remove link';
+    const entry = { key: keyInput, value: valueInput };
+    remove.onclick = (): void => {
+      const at = rows.indexOf(entry);
+      if (at >= 0) rows.splice(at, 1);
+      row.remove();
+      onChange();
+    };
+    row.append(keyInput, valueInput, remove);
+    rows.push(entry);
+    wrap.insertBefore(row, addBtn);
+  }
+
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'dtk-ui-chip-preset';
+  addBtn.textContent = '+ Add link';
+  addBtn.onclick = (): void => {
+    addRow('', '');
+    onChange();
+  };
+  wrap.appendChild(addBtn);
+  for (const [k, v] of Object.entries(initial)) addRow(k, v);
+
+  return {
+    el: wrap,
+    get: (): Record<string, string> => {
+      const out: Record<string, string> = {};
+      for (const r of rows) {
+        const k = r.key.value.trim();
+        const v = r.value.value.trim();
+        if (k && v) out[k] = v;
+      }
+      return out;
+    },
+  };
+}
+
 /**
  * A handful of config fields accept either an int (seconds) or a unit-suffixed
  * duration string ("10min", "1h") — but `detectkit.core.interval.Interval`'s
@@ -213,6 +290,7 @@ const MODELED_TOP_KEYS = new Set([
   'description',
   'tags',
   'profile',
+  'source_profile',
   'ai_context',
   'query',
   'query_file',
@@ -269,11 +347,37 @@ interface BasicsSection {
   getTags(): string[];
   getEnabled(): boolean;
   getProfile(): string;
+  getSourceProfile(): string;
   /** Used only by the OSI-apply flow (create mode, name still blank). */
   setName(v: string): void;
   setDescription(v: string): void;
   focusName(): void;
   issues(): string[];
+}
+
+/**
+ * A profile picker seeded from `form_meta.profiles`. A seeded name the server
+ * didn't list (a profile added to profiles.yml after the page booted, or one the
+ * boot payload omits) is prepended so opening the editor can never silently drop it.
+ */
+function buildProfileSelect(seed: unknown, meta: FormMeta, emptyLabel: string, cb: MetricFormCallbacks): HTMLSelectElement {
+  const select = document.createElement('select');
+  select.className = 'dtk-ui-select';
+  const emptyOpt = document.createElement('option');
+  emptyOpt.value = '';
+  emptyOpt.textContent = emptyLabel;
+  select.appendChild(emptyOpt);
+  const seeded = typeof seed === 'string' ? seed : '';
+  const names = seeded && !meta.profiles.includes(seeded) ? [seeded, ...meta.profiles] : meta.profiles;
+  for (const p of names) {
+    const o = document.createElement('option');
+    o.value = p;
+    o.textContent = p;
+    select.appendChild(o);
+  }
+  select.value = seeded;
+  select.onchange = (): void => cb.onDirty();
+  return select;
 }
 
 function buildBasicsSection(data: Record<string, unknown> | null, meta: FormMeta, cb: MetricFormCallbacks): BasicsSection {
@@ -313,23 +417,21 @@ function buildBasicsSection(data: Record<string, unknown> | null, meta: FormMeta
   const tagsChips = buildChipInput(tagsInitial, 'add tag, Enter', () => cb.onDirty());
   body.appendChild(field('Tags', tagsChips.el));
 
-  const profileSelect = document.createElement('select');
-  profileSelect.className = 'dtk-ui-select';
-  const emptyOpt = document.createElement('option');
-  emptyOpt.value = '';
-  emptyOpt.textContent = '(project default)';
-  profileSelect.appendChild(emptyOpt);
-  const seedProfile = typeof data?.profile === 'string' ? data.profile : '';
-  const profileNames = seedProfile && !meta.profiles.includes(seedProfile) ? [seedProfile, ...meta.profiles] : meta.profiles;
-  for (const p of profileNames) {
-    const o = document.createElement('option');
-    o.value = p;
-    o.textContent = p;
-    profileSelect.appendChild(o);
-  }
-  profileSelect.value = seedProfile;
-  profileSelect.onchange = (): void => cb.onDirty();
+  const profileSelect = buildProfileSelect(data?.profile, meta, '(project default)', cb);
   body.appendChild(field('Profile', profileSelect));
+
+  // Hybrid mode: the metric's load SQL runs on this profile's database while every
+  // `_dtk_*` table stays on the state profile above. Source-only backends
+  // (Snowflake/BigQuery) are valid HERE and nowhere else, which is exactly why the
+  // Builder has to model it — a YAML-only field can't be set on a new metric.
+  const sourceSelect = buildProfileSelect(data?.source_profile, meta, '(same as profile)', cb);
+  body.appendChild(
+    field(
+      'Source profile',
+      sourceSelect,
+      'Hybrid mode: run this metric’s load SQL against another profile’s database. State stays on the profile above.',
+    ),
+  );
 
   const enabledLabel = document.createElement('label');
   enabledLabel.className = 'dtk-ui-check';
@@ -347,6 +449,7 @@ function buildBasicsSection(data: Record<string, unknown> | null, meta: FormMeta
     getTags: () => tagsChips.get(),
     getEnabled: () => enabledBox.checked,
     getProfile: () => profileSelect.value.trim(),
+    getSourceProfile: () => sourceSelect.value.trim(),
     setName: (v: string): void => {
       nameInput.value = v;
       validateName();
@@ -787,18 +890,26 @@ function buildDetectorsSection(
 
 const ALERTING_MODELED_KEYS = new Set([
   'enabled',
+  'suppress_until',
+  'timezone',
   'channels',
   'consecutive_anomalies',
   'direction',
   'no_data_alert',
   'notify_on_recovery',
   'alert_cooldown',
+  'cooldown_reset_on_recovery',
   'min_detectors',
   'anomaly_window',
   'min_anomaly_share',
   'mentions',
   'dashboard_url',
+  'links',
 ]);
+
+// Mirrors `parse_suppress_until` (config/metric_config.py) — the server rejects
+// anything else, so the form flags it inline instead of on save.
+const SUPPRESS_UNTIL_RE = /^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?$/;
 
 interface SeededAlerting {
   mode: 'none' | 'single' | 'verbatim';
@@ -940,10 +1051,38 @@ function buildAlertingSection(data: Record<string, unknown> | null, meta: FormMe
   cooldownInput.oninput = (): void => cb.onDirty();
   fieldsWrap.appendChild(field('Alert cooldown', cooldownInput));
 
+  // The operational "mute" lever — kept out of Advanced on purpose: it's what you
+  // reach for during a known incident, and an expired value is harmless.
+  const suppressInput = document.createElement('input');
+  suppressInput.type = 'text';
+  suppressInput.className = 'dtk-ui-input';
+  suppressInput.placeholder = 'YYYY-MM-DD HH:MM:SS (optional)';
+  suppressInput.value = typeof blockSeed.suppress_until === 'string' ? blockSeed.suppress_until : '';
+  const suppressErr = el('div', 'dtk-ui-form-err-inline');
+  function validateSuppress(): void {
+    const v = suppressInput.value.trim();
+    suppressErr.textContent = v === '' || SUPPRESS_UNTIL_RE.test(v) ? '' : 'use YYYY-MM-DD HH:MM:SS (UTC) or YYYY-MM-DD';
+  }
+  suppressInput.oninput = (): void => {
+    validateSuppress();
+    cb.onDirty();
+  };
+  validateSuppress();
+  const suppressField = field(
+    'Suppress until',
+    suppressInput,
+    'UTC. Load and detect keep running; only this config’s alerts are skipped until then, and resume automatically.',
+  );
+  suppressField.appendChild(suppressErr);
+  fieldsWrap.appendChild(suppressField);
+
   const hasAdvSeed =
     blockSeed.min_detectors !== undefined ||
     blockSeed.anomaly_window !== undefined ||
     blockSeed.min_anomaly_share !== undefined ||
+    blockSeed.timezone !== undefined ||
+    blockSeed.cooldown_reset_on_recovery === false ||
+    (blockSeed.links !== undefined && Object.keys(blockSeed.links as object).length > 0) ||
     (Array.isArray(blockSeed.mentions) && blockSeed.mentions.length > 0) ||
     !!blockSeed.dashboard_url;
   const adv = advancedGroup('Advanced');
@@ -990,6 +1129,32 @@ function buildAlertingSection(data: Record<string, unknown> | null, meta: FormMe
   dashUrlInput.oninput = (): void => cb.onDirty();
   adv.body.appendChild(field('Dashboard URL', dashUrlInput));
 
+  const linksSeed: Record<string, string> = {};
+  if (blockSeed.links && typeof blockSeed.links === 'object' && !Array.isArray(blockSeed.links)) {
+    for (const [k, v] of Object.entries(blockSeed.links as Record<string, unknown>)) linksSeed[k] = String(v);
+  }
+  const linksPairs = buildPairInput(linksSeed, 'Runbook', 'https://…', () => cb.onDirty());
+  adv.body.appendChild(field('Extra links', linksPairs.el, 'Rendered next to the dashboard URL as clickable labels.'));
+
+  const tzInput = document.createElement('input');
+  tzInput.type = 'text';
+  tzInput.className = 'dtk-ui-input';
+  tzInput.placeholder = 'e.g. Europe/Moscow';
+  tzInput.value = typeof blockSeed.timezone === 'string' ? blockSeed.timezone : '';
+  tzInput.oninput = (): void => cb.onDirty();
+  adv.body.appendChild(field('Timezone', tzInput, 'Display timezone for timestamps in this config’s messages (UTC when unset).'));
+
+  // Default-true, so the checkbox is "on" unless the config says otherwise and only
+  // an explicit `false` is emitted (keeping untouched configs byte-stable).
+  const cooldownResetLabel = document.createElement('label');
+  cooldownResetLabel.className = 'dtk-ui-check';
+  const cooldownResetBox = document.createElement('input');
+  cooldownResetBox.type = 'checkbox';
+  cooldownResetBox.checked = blockSeed.cooldown_reset_on_recovery !== false;
+  cooldownResetBox.onchange = (): void => cb.onDirty();
+  cooldownResetLabel.append(cooldownResetBox, document.createTextNode('Reset cooldown on recovery'));
+  adv.body.appendChild(cooldownResetLabel);
+
   if (Object.keys(extraAlerting).length > 0) {
     const chip = el('span', 'dtk-ui-preschip');
     chip.textContent = `+${Object.keys(extraAlerting).length} fields preserved`;
@@ -1022,6 +1187,11 @@ function buildAlertingSection(data: Record<string, unknown> | null, meta: FormMe
       out.notify_on_recovery = recoveryBox.checked;
       const cooldown = cooldownInput.value.trim();
       if (cooldown) out.alert_cooldown = coerceDurationValue(cooldown);
+      if (!cooldownResetBox.checked) out.cooldown_reset_on_recovery = false;
+      const suppress = suppressInput.value.trim();
+      if (suppress) out.suppress_until = suppress;
+      const tz = tzInput.value.trim();
+      if (tz) out.timezone = tz;
       const minDetRaw = Number(minDetInput.value);
       const minDet =
         minDetInput.value.trim() !== '' && Number.isFinite(minDetRaw)
@@ -1038,6 +1208,8 @@ function buildAlertingSection(data: Record<string, unknown> | null, meta: FormMe
       if (mentions.length > 0) out.mentions = mentions;
       const dash = dashUrlInput.value.trim();
       if (dash) out.dashboard_url = dash;
+      const links = linksPairs.get();
+      if (Object.keys(links).length > 0) out.links = links;
       // Passthrough LAST, filtered against the modeled-key set again (defensive —
       // seed-time filtering already excludes these, this just guards against drift).
       for (const [k, v] of Object.entries(extraAlerting)) if (!ALERTING_MODELED_KEYS.has(k)) out[k] = v;
@@ -1045,10 +1217,17 @@ function buildAlertingSection(data: Record<string, unknown> | null, meta: FormMe
     },
     issues: () => {
       if (!masterBox.checked) return [];
+      const out: string[] = [];
       const win = windowInput.value.trim();
       const share = shareInput.value.trim();
-      if ((win === '') !== (share === '')) return ['anomaly window and min anomaly share must be set together'];
-      return [];
+      if ((win === '') !== (share === '')) out.push('anomaly window and min anomaly share must be set together');
+      const suppress = suppressInput.value.trim();
+      if (suppress && !SUPPRESS_UNTIL_RE.test(suppress)) {
+        out.push('suppress until must be a UTC datetime (YYYY-MM-DD HH:MM:SS) or a date');
+      }
+      const badLink = Object.entries(linksPairs.get()).find(([, url]) => !/^https?:\/\//.test(url));
+      if (badLink) out.push(`links['${badLink[0]}'] must be an http:// or https:// URL`);
+      return out;
     },
   };
 }
@@ -1567,7 +1746,7 @@ export function buildMetricForm(
   render(seed);
 
   // toData()'s key order (see the module header comment for the passthrough
-  // rules): name, description, tags, profile, ai_context, query|query_file,
+  // rules): name, description, tags, profile, source_profile, ai_context, query|query_file,
   // query_columns, interval, loading_start_time, loading_delay,
   // loading_batch_size, seasonality_columns, detectors, alerting, then
   // preserved top-level extras in their original seed order, enabled last
@@ -1583,6 +1762,8 @@ export function buildMetricForm(
     if (tags.length > 0) out.tags = tags;
     const profile = basics.getProfile();
     if (profile) out.profile = profile;
+    const sourceProfile = basics.getSourceProfile();
+    if (sourceProfile) out.source_profile = sourceProfile;
     const aiCtx = aiContextSec.getData();
     if (aiCtx) out.ai_context = aiCtx;
 

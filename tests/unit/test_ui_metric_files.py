@@ -95,6 +95,38 @@ def test_parse_bad_detector_params_names_the_detector():
         parse_metric_text(_BAD_DETECTOR_PARAMS)
 
 
+# The Builder gained controls for these in v0.67.0; the save path validates them
+# here, so a typo is refused before anything is written.
+
+
+def test_parse_accepts_builder_fields_source_profile_and_alert_extras():
+    config = parse_metric_text(
+        'name: orders\ninterval: 1h\nquery: "SELECT 1"\n'
+        "source_profile: warehouse\n"
+        "alerting:\n"
+        "  - channels: [ops]\n"
+        '    suppress_until: "2026-04-11 18:00:00"\n'
+        "    timezone: Europe/Moscow\n"
+        "    cooldown_reset_on_recovery: false\n"
+        "    links:\n"
+        '      Runbook: "https://runbooks.ops/api"\n'
+    )
+    assert config.source_profile == "warehouse"
+    block = config.alerting[0]
+    assert block.suppress_until == "2026-04-11 18:00:00"
+    assert block.timezone == "Europe/Moscow"
+    assert block.cooldown_reset_on_recovery is False
+    assert block.links == {"Runbook": "https://runbooks.ops/api"}
+
+
+def test_parse_rejects_malformed_suppress_until():
+    with pytest.raises(ValueError, match="suppress_until"):
+        parse_metric_text(
+            'name: orders\ninterval: 1h\nquery: "SELECT 1"\n'
+            "alerting:\n  - channels: [ops]\n    suppress_until: tomorrow\n"
+        )
+
+
 # ── create_metric_file ───────────────────────────────────────────────────────
 
 

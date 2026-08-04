@@ -223,10 +223,10 @@ hand-edited YAML gets the server verdict, summarized to one readable
 ### The Builder
 
 The Builder covers the whole config as form controls: the basics (name,
-description, tags, profile, enabled), schedule & loading (interval with
-common presets, `loading_start_time`; `loading_delay`, `loading_batch_size`
-and `query_columns` under an advanced fold), seasonality-feature checkboxes,
-detector rows, alerting, and `ai_context`.
+description, tags, profile, `source_profile`, enabled), schedule & loading
+(interval with common presets, `loading_start_time`; `loading_delay`,
+`loading_batch_size` and `query_columns` under an advanced fold),
+seasonality-feature checkboxes, detector rows, alerting, and `ai_context`.
 
 - **SQL gets a real code pane** — syntax-highlighted (keywords, strings,
   comments, numbers, and the Jinja `{{ dtk_start_time }}`-style variables),
@@ -239,16 +239,25 @@ detector rows, alerting, and `ai_context`.
   rough starting point belongs here, but fine-tuning belongs in the
   [`dtk tune` cockpit](tuning.md), against the metric's real series — the
   form says as much next to the rows.
+- **Both profiles are pickers.** `profile` chooses where the metric's
+  `_dtk_*` state lives; `source_profile` (right below it) is
+  [hybrid mode](hybrid-mode.md) — run this metric's load SQL against a
+  different profile's database while state stays put. Source-only backends
+  (Snowflake, BigQuery) are valid *only* there, so a hybrid metric can be
+  created start to finish in the browser.
 - **Alerting is form-first too**: channels come as a multi-select seeded from
   the channel names in your `profiles.yml` (names and types only — channel
   configs and secrets never reach the browser), alongside direction,
-  consecutive anomalies, no-data / recovery toggles and the cooldown;
-  `min_detectors`, the `anomaly_window` + `min_anomaly_share` pair, mentions
-  and `dashboard_url` sit under an advanced fold.
+  consecutive anomalies, no-data / recovery toggles, the cooldown and
+  **Suppress until** (the operational mute — see
+  [Cooldown, suppression & recovery](alerting-cooldown-recovery.md));
+  `min_detectors`, the `anomaly_window` + `min_anomaly_share` pair, mentions,
+  `dashboard_url`, extra `links`, the display `timezone` and
+  `cooldown_reset_on_recovery` sit under an advanced fold.
 - **Nothing you don't edit is lost.** Config keys the form doesn't model — an
-  `autotune:` block, `tables:`, a custom alert `template`, a detector
-  parameter the row doesn't render (say `smoothing`), a detector type the
-  picker doesn't know (`prophet`, `timesfm`), a multi-entry alerting list —
+  `autotune:` block, `tables:`, a custom alert `template_*` message body, a
+  detector parameter the row doesn't render (say `smoothing`), a detector type
+  the picker doesn't know (`prophet`, `timesfm`), a multi-entry alerting list —
   round-trip verbatim and are listed in a **Preserved fields** section so you
   can see what's riding along.
 - **One caveat: comments.** Saving from the Builder re-emits the YAML

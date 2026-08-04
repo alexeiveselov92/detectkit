@@ -210,6 +210,16 @@ alerting:
 - After the specified time, alerts resume automatically — no second config edit needed
 - The `suppress_until` value can be left in the config after it expires — it has no effect once the time has passed
 
+The value is **UTC** and accepts `"2026-04-11 18:00:00"`, `"2026-04-11 18:00"`,
+the ISO `"2026-04-11T18:00:00"` form, or a bare date `"2026-04-11"` (midnight).
+It is validated when the config is loaded (and when the
+[`dtk ui` editor](project-ui.md) saves), so a malformed value is refused up
+front rather than failing the metric at alert time.
+
+In `dtk ui`, the Builder's alerting section has a **Suppress until** field, so
+muting a noisy config during a known incident is a browser edit rather than a
+YAML one.
+
 ### Timeline Example
 
 ```

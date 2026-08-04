@@ -452,6 +452,12 @@ export function injectStyle(): void {
   line-height:1;}
 .dtk-ui-detrow-remove:hover{border-color:var(--st-anomaly);color:var(--st-anomaly);}
 
+/* --- label:url pair rows (alerting links) ------------------------------------- */
+.dtk-ui-pairs{display:flex;flex-direction:column;gap:6px;align-items:flex-start;}
+.dtk-ui-pairrow{display:flex;gap:6px;align-items:center;width:100%;}
+.dtk-ui-pairrow .dtk-ui-input{flex:1 1 auto;min-width:0;}
+.dtk-ui-pairkey{flex:0 0 34%;}
+
 /* --- alerting rail fields + channel checkbox type suffix ---------------------- */
 .dtk-ui-alerting-fields{display:flex;flex-direction:column;gap:10px;}
 .dtk-ui-check-type{color:var(--faint);font-family:var(--mono);font-size:10.5px;}

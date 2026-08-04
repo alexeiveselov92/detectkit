@@ -527,7 +527,13 @@ the chosen consecutive rule — see Auto-tuning), and the `dtk tune` cockpit
 has anomaly-window/min-share rail controls whose fires the worker replays
 with the same latest-point-gate/denominator semantics.
 
-Other behaviors: **cooldown** (`_cooldown.py`) suppresses repeat alerts within
+Other behaviors: **suppression** — `suppress_until` skips a config's alert step
+entirely while `now <` the deadline (load/detect keep running); its accepted
+spellings live in one seam, `parse_suppress_until` (`config/metric_config.py`),
+shared by the `AlertConfig` validator and `_alert_step.py`, so a malformed value
+is refused at config load / at a `dtk ui` save instead of raising mid-run out of
+a strict `strptime` (it also accepts the date-only form the docs' own examples
+use); **cooldown** (`_cooldown.py`) suppresses repeat alerts within
 `alert_cooldown`, optionally reset on recovery; **recovery** (`_recovery.py`)
 sends a direction-aware all-clear once per incident when `notify_on_recovery`;
 **no-data** alerts fire when the latest expected datapoint is missing/NULL
@@ -1324,13 +1330,19 @@ provably-round-trip-safe emitter — no YAML lib in the bundle) that **drops
 hand-written comments** (the archive keeps the previous file; the editor
 warns when the source has any). The Builder's invariant is
 **modeled-fields-plus-verbatim-passthrough**: it renders the config's main
-knobs as controls (basics, schedule/loading, seasonality, minimal detector
+knobs as controls (basics — including `source_profile` as a second profile
+picker, so a **hybrid** metric is creatable in the browser and a source-only
+backend has a home in the form —, schedule/loading, seasonality, minimal detector
 rows — type + 1–2 key params, fine-tuning deferred to `dtk tune` —,
-alerting, `ai_context`; SQL in a hand-rolled syntax-highlighted pane,
+alerting — the rule + channels + `suppress_until`, with `timezone`, `links`
+(a `{label: url}` pair-row editor), `cooldown_reset_on_recovery`,
+`min_detectors`, the fraction pair, mentions and `dashboard_url` under
+Advanced —, `ai_context`; SQL in a hand-rolled syntax-highlighted pane,
 `sql-editor.ts`; `query_file` shown read-only, never inlined) and carries
-every unmodeled key (`autotune:`, `tables:`, unknown detector types/params,
-a >1-entry alerting list) through untouched, surfaced in a "Preserved
-fields" list. Tab sync goes through the server-side parse seam
+every unmodeled key (`autotune:`, `tables:`, `false_alert_budget`, the four
+`template_*` message bodies — multi-line text that belongs in the YAML tab —,
+unknown detector types/params, a >1-entry alerting list) through untouched,
+surfaced in a "Preserved fields" list. Tab sync goes through the server-side parse seam
 `metric_files.parse_metric_mapping` (validated config **plus** the raw
 unwrapped mapping — only the keys the file sets, no pydantic defaults) via
 `POST /api/metric-parse`: leaving an edited YAML tab must parse (blocked on

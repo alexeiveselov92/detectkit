@@ -125,6 +125,33 @@ class QueryColumnsConfig(BaseModel):
     )
 
 
+#: Accepted ``suppress_until`` spellings. The date-only form means midnight UTC —
+#: it is what the docs' own examples use, so it must not be a runtime crash.
+_SUPPRESS_UNTIL_FORMATS = ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d")
+
+
+def parse_suppress_until(value: str) -> datetime:
+    """Parse an ``alerting.suppress_until`` value into a naive UTC datetime.
+
+    The single seam shared by :class:`AlertConfig`'s validator (fail at config
+    load / at a UI save) and the alert step (decide whether to skip).
+
+    :param value: The configured deadline string.
+    :return: The deadline as a naive UTC datetime.
+    :raises ValueError: If the value matches none of the accepted formats.
+    """
+    text = value.strip()
+    for fmt in _SUPPRESS_UNTIL_FORMATS:
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    raise ValueError(
+        f"suppress_until must be a UTC datetime like '2026-04-11 18:00:00' "
+        f"or a date like '2026-04-11' (got {value!r})"
+    )
+
+
 class AlertConfig(BaseModel):
     """
     Alert configuration for a metric.
@@ -231,6 +258,20 @@ class AlertConfig(BaseModel):
         description="Additional 'label: url' links appended to the alert alongside "
         "dashboard_url (e.g. {'Runbook': 'https://...', 'Grafana': 'https://...'}).",
     )
+
+    @field_validator("suppress_until")
+    @classmethod
+    def validate_suppress_until(cls, v: str | None) -> str | None:
+        """The suppression deadline must parse, at config load, into a UTC datetime.
+
+        It used to be an unvalidated string that the alert step parsed with a strict
+        ``strptime`` — so a typo (or the date-only form the docs themselves showed)
+        raised mid-run and failed the metric instead of being caught at load/save.
+        """
+        if v is None:
+            return v
+        parse_suppress_until(v)
+        return v
 
     @field_validator("consecutive_anomalies")
     @classmethod

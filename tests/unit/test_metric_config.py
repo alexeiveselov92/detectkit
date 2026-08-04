@@ -1,5 +1,6 @@
 """Tests for MetricConfig."""
 
+from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -10,6 +11,7 @@ from detectkit.config.metric_config import (
     AutoTuneConfig,
     DetectorConfig,
     MetricConfig,
+    parse_suppress_until,
 )
 
 
@@ -476,6 +478,36 @@ class TestAlertConfigDashboardLinks:
     def test_dangerous_link_url_rejected(self):
         with pytest.raises(ValueError, match="http"):
             AlertConfig(links={"x": "data:text/html,<script>"})
+
+
+class TestAlertConfigSuppressUntil:
+    """`suppress_until` is validated at config load, not at alert time."""
+
+    def test_default_is_none(self):
+        assert AlertConfig().suppress_until is None
+
+    def test_datetime_form_accepted(self):
+        cfg = AlertConfig(suppress_until="2026-04-11 18:00:00")
+        assert cfg.suppress_until == "2026-04-11 18:00:00"
+        assert parse_suppress_until(cfg.suppress_until) == datetime(2026, 4, 11, 18, 0, 0)
+
+    def test_date_only_form_accepted(self):
+        """The docs' own examples use the date-only form — it means midnight UTC."""
+        cfg = AlertConfig(suppress_until="2026-07-01")
+        assert parse_suppress_until(cfg.suppress_until) == datetime(2026, 7, 1, 0, 0, 0)
+
+    def test_iso_t_separator_and_minute_precision_accepted(self):
+        assert parse_suppress_until("2026-07-01T09:30:00") == datetime(2026, 7, 1, 9, 30)
+        assert parse_suppress_until("2026-07-01 09:30") == datetime(2026, 7, 1, 9, 30)
+
+    def test_garbage_rejected_at_load(self):
+        """Previously this only blew up mid-run, inside the alert step's strptime."""
+        with pytest.raises(ValueError, match="suppress_until"):
+            AlertConfig(suppress_until="next tuesday")
+
+    def test_us_style_date_rejected(self):
+        with pytest.raises(ValueError, match="suppress_until"):
+            AlertConfig(suppress_until="04/11/2026 18:00:00")
 
 
 class TestMetricFalseAlertBudget:

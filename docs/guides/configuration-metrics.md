@@ -474,6 +474,9 @@ list of one block. See the [Alerting Guide](alerting.md) for full details.
 - **`suppress_until`**: Temporarily suppress alerts until a UTC datetime
   - `null` = No suppression (default)
   - `"2026-04-11 18:00:00"` = Suppress alerts until this UTC time
+  - Also accepts `"2026-04-11 18:00"`, `"2026-04-11T18:00:00"` and a bare
+    date `"2026-04-11"` (midnight UTC); anything else is rejected when the
+    config loads
   - Load and detect steps continue running; only alerting is paused
   - Alerts auto-resume after the specified time — no need to edit config again
 

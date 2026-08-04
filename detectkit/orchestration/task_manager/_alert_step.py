@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 import click
 
 from detectkit.alerting.orchestrator import AlertConditions, AlertOrchestrator
-from detectkit.config.metric_config import MetricConfig
+from detectkit.config.metric_config import MetricConfig, parse_suppress_until
 from detectkit.orchestration.task_manager._base import _TaskManagerBase
 from detectkit.orchestration.task_manager._types import make_alert_config_id
 from detectkit.utils.datetime_utils import now_utc_naive
@@ -48,7 +46,7 @@ class _AlertStepMixin(_TaskManagerBase):
                 )
 
             if alerting_config.suppress_until:
-                suppress_dt = datetime.strptime(alerting_config.suppress_until, "%Y-%m-%d %H:%M:%S")
+                suppress_dt = parse_suppress_until(alerting_config.suppress_until)
                 if now_utc_naive() < suppress_dt:
                     click.echo(
                         f"  │ Alerts suppressed until " f"{alerting_config.suppress_until} UTC"

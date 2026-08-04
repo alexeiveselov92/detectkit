@@ -182,6 +182,10 @@ suppress_until: "2026-04-11 18:00:00"   # UTC; default null
 
 Load and detect keep running; only alerting is paused until that time, then it
 auto-resumes (no second edit needed). For permanent off, use `enabled: false`.
+Accepts `"YYYY-MM-DD HH:MM:SS"`, `"YYYY-MM-DD HH:MM"`, the ISO `T` form, or a
+bare `"YYYY-MM-DD"` (midnight UTC) — validated when the config loads, so a
+typo is refused up front instead of failing the metric at alert time. Also a
+field in the `dtk ui` Builder's alerting section.
 
 ## Mentions
 

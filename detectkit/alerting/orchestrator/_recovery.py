@@ -177,27 +177,47 @@ class _RecoveryMixin(_OrchestratorBase):
         # ``detections`` is oldest→newest, so the latest point lives at [-1].
         latest = detections[-1]
 
-        # Prefer the latest CI so the message reflects the *current* interval.
-        # Fall back to the last anomalous point only if the latest row has no
-        # CI (e.g. missing-data / insufficient-data placeholders).
-        recovery_ci_lower = latest.confidence_lower
-        recovery_ci_upper = latest.confidence_upper
-        recovery_detector_name = latest.detector_name
-        recovery_detector_params = latest.detector_params
-
-        if recovery_ci_lower is None or recovery_ci_upper is None:
-            last_anomalous = next((d for d in reversed(detections) if d.is_anomaly), None)
-            if last_anomalous:
-                recovery_detector_name = last_anomalous.detector_name
-                recovery_detector_params = last_anomalous.detector_params
-                recovery_ci_lower = last_anomalous.confidence_lower
-                recovery_ci_upper = last_anomalous.confidence_upper
-
         # Reconstruct the just-ended incident so the recovery message can say how
-        # long it lasted (symmetric with the anomaly alert's onset/duration).
-        incident_count, onset_ts, capped = self._resolve_incident(
+        # long it lasted (symmetric with the anomaly alert's onset/duration) and
+        # WHICH detector fired it.
+        incident_count, onset_ts, capped, firing = self._resolve_incident(
             latest.timestamp, records=incident_records
         )
+
+        # Render the band of the detector that actually fired. Using ``latest``
+        # verbatim picked whichever detector_id sorted last at the latest
+        # timestamp (``get_recent_detections`` orders by detector_id), so a
+        # multi-detector metric could clear with a band belonging to a detector
+        # that had nothing to do with the alert — e.g. a manual_bounds floor's
+        # ">= 30.00" where the MAD band that fired was "[249.34, 418.61]".
+        source = self._recovery_source(detections, firing)
+
+        recovery_ci_lower = source.confidence_lower
+        recovery_ci_upper = source.confidence_upper
+        recovery_detector_name = source.detector_name
+        recovery_detector_params = source.detector_params
+
+        if recovery_ci_lower is None and recovery_ci_upper is None:
+            # The chosen row carries no band at all (missing-data /
+            # insufficient-data placeholder): prefer the same detector's most
+            # recent banded row, then the last anomalous row of any detector.
+            # A ONE-SIDED band (manual_bounds with only ``lower_bound``) is not
+            # "no band" — ``expected_range`` renders it as ">= lo" — so it must
+            # not trip this fallback and inherit another detector's numbers.
+            fallback = next(
+                (
+                    d
+                    for d in reversed(detections)
+                    if d.detector_id == source.detector_id
+                    and (d.confidence_lower is not None or d.confidence_upper is not None)
+                ),
+                None,
+            ) or next((d for d in reversed(detections) if d.is_anomaly), None)
+            if fallback is not None:
+                recovery_detector_name = fallback.detector_name
+                recovery_detector_params = fallback.detector_params
+                recovery_ci_lower = fallback.confidence_lower
+                recovery_ci_upper = fallback.confidence_upper
 
         return AlertData(
             metric_name=self.metric_name,
@@ -237,16 +257,52 @@ class _RecoveryMixin(_OrchestratorBase):
             loading_delay_seconds=self.loading_delay_seconds or None,
         )
 
+    @staticmethod
+    def _recovery_source(
+        detections: list[DetectionRecord],
+        firing: DetectionRecord | None,
+    ) -> DetectionRecord:
+        """Pick the record whose band/name/params the recovery message renders.
+
+        Resolves a target DETECTOR first, then renders that detector's freshest
+        row — so the message reads "the detector that fired is back inside its
+        band" with the band of the *current* interval:
+
+        1. target = the incident's firing detector; with no incident to walk
+           (direct-API caller with no DB) = the newest anomalous record in the
+           window, which is the best available proxy for "what fired";
+        2. render that detector's row at the latest (now-clean) point, else its
+           most recent row in the window, else the target row itself (a
+           retuned/removed detector id that no longer scores);
+        3. ``detections[-1]`` verbatim when there is nothing to anchor on —
+           which is also what a single-detector metric resolves to, so those
+           render exactly as before.
+        """
+        latest = detections[-1]
+        target = firing or next((d for d in reversed(detections) if d.is_anomaly), None)
+        if target is None:
+            return latest
+        same = [d for d in detections if d.detector_id == target.detector_id]
+        if not same:
+            return target
+        at_latest = next((d for d in same if d.timestamp == latest.timestamp), None)
+        return at_latest if at_latest is not None else same[-1]
+
     def _resolve_incident(
         self, cleared_ts: Any, records: list[DetectionRecord] | None = None
-    ) -> tuple[int, Any, bool]:
+    ) -> tuple[int, Any, bool, DetectionRecord | None]:
         """Find the anomalous run that just ended before the recovery point.
 
         Walks back from *cleared_ts* (the latest, now-clean point): skips the
         clean tail, then counts the contiguous direction-aware quorum run using
         the same logic that fired the alert. Returns ``(length, onset_timestamp,
-        capped)`` — ``(0, None, False)`` when no run can be reconstructed, so the
-        recovery message just omits the incident duration.
+        capped, firing_record)`` — ``(0, None, False, None)`` when no run can be
+        reconstructed, so the recovery message just omits the incident duration.
+
+        ``firing_record`` is the primary (highest-severity, deterministically
+        tie-broken) record of the quorum at the incident's LAST point — the
+        detector that was driving the alert when it cleared — so the recovery
+        message can name it instead of an unrelated detector.
         """
         step = np.timedelta64(self.interval.seconds, "s")
         # ``records`` lets a pure caller (alert replay) supply the in-memory
@@ -254,7 +310,7 @@ class _RecoveryMixin(_OrchestratorBase):
         # incident is resolved from ``_dtk_detections`` as before.
         if records is None:
             if not self.internal:
-                return 0, None, False
+                return 0, None, False, None
             if isinstance(cleared_ts, np.datetime64):
                 last_point = cleared_ts.astype("datetime64[ms]").astype(datetime)
             else:
@@ -266,7 +322,7 @@ class _RecoveryMixin(_OrchestratorBase):
             )
             records = hydrate_detection_records(rows)
         if not records:
-            return 0, None, False
+            return 0, None, False, None
 
         by_time = self._group_by_timestamp(records)
         timestamps_sorted = sorted(by_time.keys(), reverse=True)
@@ -276,6 +332,7 @@ class _RecoveryMixin(_OrchestratorBase):
         count = 0
         onset: Any = None
         prev: np.datetime64 | None = None
+        firing: DetectionRecord | None = None
         for ts in timestamps_sorted:
             anomalies = [d for d in by_time[ts] if d.is_anomaly]
             # ``_quorum_at`` lives in _DecisionMixin; both mixins compose into
@@ -289,6 +346,11 @@ class _RecoveryMixin(_OrchestratorBase):
                 started = True
                 if self.conditions.direction == "same":
                     locked = direction
+                # The incident's last point — its primary record is the detector
+                # that was driving the alert when it cleared. ``_primary_record``
+                # lives in _DecisionMixin; both mixins compose into
+                # AlertOrchestrator so the call resolves at runtime.
+                firing = self._primary_record(quorum)
                 count = 1
                 onset = ts
                 prev = ts
@@ -302,6 +364,6 @@ class _RecoveryMixin(_OrchestratorBase):
             prev = ts
 
         if count == 0:
-            return 0, None, False
+            return 0, None, False, None
         capped = count >= STREAK_LOOKBACK_POINTS
-        return count, onset, capped
+        return count, onset, capped, firing

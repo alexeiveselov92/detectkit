@@ -535,7 +535,20 @@ is refused at config load / at a `dtk ui` save instead of raising mid-run out of
 a strict `strptime` (it also accepts the date-only form the docs' own examples
 use); **cooldown** (`_cooldown.py`) suppresses repeat alerts within
 `alert_cooldown`, optionally reset on recovery; **recovery** (`_recovery.py`)
-sends a direction-aware all-clear once per incident when `notify_on_recovery`;
+sends a direction-aware all-clear once per incident when `notify_on_recovery`.
+Its payload is **anchored on the incident's firing detector**: `_resolve_incident`
+already re-walks the quorum to reconstruct the span, so it also returns that
+quorum's `_primary_record`, and `_recovery_source` renders **that** detector's
+band at the recovered point. Taking `detections[-1]` instead (the old behavior)
+picked whichever `detector_id` sorted last in `get_recent_detections`'s
+`ORDER BY timestamp DESC, detector_id` — so a metric pairing a MAD band with a
+`manual_bounds` floor fired on `[249.34, 418.61]` and cleared on `>= 30.00`,
+evidence from a detector that never fired (issue #159). A **one-sided** band
+(`manual_bounds` with only `lower_bound`) is a band, not a missing one — the
+no-band fallback requires *both* bounds absent, or every one-sided detector
+would inherit an unrelated record's numbers. Note this is *rendering* only:
+detectors stay **metric-level** and every alerting block quorums over all of
+them (`AlertConfig` has no detector filter — scoping is issue #160).
 **no-data** alerts fire when the latest expected datapoint is missing/NULL
 (independent of quorum) — `get_last_complete_point` is both `loading_delay`- and
 **grid-phase**-aware (two scalars ride as constructor state on the orchestrator,

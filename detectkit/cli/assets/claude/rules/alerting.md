@@ -157,6 +157,11 @@ does not block recovery (the original condition no longer holds). Independent of
 `alert_cooldown` (recovery always sends once per incident). Default body is
 alert-centric (`🟢 Alert cleared: <metric>`).
 
+On a **multi-detector** metric the recovery message reports the detector that
+actually fired the incident — its name, params and `Expected` range at the
+recovered point — so a metric pairing a MAD band with a `manual_bounds` floor
+clears with the same detector's numbers it fired with.
+
 ## No-data alerts
 
 ```yaml

@@ -5,6 +5,49 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.67.1] - 2026-08-17
+
+### Fixed
+- **Recovery ("Alert cleared") messages showed the wrong detector's `Expected`
+  range on a multi-detector metric.** A metric combining a MAD band with a
+  `manual_bounds` floor would fire with `Expected [249.34, 418.61]` (the MAD
+  band that actually tripped) and then clear with `Expected >= 30.00` — the
+  floor's `lower_bound`, a detector that had nothing to do with the alert. The
+  `Detectors` and `Parameters` fields in the collapsed tail were wrong the same
+  way. Nothing was mis-*evaluated* — the rule, the alert config and the channel
+  were all correct, and the same `Rule` chip rendered on both messages — but the
+  evidence in the cleared message pointed at the wrong detector, which reads as
+  if a different condition had cleared.
+
+  Cause: the fire path builds its payload from the highest-severity record of
+  the alert quorum, while the recovery path took `detections[-1]` — literally
+  the last row of the latest timestamp. Since `get_recent_detections` orders by
+  `ORDER BY timestamp DESC, detector_id`, that selected whichever detector's
+  **id hash sorted last**, unrelated to which detector fired. Recovery now
+  resolves the incident's firing detector (`_resolve_incident` already re-walks
+  the quorum to compute the incident span, so it now also returns that
+  quorum's primary record) and renders **that** detector's band at the
+  recovered point — so the message reads "the detector that fired is back
+  inside its band" and the outcome no longer depends on SQL row ordering.
+
+  Also fixed in the same path: a **one-sided** band (a `manual_bounds` detector
+  with only `lower_bound`, so `confidence_upper` is legitimately `None`) tripped
+  a "no band here" fallback that jumped to an unrelated record — the check
+  required *both* bounds to be present. `expected_range` renders one-sided
+  bounds fine (`>= 30.00`), so the fallback now only triggers when a record
+  carries no bound at all (a missing-data / insufficient-data placeholder).
+
+  Single-detector metrics, the direct-API path and the `Rule` chip are
+  unaffected. The fix rides in the shared `_build_recovery_data`, so replayed
+  recovery events in `dtk run --report` and `dtk ui` are corrected too.
+
+  Note this is a *rendering* fix, not a scoping one: detectors remain
+  **metric-level**, and every `alerting:` block still forms its quorum over
+  **all** of a metric's detectors (`AlertConfig` has no detector filter). On a
+  metric with `min_detectors: 1` and two detectors, either detector can fire
+  either alerting block — per-block detector scoping is tracked separately as
+  [#160](https://github.com/alexeiveselov92/detectkit/issues/160).
+
 ## [0.67.0] - 2026-08-04
 
 ### Added

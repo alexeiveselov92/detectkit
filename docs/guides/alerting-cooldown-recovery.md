@@ -284,6 +284,12 @@ Timeline with notify_on_recovery: true and consecutive_anomalies: 3:
 11:30 - Normal point    → RECOVERY sent (new recovery)
 ```
 
+On a metric with **several detectors**, the recovery message reports the
+detector that actually fired the incident — its name, its parameters and its
+`Expected` range at the now-recovered point. So a metric combining, say, a MAD
+band with a `manual_bounds` floor clears with the same detector's numbers it
+fired with, not another detector's bounds.
+
 ### Fraction-Rule Hysteresis
 
 When a metric also configures the [fraction-based alert

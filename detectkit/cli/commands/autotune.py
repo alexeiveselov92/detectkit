@@ -319,11 +319,23 @@ def _tune_one(
     """Tune one metric end to end.
 
     Returns:
-        ``"ok"`` on success, ``"skipped"`` when autotune is disabled for this
-        metric (an explicit config choice, not a failure), or ``"failed"``
-        (no datapoints, a validation/engine error, or an unexpected exception).
+        ``"ok"`` on success, ``"skipped"`` when the metric itself is disabled
+        (``enabled: false``) or autotuning is refused for it
+        (``autotune.enabled: false``) — both explicit config choices, not
+        failures — or ``"failed"`` (no datapoints, a validation/engine error,
+        or an unexpected exception).
     """
     name = config.name
+    # Two independent switches, checked broadest-first. `enabled: false` retires
+    # the whole metric (`dtk run` skips it too), so tuning it would persist
+    # detections and emit a `__tuned_<id>.yml` for something deliberately taken
+    # out of production. `autotune.enabled: false` keeps the metric live but
+    # opts it out of automatic tuning. Either way it counts as skipped, not
+    # failed — the exit code stays 0. `dtk tune` is deliberately NOT gated: the
+    # interactive cockpit is how you inspect a disabled metric to decide its fate.
+    if not config.enabled:
+        echo_noop(name, "metric disabled in config (enabled: false)")
+        return "skipped"
     autotune_cfg = config.autotune or AutoTuneConfig()
     if not autotune_cfg.enabled:
         echo_noop(name, "autotune disabled in config")

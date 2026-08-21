@@ -49,9 +49,13 @@ schedulers and CI to gate on:
 | `1` | Failure — any metric failed, the run aborted early, a startup/config/DB error occurred, or the selector matched no metrics. |
 | `2` | Usage error — bad CLI arguments. |
 
-On `dtk autotune`, a metric that's disabled in its config counts as **skipped**,
-not failed, and doesn't turn the exit code non-zero by itself. Other commands
-keep Click's default behavior (0 on success, non-zero on any exception).
+A **skipped** metric never turns the exit code non-zero by itself — a skip is a
+config choice, not a failure. Both switches skip: `enabled: false` on the metric
+(skipped by `dtk run` *and* `dtk autotune` — no load, detect, alert or tuning) and
+`autotune.enabled: false` (skipped by `dtk autotune` only). A run whose every
+selected metric is disabled still exits `0`; only a selector matching **no metric
+at all** is the exit-1 case. Other commands keep Click's default behavior (0 on
+success, non-zero on any exception).
 
 ## `dtk run`
 

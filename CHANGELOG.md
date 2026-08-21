@@ -5,6 +5,48 @@ All notable changes to detectkit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.67.2] - 2026-08-21
+
+### Fixed
+- **A metric with `enabled: false` kept loading, detecting and alerting.** The
+  metric-level flag was a silent no-op: `dtk run` never read `config.enabled`, so
+  a metric disabled in its YAML stayed fully live — and the disagreement was
+  documented the wrong way round, with three doc surfaces (the
+  `configuration-metrics` guide and both rules `dtk init-claude` ships) promising
+  "disabled metrics are skipped by `dtk run`". In production a metric was disabled
+  and pushed; the next scheduled run processed it anyway and paged the on-call
+  channel, with fresh `_dtk_datapoints` / `_dtk_detections` rows to prove the flag
+  had simply never been consulted (#162). Its only readers were the informational
+  `_dtk_metrics` registry, `dtk ui` and `dtk mcp` — display, never control.
+
+  `enabled: false` now takes the metric out of the pipeline entirely: no load, no
+  detect, no alert, no pipeline lock. `dtk autotune` skips it too (tuning a retired
+  metric would persist detections and emit a `__tuned_<id>.yml` for it),
+  independently of the narrower `autotune.enabled` switch.
+
+  The skip is **loud**, because silence was the worse half of the bug: `dtk run`
+  prints `• <metric>: disabled in config (enabled: false) — skipped`, and
+  `dtk run --json` reports the metric with `"status": "skipped"`, zeroed counters
+  and `"error": null`, counted in `totals.skipped` (the per-metric key set is
+  unchanged — still `schema_version: 1`). It is also **not a failure**: the exit
+  code stays `0`, and a run whose every selected metric is disabled exits `0` too
+  (only a selector matching *no* metric at all remains the exit-`1` case).
+
+  The gate sits in the runner, not in metric discovery, so a disabled metric stays
+  reachable everywhere it should be: `dtk tune`, `dtk ui` (dimmed and sorted last)
+  and `dtk mcp` still open it — inspecting a metric you just turned off is how you
+  decide whether to fix or delete it — and `dtk clean --orphaned-metrics` still
+  sees it as defined in YAML, so its stored history is never purged as orphaned.
+  The one database write it still gets is its informational `_dtk_metrics` row, so
+  that table's `enabled` column follows the YAML instead of reporting a
+  just-disabled metric as enabled forever; a failure there is a warning, never the
+  run's exit code.
+
+  Nothing changes for an enabled metric (the default), and the narrower switches
+  keep their meanings: `alerting.enabled: false` / `suppress_until` stop the
+  notifications while load and detect keep the history continuous,
+  `autotune.enabled: false` only opts out of `dtk autotune`.
+
 ## [0.67.1] - 2026-08-17
 
 ### Fixed

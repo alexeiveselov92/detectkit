@@ -140,7 +140,26 @@ run` today. See the [Hybrid Mode guide](hybrid-mode.md) for the full config
 example, what runs where, and error semantics.
 
 #### `enabled` (boolean, default: true)
-Whether metric is active. Disabled metrics are skipped by `dtk run`.
+Whether metric is active. `enabled: false` takes the metric out of the pipeline
+entirely: `dtk run` skips it — no load, no detect, no alert, no pipeline lock —
+and reports it as a `• <metric>: disabled in config (enabled: false) — skipped`
+line, a `"status": "skipped"` entry in `dtk run --json`, and a `skipped` count in
+that summary's `totals`. A skip is a config choice, not a failure, so it never
+makes the exit code non-zero — a run whose every selected metric is disabled
+still exits `0`. `dtk autotune` skips it for the same reason (tuning a retired
+metric would persist detections and emit a `__tuned_<id>.yml` for it).
+
+What a disabled metric keeps: its `_dtk_metrics` registry row is still refreshed
+(so that table's `enabled` column follows the YAML instead of going stale) and
+its stored `_dtk_datapoints` / `_dtk_detections` history is untouched — a
+disabled metric is **not** orphaned, so `dtk clean --orphaned-metrics` leaves it
+alone. `dtk tune`, `dtk ui` and `dtk mcp` still see it (dimmed and sorted last in
+the `dtk ui` overview): inspecting a metric you just turned off is exactly how
+you decide whether to fix it or delete it.
+
+Related, narrower switches: `alerting.enabled: false` stops the notifications but
+keeps loading and detecting; `alerting.suppress_until` mutes them until a
+deadline; `autotune.enabled: false` only opts out of `dtk autotune`.
 
 ### Data Loading
 

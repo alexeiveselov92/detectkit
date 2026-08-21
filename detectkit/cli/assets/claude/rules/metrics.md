@@ -12,7 +12,7 @@ name: api_response_time        # required, unique across the project
 description: API p95 latency   # optional, shown in alerts
 profile: prod                  # optional, overrides project default_profile
 source_profile: warehouse      # optional — hybrid mode: source-DB profile for THIS metric's SQL (see below)
-enabled: true                  # optional, false → skipped by `dtk run`
+enabled: true                  # optional, false → whole metric skipped (see "Turning a metric off")
 tags: [critical, api]          # optional, used by `--select tag:<t>`
 ai_context:                    # optional — OSI-compatible grounding (descriptive only)
   instructions: "p95 API latency, ms; user-facing"
@@ -165,6 +165,33 @@ columns and bakes the best grouping into the tuned config (see `autotune.md`).
   `--to` bypasses it. Trade-off: every second of delay adds the same to
   real-outage detection time, and it reduces but doesn't eliminate the race
   (repair a bucket that slipped through with `dtk run --from <date>`).
+
+## Turning a metric off
+
+Three switches, from broadest to narrowest — pick by what you want to stop:
+
+| Want to stop | Set | Effect |
+|---|---|---|
+| Everything | `enabled: false` (metric top level) | `dtk run` skips the metric: no load, no detect, no alert, no pipeline lock. `dtk autotune` skips it too. |
+| Only notifications | `alerting.enabled: false` | Load + detect keep running (history stays continuous); nothing is sent. |
+| Notifications, temporarily | `alerting.suppress_until: "2026-09-01"` | Same, until the deadline passes. |
+| Only automatic tuning | `autotune.enabled: false` | Metric stays fully live; `dtk autotune` refuses it. |
+
+`enabled: false` is visible, not silent — `dtk run` prints
+`• <metric>: disabled in config (enabled: false) — skipped`, `dtk run --json`
+reports the metric with `"status": "skipped"` and counts it in `totals.skipped`,
+and the exit code stays **0** (a config choice is not a failure; a run whose every
+selected metric is disabled still exits 0).
+
+A disabled metric is **not** deleted: its stored history is untouched and
+`dtk clean --orphaned-metrics` leaves it alone (it is still defined in YAML).
+`dtk tune`, `dtk ui` (dimmed, sorted last) and `dtk mcp` still see it — that's how
+you inspect a metric you just turned off before deciding to fix or delete it. Its
+`_dtk_metrics` registry row is still refreshed, so that table's `enabled` column
+tracks the YAML.
+
+Prefer `enabled: false` over deleting the file when you may want the metric back:
+deleting orphans every `_dtk_*` row under that name.
 
 ## Editing a metric that already has data
 

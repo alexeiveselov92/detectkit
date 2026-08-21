@@ -470,8 +470,12 @@ dtk run --select "tag:critical" --json > summary.json
 - `status` — `"success"` (every metric succeeded), `"failed"` (the run
   completed but at least one metric failed), or `"error"` (a startup failure
   before any metric ran — `metrics` is `[]`).
-- Per-metric `status` — `"success"`, `"failed"`, or `"skipped"` (not
-  processed because the run aborted after a project-level error alert fired).
+- Per-metric `status` — `"success"`, `"failed"`, or `"skipped"`. A metric is
+  skipped when it is disabled in its config (`enabled: false`) or when the run
+  aborted after a project-level error alert fired (in which case the payload's
+  top-level `aborted` is `true`, which is how a consumer tells the two apart).
+  A skipped metric carries zeroed counters and `"error": null`, and does not
+  make `status`/`exit_code` non-zero.
 - `exit_code` mirrors the process's real exit code (see [Exit
   Codes](#exit-codes)), so a consumer can gate on either the JSON or the
   shell `$?`.
@@ -1646,8 +1650,14 @@ scheduler or CI step can gate on it directly instead of parsing logs:
 - A dry-run that finds stale data to report → `0` (nothing was deleted; the
   command itself succeeded)
 
+**`dtk run` specifics**:
+- A metric disabled in its config (`enabled: false`) counts as **skipped**, not a
+  failure — even a run whose *every* selected metric is disabled exits `0`. Only a
+  selector that matches no metric at all is the exit-`1` case
+
 **`dtk autotune` specifics**:
-- A metric with autotuning disabled counts as **skipped**, not a failure
+- A metric that is disabled (`enabled: false`) or has autotuning disabled
+  (`autotune.enabled: false`) counts as **skipped**, not a failure
 - "No datapoints loaded" for a metric is a **failure**
 
 Other commands (`dtk tune`, `dtk ui`, `dtk unlock`, `dtk init`,

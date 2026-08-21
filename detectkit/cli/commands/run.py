@@ -13,6 +13,7 @@ from typing import Any
 
 import click
 
+from detectkit.cli._output import echo_noop
 from detectkit.config.metric_config import MetricConfig, resolve_source_profile
 from detectkit.config.profile import ProfilesConfig
 from detectkit.config.project_config import ProjectConfig
@@ -169,6 +170,59 @@ def _status_str(status: Any) -> str:
     return status.value if isinstance(status, TaskStatus) else str(status)
 
 
+def _skipped_metric_entry(name: str) -> dict[str, Any]:
+    """A JSON-summary entry for a metric the run did not process.
+
+    Shaped exactly like a processed metric's entry (the key set is part of the
+    ``schema_version: 1`` contract) with every counter at zero and no error —
+    a skip is a deliberate outcome, not a failure.
+    """
+    return {
+        "name": name,
+        "status": "skipped",
+        "steps_completed": [],
+        "datapoints_loaded": 0,
+        "anomalies_detected": 0,
+        "alerts_sent": 0,
+        "error": None,
+    }
+
+
+def _refresh_disabled_registry(
+    internal_manager: InternalTablesManager,
+    project_config: ProjectConfig,
+    disabled_metrics: list[tuple[Path, MetricConfig]],
+) -> None:
+    """Refresh ``_dtk_metrics`` for the metrics this run skipped.
+
+    ``_dtk_metrics`` is the informational mirror of each metric's config and
+    carries an ``enabled`` column, so a skipped metric must still refresh its
+    row — otherwise the registry (and any dashboard built on it) would keep
+    reporting a just-disabled metric as enabled forever. This is the *only*
+    database write a disabled metric gets: no lock, no datapoints, no
+    detections, no alerts. Informational, so a failure here is a warning and
+    never the run's exit code.
+    """
+    table_override = None
+    if project_config is not None and hasattr(project_config, "tables"):
+        table_override = project_config.tables.metrics
+
+    for metric_path, config in disabled_metrics:
+        try:
+            internal_manager.upsert_metric_config(
+                metric_config=config,
+                file_path=str(metric_path),
+                table_name_override=table_override,
+            )
+        except Exception as exc:  # never fail a run over the informational mirror
+            click.echo(
+                click.style(
+                    f"  │ Registry refresh skipped for {config.name}: {exc}",
+                    fg="yellow",
+                )
+            )
+
+
 def _finish_summary(summary: dict[str, Any], started_at: datetime, rc: int) -> None:
     """Fill in totals, timing and the final status, keyed off the per-metric entries."""
     finished_at = now_utc_naive()
@@ -296,6 +350,23 @@ def _run_impl(
         summary["error"] = f"No metrics found matching selector: {select}"
         return 1
 
+    # `enabled: false` takes the metric out of the pipeline entirely — no load,
+    # no detect, no alert, no lock. The skip happens HERE, in the runner, not in
+    # discovery/`select_metrics`, for two reasons: (1) observability — a disabled
+    # metric stays visible as one `•` line in the log and a `skipped` entry in
+    # the --json summary instead of silently vanishing; (2) every other command
+    # shares `select_metrics`, and they must keep seeing it — `dtk tune`/`dtk ui`
+    # are exactly how you inspect a disabled metric to decide its fate, and its
+    # `_dtk_*` rows must not read as orphaned to `dtk clean --orphaned-metrics`.
+    # A skip is a config choice, never a failure: it does not affect the exit
+    # code (a run whose every selected metric is disabled still exits 0).
+    disabled_metrics = [(path, cfg) for path, cfg in metrics if not cfg.enabled]
+    if disabled_metrics:
+        metrics = [(path, cfg) for path, cfg in metrics if cfg.enabled]
+        for _path, disabled_config in disabled_metrics:
+            echo_noop(disabled_config.name, "disabled in config (enabled: false) — skipped")
+            summary["metrics"].append(_skipped_metric_entry(disabled_config.name))
+
     click.echo(f"Found {len(metrics)} metric(s) to process")
     click.echo()
 
@@ -330,7 +401,8 @@ def _run_impl(
     # mode) must name a real profile. This is a cheap name check — no
     # connections opened — so a typo'd source_profile fails the whole run
     # up front instead of surfacing deep inside whichever metric's LOAD step
-    # happens to hit it first.
+    # happens to hit it first. Disabled metrics are already out of `metrics`,
+    # so a typo in one of them can't fail a run that would never have used it.
     source_profile_error = _validate_source_profiles(metrics, project_config, profiles_config)
     if source_profile_error:
         # A config typo, not an outage: exit 1 without paging error_alerting,
@@ -396,6 +468,11 @@ def _run_impl(
         )
         summary["error"] = f"Error initializing internal tables: {e}"
         return 1
+
+    # Disabled metrics run no pipeline step, but their config mirror stays
+    # truthful so `_dtk_metrics.enabled` reflects the YAML that was just read.
+    if disabled_metrics:
+        _refresh_disabled_registry(internal_manager, project_config, disabled_metrics)
 
     # The active STATE profile's actual name (mirrors ProfilesConfig.get_profile's
     # own None -> default_profile resolution) — lets the task manager recognize

@@ -25,6 +25,11 @@ rendered on the docs site under **For developers**). Read the relevant one:
 - `__version__` lives in `detectkit/__init__.py`; **`CHANGELOG.md` is authoritative** for behavior changes.
 - **Automation contract:** `dtk run`/`autotune`/`clean` exit non-zero on failure
   (0 success / 1 failure — including a selector matching nothing / 2 usage error);
+  a metric-level **`enabled: false`** skips the whole pipeline for that metric
+  (`dtk run` **and** `dtk autotune`; gate in the runner, not in discovery — so
+  `tune`/`ui`/`mcp` still open it and `clean --orphaned-metrics` still sees it as
+  defined) — visible as an `echo_noop` line + a `skipped` `--json` entry, never
+  non-zero exit;
   `dtk run --json` emits one machine-readable summary on stdout (`schema_version: 1`,
   human logs move to stderr) — schedulers/CI gate on these. The generic webhook
   channel takes `format: attachments|json|alertmanager` (versioned event schema /

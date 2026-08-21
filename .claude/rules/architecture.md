@@ -21,6 +21,21 @@ failure (or a matching-nothing selector), so schedulers/CI can gate on the
 process exit code; `dtk run --json` additionally emits one machine-readable
 run summary on stdout while human logs go to stderr.
 
+A metric-level **`enabled: false`** takes that metric out of the pipeline
+entirely (no load/detect/alert, no lock). The gate lives in the **runner**
+(`cli/commands/run.py:_run_impl` partitions the selected list right after
+`--exclude`; `cli/commands/autotune.py:_tune_one` checks it before
+`autotune.enabled`), deliberately **not** in discovery/`select_metrics`: the skip
+stays visible (an `echo_noop` line + a `status: "skipped"` entry in `--json`,
+never affecting the exit code — a run whose every selected metric is disabled
+exits 0), and every command that shares `select_metrics` keeps seeing the metric
+— `dtk tune` / `dtk ui` / `dtk mcp` are how you inspect one you just turned off,
+and its rows must not read as orphaned to `dtk clean --orphaned-metrics`. The one
+DB write a skipped metric still gets is its informational `_dtk_metrics` row
+(`_refresh_disabled_registry`), so that table's `enabled` column can't go stale.
+Until v0.67.2 the flag was a silent no-op — a disabled metric kept loading,
+detecting and alerting while three doc surfaces promised otherwise (issue #162).
+
 - **load** (`detectkit/orchestration/task_manager/_load_step.py` →
   `detectkit/loaders/metric_loader.py`): renders the metric's SQL with Jinja2
   (`dtk_start_time`/`dtk_end_time`/`interval_seconds` injected), executes it,
